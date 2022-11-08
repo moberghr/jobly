@@ -5,7 +5,7 @@ namespace Handfire.Core;
 
 public class HandfireContext : DbContext
 {
-    public HandfireContext(DbContextOptions<HandfireContext> options)
+    public HandfireContext(DbContextOptions options)
         : base(options)
     {
     }

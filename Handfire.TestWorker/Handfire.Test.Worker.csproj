@@ -12,4 +12,8 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.17.0" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Handfire.Core\Handfire.Core.csproj" />
+  </ItemGroup>
 </Project>

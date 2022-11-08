@@ -1,9 +1,9 @@
-using Handfire.TestWorker;
+using Handfire.Core;
 
-IHost host = Host.CreateDefaultBuilder(args)
-    .ConfigureServices(services =>
+var host = Host.CreateDefaultBuilder(args)
+    .ConfigureServices((context, services) =>
     {
-        services.AddHostedService<Worker>();
+        services.AddHandfireServices(context.Configuration);
     })
     .Build();
 
