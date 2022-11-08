@@ -13,7 +13,8 @@ public class Publisher<TContext> : IPublisher<TContext>
         _handfireContext = handfireContext;
     }
 
-    public async Task Publish(object message)
+    public async Task Publish<T>(T message)
+        where T : class
     {
         var outboxMessage = new OutboxMessage
         {
@@ -22,11 +23,12 @@ public class Publisher<TContext> : IPublisher<TContext>
             Type = message.GetType().AssemblyQualifiedName!
         };
 
-        _handfireContext.OutboxMessages.Add(outboxMessage);
+        await _context.Set<OutboxMessage>().AddAsync(outboxMessage);
     }
 }
 
 public interface IPublisher<TContext>
 {
-    Task Publish(object message);
+    Task Publish<T>(T message)
+          where T : class;
 }
