@@ -6,9 +6,9 @@ namespace Handfire.Core.Handlers;
 public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse>
 {
     private readonly TestContext _context;
-    private readonly IPublisher<TestContext> _publisher;
+    private readonly IPublisher _publisher;
 
-    public RegisterCommand(TestContext context, IPublisher<TestContext> publisher)
+    public RegisterCommand(TestContext context, IPublisher publisher)
     {
         _context = context;
         _publisher = publisher;

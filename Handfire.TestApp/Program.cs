@@ -13,7 +13,8 @@ builder.Services.AddServices<TestContext>(builder.Configuration);
 
 var app = builder.Build();
 
-//await Migrate();
+// comment after db is created
+await Migrate();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
