@@ -13,10 +13,7 @@ builder.Services.AddServices<TestContext>(builder.Configuration);
 
 var app = builder.Build();
 
-//using var scope = app.Services.CreateScope();
-//var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
-//await ctx.Database.EnsureDeletedAsync();
-//await ctx.Database.EnsureCreatedAsync();
+//await Migrate();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -32,3 +29,11 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+async Task Migrate()
+{
+    using var scope = app!.Services.CreateScope();
+    var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
+    await ctx.Database.EnsureDeletedAsync();
+    await ctx.Database.EnsureCreatedAsync();
+}

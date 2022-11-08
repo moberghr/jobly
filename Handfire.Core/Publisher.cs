@@ -23,7 +23,7 @@ public class Publisher<TContext> : IPublisher<TContext>
             Type = message.GetType().AssemblyQualifiedName!
         };
 
-        await _context.Set<OutboxMessage>().AddAsync(outboxMessage);
+        await _handfireContext.Set<OutboxMessage>().AddAsync(outboxMessage);
     }
 }
 
