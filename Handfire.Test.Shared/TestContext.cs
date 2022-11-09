@@ -3,9 +3,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Core;
 
-public class TestContext : HandfireContext
+public class TestContext : DbContext
 {
-    public TestContext(DbContextOptions options)
+    public TestContext(DbContextOptions<TestContext> options)
         : base(options)
     {
     }
@@ -13,4 +13,11 @@ public class TestContext : HandfireContext
     public DbSet<Registration> Registrations => Set<Registration>();
 
     public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.AddOutboxStateEntity();
+    }
 }

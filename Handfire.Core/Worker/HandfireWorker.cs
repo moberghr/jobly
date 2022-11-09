@@ -8,7 +8,7 @@ using Microsoft.Extensions.Hosting;
 namespace Handfire.Core.Worker;
 
 public class HandfireWorker<TContext> : BackgroundService
-    where TContext : HandfireContext
+    where TContext : DbContext
 {
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
@@ -25,7 +25,7 @@ public class HandfireWorker<TContext> : BackgroundService
 
             var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
-            var messages = await context.OutboxMessages
+            var messages = await context.Set<OutboxMessage>()
                 .Where(x => x.ProcessedTime == null)
                 .ToListAsync();
 

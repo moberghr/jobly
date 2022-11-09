@@ -15,5 +15,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Handfire.Core\Handfire.Core.csproj" />
+    <ProjectReference Include="..\Handfire.Test.Shared\Handfire.Test.Shared.csproj" />
   </ItemGroup>
 </Project>
