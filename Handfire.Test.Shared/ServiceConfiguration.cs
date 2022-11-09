@@ -18,11 +18,11 @@ public static class ServiceConfiguration
             .UseNpgsql(configuration.GetConnectionString(nameof(TestContext))!)
             .UseSnakeCaseNamingConvention());
 
-        services.AddScoped<Core.IPublisher, Publisher>();
-        services.AddScoped(typeof(IScopedContextProvider<>), typeof(EfContextProvider<>));
-        services.AddScoped<IScopedContextProvider<TContext>, EfContextProvider<TContext>>();
+        services.AddScoped<Core.IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>()));
+        // services.AddScoped(typeof(IScopedContextProvider<>), typeof(EfContextProvider<>));
+        // services.AddScoped<IScopedContextProvider<TContext>, EfContextProvider<TContext>>();
 
-        services.AddScoped(x => x.GetRequiredService<IScopedContextProvider<TContext>>().Context);
+        // services.AddScoped(x => x.GetRequiredService<IScopedContextProvider<TContext>>().Context);
 
 
         services.AddHostedService<HandfireWorker<TContext>>();

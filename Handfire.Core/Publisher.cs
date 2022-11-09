@@ -4,11 +4,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Core;
 
-public class Publisher : IPublisher
+public class Publisher<TContext> : IPublisher
+    where TContext : DbContext
 {
-    private readonly ISendContext _context;
+    private readonly TContext _context;
 
-    public Publisher(ISendContext context)
+    public Publisher(TContext context)
     {
         _context = context;
     }
@@ -23,7 +24,7 @@ public class Publisher : IPublisher
             Type = message.GetType().AssemblyQualifiedName!
         };
 
-        await _context.Send(outboxMessage);
+        await _context.Set<OutboxMessage>().AddAsync(outboxMessage);
     }
 }
 
@@ -33,41 +34,41 @@ public interface IPublisher
           where T : class;
 }
 
-public interface IScopedContextProvider<TContext>
-      where TContext : DbContext
-{
-    public ISendContext Context { get; set; }
-}
+// public interface IScopedContextProvider<TContext>
+//       where TContext : DbContext
+// {
+//     public ISendContext Context { get; set; }
+// }
 
-public class EfContextProvider<TContext> : IScopedContextProvider<TContext>
-    where TContext : DbContext
-{
-    public EfContextProvider(TContext context)
-    {
-        Context = new EfScopedContext<TContext>(context);
-    }
+// public class EfContextProvider<TContext> : IScopedContextProvider<TContext>
+//     where TContext : DbContext
+// {
+//     public EfContextProvider(TContext context)
+//     {
+//         Context = new EfScopedContext<TContext>(context);
+//     }
+//
+//     public ISendContext Context { get; set; }
+// }
 
-    public ISendContext Context { get; set; }
-}
+// public class EfScopedContext<TContext> : ISendContext
+//     where TContext : DbContext
+// {
+//     private readonly TContext _context;
+//
+//     public EfScopedContext(TContext context)
+//     {
+//         _context = context;
+//     }
+//
+//     public async Task Send(OutboxMessage message)
+//     {
+//         await _context.Set<OutboxMessage>().AddAsync(message);
+//     }
+// }
 
-public class EfScopedContext<TContext> : ISendContext
-    where TContext : DbContext
-{
-    private readonly TContext _context;
-
-    public EfScopedContext(TContext context)
-    {
-        _context = context;
-    }
-
-    public async Task Send(OutboxMessage message)
-    {
-        await _context.Set<OutboxMessage>().AddAsync(message);
-    }
-}
-
-public interface ISendContext
-{
-
-    Task Send(OutboxMessage message);
-}
+// public interface ISendContext
+// {
+//
+//     Task Send(OutboxMessage message);
+// }
