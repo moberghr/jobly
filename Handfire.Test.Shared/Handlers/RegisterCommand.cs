@@ -41,7 +41,10 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
             EmailLogId = emailLog.Id
         };
 
-        await _publisher.Publish(sendEmailRequest);
+        for (var i = 0; i < 1000; i++)
+        {
+            await _publisher.Publish(sendEmailRequest);
+        }
 
         await _context.SaveChangesAsync();
 

@@ -26,25 +26,32 @@ public class HandfireWorker<TContext> : BackgroundService
             var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
             var messages = await context.Set<OutboxMessage>()
+                .AsNoTracking()
                 .Where(x => x.ProcessedTime == null)
+                .OrderBy(x => x.CreateTime)
+                .Take(10)
                 .ToListAsync();
 
             foreach (var message in messages)
             {
                 try
                 {
-                    await ProcessOutboxMessage(context, message);
+                    await ProcessOutboxMessage(message);
                 }
                 catch (Exception)
                 {
                 }
             }
 
-            await Task.Delay(100000);
+            // if we didn't find any messages then we wait, otherwise we query again immediately 
+            if (!messages.Any())
+            {
+                await Task.Delay(1000);
+            }
         }
     }
 
-    private async Task ProcessOutboxMessage(TContext context, OutboxMessage message)
+    private async Task ProcessOutboxMessage(OutboxMessage message)
     {
         var type = Type.GetType(message.Type);
 
@@ -66,8 +73,10 @@ public class HandfireWorker<TContext> : BackgroundService
 
         await mediator.Send(request);
 
-        message.ProcessedTime = DateTime.UtcNow;
+        var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
-        await context.SaveChangesAsync();
+        await context.Set<OutboxMessage>()
+            .Where(x => x.Id == message.Id)
+            .ExecuteUpdateAsync(x => x.SetProperty(y => y.ProcessedTime, DateTime.UtcNow));
     }
 }
