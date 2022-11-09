@@ -2,6 +2,7 @@
 using Handfire.Core.Worker;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Handfire.Core;
 
@@ -11,7 +12,11 @@ public static class ServiceConfiguration
         where TContext : DbContext
     {
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>()));
-        services.AddHostedService<HandfireWorker<TContext>>();
+
+        for (var i = 0; i < 10; i++)
+        {
+            services.AddSingleton<IHostedService, HandfireWorker<TContext>>();
+        }
     }
 
     public static void AddOutboxStateEntity(this ModelBuilder modelBuilder)

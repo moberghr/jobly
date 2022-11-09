@@ -4,17 +4,22 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Handfire.Core.Worker;
 
 public class HandfireWorker<TContext> : BackgroundService
     where TContext : DbContext
 {
+    public static int Counter = 0;
     private readonly IServiceScopeFactory _serviceScopeFactory;
+    private readonly ILogger<HandfireWorker<TContext>> _logger;
+    private readonly string _workerId = Guid.NewGuid().ToString();
 
-    public HandfireWorker(IServiceScopeFactory serviceScopeFactory)
+    public HandfireWorker(IServiceScopeFactory serviceScopeFactory, ILogger<HandfireWorker<TContext>> logger)
     {
         _serviceScopeFactory = serviceScopeFactory;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -25,29 +30,40 @@ public class HandfireWorker<TContext> : BackgroundService
 
             var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
-            var messages = await context.Set<OutboxMessage>()
-                .AsNoTracking()
-                .Where(x => x.ProcessedTime == null)
-                .OrderBy(x => x.CreateTime)
-                .Take(10)
-                .ToListAsync();
+            using var transaction = await context.Database.BeginTransactionAsync();
 
-            foreach (var message in messages)
-            {
-                try
-                {
-                    await ProcessOutboxMessage(message);
-                }
-                catch (Exception)
-                {
-                }
-            }
+            var message = await context.Set<OutboxMessage>()
+                .FromSqlRaw("SELECT * from outbox_message WHERE processed_time is null LIMIT 1 FOR UPDATE SKIP LOCKED ")
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
 
             // if we didn't find any messages then we wait, otherwise we query again immediately 
-            if (!messages.Any())
+            if (message == null)
             {
                 await Task.Delay(1000);
+
+                continue;
             }
+
+            Interlocked.Increment(ref Counter);
+
+            _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, message.Id);
+
+            try
+            {
+                await ProcessOutboxMessage(message);
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
+
+            await context.Set<OutboxMessage>()
+               .Where(x => x.Id == message.Id)
+               .ExecuteUpdateAsync(x => x.SetProperty(y => y.ProcessedTime, DateTime.UtcNow));
+
+            transaction.Commit();
         }
     }
 
@@ -72,11 +88,5 @@ public class HandfireWorker<TContext> : BackgroundService
         var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
         await mediator.Send(request);
-
-        var context = scope.ServiceProvider.GetRequiredService<TContext>();
-
-        await context.Set<OutboxMessage>()
-            .Where(x => x.Id == message.Id)
-            .ExecuteUpdateAsync(x => x.SetProperty(y => y.ProcessedTime, DateTime.UtcNow));
     }
 }
