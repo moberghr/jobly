@@ -1,0 +1,19 @@
+@using Handfire.Core.Models;
+@model DashboardStatistics
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Dashboard</title>
+</head>
+<body>
+    <h3>Total : @Model.Total</h3>
+    <h3>Pending : @Model.Pending</h3>
+</body>
+
+<script type="text/javascript">
+    setTimeout(function () {
+        window.location.reload();
+    }, 1000)
+</script>
+</html>
