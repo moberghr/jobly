@@ -31,6 +31,17 @@ public class HandfireService<TContext> : IHandfireService
 
         return counter;
     }
+
+    public async Task<int> GetScheduledJobs()
+    {
+
+        var counter = await _context.Set<OutboxMessage>()
+            .Where(x => x.ProcessedTime == null)
+            .Where(x => x.ScheduleTime != null)
+            .CountAsync();
+
+        return counter;
+    }
 }
 
 public interface IHandfireService
@@ -38,4 +49,6 @@ public interface IHandfireService
     Task<int> GetPendingJobs();
 
     Task<int> GetTotalJobs();
+
+    Task<int> GetScheduledJobs();
 }

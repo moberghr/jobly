@@ -43,6 +43,7 @@ public static class ServiceConfiguration
         outbox.Property(p => p.Type);
         outbox.Property(p => p.Message);
         outbox.Property(p => p.CreateTime);
+        outbox.Property(p => p.ScheduleTime);
         outbox.Property(p => p.ProcessedTime);
     }
 }
