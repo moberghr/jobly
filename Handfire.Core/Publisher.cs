@@ -14,7 +14,19 @@ public class Publisher<TContext> : IPublisher
         _context = context;
     }
 
-    public async Task Publish<T>(T message, DateTime? scheduleTime = null)
+    public async Task Publish<T>(T message)
+        where T : class
+    {
+        await CreateOutboxMessage<T>(message, scheduleTime: null);
+    }
+
+    public async Task Publish<T>(T message, DateTime scheduleTime)
+        where T : class
+    {
+        await CreateOutboxMessage<T>(message, scheduleTime);
+    }
+
+    private async Task CreateOutboxMessage<T>(T message, DateTime? scheduleTime)
         where T : class
     {
         var outboxMessage = new OutboxMessage
@@ -31,6 +43,6 @@ public class Publisher<TContext> : IPublisher
 
 public interface IPublisher
 {
-    Task Publish<T>(T message, DateTime? scheduleTime = null)
-          where T : class;
+    Task Publish<T>(T message) where T : class;
+    Task Publish<T>(T message, DateTime scheduleTime) where T : class;
 }
