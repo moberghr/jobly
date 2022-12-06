@@ -19,11 +19,13 @@ public class DashboardController : Controller
     {
         var total = await _handfireService.GetTotalJobs();
         var pending = await _handfireService.GetPendingJobs();
+        var scheduled = await _handfireService.GetScheduledJobs();
 
         var model = new DashboardStatistics
         {
             Total = total,
-            Pending = pending
+            Pending = pending,
+            Scheduled = scheduled
         };
 
         return View(model);

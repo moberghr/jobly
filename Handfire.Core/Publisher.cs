@@ -17,11 +17,24 @@ public class Publisher<TContext> : IPublisher
     public async Task Publish<T>(T message)
         where T : class
     {
+        await CreateOutboxMessage<T>(message, scheduleTime: null);
+    }
+
+    public async Task Publish<T>(T message, DateTime scheduleTime)
+        where T : class
+    {
+        await CreateOutboxMessage<T>(message, scheduleTime);
+    }
+
+    private async Task CreateOutboxMessage<T>(T message, DateTime? scheduleTime)
+        where T : class
+    {
         var outboxMessage = new OutboxMessage
         {
             CreateTime = DateTime.UtcNow,
             Message = JsonSerializer.Serialize(message),
-            Type = message.GetType().AssemblyQualifiedName!
+            Type = message.GetType().AssemblyQualifiedName!,
+            ScheduleTime = scheduleTime
         };
 
         await _context.Set<OutboxMessage>().AddAsync(outboxMessage);
@@ -30,6 +43,6 @@ public class Publisher<TContext> : IPublisher
 
 public interface IPublisher
 {
-    Task Publish<T>(T message)
-          where T : class;
+    Task Publish<T>(T message) where T : class;
+    Task Publish<T>(T message, DateTime scheduleTime) where T : class;
 }

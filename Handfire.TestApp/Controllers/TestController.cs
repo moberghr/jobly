@@ -19,4 +19,10 @@ public class TestController : ControllerBase
     {
         return await _mediator.Send(request);
     }
+
+    [HttpPost("register-schedule")]
+    public async Task<ScheduleRegisterResponse> ScheduleRegister(ScheduleRegisterRequest request)
+    {
+        return await _mediator.Send(request);
+    }
 }

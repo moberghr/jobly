@@ -10,5 +10,7 @@ public class OutboxMessage
 
     public DateTime CreateTime { get; set; }
 
+    public DateTime? ScheduleTime { get; set; }
+
     public DateTime? ProcessedTime { get; set; }
 }

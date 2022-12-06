@@ -33,7 +33,7 @@ public class HandfireWorker<TContext> : BackgroundService
             using var transaction = await context.Database.BeginTransactionAsync();
 
             var message = await context.Set<OutboxMessage>()
-                .FromSqlRaw("SELECT * from outbox_message WHERE processed_time is null LIMIT 1 FOR UPDATE SKIP LOCKED ")
+                .FromSqlRaw("SELECT * from outbox_message WHERE processed_time is null AND schedule_time < NOW() LIMIT 1 FOR UPDATE SKIP LOCKED ")
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
 
