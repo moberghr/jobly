@@ -1,4 +1,5 @@
 ﻿using Handfire.Core.Entities;
+using Handfire.Core.Enums;
 using Handfire.Core.Worker;
 using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
 using Microsoft.EntityFrameworkCore;
@@ -35,15 +36,39 @@ public static class ServiceConfiguration
 
     public static void AddOutboxStateEntity(this ModelBuilder modelBuilder)
     {
-        var outbox = modelBuilder.Entity<OutboxMessage>();
+        AddJobEntity(modelBuilder);
+        AddJobStateEntity(modelBuilder);
+    }
 
-        outbox.Property(p => p.Id);
-        outbox.HasKey(p => p.Id);
+    private static void AddJobEntity(ModelBuilder modelBuilder)
+    {
+        var job = modelBuilder.Entity<Job>();
 
-        outbox.Property(p => p.Type);
-        outbox.Property(p => p.Message);
-        outbox.Property(p => p.CreateTime);
-        outbox.Property(p => p.ScheduleTime);
-        outbox.Property(p => p.ProcessedTime);
+        job.Property(p => p.Id);
+        job.HasKey(p => p.Id);
+
+        job.Property(p => p.Type);
+        job.Property(p => p.Message);
+        job.Property(p => p.CreateTime);
+        job.Property(p => p.ScheduleTime);
+        job.Property(p => p.ProcessedTime);
+        job.Property(p => p.CurrentState);
+
+        job.HasMany(p => p.JobStates)
+            .WithOne(p => p.Job);
+    }
+
+    private static void AddJobStateEntity(ModelBuilder modelBuilder)
+    {
+        var jobState = modelBuilder.Entity<JobState>();
+
+        jobState.Property(p => p.Id);
+        jobState.HasKey(p => p.Id);
+
+        jobState.Property(p => p.State);
+        jobState.Property(p => p.DateTime);
+
+        jobState.HasOne(p => p.Job)
+            .WithMany(p => p.JobStates);
     }
 }

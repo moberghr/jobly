@@ -7,4 +7,10 @@ public class DashboardStatistics
     public int Pending { get; set; }
 
     public int Scheduled { get; set; }
+
+    public int Created { get; set; }
+
+    public int Failed { get; set; }
+
+    public int Completed { get; set; }
 }

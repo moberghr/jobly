@@ -25,4 +25,10 @@ public class TestController : ControllerBase
     {
         return await _mediator.Send(request);
     }
+
+    [HttpPost("failed-job")]
+    public async Task<FailedJobResponse> FailedJob(FailedJobRequest request)
+    {
+        return await _mediator.Send(request);
+    }
 }

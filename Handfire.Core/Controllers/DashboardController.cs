@@ -20,12 +20,18 @@ public class DashboardController : Controller
         var total = await _handfireService.GetTotalJobs();
         var pending = await _handfireService.GetPendingJobs();
         var scheduled = await _handfireService.GetScheduledJobs();
+        var created = await _handfireService.GetCreatedJobs();
+        var completed = await _handfireService.GetCompletedJobs();
+        var failed = await _handfireService.GetFailedJobs();
 
         var model = new DashboardStatistics
         {
             Total = total,
             Pending = pending,
-            Scheduled = scheduled
+            Scheduled = scheduled,
+            Created = created,
+            Completed = completed,
+            Failed = failed
         };
 
         return View(model);

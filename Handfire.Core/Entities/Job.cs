@@ -1,6 +1,8 @@
-﻿namespace Handfire.Core.Entities;
+﻿using Handfire.Core.Enums;
 
-public class OutboxMessage
+namespace Handfire.Core.Entities;
+
+public class Job
 {
     public int Id { get; set; }
 
@@ -13,4 +15,8 @@ public class OutboxMessage
     public DateTime? ScheduleTime { get; set; }
 
     public DateTime? ProcessedTime { get; set; }
+
+    public State CurrentState { get; set; }
+
+    public ICollection<JobState> JobStates { get; set; }
 }
