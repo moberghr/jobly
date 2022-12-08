@@ -17,27 +17,36 @@ public class Publisher<TContext> : IPublisher
     public async Task Publish<T>(T message)
         where T : class
     {
-        await CreateOutboxMessage<T>(message, scheduleTime: null);
+        await CreateJobAndJobState<T>(message, scheduleTime: null);
     }
 
     public async Task Publish<T>(T message, DateTime scheduleTime)
         where T : class
     {
-        await CreateOutboxMessage<T>(message, scheduleTime);
+        await CreateJobAndJobState<T>(message, scheduleTime);
     }
 
-    private async Task CreateOutboxMessage<T>(T message, DateTime? scheduleTime)
+    private async Task CreateJobAndJobState<T>(T message, DateTime? scheduleTime)
         where T : class
     {
-        var outboxMessage = new OutboxMessage
+        var job = new Job
         {
             CreateTime = DateTime.UtcNow,
             Message = JsonSerializer.Serialize(message),
             Type = message.GetType().AssemblyQualifiedName!,
-            ScheduleTime = scheduleTime
+            ScheduleTime = scheduleTime,
+            CurrentState = Enums.State.Created
         };
 
-        await _context.Set<OutboxMessage>().AddAsync(outboxMessage);
+        var jobState = new JobState
+        {
+            Job = job,
+            State = Enums.State.Created,
+            DateTime = DateTime.UtcNow,
+        };
+
+        await _context.Set<Job>().AddAsync(job);
+        await _context.Set<JobState>().AddAsync(jobState);
     }
 }
 

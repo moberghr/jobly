@@ -1,5 +1,7 @@
 ﻿using System.Text.Json;
 using Handfire.Core.Entities;
+using Handfire.Core.Enums;
+using Handfire.Core.Interceptors;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,13 +34,16 @@ public class HandfireWorker<TContext> : BackgroundService
 
             using var transaction = await context.Database.BeginTransactionAsync();
 
-            var message = await context.Set<OutboxMessage>()
-                .FromSqlRaw("SELECT * from outbox_message WHERE processed_time is null AND schedule_time < NOW() LIMIT 1 FOR UPDATE SKIP LOCKED ")
+            var job = await context.Set<Job>()
+                .Where(x => x.ProcessedTime == null)
+                .Where(x => x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
+                .Where(x => x.CurrentState == State.Created)
+                .TagWith(ForUpdateSkipLockedCommandInterceptor.Label)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
 
             // if we didn't find any messages then we wait, otherwise we query again immediately 
-            if (message == null)
+            if (job == null)
             {
                 await Task.Delay(1000);
 
@@ -47,27 +52,28 @@ public class HandfireWorker<TContext> : BackgroundService
 
             Interlocked.Increment(ref Counter);
 
-            _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, message.Id);
+            _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
 
             try
             {
-                await ProcessOutboxMessage(message);
+                await ProcessOutboxMessage(job);
             }
-            catch (Exception)
+            catch (Exception e)
             {
+                await UpdateJobData(context, job, State.Failed, e.Message);
 
-                throw;
+                transaction.Commit();
+
+                continue;
             }
 
-            await context.Set<OutboxMessage>()
-               .Where(x => x.Id == message.Id)
-               .ExecuteUpdateAsync(x => x.SetProperty(y => y.ProcessedTime, DateTime.UtcNow));
+            await UpdateJobData(context, job, State.Completed);
 
             transaction.Commit();
         }
     }
 
-    private async Task ProcessOutboxMessage(OutboxMessage message)
+    private async Task ProcessOutboxMessage(Job message)
     {
         var type = Type.GetType(message.Type);
 
@@ -89,4 +95,34 @@ public class HandfireWorker<TContext> : BackgroundService
 
         await mediator.Send(request);
     }
+
+    private static async Task UpdateJobData(TContext context, Job job, State state, string? message = null)
+    {
+        UpdateJob(context, job, state);
+
+        await CreateJobState(context, job.Id, state, message);
+    }
+
+    private static void UpdateJob(TContext context, Job job, State state)
+    {
+        job.CurrentState = state;
+        job.ProcessedTime = DateTime.UtcNow;
+
+        context.Set<Job>().Update(job);
+    }
+
+    private static async Task CreateJobState(TContext context, int jobId, State state, string? message = null)
+    {
+        var jobState = new JobState
+        {
+            JobId = jobId,
+            DateTime = DateTime.UtcNow,
+            State = state,
+            Message = message
+        };
+
+        await context.Set<JobState>().AddAsync(jobState);
+        await context.SaveChangesAsync();
+    }
 }
+
