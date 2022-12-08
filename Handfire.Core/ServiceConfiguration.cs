@@ -1,5 +1,6 @@
 ﻿using Handfire.Core.Entities;
 using Handfire.Core.Enums;
+using Handfire.Core.Interceptors;
 using Handfire.Core.Worker;
 using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,7 @@ namespace Handfire.Core;
 
 public static class ServiceConfiguration
 {
+    private static readonly ForUpdateSkipLockedCommandInterceptor _interceptor = new();
     public static void AddHandfire<TContext>(this IServiceCollection services, int workerCount)
         where TContext : DbContext
     {
@@ -33,6 +35,8 @@ public static class ServiceConfiguration
             services.AddSingleton<IHostedService, HandfireWorker<TContext>>();
         }
     }
+
+    public static void AddHandfireInterceptors(this DbContextOptionsBuilder optionsBuilder) => optionsBuilder.AddInterceptors(_interceptor);
 
     public static void AddOutboxStateEntity(this ModelBuilder modelBuilder)
     {
@@ -67,6 +71,7 @@ public static class ServiceConfiguration
 
         jobState.Property(p => p.State);
         jobState.Property(p => p.DateTime);
+        jobState.Property(p => p.Message);
 
         jobState.HasOne(p => p.Job)
             .WithMany(p => p.JobStates);

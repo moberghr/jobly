@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using Handfire.Core.Entities;
 using Handfire.Core.Enums;
+using Handfire.Core.Interceptors;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,11 +35,10 @@ public class HandfireWorker<TContext> : BackgroundService
             using var transaction = await context.Database.BeginTransactionAsync();
 
             var job = await context.Set<Job>()
-                .FromSqlRaw("SELECT * FROM job " +
-                "WHERE processed_time IS NULL " +
-                "AND (schedule_time < NOW() OR schedule_time IS NULL) " +
-                "AND current_state = 0 " +
-                "LIMIT 1 FOR UPDATE SKIP LOCKED ")
+                .Where(x => x.ProcessedTime == null)
+                .Where(x => x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
+                .Where(x => x.CurrentState == State.Created)
+                .TagWith(ForUpdateSkipLockedCommandInterceptor.Label)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
 
@@ -58,20 +58,16 @@ public class HandfireWorker<TContext> : BackgroundService
             {
                 await ProcessOutboxMessage(job);
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                await UpdateJob(context, job.Id, State.Failed);
-
-                await CreateJobState(context, job.Id, State.Failed);
+                await UpdateJobData(context, job, State.Failed, e.Message);
 
                 transaction.Commit();
 
                 continue;
             }
 
-            await UpdateJob(context, job.Id, State.Completed);
-
-            await CreateJobState(context, job.Id, State.Completed);
+            await UpdateJobData(context, job, State.Completed);
 
             transaction.Commit();
         }
@@ -100,20 +96,33 @@ public class HandfireWorker<TContext> : BackgroundService
         await mediator.Send(request);
     }
 
-    private static async Task UpdateJob(TContext context, int jobId, State state)
+    private static async Task UpdateJobData(TContext context, Job job, State state, string? message = null)
     {
-        await context.Set<Job>()
-                    .Where(x => x.Id == jobId)
-                    .ExecuteUpdateAsync(x => x
-                        .SetProperty(y => y.ProcessedTime, DateTime.UtcNow)
-                        .SetProperty(y => y.CurrentState, state));
+        UpdateJob(context, job, state);
+
+        await CreateJobState(context, job.Id, state, message);
     }
 
-    private static async Task CreateJobState(TContext context, int jobId, State state)
+    private static void UpdateJob(TContext context, Job job, State state)
     {
-        FormattableString query = $"INSERT INTO job_state (job_id, date_time, state) VALUES ({jobId}, {DateTime.UtcNow}, {state})";
+        job.CurrentState = state;
+        job.ProcessedTime = DateTime.UtcNow;
 
-        await context.Database.ExecuteSqlAsync(query);
+        context.Set<Job>().Update(job);
+    }
+
+    private static async Task CreateJobState(TContext context, int jobId, State state, string? message = null)
+    {
+        var jobState = new JobState
+        {
+            JobId = jobId,
+            DateTime = DateTime.UtcNow,
+            State = state,
+            Message = message
+        };
+
+        await context.Set<JobState>().AddAsync(jobState);
+        await context.SaveChangesAsync();
     }
 }
 

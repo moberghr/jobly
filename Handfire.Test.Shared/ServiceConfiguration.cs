@@ -12,7 +12,7 @@ public static class ServiceConfiguration
     {
         services.AddMediatR(typeof(ServiceConfiguration));
 
-        services.AddDbContextPool<TestContext>(options => options
+        services.AddDbContext<TestContext>(options => options
             .UseNpgsql(configuration.GetConnectionString(nameof(TestContext))!)
             .UseSnakeCaseNamingConvention());
     }
