@@ -1,5 +1,4 @@
 ﻿using Handfire.Core.Entities;
-using Handfire.Core.Enums;
 using Handfire.Core.Interceptors;
 using Handfire.Core.Worker;
 using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
@@ -18,7 +17,7 @@ public static class ServiceConfiguration
     {
         var assembly = typeof(ServiceConfiguration).Assembly;
 
-        var builder = services.AddMvc();
+        var builder = services.AddControllersWithViews();
         builder.AddApplicationPart(assembly)
             .AddRazorRuntimeCompilation();
 

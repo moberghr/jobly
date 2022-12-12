@@ -1,4 +1,5 @@
 @using Handfire.Core.Models;
+
 @model DashboardStatistics
 
 <!DOCTYPE html>
@@ -7,6 +8,10 @@
     <title>Dashboard</title>
 </head>
 <body>
+
+    <!-- Navigation -->
+    @await Html.PartialAsync("../Shared/_Nav")
+
     <h3>Total : @Model.Total</h3>
     <h3>Pending : @Model.Pending</h3>
     <h3>Scheduled : @Model.Scheduled</h3>
