@@ -7,23 +7,15 @@ namespace Handfire.Core;
 
 public interface IHandfireService
 {
-    Task<int> GetPendingJobs();
+    Task<int> GetPendingJobsCount();
 
-    Task<int> GetTotalJobs();
+    Task<int> GetTotalJobsCount();
 
-    Task<int> GetScheduledJobs();
+    Task<int> GetScheduledJobsCount();
 
-    Task<int> GetCreatedCount();
+    Task<int> GetJobsCount(State state);
 
-    Task<int> GetCompletedCount();
-
-    Task<int> GetFailedCount();
-
-    Task<PagedList<JobModel>> GetCreatedJobs(BaseListRequest request);
-
-    Task<PagedList<JobModel>> GetCompetedJobs(BaseListRequest request);
-
-    Task<PagedList<JobModel>> GetFailedJobs(BaseListRequest request);
+    Task<PagedList<JobModel>> GetJobsList(BaseListRequest request, State state);
 
     Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request);
 
@@ -40,7 +32,7 @@ public class HandfireService<TContext> : IHandfireService
         _context = context;
     }
 
-    public async Task<int> GetTotalJobs()
+    public async Task<int> GetTotalJobsCount()
     {
 
         var counter = await _context.Set<Job>()
@@ -49,85 +41,36 @@ public class HandfireService<TContext> : IHandfireService
         return counter;
     }
 
-    public async Task<int> GetPendingJobs()
+    public async Task<int> GetPendingJobsCount()
     {
 
-        var counter = await _context.Set<Job>()
-            .Where(x => x.ProcessedTime == null)
+        var counter = await GetPendingJobs()
             .CountAsync();
 
         return counter;
     }
 
-    public async Task<int> GetScheduledJobs()
+    public async Task<int> GetScheduledJobsCount()
     {
-
-        var counter = await _context.Set<Job>()
-            .Where(x => x.ProcessedTime == null)
-            .Where(x => x.ScheduleTime != null)
+        return await GetScheduledJobs()
             .CountAsync();
-
-        return counter;
     }
 
-    public async Task<int> GetCreatedCount()
+    public async Task<int> GetJobsCount(State state)
     {
-        var counter = await _context.Set<Job>()
-            .Where(x => x.CurrentState == State.Created)
+        return await GetJobsByState(state)
             .CountAsync();
-
-        return counter;
     }
 
-    public async Task<int> GetCompletedCount()
+    public async Task<PagedList<JobModel>> GetJobsList(BaseListRequest request, State state)
     {
-        var counter = await _context.Set<Job>()
-            .Where(x => x.CurrentState == State.Completed)
-            .CountAsync();
-
-        return counter;
-    }
-
-    public async Task<int> GetFailedCount()
-    {
-        var counter = await _context.Set<Job>()
-            .Where(x => x.CurrentState == State.Failed)
-            .CountAsync();
-
-        return counter;
-    }
-
-    public async Task<PagedList<JobModel>> GetCreatedJobs(BaseListRequest request)
-    {
-        return await GetJobsByState(request, State.Created);
-    }
-
-    public async Task<PagedList<JobModel>> GetCompetedJobs(BaseListRequest request)
-    {
-        return await GetJobsByState(request, State.Completed);
-    }
-
-    public async Task<PagedList<JobModel>> GetFailedJobs(BaseListRequest request)
-    {
-        return await GetJobsByState(request, State.Failed);
+        return await GetJobsByState(state)
+            .ToPagedListAsync(request);
     }
 
     public async Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request)
     {
-        var jobs = await _context.Set<Job>()
-            .Where(x => x.ProcessedTime == null)
-            .Where(x => x.ScheduleTime > DateTime.UtcNow)
-            .Select(x =>
-                new JobModel
-                {
-                    Id = x.Id,
-                    CurrentState = x.CurrentState,
-                    CreateTime = x.CreateTime,
-                    Message = x.Message,
-                    ProcessedTime = x.ProcessedTime,
-                    ScheduleTime = x.ScheduleTime,
-                    Type = x.Type
-                })
+        var jobs = await GetScheduledJobs()
             .ToPagedListAsync(request);
 
         return jobs;
@@ -151,9 +94,51 @@ public class HandfireService<TContext> : IHandfireService
         return history;
     }
 
-    private async Task<PagedList<JobModel>> GetJobsByState(BaseListRequest request, State state)
+    private IQueryable<JobModel> GetScheduledJobs()
     {
-        var jobs = await _context.Set<Job>()
+        var query = _context.Set<Job>()
+            .Where(x => x.ProcessedTime == null)
+            .Where(x => x.ScheduleTime > DateTime.UtcNow)
+            .Select(x =>
+                new JobModel
+                {
+                    Id = x.Id,
+                    CurrentState = x.CurrentState,
+                    CreateTime = x.CreateTime,
+                    Message = x.Message,
+                    ProcessedTime = x.ProcessedTime,
+                    ScheduleTime = x.ScheduleTime,
+                    Type = x.Type
+                })
+            .AsQueryable();
+
+        return query;
+    }
+
+    private IQueryable<JobModel> GetPendingJobs()
+    {
+        var query = _context.Set<Job>()
+            .Where(x => x.ProcessedTime == null)
+            .Where(x => x.ScheduleTime < DateTime.UtcNow)
+            .Select(x =>
+                new JobModel
+                {
+                    Id = x.Id,
+                    CurrentState = x.CurrentState,
+                    CreateTime = x.CreateTime,
+                    Message = x.Message,
+                    ProcessedTime = x.ProcessedTime,
+                    ScheduleTime = x.ScheduleTime,
+                    Type = x.Type
+                })
+            .AsQueryable();
+
+        return query;
+    }
+
+    private IQueryable<JobModel> GetJobsByState(State state)
+    {
+        var query = _context.Set<Job>()
             .Where(x => x.CurrentState == state)
             .Select(x =>
                 new JobModel
@@ -166,8 +151,8 @@ public class HandfireService<TContext> : IHandfireService
                     ScheduleTime = x.ScheduleTime,
                     Type = x.Type
                 })
-            .ToPagedListAsync(request);
+            .AsQueryable();
 
-        return jobs;
+        return query;
     }
 }
