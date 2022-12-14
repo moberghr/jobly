@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Handfire.Core.Enums;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Handfire.Core.Controllers;
 
@@ -16,7 +17,7 @@ public class JobsController : Controller
     [HttpGet("created")]
     public async Task<IActionResult> Created(BaseListRequest request)
     {
-        var model = await _handfireService.GetCreatedJobs(request);
+        var model = await _handfireService.GetJobsList(request, State.Created);
 
         return View(model);
     }
@@ -24,7 +25,7 @@ public class JobsController : Controller
     [HttpGet("completed")]
     public async Task<IActionResult> Completed(BaseListRequest request)
     {
-        var model = await _handfireService.GetCompetedJobs(request);
+        var model = await _handfireService.GetJobsList(request, State.Completed);
 
         return View(model);
     }
@@ -32,7 +33,7 @@ public class JobsController : Controller
     [HttpGet("failed")]
     public async Task<IActionResult> Failed(BaseListRequest request)
     {
-        var model = await _handfireService.GetFailedJobs(request);
+        var model = await _handfireService.GetJobsList(request, State.Failed);
 
         return View(model);
     }
