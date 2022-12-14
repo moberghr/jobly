@@ -20,6 +20,7 @@ public interface IHandfireService
     Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request);
 
     Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request);
+    Task SetRetry(int jobId);
 }
 
 public class HandfireService<TContext> : IHandfireService
@@ -74,6 +75,33 @@ public class HandfireService<TContext> : IHandfireService
             .ToPagedListAsync(request);
 
         return jobs;
+    }
+
+    public async Task SetRetry(int jobId)
+    {
+        var job = _context.Set<Job>()
+            .Where(x => x.Id == jobId)
+            .Where(x => x.CurrentState == State.Failed)
+            .FirstOrDefault();
+
+        if(job == null)
+        {
+            throw new ArgumentException("Invalid job id.");
+        }
+
+        job.CurrentState = State.Retry;
+
+        var jobState = new JobState
+        {
+            Job = job,
+            DateTime = DateTime.UtcNow,
+            State = State.Retry
+        };
+
+        _context.Set<Job>().Update(job);
+        await _context.Set<JobState>().AddAsync(jobState);
+
+        await _context.SaveChangesAsync();
     }
 
     public async Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request)

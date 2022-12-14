@@ -3,5 +3,6 @@ public enum State
 {
     Created,
     Completed,
-    Failed
+    Failed,
+    Retry,
 }

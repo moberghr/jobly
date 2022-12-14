@@ -35,9 +35,11 @@ public class HandfireWorker<TContext> : BackgroundService
             using var transaction = await context.Database.BeginTransactionAsync();
 
             var job = await context.Set<Job>()
-                .Where(x => x.ProcessedTime == null)
-                .Where(x => x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
-                .Where(x => x.CurrentState == State.Created)
+                .Where(x => 
+                    (x.ProcessedTime == null
+                        && (x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
+                        && x.CurrentState == State.Created)
+                    || x.CurrentState == State.Retry)
                 .TagWith(ForUpdateSkipLockedCommandInterceptor.Label)
                 .AsNoTracking()
                 .FirstOrDefaultAsync();

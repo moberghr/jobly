@@ -1,4 +1,5 @@
 ﻿using Handfire.Core.Enums;
+using Handfire.Core.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Handfire.Core.Controllers;
@@ -36,5 +37,13 @@ public class JobsController : Controller
         var model = await _handfireService.GetJobsList(request, State.Failed);
 
         return View(model);
+    }
+
+    [HttpGet("retry")]
+    public async Task<IActionResult> Retry(RetryRequest request)
+    {
+        await _handfireService.SetRetry(request.JobId);
+
+        return Redirect(request.Url);
     }
 }
