@@ -1,8 +1,26 @@
 ﻿using Handfire.Core.Entities;
 using Handfire.Core.Enums;
+using Handfire.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Core;
+
+public interface IHandfireService
+{
+    Task<int> GetPendingJobsCount();
+
+    Task<int> GetTotalJobsCount();
+
+    Task<int> GetScheduledJobsCount();
+
+    Task<int> GetJobsCount(State state);
+
+    Task<PagedList<JobModel>> GetJobsList(BaseListRequest request, State state);
+
+    Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request);
+
+    Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request);
+}
 
 public class HandfireService<TContext> : IHandfireService
     where TContext : DbContext
@@ -14,7 +32,7 @@ public class HandfireService<TContext> : IHandfireService
         _context = context;
     }
 
-    public async Task<int> GetTotalJobs()
+    public async Task<int> GetTotalJobsCount()
     {
 
         var counter = await _context.Set<Job>()
@@ -23,66 +41,118 @@ public class HandfireService<TContext> : IHandfireService
         return counter;
     }
 
-    public async Task<int> GetPendingJobs()
+    public async Task<int> GetPendingJobsCount()
     {
 
-        var counter = await _context.Set<Job>()
+        var counter = await GetPendingJobs()
+            .CountAsync();
+
+        return counter;
+    }
+
+    public async Task<int> GetScheduledJobsCount()
+    {
+        return await GetScheduledJobs()
+            .CountAsync();
+    }
+
+    public async Task<int> GetJobsCount(State state)
+    {
+        return await GetJobsByState(state)
+            .CountAsync();
+    }
+
+    public async Task<PagedList<JobModel>> GetJobsList(BaseListRequest request, State state)
+    {
+        return await GetJobsByState(state)
+            .ToPagedListAsync(request);
+    }
+
+    public async Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request)
+    {
+        var jobs = await GetScheduledJobs()
+            .ToPagedListAsync(request);
+
+        return jobs;
+    }
+
+    public async Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request)
+    {
+        var history = await _context.Set<JobState>()
+            .Where(x => x.JobId == request.JobId)
+            .Select(x =>
+                new JobStateModel
+                {
+                    Id = x.Id,
+                    JobId = x.JobId,
+                    DateTime = x.DateTime,
+                    Message = x.Message,
+                    State = x.State,
+                })
+            .ToPagedListAsync(request);
+
+        return history;
+    }
+
+    private IQueryable<JobModel> GetScheduledJobs()
+    {
+        var query = _context.Set<Job>()
             .Where(x => x.ProcessedTime == null)
-            .CountAsync();
+            .Where(x => x.ScheduleTime > DateTime.UtcNow)
+            .Select(x =>
+                new JobModel
+                {
+                    Id = x.Id,
+                    CurrentState = x.CurrentState,
+                    CreateTime = x.CreateTime,
+                    Message = x.Message,
+                    ProcessedTime = x.ProcessedTime,
+                    ScheduleTime = x.ScheduleTime,
+                    Type = x.Type
+                })
+            .AsQueryable();
 
-        return counter;
+        return query;
     }
 
-    public async Task<int> GetScheduledJobs()
+    private IQueryable<JobModel> GetPendingJobs()
     {
-
-        var counter = await _context.Set<Job>()
+        var query = _context.Set<Job>()
             .Where(x => x.ProcessedTime == null)
-            .Where(x => x.ScheduleTime != null)
-            .CountAsync();
+            .Where(x => x.ScheduleTime < DateTime.UtcNow)
+            .Select(x =>
+                new JobModel
+                {
+                    Id = x.Id,
+                    CurrentState = x.CurrentState,
+                    CreateTime = x.CreateTime,
+                    Message = x.Message,
+                    ProcessedTime = x.ProcessedTime,
+                    ScheduleTime = x.ScheduleTime,
+                    Type = x.Type
+                })
+            .AsQueryable();
 
-        return counter;
+        return query;
     }
 
-    public async Task<int> GetCreatedJobs()
+    private IQueryable<JobModel> GetJobsByState(State state)
     {
-        var counter = await _context.Set<Job>()
-            .Where(x => x.CurrentState == State.Created)
-            .CountAsync();
+        var query = _context.Set<Job>()
+            .Where(x => x.CurrentState == state)
+            .Select(x =>
+                new JobModel
+                {
+                    Id = x.Id,
+                    CurrentState = x.CurrentState,
+                    CreateTime = x.CreateTime,
+                    Message = x.Message,
+                    ProcessedTime = x.ProcessedTime,
+                    ScheduleTime = x.ScheduleTime,
+                    Type = x.Type
+                })
+            .AsQueryable();
 
-        return counter;
+        return query;
     }
-
-    public async Task<int> GetCompletedJobs()
-    {
-        var counter = await _context.Set<Job>()
-            .Where(x => x.CurrentState == State.Completed)
-            .CountAsync();
-
-        return counter;
-    }
-
-    public async Task<int> GetFailedJobs()
-    {
-        var counter = await _context.Set<Job>()
-            .Where(x => x.CurrentState == State.Failed)
-            .CountAsync();
-
-        return counter;
-    }
-}
-
-public interface IHandfireService
-{
-    Task<int> GetPendingJobs();
-
-    Task<int> GetTotalJobs();
-
-    Task<int> GetScheduledJobs();
-
-    Task<int> GetCreatedJobs();
-
-    Task<int> GetCompletedJobs();
-
-    Task<int> GetFailedJobs();
 }

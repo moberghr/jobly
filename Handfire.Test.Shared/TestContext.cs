@@ -14,7 +14,6 @@ public class TestContext : DbContext
 
     public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) => optionsBuilder.AddHandfireInterceptors();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
