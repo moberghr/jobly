@@ -1,5 +1,6 @@
 ﻿using Handfire.Core.Enums;
 using Handfire.Core.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Handfire.Core.Controllers;
@@ -44,7 +45,7 @@ public class JobsController : Controller
     {
         await _handfireService.SetRetry(jobId);
 
-        var url = Request.Headers["Referer"].ToString();
+        var url = Request.GetTypedHeaders().Referer!.ToString();
 
         return Redirect(url);
     }
