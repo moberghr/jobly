@@ -40,10 +40,12 @@ public class JobsController : Controller
     }
 
     [HttpGet("retry")]
-    public async Task<IActionResult> Retry(RetryRequest request)
+    public async Task<IActionResult> Retry(int jobId)
     {
-        await _handfireService.SetRetry(request.JobId);
+        await _handfireService.SetRetry(jobId);
 
-        return Redirect(request.Url);
+        var url = Request.Headers["Referer"].ToString();
+
+        return Redirect(url);
     }
 }
