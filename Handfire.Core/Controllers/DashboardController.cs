@@ -1,4 +1,5 @@
-﻿using Handfire.Core.Models;
+﻿using Handfire.Core.Enums;
+using Handfire.Core.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Handfire.Core.Controllers;
@@ -20,9 +21,9 @@ public class DashboardController : Controller
         var total = await _handfireService.GetTotalJobsCount();
         var pending = await _handfireService.GetPendingJobsCount();
         var scheduled = await _handfireService.GetScheduledJobsCount();
-        var created = await _handfireService.GetCreatedCount();
-        var completed = await _handfireService.GetCompletedCount();
-        var failed = await _handfireService.GetFailedCount();
+        var created = await _handfireService.GetJobsCount(State.Created);
+        var completed = await _handfireService.GetJobsCount(State.Completed);
+        var failed = await _handfireService.GetJobsCount(State.Failed);
 
         var model = new DashboardStatistics
         {

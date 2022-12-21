@@ -10,6 +10,27 @@ using Microsoft.Extensions.Logging;
 
 namespace Handfire.Core.Worker;
 
+file static class JobQueryHelper
+{
+    public static IQueryable<Job> GetJobs<TContext>(this TContext context) where TContext : DbContext
+    {
+        return context.Set<Job>()
+                .WhereIsPendingOrRetry()
+                .TagWith(ForUpdateSkipLockedCommandInterceptor.Label)
+                .AsNoTracking();
+    }
+
+    private static IQueryable<Job> WhereIsPendingOrRetry(this IQueryable<Job> query)
+    {
+        return query
+            .Where(x =>
+                (x.ProcessedTime == null
+                    && (x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
+                    && x.CurrentState == State.Created)
+                || x.CurrentState == State.Retry);
+    }
+}
+
 public class HandfireWorker<TContext> : BackgroundService
     where TContext : DbContext
 {
@@ -34,12 +55,7 @@ public class HandfireWorker<TContext> : BackgroundService
 
             using var transaction = await context.Database.BeginTransactionAsync();
 
-            var job = await context.Set<Job>()
-                .Where(x => x.ProcessedTime == null)
-                .Where(x => x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
-                .Where(x => x.CurrentState == State.Created)
-                .TagWith(ForUpdateSkipLockedCommandInterceptor.Label)
-                .AsNoTracking()
+            var job = await context.GetJobs()
                 .FirstOrDefaultAsync();
 
             // if we didn't find any messages then we wait, otherwise we query again immediately 
