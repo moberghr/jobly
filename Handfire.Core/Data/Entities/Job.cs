@@ -1,4 +1,5 @@
-﻿using Handfire.Core.Enums;
+﻿using Handfire.Core.Data.Entities;
+using Handfire.Core.Enums;
 
 namespace Handfire.Core.Entities;
 
@@ -17,6 +18,10 @@ public class Job
     public DateTime? ProcessedTime { get; set; }
 
     public State CurrentState { get; set; }
+
+    public bool IsRecurringJob { get; set; }
+
+    public RecurringJob RecurringJob { get; set; }
 
     public ICollection<JobState> JobStates { get; set; }
 }

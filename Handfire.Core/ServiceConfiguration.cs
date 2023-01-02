@@ -1,4 +1,5 @@
-﻿using Handfire.Core.Entities;
+﻿using Handfire.Core.Data.Entities;
+using Handfire.Core.Entities;
 using Handfire.Core.Interceptors;
 using Handfire.Core.Worker;
 using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
@@ -41,6 +42,7 @@ public static class ServiceConfiguration
     {
         AddJobEntity(modelBuilder);
         AddJobStateEntity(modelBuilder);
+        AddRecurringJobEntity(modelBuilder);
     }
 
     private static void AddJobEntity(ModelBuilder modelBuilder)
@@ -74,5 +76,21 @@ public static class ServiceConfiguration
 
         jobState.HasOne(p => p.Job)
             .WithMany(p => p.JobStates);
+    }
+
+    private static void AddRecurringJobEntity(ModelBuilder modelBuilder)
+    {
+        var recurringJob = modelBuilder.Entity<RecurringJob>();
+
+        recurringJob.Property(p => p.Id);
+        recurringJob.HasKey(p => p.Id);
+
+        recurringJob.Property(p => p.Name);
+        recurringJob.Property(p => p.Cron);
+        recurringJob.Property(p => p.CreatedAt);
+        recurringJob.Property(p => p.NextExecution);
+        recurringJob.Property(p => p.LastExecution);
+
+        recurringJob.HasMany(p => p.Jobs).WithOne(p => p.RecurringJob);
     }
 }
