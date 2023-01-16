@@ -1,9 +1,11 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using System.Xml.Linq;
 using Cronos;
 using Handfire.Core.Data.Entities;
 using Handfire.Core.Entities;
 using Handfire.Core.Enums;
+using Microsoft.AspNetCore.SignalR.Protocol;
 using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Core;
@@ -43,41 +45,94 @@ public class Publisher<TContext> : IPublisher
     {
         ValidateCronExpression(cronExpression);
 
-        var nextJobScheduleTime = CronExpression.Parse(cronExpression).GetNextOccurrence(DateTime.UtcNow);
-        var jobMessage = JsonSerializer.Serialize(message);
-        var jobType = message.GetType().AssemblyQualifiedName!;
+        var job = CreateJobForRecurringJob(message, cronExpression);
 
-        var recurringJob = new RecurringJob
+        var recurringJob = await CreateRecurringJob(message, name, cronExpression);
+
+        await _context.Set<Job>().AddAsync(job);
+        await _context.Set<RecurringJob>().AddAsync(recurringJob);
+
+        await _context.SaveChangesAsync();
+
+        recurringJob.NextJobId = job.Id;
+        job.RecurringJob = recurringJob;
+
+        _context.Set<RecurringJob>().Update(recurringJob);
+        _context.Set<Job>().Update(job);
+
+        await _context.SaveChangesAsync();
+    }
+
+    private Job CreateJobForRecurringJob<T>(T message, string cronExpression) where T : class
+    {
+        var (nextJobScheduleTime, jobMessage, jobType) = GetRecurringJobData(message, cronExpression);
+
+        var jobStats = new List<JobState>
         {
-            Name = name,
-            Message = jobMessage,
-            Type = jobType,
-            Cron = cronExpression,
-            CreatedAt = DateTime.UtcNow,
-            LastExecution = null,
-            NextExecution = nextJobScheduleTime
+            new() { State = State.Created, DateTime = DateTime.UtcNow}
         };
+
         var job = new Job
         {
-            Message = jobMessage,
-            Type = jobType,
+            Message = jobMessage!,
+            Type = jobType!,
             CreateTime = DateTime.UtcNow,
             IsRecurringJob = true,
             ScheduleTime = nextJobScheduleTime,
             CurrentState = State.Created,
-            RecurringJob = recurringJob,
+            JobStates = jobStats
         };
 
-        var jobState = new JobState
+        return job;
+    }
+
+    private async Task<RecurringJob> CreateRecurringJob<T>(T message, string name, string cronExpression) where T : class
+    {
+        var recurringJob = await _context.Set<RecurringJob>()
+            .Where(x => x.Name == name)
+            .SingleOrDefaultAsync();
+
+        if (recurringJob != null)
         {
-            Job = job,
-            State = State.Created,
-            DateTime = DateTime.UtcNow,
-        };
+            var nextJob = await _context.Set<Job>()
+                .Where(x => x.Id == recurringJob.NextJobId)
+                .SingleAsync();
 
-        await _context.Set<Job>().AddAsync(job);
-        await _context.Set<JobState>().AddAsync(jobState);
-        //await _context.Set<RecurringJob>().AddAsync(recurringJob);
+            if (nextJob.ProcessedTime == null)
+            {
+                nextJob.ProcessedTime = DateTime.UtcNow;
+                nextJob.CurrentState = State.Obsolete;
+                nextJob.JobStates.Add(new() { DateTime = DateTime.UtcNow, State = State.Obsolete });
+
+                _context.Set<Job>().Update(nextJob);
+            }
+        }
+
+        var (nextJobScheduleTime, jobMessage, jobType) = GetRecurringJobData(message, cronExpression);
+
+        if (recurringJob == null)
+        {
+            recurringJob = new RecurringJob
+            {
+                Name = name,
+                Message = jobMessage,
+                Type = jobType,
+                Cron = cronExpression,
+                CreatedAt = DateTime.UtcNow,
+                NextExecution = nextJobScheduleTime,
+            };
+        }
+
+        return recurringJob;
+    }
+
+    private (DateTime? nextJobScheduleTime, string? jobMessage, string? jobType) GetRecurringJobData<T>(T message, string cronExpression) where T : class
+    {
+        var nextJobScheduleTime = CronExpression.Parse(cronExpression).GetNextOccurrence(DateTime.UtcNow);
+        var jobMessage = JsonSerializer.Serialize(message);
+        var jobType = message.GetType().AssemblyQualifiedName!;
+
+        return (nextJobScheduleTime, jobMessage, jobType);
     }
 
     private async Task CreateJobAndJobState<T>(T message, DateTime? scheduleTime)

@@ -1,33 +1,39 @@
-﻿using Handfire.Test.Shared.Entities;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Handfire.Test.Shared.Entities;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Core.Handlers;
 
-public class ScheduleRegisterResponse
+public class RecurringJobResponse
 {
-
 }
 
-public class ScheduleRegisterRequest : IRequest<ScheduleRegisterResponse>
+public class RecurringJobRequest : IRequest<RecurringJobResponse>
 {
     public string Email { get; set; }
 
-    public DateTime ScheduleTime { get; set; }
+    public string Name { get; set; }
+
+    public string Cron { get; set; }
 }
 
-public class ScheduleRegisterCommand : IRequestHandler<ScheduleRegisterRequest, ScheduleRegisterResponse>
+
+public class RecurringJobCommand : IRequestHandler<RecurringJobRequest, RecurringJobResponse>
 {
     private readonly TestContext _context;
     private readonly IPublisher _publisher;
 
-    public ScheduleRegisterCommand(TestContext context, IPublisher publisher)
+    public RecurringJobCommand(TestContext context, IPublisher publisher)
     {
         _context = context;
         _publisher = publisher;
     }
 
-    public async Task<ScheduleRegisterResponse> Handle(ScheduleRegisterRequest request, CancellationToken cancellationToken)
+    public async Task<RecurringJobResponse> Handle(RecurringJobRequest request, CancellationToken cancellationToken)
     {
         var registration = new Registration
         {
@@ -48,23 +54,18 @@ public class ScheduleRegisterCommand : IRequestHandler<ScheduleRegisterRequest, 
         using var transaction = await _context.Database.BeginTransactionAsync();
 
         await _context.SaveChangesAsync();
-
+        
         var sendEmailRequest = new SendEmailRequest
         {
             EmailLogId = emailLog.Id,
         };
 
-        for (var i = 0; i < 10; i++)
-        {
-            await _publisher.Publish(sendEmailRequest, request.ScheduleTime);
-        }
+        await _publisher.AddOrUpdateRecurringJob(sendEmailRequest, request.Name, request.Cron);
 
         await _context.SaveChangesAsync();
 
         await transaction.CommitAsync();
 
         return new();
-
     }
 }
-

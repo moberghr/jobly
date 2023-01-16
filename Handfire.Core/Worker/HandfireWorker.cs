@@ -68,6 +68,11 @@ public class HandfireWorker<TContext> : BackgroundService
                 continue;
             }
 
+            if (job.IsRecurringJob)
+            {
+                await CreateNextJob(context, job);
+            }
+
             Interlocked.Increment(ref Counter);
 
             _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
@@ -89,6 +94,47 @@ public class HandfireWorker<TContext> : BackgroundService
 
             transaction.Commit();
         }
+    }
+
+    private async Task CreateNextJob(TContext context, Job job)
+    {
+        var recurringJob = await context.Set<RecurringJob>()
+            .Where(x => x.Id == job.RecurringJobId)
+            .SingleAsync();
+
+        if (recurringJob.NextExecution != job.ScheduleTime)
+        {
+            return;
+        }
+
+        var nextJobScheduleTime = CronExpression.Parse(recurringJob.Cron).GetNextOccurrence(recurringJob.NextExecution ?? DateTime.UtcNow);
+
+        var jobStats = new List<JobState>
+        {
+            new() { State = State.Created, DateTime = DateTime.UtcNow}
+        };
+
+        var newJob = new Job
+        {
+            Message = recurringJob.Message,
+            Type = recurringJob.Type,
+            CreateTime = DateTime.UtcNow,
+            IsRecurringJob = true,
+            ScheduleTime = nextJobScheduleTime,
+            CurrentState = State.Created,
+            RecurringJob = recurringJob,
+            JobStates = jobStats
+        };
+
+        await context.Set<Job>().AddAsync(newJob);
+
+        recurringJob.LastExecution = recurringJob.NextExecution;
+        recurringJob.NextExecution = nextJobScheduleTime;
+
+        recurringJob.LastJobId = recurringJob.NextJobId;
+        recurringJob.NextJobId = newJob.Id;
+
+        context.Set<RecurringJob>().Update(recurringJob);
     }
 
     private async Task ProcessOutboxMessage(Job message)

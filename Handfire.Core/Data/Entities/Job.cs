@@ -21,6 +21,8 @@ public class Job
 
     public bool IsRecurringJob { get; set; }
 
+    public int? RecurringJobId { get; set; }
+
     public RecurringJob? RecurringJob { get; set; }
 
     public ICollection<JobState> JobStates { get; set; }
