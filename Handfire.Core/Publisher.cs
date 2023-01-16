@@ -3,6 +3,7 @@ using System.Text.Json;
 using Cronos;
 using Handfire.Core.Data.Entities;
 using Handfire.Core.Entities;
+using Handfire.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Core;
@@ -42,18 +43,41 @@ public class Publisher<TContext> : IPublisher
     {
         ValidateCronExpression(cronExpression);
 
+        var nextJobScheduleTime = CronExpression.Parse(cronExpression).GetNextOccurrence(DateTime.UtcNow);
+        var jobMessage = JsonSerializer.Serialize(message);
+        var jobType = message.GetType().AssemblyQualifiedName!;
+
         var recurringJob = new RecurringJob
         {
             Name = name,
-            Message = JsonSerializer.Serialize(message),
-            Type = message.GetType().AssemblyQualifiedName!,
+            Message = jobMessage,
+            Type = jobType,
             Cron = cronExpression,
             CreatedAt = DateTime.UtcNow,
             LastExecution = null,
-            NextExecution = null
+            NextExecution = nextJobScheduleTime
+        };
+        var job = new Job
+        {
+            Message = jobMessage,
+            Type = jobType,
+            CreateTime = DateTime.UtcNow,
+            IsRecurringJob = true,
+            ScheduleTime = nextJobScheduleTime,
+            CurrentState = State.Created,
+            RecurringJob = recurringJob,
         };
 
-        await _context.Set<RecurringJob>().AddAsync(recurringJob);
+        var jobState = new JobState
+        {
+            Job = job,
+            State = State.Created,
+            DateTime = DateTime.UtcNow,
+        };
+
+        await _context.Set<Job>().AddAsync(job);
+        await _context.Set<JobState>().AddAsync(jobState);
+        //await _context.Set<RecurringJob>().AddAsync(recurringJob);
     }
 
     private async Task CreateJobAndJobState<T>(T message, DateTime? scheduleTime)

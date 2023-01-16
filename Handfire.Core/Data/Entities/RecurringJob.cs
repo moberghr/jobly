@@ -20,5 +20,5 @@ public class RecurringJob
 
     public DateTime? LastExecution { get; set; }
 
-    public ICollection<Job> Jobs { get; set; }
+    public ICollection<Job>? Jobs { get; set; }
 }
