@@ -41,7 +41,6 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         await _context.SaveChangesAsync();
 
         job.RecurringJob = recurringJob;
-        _context.Set<Job>().Update(job);
         await _context.SaveChangesAsync();
 
         await transaction.CommitAsync();
@@ -76,23 +75,18 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         var recurringJob = await _context.Set<RecurringJob>()
             .Where(x => x.Name == name)
             .Include(x => x.NextJob)
-            .Include(x => x.LastJob)
+            .ThenInclude(x => x.JobStates)
             .SingleOrDefaultAsync();
 
         if (recurringJob != null)
         {
-            var nextJob = await _context.Set<Job>()
-                .Where(x => x.Id == recurringJob.NextJobId)
-                .Include(x => x.JobStates)
-                .SingleAsync();
+            var nextJob = recurringJob.NextJob;
 
             if (nextJob.ProcessedTime == null)
             {
                 nextJob.ProcessedTime = DateTime.UtcNow;
                 nextJob.CurrentState = State.Deleted;
                 nextJob.JobStates.Add(new() { DateTime = DateTime.UtcNow, State = State.Deleted });
-
-                _context.Set<Job>().Update(nextJob);
             }
 
             recurringJob.Cron = cronExpression;
@@ -104,24 +98,21 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             recurringJob.NextExecution = nextJobScheduleTime;
             recurringJob.NextJob = job;
 
-            _context.Set<RecurringJob>().Update(recurringJob);
+            return recurringJob;
         }
-
-        if (recurringJob == null)
-        {    
-            recurringJob = new RecurringJob
-            {
-                Name = name,
-                Message = jobMessage,
-                Type = jobType,
-                Cron = cronExpression,
-                CreatedAt = DateTime.UtcNow,
-                NextExecution = nextJobScheduleTime,
-                NextJob = job,
-            };
+  
+        recurringJob = new RecurringJob
+        {
+            Name = name,
+            Message = jobMessage,
+            Type = jobType,
+            Cron = cronExpression,
+            CreatedAt = DateTime.UtcNow,
+            NextExecution = nextJobScheduleTime,
+            NextJob = job,
+        };
     
-            await _context.Set<RecurringJob>().AddAsync(recurringJob);
-        }
+        await _context.Set<RecurringJob>().AddAsync(recurringJob);
 
         return recurringJob;
     }

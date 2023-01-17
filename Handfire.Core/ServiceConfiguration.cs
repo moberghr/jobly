@@ -87,6 +87,8 @@ public static class ServiceConfiguration
         recurringJob.HasKey(p => p.Id);
 
         recurringJob.Property(p => p.Name);
+        recurringJob.HasIndex(p => p.Name).IsUnique();
+
         recurringJob.Property(p => p.Cron);
         recurringJob.Property(p => p.CreatedAt);
         recurringJob.Property(p => p.NextExecution);
