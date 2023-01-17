@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 namespace Handfire.Core.Interceptors;
 public class ForUpdateSkipLockedCommandInterceptor : DbCommandInterceptor
 {
-    public static readonly string Label = "Use FOR UPDATE SKIP LOCKED";
+    public static readonly string Label = "Lock row";
 
     public override InterceptionResult<DbDataReader> ReaderExecuting(
         DbCommand command,
@@ -31,7 +31,7 @@ public class ForUpdateSkipLockedCommandInterceptor : DbCommandInterceptor
     {
         if (command.CommandText.StartsWith($"-- {Label}", StringComparison.Ordinal))
         {
-            command.CommandText += " FOR UPDATE SKIP LOCKED";
+            command.CommandText += " FOR NO KEY UPDATE SKIP LOCKED";
         }
     }
 }

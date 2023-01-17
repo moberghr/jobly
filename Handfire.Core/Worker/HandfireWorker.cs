@@ -56,7 +56,7 @@ public class HandfireWorker<TContext> : BackgroundService
             var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
             using var transaction = await context.Database.BeginTransactionAsync();
-            
+
             var job = await context.GetJobs()
                 .FirstOrDefaultAsync();
 
@@ -68,9 +68,9 @@ public class HandfireWorker<TContext> : BackgroundService
                 continue;
             }
 
-            if (job.IsRecurringJob)
+            if (job.RecurringJobId.HasValue)
             {
-                await CreateNextJob(context, job);
+                await CreateNextJob(job);
             }
 
             Interlocked.Increment(ref Counter);
@@ -96,46 +96,48 @@ public class HandfireWorker<TContext> : BackgroundService
         }
     }
 
-    private async Task CreateNextJob(TContext context, Job job)
+    private async Task CreateNextJob(Job job)
     {
-        var recurringJob = await context.Set<RecurringJob>()
+        using var scope = _serviceScopeFactory.CreateScope();
+
+        var temporaryContext = scope.ServiceProvider.GetRequiredService<TContext>();
+
+        var recurringJob = await temporaryContext.Set<RecurringJob>()
             .Where(x => x.Id == job.RecurringJobId)
-            .SingleAsync();
+            .FirstAsync();
 
         if (recurringJob.NextJobId != job.Id)
         {
             return;
         }
 
+        var createTime = DateTime.UtcNow;
+
         var nextJobScheduleTime = CronExpression.Parse(recurringJob.Cron).GetNextOccurrence(recurringJob.NextExecution ?? DateTime.UtcNow);
 
         var jobStats = new List<JobState>
         {
-            new() { State = State.Created, DateTime = DateTime.UtcNow}
+            new() { State = State.Created, DateTime = createTime}
         };
 
         var newJob = new Job
         {
             Message = recurringJob.Message,
             Type = recurringJob.Type,
-            CreateTime = DateTime.UtcNow,
-            IsRecurringJob = true,
+            CreateTime = createTime,
             ScheduleTime = nextJobScheduleTime,
             CurrentState = State.Created,
-            RecurringJob = recurringJob,
+            RecurringJobId = recurringJob.Id,
             JobStates = jobStats
         };
-
-        await context.Set<Job>().AddAsync(newJob);
-        await context.SaveChangesAsync();
 
         recurringJob.LastExecution = recurringJob.NextExecution;
         recurringJob.LastJobId = recurringJob.NextJobId;
 
         recurringJob.NextExecution = nextJobScheduleTime;
-        recurringJob.NextJobId = newJob.Id;
+        recurringJob.NextJob = newJob;
 
-        context.Set<RecurringJob>().Update(recurringJob);
+        await temporaryContext.SaveChangesAsync();
     }
 
     private async Task ProcessOutboxMessage(Job message)

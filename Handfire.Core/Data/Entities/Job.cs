@@ -19,8 +19,6 @@ public class Job
 
     public State CurrentState { get; set; }
 
-    public bool IsRecurringJob { get; set; }
-
     public int? RecurringJobId { get; set; }
 
     public RecurringJob? RecurringJob { get; set; }

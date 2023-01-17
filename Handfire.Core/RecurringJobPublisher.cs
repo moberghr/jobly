@@ -61,7 +61,6 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             Message = jobMessage!,
             Type = jobType!,
             CreateTime = DateTime.UtcNow,
-            IsRecurringJob = true,
             ScheduleTime = nextJobScheduleTime,
             CurrentState = State.Created,
             JobStates = jobStats
