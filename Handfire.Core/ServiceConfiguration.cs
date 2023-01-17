@@ -28,6 +28,7 @@ public static class ServiceConfiguration
         });
 
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>()));
+        services.AddScoped<IRecurringJobPublisher>(x => new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IHandfireService>(x => new HandfireService<TContext>(x.GetRequiredService<TContext>()));
 
         for (var i = 0; i < workerCount; i++)
@@ -91,6 +92,8 @@ public static class ServiceConfiguration
         recurringJob.Property(p => p.NextExecution);
         recurringJob.Property(p => p.LastExecution);
 
-        recurringJob.HasMany(p => p.Jobs).WithOne(p => p.RecurringJob);
+        recurringJob.HasMany(p => p.Jobs).WithOne(p => p.RecurringJob).HasForeignKey(p => p.RecurringJobId);
+        recurringJob.HasOne(p => p.NextJob);
+        recurringJob.HasOne(p => p.LastJob);
     }
 }

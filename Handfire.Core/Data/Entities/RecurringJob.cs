@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Handfire.Core.Entities;
 
 namespace Handfire.Core.Data.Entities;
@@ -16,13 +17,21 @@ public class RecurringJob
 
     public DateTime CreatedAt { get; set; }
 
+    public DateTime? UpdatedAt { get; set; }
+
     public DateTime? NextExecution { get; set; }
 
     public DateTime? LastExecution { get; set; }
 
+    [ForeignKey(nameof(NextJob))]
     public int? NextJobId { get; set; }
 
+    public Job? NextJob { get; set; }
+
+    [ForeignKey(nameof(LastJob))]
     public int? LastJobId { get; set; }
+
+    public Job? LastJob { get; set; }
 
     public ICollection<Job>? Jobs { get; set; }
 }

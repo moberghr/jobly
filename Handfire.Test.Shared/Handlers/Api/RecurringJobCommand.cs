@@ -25,9 +25,9 @@ public class RecurringJobRequest : IRequest<RecurringJobResponse>
 public class RecurringJobCommand : IRequestHandler<RecurringJobRequest, RecurringJobResponse>
 {
     private readonly TestContext _context;
-    private readonly IPublisher _publisher;
+    private readonly IRecurringJobPublisher _publisher;
 
-    public RecurringJobCommand(TestContext context, IPublisher publisher)
+    public RecurringJobCommand(TestContext context, IRecurringJobPublisher publisher)
     {
         _context = context;
         _publisher = publisher;
@@ -51,8 +51,6 @@ public class RecurringJobCommand : IRequestHandler<RecurringJobRequest, Recurrin
 
         _context.EmailLogs.Add(emailLog);
 
-        using var transaction = await _context.Database.BeginTransactionAsync();
-
         await _context.SaveChangesAsync();
         
         var sendEmailRequest = new SendEmailRequest
@@ -63,8 +61,6 @@ public class RecurringJobCommand : IRequestHandler<RecurringJobRequest, Recurrin
         await _publisher.AddOrUpdateRecurringJob(sendEmailRequest, request.Name, request.Cron);
 
         await _context.SaveChangesAsync();
-
-        await transaction.CommitAsync();
 
         return new();
     }

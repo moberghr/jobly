@@ -102,7 +102,7 @@ public class HandfireWorker<TContext> : BackgroundService
             .Where(x => x.Id == job.RecurringJobId)
             .SingleAsync();
 
-        if (recurringJob.NextExecution != job.ScheduleTime)
+        if (recurringJob.NextJobId != job.Id)
         {
             return;
         }
@@ -127,11 +127,12 @@ public class HandfireWorker<TContext> : BackgroundService
         };
 
         await context.Set<Job>().AddAsync(newJob);
+        await context.SaveChangesAsync();
 
         recurringJob.LastExecution = recurringJob.NextExecution;
-        recurringJob.NextExecution = nextJobScheduleTime;
-
         recurringJob.LastJobId = recurringJob.NextJobId;
+
+        recurringJob.NextExecution = nextJobScheduleTime;
         recurringJob.NextJobId = newJob.Id;
 
         context.Set<RecurringJob>().Update(recurringJob);
