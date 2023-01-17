@@ -89,8 +89,8 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             if (nextJob.ProcessedTime == null)
             {
                 nextJob.ProcessedTime = DateTime.UtcNow;
-                nextJob.CurrentState = State.Obsolete;
-                nextJob.JobStates.Add(new() { DateTime = DateTime.UtcNow, State = State.Obsolete });
+                nextJob.CurrentState = State.Deleted;
+                nextJob.JobStates.Add(new() { DateTime = DateTime.UtcNow, State = State.Deleted });
 
                 _context.Set<Job>().Update(nextJob);
             }

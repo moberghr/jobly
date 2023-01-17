@@ -5,5 +5,5 @@ public enum State
     Completed,
     Failed,
     Retry,
-    Obsolete,
+    Deleted,
 }

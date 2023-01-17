@@ -27,6 +27,11 @@ public class ForUpdateSkipLockedCommandInterceptor : DbCommandInterceptor
         return new ValueTask<InterceptionResult<DbDataReader>>(result);
     }
 
+    /// <summary>
+    /// FOR NO KEY UPDATE is weaker then FOR UPDATE lock: this lock will not block SELECT FOR KEY SHARE commands that attempt to acquire a lock on the same rows. This lock mode is also acquired by any UPDATE that does not acquire a FOR UPDATE lock.
+    /// FOR UPDATE is locking RecurringJob.NextJobId when updating recurring job data so FOR NO KEY UPDATE is needed.
+    /// </summary>
+    /// <param name="command"></param>
     private static void ManipulateCommand(DbCommand command)
     {
         if (command.CommandText.StartsWith($"-- {Label}", StringComparison.Ordinal))
