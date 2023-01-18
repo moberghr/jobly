@@ -34,4 +34,6 @@ public class RecurringJob
     public Job? LastJob { get; set; }
 
     public ICollection<Job>? Jobs { get; set; }
+
+    public uint Version { get; set; }
 }

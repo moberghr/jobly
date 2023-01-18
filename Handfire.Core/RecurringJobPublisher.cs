@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Text;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
-using System.Threading.Tasks;
 using Cronos;
 using Handfire.Core.Data.Entities;
 using Handfire.Core.Entities;
 using Handfire.Core.Enums;
+using Handfire.Core.Interceptors;
 using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Core;
@@ -71,22 +67,32 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
     private async Task<RecurringJob> AddOrUpdateRecurringJobToDb<T>(T message, string name, string cronExpression, Job job) where T : class
     {
         var (nextJobScheduleTime, jobMessage, jobType) = GetRecurringJobData(message, cronExpression);
-        
+
         var recurringJob = await _context.Set<RecurringJob>()
             .Where(x => x.Name == name)
-            .Include(x => x.NextJob)
-            .ThenInclude(x => x.JobStates)
             .SingleOrDefaultAsync();
 
         if (recurringJob != null)
         {
-            var nextJob = recurringJob.NextJob;
+            // if nextJob is LOCKED in HandfireWorker it will WAIT and timeout (after 30 sec)
+            var nextJob = await _context.Set<Job>()
+                .Where(x => x.Id == recurringJob.NextJobId)
+                .TagWith(ForUpdateSkipLockedCommandInterceptor.Label)
+                .FirstAsync();
 
             if (nextJob.ProcessedTime == null)
             {
                 nextJob.ProcessedTime = DateTime.UtcNow;
                 nextJob.CurrentState = State.Deleted;
-                nextJob.JobStates.Add(new() { DateTime = DateTime.UtcNow, State = State.Deleted });
+
+                var jobState = new JobState
+                {
+                    DateTime = DateTime.UtcNow,
+                    State = State.Deleted,
+                    JobId = nextJob.Id,
+                };
+
+                await _context.Set<JobState>().AddAsync(jobState);
             }
 
             recurringJob.Cron = cronExpression;
@@ -94,13 +100,13 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             recurringJob.Type = jobType;
             recurringJob.UpdatedAt = DateTime.UtcNow;
             recurringJob.LastExecution = recurringJob.NextExecution;
-            recurringJob.LastJob = recurringJob.NextJob;
+            recurringJob.LastJobId = recurringJob.NextJobId;
             recurringJob.NextExecution = nextJobScheduleTime;
             recurringJob.NextJob = job;
 
             return recurringJob;
         }
-  
+
         recurringJob = new RecurringJob
         {
             Name = name,
@@ -111,7 +117,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             NextExecution = nextJobScheduleTime,
             NextJob = job,
         };
-    
+
         await _context.Set<RecurringJob>().AddAsync(recurringJob);
 
         return recurringJob;

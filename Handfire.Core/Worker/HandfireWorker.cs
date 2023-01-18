@@ -36,7 +36,6 @@ file static class JobQueryHelper
 public class HandfireWorker<TContext> : BackgroundService
     where TContext : DbContext
 {
-    public static int Counter = 0;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<HandfireWorker<TContext>> _logger;
     private readonly string _workerId = Guid.NewGuid().ToString();
@@ -68,17 +67,15 @@ public class HandfireWorker<TContext> : BackgroundService
                 continue;
             }
 
-            if (job.RecurringJobId.HasValue)
-            {
-                await CreateNextJob(job);
-            }
-
-            Interlocked.Increment(ref Counter);
-
             _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
 
             try
             {
+                if (job.RecurringJobId.HasValue)
+                {
+                    await CreateNextJob(job);
+                }
+
                 await ProcessOutboxMessage(job);
             }
             catch (Exception e)

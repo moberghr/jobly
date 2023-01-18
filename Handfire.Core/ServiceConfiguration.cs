@@ -97,5 +97,7 @@ public static class ServiceConfiguration
         recurringJob.HasMany(p => p.Jobs).WithOne(p => p.RecurringJob).HasForeignKey(p => p.RecurringJobId);
         recurringJob.HasOne(p => p.NextJob);
         recurringJob.HasOne(p => p.LastJob);
+
+        recurringJob.Property(p => p.Version).IsRowVersion();
     }
 }
