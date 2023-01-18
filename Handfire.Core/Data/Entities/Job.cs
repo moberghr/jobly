@@ -1,4 +1,5 @@
-﻿using Handfire.Core.Enums;
+﻿using Handfire.Core.Data.Entities;
+using Handfire.Core.Enums;
 
 namespace Handfire.Core.Entities;
 
@@ -18,5 +19,9 @@ public class Job
 
     public State CurrentState { get; set; }
 
-    public ICollection<JobState> JobStates { get; set; }
+    public int? RecurringJobId { get; set; }
+
+    public RecurringJob? RecurringJob { get; set; }
+
+    public List<JobState> JobStates { get; set; } = new();
 }

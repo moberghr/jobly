@@ -31,4 +31,10 @@ public class TestController : ControllerBase
     {
         return await _mediator.Send(request);
     }
+
+    [HttpPost("recurring-job")]
+    public async Task<RecurringJobResponse> RecurringJob(RecurringJobRequest request)
+    {
+        return await _mediator.Send(request);
+    }
 }

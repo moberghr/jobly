@@ -1,8 +1,21 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
+using System.Xml.Linq;
+using Cronos;
+using Handfire.Core.Data.Entities;
 using Handfire.Core.Entities;
+using Handfire.Core.Enums;
+using Microsoft.AspNetCore.SignalR.Protocol;
 using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Core;
+
+public interface IPublisher
+{
+    Task Publish<T>(T message) where T : class;
+
+    Task Publish<T>(T message, DateTime scheduleTime) where T : class;
+}
 
 public class Publisher<TContext> : IPublisher
     where TContext : DbContext
@@ -48,10 +61,4 @@ public class Publisher<TContext> : IPublisher
         await _context.Set<Job>().AddAsync(job);
         await _context.Set<JobState>().AddAsync(jobState);
     }
-}
-
-public interface IPublisher
-{
-    Task Publish<T>(T message) where T : class;
-    Task Publish<T>(T message, DateTime scheduleTime) where T : class;
 }

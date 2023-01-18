@@ -42,6 +42,7 @@ public class ScheduleRegisterCommand : IRequestHandler<ScheduleRegisterRequest, 
             Body = "Test email",
             Subject = "Test subject"
         };
+
         _context.EmailLogs.Add(emailLog);
 
         using var transaction = await _context.Database.BeginTransactionAsync();
