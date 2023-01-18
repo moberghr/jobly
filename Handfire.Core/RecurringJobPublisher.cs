@@ -70,7 +70,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
 
         var recurringJob = await _context.Set<RecurringJob>()
             .Where(x => x.Name == name)
-            .SingleOrDefaultAsync();
+            .FirstOrDefaultAsync();
 
         if (recurringJob != null)
         {
@@ -82,17 +82,10 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
 
             if (nextJob.ProcessedTime == null)
             {
-                nextJob.ProcessedTime = DateTime.UtcNow;
+                var deletedTime = DateTime.UtcNow;
+                nextJob.ProcessedTime = deletedTime;
                 nextJob.CurrentState = State.Deleted;
-
-                var jobState = new JobState
-                {
-                    DateTime = DateTime.UtcNow,
-                    State = State.Deleted,
-                    JobId = nextJob.Id,
-                };
-
-                await _context.Set<JobState>().AddAsync(jobState);
+                nextJob.JobStates.Add(new() { DateTime = deletedTime, State = State.Deleted });
             }
 
             recurringJob.Cron = cronExpression;

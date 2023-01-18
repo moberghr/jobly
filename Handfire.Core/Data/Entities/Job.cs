@@ -23,5 +23,5 @@ public class Job
 
     public RecurringJob? RecurringJob { get; set; }
 
-    public ICollection<JobState> JobStates { get; set; }
+    public List<JobState> JobStates { get; set; } = new();
 }
