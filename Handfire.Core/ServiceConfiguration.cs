@@ -30,6 +30,7 @@ public static class ServiceConfiguration
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IRecurringJobPublisher>(x => new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IHandfireService>(x => new HandfireService<TContext>(x.GetRequiredService<TContext>()));
+        services.AddTransient<IHandfireWorkerService, HandfireWorkerService<TContext>>();
 
         for (var i = 0; i < workerCount; i++)
         {
