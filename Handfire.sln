@@ -3,15 +3,17 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33027.239
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Handfire.Core", "Handfire.Core\Handfire.Core.csproj", "{6360CE52-AECF-4793-8A75-630932D592E6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Handfire.Core", "Handfire.Core\Handfire.Core.csproj", "{6360CE52-AECF-4793-8A75-630932D592E6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Handfire.Test.App", "Handfire.TestApp\Handfire.Test.App.csproj", "{76F76011-6F53-4B8E-9506-3F0C878F3B7F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Handfire.Test.App", "Handfire.TestApp\Handfire.Test.App.csproj", "{76F76011-6F53-4B8E-9506-3F0C878F3B7F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Handfire.Test.Worker", "Handfire.TestWorker\Handfire.Test.Worker.csproj", "{C3423404-A63D-4622-9BF0-E831318D8060}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Handfire.Test.Worker", "Handfire.TestWorker\Handfire.Test.Worker.csproj", "{C3423404-A63D-4622-9BF0-E831318D8060}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "TestProjects", "TestProjects", "{9D535490-5488-4886-A038-60405FB8650F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Handfire.Test.Shared", "Handfire.Test.Shared\Handfire.Test.Shared.csproj", "{67857284-3562-4381-9980-E30617B29F41}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Handfire.Test.Shared", "Handfire.Test.Shared\Handfire.Test.Shared.csproj", "{67857284-3562-4381-9980-E30617B29F41}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Handfire.Tests", "Handfire.Tests\Handfire.Tests.csproj", "{9E187DD9-325B-4187-B08C-09BC9FD7DDAC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -35,6 +37,10 @@ Global
 		{67857284-3562-4381-9980-E30617B29F41}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{67857284-3562-4381-9980-E30617B29F41}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{67857284-3562-4381-9980-E30617B29F41}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9E187DD9-325B-4187-B08C-09BC9FD7DDAC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E187DD9-325B-4187-B08C-09BC9FD7DDAC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E187DD9-325B-4187-B08C-09BC9FD7DDAC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E187DD9-325B-4187-B08C-09BC9FD7DDAC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -43,6 +49,7 @@ Global
 		{76F76011-6F53-4B8E-9506-3F0C878F3B7F} = {9D535490-5488-4886-A038-60405FB8650F}
 		{C3423404-A63D-4622-9BF0-E831318D8060} = {9D535490-5488-4886-A038-60405FB8650F}
 		{67857284-3562-4381-9980-E30617B29F41} = {9D535490-5488-4886-A038-60405FB8650F}
+		{9E187DD9-325B-4187-B08C-09BC9FD7DDAC} = {9D535490-5488-4886-A038-60405FB8650F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {C7E12655-DE26-4176-BCC3-A0DCAABFB10E}
