@@ -34,12 +34,13 @@ file static class JobQueryHelper
 
 public interface IHandfireWorkerService
 {
-    Task GetAndProcessJob(string workerId);
+    Task GetAndProcessJob(CancellationToken stoppingToken);
 }
 
 public class HandfireWorkerService<TContext> : IHandfireWorkerService
     where TContext : DbContext
 {
+    private readonly string _workerId = Guid.NewGuid().ToString();
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<HandfireWorkerService<TContext>> _logger;
 
@@ -49,50 +50,50 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         _logger = logger;
     }
 
-    public async Task GetAndProcessJob(string workerId)
+    public async Task GetAndProcessJob(CancellationToken cancellationToken)
     {
         using var scope = _serviceScopeFactory.CreateScope();
 
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
-        using var transaction = await context.Database.BeginTransactionAsync();
+        using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
         var job = await context.GetJobs()
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
 
         // if we didn't find any messages then we wait, otherwise we query again immediately 
         if (job == null)
         {
-            await Task.Delay(1000);
+            await Task.Delay(1000, cancellationToken);
 
             return;
         }
 
-        _logger.LogInformation("Worker {workerId} fetched message {id}", workerId, job.Id);
+        _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
 
         try
         {
             if (job.RecurringJobId.HasValue)
             {
-                await CreateNextJob(job);
+                await CreateNextJob(job, cancellationToken);
             }
 
-            await ProcessOutboxMessage(job);
+            await ProcessOutboxMessage(job, cancellationToken);
         }
         catch (Exception e)
         {
-            await UpdateJobData(context, job, State.Failed, e.Message);
+            await UpdateJobData(context, job, State.Failed, e.Message, cancellationToken);
 
             transaction.Commit();
 
             return;
         }
 
-        await UpdateJobData(context, job, State.Completed);
+        await UpdateJobData(context, job, State.Completed, message: null, cancellationToken);
         transaction.Commit();
     }
 
-    private async Task CreateNextJob(Job job)
+    private async Task CreateNextJob(Job job, CancellationToken cancellationToken)
     {
         using var scope = _serviceScopeFactory.CreateScope();
 
@@ -100,7 +101,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         var recurringJob = await temporaryContext.Set<RecurringJob>()
             .Where(x => x.Id == job.RecurringJobId)
-            .FirstAsync();
+            .FirstAsync(cancellationToken);
 
         if (recurringJob.NextJobId != job.Id)
         {
@@ -133,10 +134,10 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         recurringJob.NextExecution = nextJobScheduleTime;
         recurringJob.NextJob = newJob;
 
-        await temporaryContext.SaveChangesAsync();
+        await temporaryContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task ProcessOutboxMessage(Job message)
+    private async Task ProcessOutboxMessage(Job message, CancellationToken cancellationToken)
     {
         var type = Type.GetType(message.Type);
 
@@ -156,14 +157,14 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-        await mediator.Send(request);
+        await mediator.Send(request, cancellationToken);
     }
 
-    private static async Task UpdateJobData(TContext context, Job job, State state, string? message = null)
+    private static async Task UpdateJobData(TContext context, Job job, State state, string? message, CancellationToken cancellationToken)
     {
         UpdateJob(context, job, state);
 
-        await CreateJobState(context, job.Id, state, message);
+        await CreateJobState(context, job.Id, state, message, cancellationToken);
     }
 
     private static void UpdateJob(TContext context, Job job, State state)
@@ -174,7 +175,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         context.Set<Job>().Update(job);
     }
 
-    private static async Task CreateJobState(TContext context, int jobId, State state, string? message = null)
+    private static async Task CreateJobState(TContext context, int jobId, State state, string? message, CancellationToken cancellationToken)
     {
         var jobState = new JobState
         {
@@ -184,7 +185,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             Message = message
         };
 
-        await context.Set<JobState>().AddAsync(jobState);
-        await context.SaveChangesAsync();
+        await context.Set<JobState>().AddAsync(jobState, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 }

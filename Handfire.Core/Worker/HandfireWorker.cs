@@ -7,7 +7,6 @@ public class HandfireWorker<TContext> : BackgroundService
     where TContext : DbContext
 {
     private readonly IHandfireWorkerService _handfireWorkerService;
-    private readonly string _workerId = Guid.NewGuid().ToString();
 
     public HandfireWorker(IHandfireWorkerService handfireWorkerService)
     {
@@ -18,7 +17,7 @@ public class HandfireWorker<TContext> : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            await _handfireWorkerService.GetAndProcessJob(_workerId);
+            await _handfireWorkerService.GetAndProcessJob(stoppingToken);
         }
     }
 }
