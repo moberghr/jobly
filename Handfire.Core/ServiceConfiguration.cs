@@ -61,7 +61,6 @@ public static class ServiceConfiguration
         job.Property(p => p.Message);
         job.Property(p => p.CreateTime);
         job.Property(p => p.ScheduleTime);
-        job.Property(p => p.ProcessedTime);
         job.Property(p => p.CurrentState);
 
         job.HasMany(p => p.JobStates)

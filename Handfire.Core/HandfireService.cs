@@ -125,7 +125,6 @@ public class HandfireService<TContext> : IHandfireService
     private IQueryable<JobModel> GetScheduledJobs()
     {
         var query = _context.Set<Job>()
-            .Where(x => x.ProcessedTime == null)
             .Where(x => x.ScheduleTime > DateTime.UtcNow)
             .Select(x =>
                 new JobModel
@@ -134,7 +133,6 @@ public class HandfireService<TContext> : IHandfireService
                     CurrentState = x.CurrentState,
                     CreateTime = x.CreateTime,
                     Message = x.Message,
-                    ProcessedTime = x.ProcessedTime,
                     ScheduleTime = x.ScheduleTime,
                     Type = x.Type
                 })
@@ -146,7 +144,6 @@ public class HandfireService<TContext> : IHandfireService
     private IQueryable<JobModel> GetPendingJobs()
     {
         var query = _context.Set<Job>()
-            .Where(x => x.ProcessedTime == null)
             .Where(x => x.ScheduleTime < DateTime.UtcNow)
             .Select(x =>
                 new JobModel
@@ -155,7 +152,6 @@ public class HandfireService<TContext> : IHandfireService
                     CurrentState = x.CurrentState,
                     CreateTime = x.CreateTime,
                     Message = x.Message,
-                    ProcessedTime = x.ProcessedTime,
                     ScheduleTime = x.ScheduleTime,
                     Type = x.Type
                 })
@@ -175,7 +171,6 @@ public class HandfireService<TContext> : IHandfireService
                     CurrentState = x.CurrentState,
                     CreateTime = x.CreateTime,
                     Message = x.Message,
-                    ProcessedTime = x.ProcessedTime,
                     ScheduleTime = x.ScheduleTime,
                     Type = x.Type
                 })

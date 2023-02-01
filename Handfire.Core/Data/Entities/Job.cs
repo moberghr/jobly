@@ -17,8 +17,6 @@ public class Job
 
     public DateTime? ScheduleTime { get; set; }
 
-    public DateTime? ProcessedTime { get; set; }
-
     public State CurrentState { get; set; }
 
     public int? RecurringJobId { get; set; }

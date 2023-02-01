@@ -80,12 +80,10 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
                 .TagWith(ForUpdateSkipLockedCommandInterceptor.Label)
                 .FirstAsync();
 
-            if (nextJob.ProcessedTime == null)
+            if (nextJob.CurrentState == State.Created)
             {
-                var deletedTime = DateTime.UtcNow;
-                nextJob.ProcessedTime = deletedTime;
                 nextJob.CurrentState = State.Deleted;
-                nextJob.JobStates.Add(new() { DateTime = deletedTime, State = State.Deleted });
+                nextJob.JobStates.Add(new() { DateTime = DateTime.UtcNow, State = State.Deleted });
             }
 
             recurringJob.Cron = cronExpression;

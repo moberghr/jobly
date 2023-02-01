@@ -21,8 +21,6 @@ public class JobTest : PostgreSqlTestBase
         await context.TestLogs.AddAsync(logInDb);
         await context.SaveChangesAsync();
 
-        using var transaction = await context.Database.BeginTransactionAsync();
-
         var publisher = new Publisher<TestContext>(context);
         var processLogJob = new PrecessLogRequest { TestTaskId = logInDb.Id };
         var jobName = Guid.NewGuid().ToString();
@@ -30,8 +28,6 @@ public class JobTest : PostgreSqlTestBase
         await publisher.Publish(jobName, processLogJob);
 
         await context.SaveChangesAsync();
-
-        await transaction.CommitAsync();
 
         var jobFromDb = await GetJobWithStatesByName(context, jobName);
 

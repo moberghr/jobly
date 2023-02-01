@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Handfire.Core;
 
-file static class JobQueryHelper
+public static class JobQueryHelper
 {
     public static IQueryable<Job> GetJobs<TContext>(this TContext context) where TContext : DbContext
     {
@@ -25,9 +25,7 @@ file static class JobQueryHelper
     {
         return query
             .Where(x =>
-                (x.ProcessedTime == null
-                    && (x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
-                    && x.CurrentState == State.Created)
+                (x.CurrentState == State.Created && (x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null))
                 || x.CurrentState == State.Retry);
     }
 }
@@ -170,7 +168,6 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
     private static void UpdateJob(TContext context, Job job, State state)
     {
         job.CurrentState = state;
-        job.ProcessedTime = DateTime.UtcNow;
 
         context.Set<Job>().Update(job);
     }
