@@ -31,11 +31,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Handfire.Test.Shared\Handfire.Test.Shared.csproj" />
+		<Using Include="Xunit" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<Using Include="Xunit" />
+	  <ProjectReference Include="..\Handfire.Core\Handfire.Core.csproj" />
 	</ItemGroup>
 
 </Project>

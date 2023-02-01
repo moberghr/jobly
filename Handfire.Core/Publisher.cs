@@ -30,21 +30,36 @@ public class Publisher<TContext> : IPublisher
     public async Task Publish<T>(T message)
         where T : class
     {
-        await CreateJobAndJobState<T>(message, scheduleTime: null);
+        await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null);
+    }
+
+    public async Task Publish<T>(string name, T message)
+        where T : class
+    {
+        await CreateJobAndJobState<T>(message, name, scheduleTime: null);
     }
 
     public async Task Publish<T>(T message, DateTime scheduleTime)
         where T : class
     {
-        await CreateJobAndJobState<T>(message, scheduleTime);
+        await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime);
     }
 
-    private async Task CreateJobAndJobState<T>(T message, DateTime? scheduleTime)
+    public async Task Publish<T>(string name, T message, DateTime scheduleTime)
         where T : class
     {
+        await CreateJobAndJobState<T>(message, name, scheduleTime);
+    }
+
+    private async Task CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime)
+        where T : class
+    {
+        var createdTime = DateTime.UtcNow;
+
         var job = new Job
         {
-            CreateTime = DateTime.UtcNow,
+            Name = name,
+            CreateTime = createdTime,
             Message = JsonSerializer.Serialize(message),
             Type = message.GetType().AssemblyQualifiedName!,
             ScheduleTime = scheduleTime,
@@ -55,7 +70,7 @@ public class Publisher<TContext> : IPublisher
         {
             Job = job,
             State = Enums.State.Created,
-            DateTime = DateTime.UtcNow,
+            DateTime = createdTime,
         };
 
         await _context.Set<Job>().AddAsync(job);

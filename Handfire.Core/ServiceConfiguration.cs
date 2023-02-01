@@ -13,7 +13,8 @@ namespace Handfire.Core;
 public static class ServiceConfiguration
 {
     private static readonly ForUpdateSkipLockedCommandInterceptor _interceptor = new();
-    public static void AddHandfire<TContext>(this IServiceCollection services, int workerCount)
+
+    public static IServiceCollection AddHandfire<TContext>(this IServiceCollection services, int workerCount)
         where TContext : DbContext
     {
         var assembly = typeof(ServiceConfiguration).Assembly;
@@ -36,9 +37,11 @@ public static class ServiceConfiguration
         {
             services.AddSingleton<IHostedService, HandfireWorker<TContext>>();
         }
+
+        return services;
     }
 
-    public static void AddHandfireInterceptors(this DbContextOptionsBuilder optionsBuilder) => optionsBuilder.AddInterceptors(_interceptor);
+    public static DbContextOptionsBuilder AddHandfireInterceptors(this DbContextOptionsBuilder optionsBuilder) => optionsBuilder.AddInterceptors(_interceptor);
 
     public static void AddOutboxStateEntity(this ModelBuilder modelBuilder)
     {
