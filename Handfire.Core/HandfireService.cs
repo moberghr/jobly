@@ -90,13 +90,13 @@ public class HandfireService<TContext> : IHandfireService
             throw new ArgumentException("Invalid job id.");
         }
 
-        job.CurrentState = State.Retry;
+        job.CurrentState = State.Enqueued;
 
         var jobState = new JobState
         {
             Job = job,
             DateTime = DateTime.UtcNow,
-            State = State.Retry
+            State = State.Enqueued
         };
 
         _context.Set<Job>().Update(job);

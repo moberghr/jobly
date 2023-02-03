@@ -36,6 +36,6 @@ async Task Migrate()
 {
     using var scope = app!.Services.CreateScope();
     var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
-    await ctx.Database.EnsureDeletedAsync();
+    //await ctx.Database.EnsureDeletedAsync();
     await ctx.Database.EnsureCreatedAsync();
 }

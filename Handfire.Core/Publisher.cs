@@ -53,13 +53,13 @@ public class Publisher<TContext> : IPublisher
             Message = JsonSerializer.Serialize(message),
             Type = message.GetType().AssemblyQualifiedName!,
             ScheduleTime = scheduleTime,
-            CurrentState = Enums.State.Created
+            CurrentState = Enums.State.Enqueued
         };
 
         var jobState = new JobState
         {
             Job = job,
-            State = Enums.State.Created,
+            State = Enums.State.Enqueued,
             DateTime = createdTime,
         };
 

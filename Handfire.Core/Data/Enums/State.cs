@@ -1,9 +1,8 @@
 ﻿namespace Handfire.Core.Enums;
 public enum State
 {
-    Created,
+    Enqueued,
     Completed,
     Failed,
-    Retry,
     Deleted,
 }

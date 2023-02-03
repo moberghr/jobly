@@ -21,7 +21,7 @@ public class DashboardController : Controller
         var total = await _handfireService.GetTotalJobsCount();
         var pending = await _handfireService.GetPendingJobsCount();
         var scheduled = await _handfireService.GetScheduledJobsCount();
-        var created = await _handfireService.GetJobsCount(State.Created);
+        var created = await _handfireService.GetJobsCount(State.Enqueued);
         var completed = await _handfireService.GetJobsCount(State.Completed);
         var failed = await _handfireService.GetJobsCount(State.Failed);
 

@@ -48,7 +48,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
 
         var jobStats = new List<JobState>
         {
-            new() { State = State.Created, DateTime = DateTime.UtcNow}
+            new() { State = State.Enqueued, DateTime = DateTime.UtcNow}
         };
 
         var jobId = Guid.NewGuid().ToString();
@@ -59,7 +59,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             Type = jobType!,
             CreateTime = DateTime.UtcNow,
             ScheduleTime = nextJobScheduleTime,
-            CurrentState = State.Created,
+            CurrentState = State.Enqueued,
             JobStates = jobStats
         };
 
@@ -82,7 +82,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
                 .TagWith(InterceptorConstants.Label)
                 .FirstAsync();
 
-            if (nextJob.CurrentState == State.Created)
+            if (nextJob.CurrentState == State.Enqueued)
             {
                 nextJob.CurrentState = State.Deleted;
                 nextJob.JobStates.Add(new() { DateTime = DateTime.UtcNow, State = State.Deleted });

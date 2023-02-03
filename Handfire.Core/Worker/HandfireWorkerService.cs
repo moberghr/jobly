@@ -25,8 +25,8 @@ public static class JobQueryHelper
     {
         return query
             .Where(x =>
-                (x.CurrentState == State.Created && (x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null))
-                || x.CurrentState == State.Retry);
+                x.CurrentState == State.Enqueued 
+                && (x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null));
     }
 }
 
@@ -113,7 +113,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         var jobStats = new List<JobState>
         {
-            new() { State = State.Created, DateTime = createTime}
+            new() { State = State.Enqueued, DateTime = createTime}
         };
 
         var newJobId = Guid.NewGuid().ToString();
@@ -124,7 +124,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             Type = recurringJob.Type,
             CreateTime = createTime,
             ScheduleTime = nextJobScheduleTime,
-            CurrentState = State.Created,
+            CurrentState = State.Enqueued,
             RecurringJobId = recurringJob.Id,
             JobStates = jobStats
         };

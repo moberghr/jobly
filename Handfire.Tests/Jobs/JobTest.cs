@@ -32,12 +32,12 @@ public class JobTest : SqlServerTestBase
         var jobFromDb = await GetJobWithStates(context, jobId);
 
         Assert.NotNull(jobFromDb);
-        Assert.Equal(State.Created, jobFromDb.CurrentState);
+        Assert.Equal(State.Enqueued, jobFromDb.CurrentState);
         Assert.Equal(processLogJobRequest.GetType().AssemblyQualifiedName!, jobFromDb.Type);
         Assert.Equal(JsonSerializer.Serialize(processLogJobRequest), jobFromDb.Message);
 
         Assert.Single(jobFromDb.JobStates);
-        Assert.Equal(State.Created, jobFromDb.JobStates.Single().State);
+        Assert.Equal(State.Enqueued, jobFromDb.JobStates.Single().State);
     }
 
     [Fact]
