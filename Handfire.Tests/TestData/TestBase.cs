@@ -32,16 +32,26 @@ public abstract class TestBase
 
     protected abstract TestContext CreateContext();
 
-    protected async Task<string> CreateJob(TestContext context, int testLogId)
+    protected async Task<string> CreateProcessLogJob(TestContext context, int testLogId)
     {
-        using var transaction = await context.Database.BeginTransactionAsync();
-
         var publisher = new Publisher<TestContext>(context);
         var processLogJob = new PrecessLogRequest { TestTaskId = testLogId };
         var jobId = await publisher.Publish(processLogJob);
+
         await context.SaveChangesAsync();
 
-        await transaction.CommitAsync();
+        return jobId;
+    }
+
+    protected async Task<string> CreateFailedJob(TestContext context)
+    {
+        var publisher = new Publisher<TestContext>(context);
+
+        var throwExceptionRequest = new ThrowExceptionRequest();
+
+        var jobId = await publisher.Publish(throwExceptionRequest);
+
+        await context.SaveChangesAsync();
 
         return jobId;
     }

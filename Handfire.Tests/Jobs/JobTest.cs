@@ -18,14 +18,9 @@ public class JobTest : SqlServerTestBase
     {
         var context = CreateContext();
 
-        var logInDb = new TestLog();
-        await context.TestLogs.AddAsync(logInDb);
-        await context.SaveChangesAsync();
-
         var publisher = new Publisher<TestContext>(context);
-        var processLogJobRequest = new PrecessLogRequest { TestTaskId = logInDb.Id };
-
-        var jobId = await publisher.Publish(processLogJobRequest);
+        var jobRequest = new UnitRequest();
+        var jobId = await publisher.Publish(jobRequest);
 
         await context.SaveChangesAsync();
 
@@ -33,8 +28,8 @@ public class JobTest : SqlServerTestBase
 
         Assert.NotNull(jobFromDb);
         Assert.Equal(State.Enqueued, jobFromDb.CurrentState);
-        Assert.Equal(processLogJobRequest.GetType().AssemblyQualifiedName!, jobFromDb.Type);
-        Assert.Equal(JsonSerializer.Serialize(processLogJobRequest), jobFromDb.Message);
+        Assert.Equal(jobRequest.GetType().AssemblyQualifiedName!, jobFromDb.Type);
+        Assert.Equal(JsonSerializer.Serialize(jobRequest), jobFromDb.Message);
 
         Assert.Single(jobFromDb.JobStates);
         Assert.Equal(State.Enqueued, jobFromDb.JobStates.Single().State);
@@ -47,7 +42,7 @@ public class JobTest : SqlServerTestBase
 
         var testLogId = await CreateLogInDb(context);
 
-        var jobId = await CreateJob(context, testLogId);
+        var jobId = await CreateProcessLogJob(context, testLogId);
 
         await ProcessJob();
 
@@ -56,8 +51,28 @@ public class JobTest : SqlServerTestBase
         
         Assert.Equal(State.Completed, jobFromDb.CurrentState);
         Assert.Equal(2, jobFromDb.JobStates.Count);
+        
+        Assert.Equal(State.Enqueued, jobFromDb.JobStates.First().State);
         Assert.Equal(State.Completed, jobFromDb.JobStates.Last().State);
 
         Assert.NotNull(logFromDb.ProcessedTime);
+    }
+
+    [Fact]
+    public async Task GetAndProcessJob_JobThrowsException_ShouldBeFailed()
+    {
+        var context = CreateContext();
+
+        var jobId = await CreateFailedJob(context);
+
+        await ProcessJob();
+
+        var jobFromDb = await GetJobWithStates(context, jobId);
+
+        Assert.Equal(State.Failed, jobFromDb.CurrentState);
+
+        Assert.Equal(2, jobFromDb.JobStates.Count);
+        Assert.Equal(State.Enqueued, jobFromDb.JobStates.First().State);
+        Assert.Equal(State.Failed, jobFromDb.JobStates.Last().State);
     }
 }
