@@ -10,7 +10,7 @@ namespace Handfire.Tests;
 
 public class PostgreSqlTestBase : TestBase, IAsyncLifetime
 {
-    private static readonly ForUpdateSkipLockedCommandInterceptor _interceptor = new();
+    private static readonly PostgresRowLockInterceptor _interceptor = new();
 
     private readonly PostgreSqlTestcontainer _dbContainer = new TestcontainersBuilder<PostgreSqlTestcontainer>()
         .WithDatabase(

@@ -17,7 +17,7 @@ public static class JobQueryHelper
     {
         return context.Set<Job>()
                 .WhereIsPendingOrRetry()
-                .TagWith(ForUpdateSkipLockedCommandInterceptor.Label)
+                .TagWith(InterceptorConstants.Label)
                 .AsNoTracking();
     }
 
@@ -108,15 +108,18 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         var createTime = DateTime.UtcNow;
 
-        var nextJobScheduleTime = CronExpression.Parse(recurringJob.Cron).GetNextOccurrence(recurringJob.NextExecution ?? DateTime.UtcNow);
+        var fromUtc = DateTime.SpecifyKind(recurringJob.NextExecution ?? DateTime.UtcNow, DateTimeKind.Utc);
+        var nextJobScheduleTime = CronExpression.Parse(recurringJob.Cron).GetNextOccurrence(fromUtc);
 
         var jobStats = new List<JobState>
         {
             new() { State = State.Created, DateTime = createTime}
         };
 
+        var newJobId = Guid.NewGuid().ToString();
         var newJob = new Job
         {
+            Id = newJobId,
             Message = recurringJob.Message,
             Type = recurringJob.Type,
             CreateTime = createTime,

@@ -37,5 +37,7 @@ public class RecurringJob
 
     public ICollection<Job>? Jobs { get; set; }
 
-    public uint Version { get; set; }
+    //public uint Version { get; set; }
+    [Timestamp]
+    public byte[] Version { get; set; }
 }

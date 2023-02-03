@@ -1,11 +1,16 @@
 ﻿using System.Data.Common;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Handfire.Core.Interceptors;
-public class ForUpdateSkipLockedCommandInterceptor : DbCommandInterceptor
-{
-    public static readonly string Label = "Lock row";
 
+public static class InterceptorConstants
+{
+    public static readonly string Label = "LOCK ROW";
+}
+
+public class PostgresRowLockInterceptor : DbCommandInterceptor
+{
     public override InterceptionResult<DbDataReader> ReaderExecuting(
         DbCommand command,
         CommandEventData eventData,
@@ -34,9 +39,41 @@ public class ForUpdateSkipLockedCommandInterceptor : DbCommandInterceptor
     /// <param name="command"></param>
     private static void ManipulateCommand(DbCommand command)
     {
-        if (command.CommandText.StartsWith($"-- {Label}", StringComparison.Ordinal))
+        if (command.CommandText.StartsWith($"-- {InterceptorConstants.Label}", StringComparison.Ordinal))
         {
             command.CommandText += " FOR NO KEY UPDATE SKIP LOCKED";
+        }
+    }
+}
+
+public class SqlServerRowLockInterceptor : DbCommandInterceptor
+{
+    public override InterceptionResult<DbDataReader> ReaderExecuting(
+    DbCommand command,
+    CommandEventData eventData,
+    InterceptionResult<DbDataReader> result)
+    {
+        ManipulateCommand(command);
+
+        return result;
+    }
+
+    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+        DbCommand command,
+        CommandEventData eventData,
+        InterceptionResult<DbDataReader> result,
+        CancellationToken cancellationToken = default)
+    {
+        ManipulateCommand(command);
+
+        return new ValueTask<InterceptionResult<DbDataReader>>(result);
+    }
+
+    private static void ManipulateCommand(DbCommand command)
+    {
+        if (command.CommandText.StartsWith($"-- {InterceptorConstants.Label}", StringComparison.Ordinal))
+        {
+            command.CommandText = command.CommandText.Replace($"FROM [job] AS [j]", $"FROM [job] AS [j] WITH (ROWLOCK, UPDLOCK)");
         }
     }
 }

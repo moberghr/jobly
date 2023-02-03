@@ -5,7 +5,7 @@ using Handfire.Core;
 using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Tests.TestData;
-public class SqlServerTestBase : IAsyncLifetime
+public class SqlServerTestBase : TestBase, IAsyncLifetime
 {
     private readonly MsSqlTestcontainer _dbContainer = new TestcontainersBuilder<MsSqlTestcontainer>()
         .WithDatabase(
@@ -19,18 +19,7 @@ public class SqlServerTestBase : IAsyncLifetime
         .WithCleanUp(true)
         .Build();
 
-    public TContext CreateTContext<TContext>() where TContext : DbContext
-    {
-        var testContext = new TestContext(new DbContextOptionsBuilder<TestContext>()
-           .UseSqlServer(_dbContainer.ConnectionString + ";Encrypt=False;")
-           .Options);
-
-        testContext.Database.EnsureCreated();
-
-        return testContext as TContext;
-    }
-
-    public TestContext CreateContext()
+    protected override TestContext CreateContext()
     {
         var testContext = new TestContext(new DbContextOptionsBuilder<TestContext>()
            .UseSqlServer(_dbContainer.ConnectionString + ";Encrypt=False;")

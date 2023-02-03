@@ -2,6 +2,7 @@
 using Handfire.Core;
 using Handfire.Core.Entities;
 using Handfire.Core.Enums;
+using Handfire.Tests.TestData;
 using Handfire.Tests.TestData.Handlers;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Handfire.Tests.Jobs;
 
-public class JobTest : PostgreSqlTestBase
+public class JobTest : SqlServerTestBase
 {
     [Fact]
     public async Task Publish_AddJob_ShouldHaveCreatedStatusInDb()

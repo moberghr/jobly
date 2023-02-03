@@ -12,7 +12,8 @@ namespace Handfire.Core;
 
 public static class ServiceConfiguration
 {
-    private static readonly ForUpdateSkipLockedCommandInterceptor _interceptor = new();
+    private static readonly PostgresRowLockInterceptor _postgresInterceptor = new();
+    private static readonly SqlServerRowLockInterceptor _sqlServerInterceptor = new();
 
     public static IServiceCollection AddHandfire<TContext>(this IServiceCollection services, int workerCount)
         where TContext : DbContext
@@ -41,7 +42,19 @@ public static class ServiceConfiguration
         return services;
     }
 
-    public static DbContextOptionsBuilder AddHandfireInterceptors(this DbContextOptionsBuilder optionsBuilder) => optionsBuilder.AddInterceptors(_interceptor);
+    public static DbContextOptionsBuilder AddHandfireInterceptors(this DbContextOptionsBuilder optionsBuilder, DatabaseType databaseType)
+    {
+        if(databaseType is DatabaseType.Postgres)
+        {
+            optionsBuilder.AddInterceptors(_postgresInterceptor);
+        }
+        else if(databaseType is DatabaseType.SqlServer)
+        {
+            optionsBuilder.AddInterceptors(_sqlServerInterceptor);
+        }
+
+        return optionsBuilder;
+    }
 
     public static void AddOutboxStateEntity(this ModelBuilder modelBuilder)
     {
