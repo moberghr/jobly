@@ -51,8 +51,10 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             new() { State = State.Created, DateTime = DateTime.UtcNow}
         };
 
+        var jobId = Guid.NewGuid().ToString();
         var job = new Job
         {
+            Id = jobId,
             Message = jobMessage!,
             Type = jobType!,
             CreateTime = DateTime.UtcNow,
@@ -77,7 +79,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             // if nextJob is LOCKED in HandfireWorker it will WAIT and timeout (after 30 sec)
             var nextJob = await _context.Set<Job>()
                 .Where(x => x.Id == recurringJob.NextJobId)
-                .TagWith(ForUpdateSkipLockedCommandInterceptor.Label)
+                .TagWith(InterceptorConstants.Label)
                 .FirstAsync();
 
             if (nextJob.CurrentState == State.Created)

@@ -12,7 +12,7 @@ public class JobStateModel
 
     public string? Message { get; set; }
 
-    public int JobId { get; set; }
+    public string JobId { get; set; }
 
     public Job Job { get; set; }
 }

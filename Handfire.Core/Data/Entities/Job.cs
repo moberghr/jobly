@@ -1,13 +1,13 @@
-﻿using Handfire.Core.Data.Entities;
+﻿using System.ComponentModel.DataAnnotations;
+using Handfire.Core.Data.Entities;
 using Handfire.Core.Enums;
 
 namespace Handfire.Core.Entities;
 
 public class Job
 {
-    public int Id { get; set; }
-
-    public string Name { get; set; }
+    [MaxLength(50)]
+    public string Id { get; set; }
 
     public string Type { get; set; }
 

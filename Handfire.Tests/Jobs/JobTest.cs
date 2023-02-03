@@ -22,19 +22,18 @@ public class JobTest : PostgreSqlTestBase
         await context.SaveChangesAsync();
 
         var publisher = new Publisher<TestContext>(context);
-        var processLogJob = new PrecessLogRequest { TestTaskId = logInDb.Id };
-        var jobName = Guid.NewGuid().ToString();
+        var processLogJobRequest = new PrecessLogRequest { TestTaskId = logInDb.Id };
 
-        await publisher.Publish(jobName, processLogJob);
+        var jobId = await publisher.Publish(processLogJobRequest);
 
         await context.SaveChangesAsync();
 
-        var jobFromDb = await GetJobWithStatesByName(context, jobName);
+        var jobFromDb = await GetJobWithStates(context, jobId);
 
         Assert.NotNull(jobFromDb);
         Assert.Equal(State.Created, jobFromDb.CurrentState);
-        Assert.Equal(processLogJob.GetType().AssemblyQualifiedName!, jobFromDb.Type);
-        Assert.Equal(JsonSerializer.Serialize(processLogJob), jobFromDb.Message);
+        Assert.Equal(processLogJobRequest.GetType().AssemblyQualifiedName!, jobFromDb.Type);
+        Assert.Equal(JsonSerializer.Serialize(processLogJobRequest), jobFromDb.Message);
 
         Assert.Single(jobFromDb.JobStates);
         Assert.Equal(State.Created, jobFromDb.JobStates.Single().State);
@@ -47,11 +46,11 @@ public class JobTest : PostgreSqlTestBase
 
         var testLogId = await CreateLogInDb(context);
 
-        var jobName = await CreateJob(context, testLogId);
+        var jobId = await CreateJob(context, testLogId);
 
         await ProcessJob();
 
-        var jobFromDb = await GetJobWithStatesByName(context, jobName);
+        var jobFromDb = await GetJobWithStates(context, jobId);
         var logFromDb = await GetTestLog(context, testLogId);
         
         Assert.Equal(State.Completed, jobFromDb.CurrentState);

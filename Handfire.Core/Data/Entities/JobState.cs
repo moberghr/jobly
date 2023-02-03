@@ -1,4 +1,5 @@
-﻿using Handfire.Core.Enums;
+﻿using System.ComponentModel.DataAnnotations;
+using Handfire.Core.Enums;
 
 namespace Handfire.Core.Entities;
 public class JobState
@@ -11,7 +12,8 @@ public class JobState
 
     public string? Message { get; set; }
 
-    public int JobId { get; set; }
+    [MaxLength(50)]
+    public string JobId { get; set; }
 
     public Job Job { get; set; }
 }

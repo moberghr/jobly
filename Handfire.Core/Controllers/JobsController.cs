@@ -41,7 +41,7 @@ public class JobsController : Controller
     }
 
     [HttpGet("retry")]
-    public async Task<IActionResult> Retry(int jobId)
+    public async Task<IActionResult> Retry(string jobId)
     {
         await _handfireService.SetRetry(jobId);
 

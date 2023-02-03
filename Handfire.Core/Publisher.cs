@@ -12,9 +12,9 @@ namespace Handfire.Core;
 
 public interface IPublisher
 {
-    Task Publish<T>(T message) where T : class;
+    Task<string> Publish<T>(T message) where T : class;
 
-    Task Publish<T>(T message, DateTime scheduleTime) where T : class;
+    Task<string> Publish<T>(T message, DateTime scheduleTime) where T : class;
 }
 
 public class Publisher<TContext> : IPublisher
@@ -27,38 +27,28 @@ public class Publisher<TContext> : IPublisher
         _context = context;
     }
 
-    public async Task Publish<T>(T message)
+    public async Task<string> Publish<T>(T message)
         where T : class
     {
-        await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null);
     }
 
-    public async Task Publish<T>(string name, T message)
+    public async Task<string> Publish<T>(T message, DateTime scheduleTime)
         where T : class
     {
-        await CreateJobAndJobState<T>(message, name, scheduleTime: null);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime);
     }
 
-    public async Task Publish<T>(T message, DateTime scheduleTime)
-        where T : class
-    {
-        await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime);
-    }
-
-    public async Task Publish<T>(string name, T message, DateTime scheduleTime)
-        where T : class
-    {
-        await CreateJobAndJobState<T>(message, name, scheduleTime);
-    }
-
-    private async Task CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime)
+    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime)
         where T : class
     {
         var createdTime = DateTime.UtcNow;
 
+        var jobId = Guid.NewGuid().ToString();
+
         var job = new Job
         {
-            Name = name,
+            Id = jobId,
             CreateTime = createdTime,
             Message = JsonSerializer.Serialize(message),
             Type = message.GetType().AssemblyQualifiedName!,
@@ -73,7 +63,8 @@ public class Publisher<TContext> : IPublisher
             DateTime = createdTime,
         };
 
-        await _context.Set<Job>().AddAsync(job);
         await _context.Set<JobState>().AddAsync(jobState);
+
+        return jobId;
     }
 }

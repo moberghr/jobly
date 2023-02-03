@@ -172,7 +172,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         context.Set<Job>().Update(job);
     }
 
-    private static async Task CreateJobState(TContext context, int jobId, State state, string? message, CancellationToken cancellationToken)
+    private static async Task CreateJobState(TContext context, string jobId, State state, string? message, CancellationToken cancellationToken)
     {
         var jobState = new JobState
         {

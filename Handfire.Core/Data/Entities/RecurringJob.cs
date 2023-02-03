@@ -23,13 +23,15 @@ public class RecurringJob
 
     public DateTime? LastExecution { get; set; }
 
+    [MaxLength(50)]
     [ForeignKey(nameof(NextJob))]
-    public int? NextJobId { get; set; }
+    public string? NextJobId { get; set; }
 
     public Job? NextJob { get; set; }
 
+    [MaxLength(50)]
     [ForeignKey(nameof(LastJob))]
-    public int? LastJobId { get; set; }
+    public string? LastJobId { get; set; }
 
     public Job? LastJob { get; set; }
 

@@ -20,7 +20,8 @@ public interface IHandfireService
     Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request);
 
     Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request);
-    Task SetRetry(int jobId);
+    
+    Task SetRetry(string jobId);
 }
 
 public class HandfireService<TContext> : IHandfireService
@@ -77,7 +78,7 @@ public class HandfireService<TContext> : IHandfireService
         return jobs;
     }
 
-    public async Task SetRetry(int jobId)
+    public async Task SetRetry(string jobId)
     {
         var job = _context.Set<Job>()
             .Where(x => x.Id == jobId)

@@ -38,13 +38,12 @@ public abstract class TestBase
 
         var publisher = new Publisher<TestContext>(context);
         var processLogJob = new PrecessLogRequest { TestTaskId = testLogId };
-        var jobName = Guid.NewGuid().ToString();
-        await publisher.Publish(jobName, processLogJob);
+        var jobId = await publisher.Publish(processLogJob);
         await context.SaveChangesAsync();
 
         await transaction.CommitAsync();
 
-        return jobName;
+        return jobId;
     }
 
     protected async Task<int> CreateLogInDb(TestContext context)
@@ -56,10 +55,10 @@ public abstract class TestBase
         return logInDb.Id;
     }
 
-    protected async Task<Job> GetJobWithStatesByName(TestContext context, string jobName)
+    protected async Task<Job> GetJobWithStates(TestContext context, string jobId)
     {
         var job = await context.Set<Job>()
-            .Where(x => x.Name == jobName)
+            .Where(x => x.Id == jobId)
             .Include(x => x.JobStates)
             .AsNoTracking()
             .SingleAsync();
