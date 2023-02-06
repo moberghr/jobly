@@ -11,6 +11,7 @@ namespace Handfire.Tests;
 public class PostgreSqlTestBase : TestBase, IAsyncLifetime
 {
     private static readonly PostgresRowLockInterceptor _interceptor = new();
+    private static readonly SaveChangesConcurrencyTokenInterceptor _concurrencyTokenInterceptor = new();
 
     private readonly PostgreSqlTestcontainer _dbContainer = new TestcontainersBuilder<PostgreSqlTestcontainer>()
         .WithDatabase(
@@ -30,7 +31,7 @@ public class PostgreSqlTestBase : TestBase, IAsyncLifetime
 
         var testContext = new TestContext(new DbContextOptionsBuilder<TestContext>()
            .UseNpgsql(_dbContainer.ConnectionString)
-           .AddInterceptors(_interceptor).Options);
+           .AddInterceptors(_interceptor, _concurrencyTokenInterceptor).Options);
 
         testContext.Database.EnsureCreated();
 

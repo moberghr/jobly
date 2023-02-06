@@ -4,6 +4,7 @@ using Handfire.Core.Interceptors;
 using Handfire.Core.Worker;
 using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
@@ -14,6 +15,8 @@ public static class ServiceConfiguration
 {
     private static readonly PostgresRowLockInterceptor _postgresInterceptor = new();
     private static readonly SqlServerRowLockInterceptor _sqlServerInterceptor = new();
+
+    private static readonly SaveChangesConcurrencyTokenInterceptor _saveChangesInterceptor = new();
 
     public static IServiceCollection AddHandfire<TContext>(this IServiceCollection services, int workerCount)
         where TContext : DbContext
@@ -52,6 +55,10 @@ public static class ServiceConfiguration
         {
             optionsBuilder.AddInterceptors(_sqlServerInterceptor);
         }
+
+        optionsBuilder.AddInterceptors(_saveChangesInterceptor);
+
+        optionsBuilder.ConfigureWarnings(w => w.Ignore(SqlServerEventId.SavepointsDisabledBecauseOfMARS));
 
         return optionsBuilder;
     }
@@ -114,6 +121,6 @@ public static class ServiceConfiguration
         recurringJob.HasOne(p => p.NextJob);
         recurringJob.HasOne(p => p.LastJob);
 
-        recurringJob.Property(p => p.Version).IsRowVersion();
+        recurringJob.Property(p => p.Version).IsConcurrencyToken();
     }
 }

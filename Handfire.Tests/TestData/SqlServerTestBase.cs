@@ -2,11 +2,15 @@
 using DotNet.Testcontainers.Configurations;
 using DotNet.Testcontainers.Containers;
 using Handfire.Core;
+using Handfire.Core.Interceptors;
 using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Tests.TestData;
 public class SqlServerTestBase : TestBase, IAsyncLifetime
 {
+    private static readonly SqlServerRowLockInterceptor _interceptor = new();
+    private static readonly SaveChangesConcurrencyTokenInterceptor _concurrencyTokenInterceptor = new();
+
     private readonly MsSqlTestcontainer _dbContainer = new TestcontainersBuilder<MsSqlTestcontainer>()
         .WithDatabase(
             new MsSqlTestcontainerConfiguration
@@ -23,7 +27,7 @@ public class SqlServerTestBase : TestBase, IAsyncLifetime
     {
         var testContext = new TestContext(new DbContextOptionsBuilder<TestContext>()
            .UseSqlServer(_dbContainer.ConnectionString + ";Encrypt=False;")
-           .Options);
+           .AddInterceptors(_interceptor, _concurrencyTokenInterceptor).Options);
 
         testContext.Database.EnsureCreated();
 

@@ -95,4 +95,37 @@ public abstract class TestBase
         await worker.GetAndProcessJob(CancellationToken.None);
     }
 
+    protected async Task<string> CreateUnitRecurringJob(string cronExpression)
+    {
+        var name = Guid.NewGuid().ToString();
+
+        var context = CreateContext();
+
+        var publisher = new RecurringJobPublisher<TestContext>(context);
+        var request = new UnitRequest();
+        await publisher.AddOrUpdateRecurringJob(request, name, cronExpression);
+
+        return name;
+    }
+    protected async Task<RecurringJob> GetRecurringJob(string name)
+    {
+        var context = CreateContext();
+
+        var recurringJob = await context.Set<RecurringJob>()
+            .Where(x => x.Name == name)
+            .SingleOrDefaultAsync();
+
+        return recurringJob;
+    }
+
+    protected async Task<Job> GetJob(string id)
+    {
+        var context = CreateContext();
+
+        var job = await context.Set<Job>()
+            .Where(x => x.Id == id)
+            .SingleOrDefaultAsync();
+
+        return job;
+    }
 }
