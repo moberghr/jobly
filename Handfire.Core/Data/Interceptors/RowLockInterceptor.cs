@@ -1,4 +1,5 @@
 ﻿using System.Data.Common;
+using Handfire.Core.Entities;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Handfire.Core.Interceptors;
@@ -11,7 +12,7 @@ public enum DatabaseType
 
 public static class InterceptorConstants
 {
-    public static readonly string Label = "LOCK ROW";
+    public static readonly string RowLock = "LOCK ROW";
 }
 
 public class PostgresRowLockInterceptor : DbCommandInterceptor
@@ -44,7 +45,7 @@ public class PostgresRowLockInterceptor : DbCommandInterceptor
     /// <param name="command"></param>
     private static void ManipulateCommand(DbCommand command)
     {
-        if (command.CommandText.StartsWith($"-- {InterceptorConstants.Label}", StringComparison.Ordinal))
+        if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLock}", StringComparison.Ordinal))
         {
             command.CommandText += " FOR NO KEY UPDATE SKIP LOCKED";
         }
@@ -76,9 +77,9 @@ public class SqlServerRowLockInterceptor : DbCommandInterceptor
 
     private static void ManipulateCommand(DbCommand command)
     {
-        if (command.CommandText.StartsWith($"-- {InterceptorConstants.Label}", StringComparison.Ordinal))
+        if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLock}", StringComparison.Ordinal))
         {
-            command.CommandText = command.CommandText.Replace($"FROM [job] AS [j]", $"FROM [job] AS [j] WITH (ROWLOCK, UPDLOCK)");
+            command.CommandText = command.CommandText.Replace($"FROM [{nameof(Job)}] AS [j]", $"FROM [{nameof(Job)}] AS [j] WITH (ROWLOCK, UPDLOCK)");
         }
     }
 }

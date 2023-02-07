@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection.Emit;
-using System.Text;
-using System.Threading.Tasks;
-using Cronos;
-using Handfire.Core;
+﻿using Handfire.Core;
 using Handfire.Core.Data.Entities;
 using Handfire.Core.Entities;
 using Handfire.Tests.TestData.Handlers;
@@ -18,6 +11,7 @@ namespace Handfire.Tests;
 public abstract class TestBase
 {
     private IServiceScopeFactory _serviceScopeFactory;
+    private IServiceScopeFactory _serviceScopeFactoryNoLocking;
 
     public TestBase()
     {
@@ -25,12 +19,23 @@ public abstract class TestBase
         var provider = services.AddMediatR(typeof(TestBase))
             .AddTransient<TestContext>(x => CreateContext())
             .AddHandfire<TestContext>(0)
+            .AddSingleton<CounterService>()
             .BuildServiceProvider();
 
         _serviceScopeFactory = provider.GetService<IServiceScopeFactory>()!;
+
+        var providerWithNoLocking = services.AddMediatR(typeof(TestBase))
+            .AddTransient<TestContext>(x => CreateContextWithoutJobLocking())
+            .AddHandfire<TestContext>(0)
+            .AddSingleton<CounterService>()
+            .BuildServiceProvider();
+
+        _serviceScopeFactoryNoLocking = providerWithNoLocking.GetService<IServiceScopeFactory>()!;
     }
 
     protected abstract TestContext CreateContext();
+
+    protected abstract TestContext CreateContextWithoutJobLocking();
 
     protected async Task<string> CreateProcessLogJob(TestContext context, int testLogId)
     {
@@ -54,6 +59,19 @@ public abstract class TestBase
         await context.SaveChangesAsync();
 
         return jobId;
+    }
+
+    protected async Task CreateCounterJob()
+    {
+        var context = CreateContext();
+
+        var publisher = new Publisher<TestContext>(context);
+
+        var request = new CounterRequest();
+
+        await publisher.Publish(request);
+
+        await context.SaveChangesAsync();
     }
 
     protected async Task<int> CreateLogInDb(TestContext context)
@@ -93,6 +111,35 @@ public abstract class TestBase
         var worker = new HandfireWorkerService<TestContext>(_serviceScopeFactory, new NullLogger<HandfireWorkerService<TestContext>>());
 
         await worker.GetAndProcessJob(CancellationToken.None);
+
+        return;
+    }
+
+    protected async Task ProcessJobWithoutLocking()
+    {
+        using var scope = _serviceScopeFactoryNoLocking.CreateScope();
+
+        var worker = new HandfireWorkerService<TestContext>(_serviceScopeFactoryNoLocking, new NullLogger<HandfireWorkerService<TestContext>>());
+
+        await worker.GetAndProcessJob(CancellationToken.None);
+    }
+
+    protected async Task<int> GetCounterForNoLocking()
+    {
+        using var scope = _serviceScopeFactoryNoLocking.CreateScope();
+
+        var counterService = scope.ServiceProvider.GetService<CounterService>();
+
+        return counterService.Counter;
+    }
+
+    protected async Task<int> GetCounter()
+    {
+        using var scope = _serviceScopeFactory.CreateScope();
+
+        var counterService = scope.ServiceProvider.GetService<CounterService>();
+
+        return counterService.Counter;
     }
 
     protected async Task<string> CreateUnitRecurringJob(string cronExpression)

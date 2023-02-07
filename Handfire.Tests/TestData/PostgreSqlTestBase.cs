@@ -1,10 +1,8 @@
 ﻿using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Configurations;
 using DotNet.Testcontainers.Containers;
-using Microsoft.EntityFrameworkCore;
-using Handfire.Core;
 using Handfire.Core.Interceptors;
-using Handfire.Tests.TestData;
+using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Tests;
 
@@ -27,11 +25,20 @@ public class PostgreSqlTestBase : TestBase, IAsyncLifetime
 
     protected override TestContext CreateContext()
     {
-        var dbcn = _dbContainer.ConnectionString;
-
         var testContext = new TestContext(new DbContextOptionsBuilder<TestContext>()
            .UseNpgsql(_dbContainer.ConnectionString)
            .AddInterceptors(_interceptor, _concurrencyTokenInterceptor).Options);
+
+        testContext.Database.EnsureCreated();
+
+        return testContext;
+    }
+
+    protected override TestContext CreateContextWithoutJobLocking()
+    {
+        var testContext = new TestContext(new DbContextOptionsBuilder<TestContext>()
+           .UseNpgsql(_dbContainer.ConnectionString)
+           .AddInterceptors(_concurrencyTokenInterceptor).Options);
 
         testContext.Database.EnsureCreated();
 

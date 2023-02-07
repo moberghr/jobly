@@ -47,11 +47,11 @@ public static class ServiceConfiguration
 
     public static DbContextOptionsBuilder AddHandfireInterceptors(this DbContextOptionsBuilder optionsBuilder, DatabaseType databaseType)
     {
-        if (databaseType is DatabaseType.Postgres)
+        if(databaseType is DatabaseType.Postgres)
         {
             optionsBuilder.AddInterceptors(_postgresInterceptor);
         }
-        else if (databaseType is DatabaseType.SqlServer)
+        else if(databaseType is DatabaseType.SqlServer)
         {
             optionsBuilder.AddInterceptors(_sqlServerInterceptor);
         }
@@ -73,6 +73,7 @@ public static class ServiceConfiguration
     private static void AddJobEntity(ModelBuilder modelBuilder)
     {
         var job = modelBuilder.Entity<Job>();
+        job.ToTable(nameof(Job));
 
         job.Property(p => p.Id);
         job.HasKey(p => p.Id);
@@ -90,6 +91,7 @@ public static class ServiceConfiguration
     private static void AddJobStateEntity(ModelBuilder modelBuilder)
     {
         var jobState = modelBuilder.Entity<JobState>();
+        jobState.ToTable(nameof(JobState));
 
         jobState.Property(p => p.Id);
         jobState.HasKey(p => p.Id);
@@ -105,6 +107,7 @@ public static class ServiceConfiguration
     private static void AddRecurringJobEntity(ModelBuilder modelBuilder)
     {
         var recurringJob = modelBuilder.Entity<RecurringJob>();
+        recurringJob.ToTable(nameof(RecurringJob));
 
         recurringJob.Property(p => p.Id);
         recurringJob.HasKey(p => p.Id);

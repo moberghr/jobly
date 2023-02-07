@@ -1,13 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Handfire.Core;
-using Handfire.Core.Data.Entities;
-using Handfire.Core.Entities;
-using Handfire.Tests.TestData;
-using Handfire.Tests.TestData.Handlers;
+﻿using Handfire.Core.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Tests.RecurringJobs;

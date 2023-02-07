@@ -17,7 +17,7 @@ public static class JobQueryHelper
     {
         return context.Set<Job>()
                 .WhereIsPendingOrRetry()
-                .TagWith(InterceptorConstants.Label)
+                .TagWith(InterceptorConstants.RowLock)
                 .AsNoTracking();
     }
 

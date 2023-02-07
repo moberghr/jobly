@@ -79,7 +79,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             // if nextJob is LOCKED in HandfireWorker it will WAIT and timeout (after 30 sec)
             var nextJob = await _context.Set<Job>()
                 .Where(x => x.Id == recurringJob.NextJobId)
-                .TagWith(InterceptorConstants.Label)
+                .TagWith(InterceptorConstants.RowLock)
                 .FirstAsync();
 
             if (nextJob.CurrentState == State.Enqueued)

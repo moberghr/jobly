@@ -1,17 +1,11 @@
 ﻿using System.Text.Json;
 using Handfire.Core;
-using Handfire.Core.Entities;
 using Handfire.Core.Enums;
-using Handfire.Tests.TestData;
 using Handfire.Tests.TestData.Handlers;
-using MediatR;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Handfire.Tests.Jobs;
 
-public class JobTest : SqlServerTestBase
+public class JobPublisherSqlServer : SqlServerTestBase
 {
     [Fact]
     public async Task Publish_AddJob_ShouldHaveCreatedStatusInDb()
@@ -48,10 +42,10 @@ public class JobTest : SqlServerTestBase
 
         var jobFromDb = await GetJobWithStates(context, jobId);
         var logFromDb = await GetTestLog(context, testLogId);
-        
+
         Assert.Equal(State.Completed, jobFromDb.CurrentState);
         Assert.Equal(2, jobFromDb.JobStates.Count);
-        
+
         Assert.Equal(State.Enqueued, jobFromDb.JobStates.First().State);
         Assert.Equal(State.Completed, jobFromDb.JobStates.Last().State);
 
@@ -74,5 +68,40 @@ public class JobTest : SqlServerTestBase
         Assert.Equal(2, jobFromDb.JobStates.Count);
         Assert.Equal(State.Enqueued, jobFromDb.JobStates.First().State);
         Assert.Equal(State.Failed, jobFromDb.JobStates.Last().State);
+    }
+
+    [Fact]
+    public async Task GetAndProcessJob_WithoutLockingInterceptor_CounterShouldBeMoreThenOne()
+    {
+        await CreateCounterJob();
+
+        List<Task> tasks = new();
+        for (var i = 0; i < 20; i++)
+        {
+            tasks.Add(ProcessJobWithoutLocking());
+        }
+
+        Task.WaitAll(tasks.ToArray());
+
+
+        var counter = await GetCounterForNoLocking();
+        Assert.NotEqual(1, counter);
+    }
+
+    [Fact]
+    public async Task GetAndProcessJob_JobWithCounter_CounterShouldBeOne()
+    {
+        await CreateCounterJob();
+
+        List<Task> tasks = new();
+        for (var i = 0; i < 20; i++)
+        {
+            tasks.Add(ProcessJob());
+        }
+
+        Task.WaitAll(tasks.ToArray());
+
+        var counter = await GetCounter();
+        Assert.Equal(1, counter);
     }
 }
