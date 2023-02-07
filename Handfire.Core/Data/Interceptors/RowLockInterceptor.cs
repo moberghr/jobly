@@ -1,5 +1,4 @@
 ﻿using System.Data.Common;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Handfire.Core.Interceptors;

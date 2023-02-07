@@ -47,11 +47,11 @@ public static class ServiceConfiguration
 
     public static DbContextOptionsBuilder AddHandfireInterceptors(this DbContextOptionsBuilder optionsBuilder, DatabaseType databaseType)
     {
-        if(databaseType is DatabaseType.Postgres)
+        if (databaseType is DatabaseType.Postgres)
         {
             optionsBuilder.AddInterceptors(_postgresInterceptor);
         }
-        else if(databaseType is DatabaseType.SqlServer)
+        else if (databaseType is DatabaseType.SqlServer)
         {
             optionsBuilder.AddInterceptors(_sqlServerInterceptor);
         }

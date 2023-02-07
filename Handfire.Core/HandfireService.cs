@@ -20,7 +20,7 @@ public interface IHandfireService
     Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request);
 
     Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request);
-    
+
     Task SetRetry(string jobId);
 }
 
@@ -85,7 +85,7 @@ public class HandfireService<TContext> : IHandfireService
             .Where(x => x.CurrentState == State.Failed)
             .FirstOrDefault();
 
-        if(job == null)
+        if (job == null)
         {
             throw new ArgumentException("Invalid job id.");
         }

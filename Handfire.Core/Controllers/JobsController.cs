@@ -1,5 +1,4 @@
 ﻿using Handfire.Core.Enums;
-using Handfire.Core.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 

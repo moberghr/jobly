@@ -24,9 +24,8 @@ public static class JobQueryHelper
     private static IQueryable<Job> WhereIsPendingOrRetry(this IQueryable<Job> query)
     {
         return query
-            .Where(x =>
-                x.CurrentState == State.Enqueued 
-                && (x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null));
+            .Where(x => x.CurrentState == State.Enqueued)
+            .Where(x => x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null);
     }
 }
 
