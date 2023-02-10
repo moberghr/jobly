@@ -4,6 +4,7 @@ using Handfire.Core.Interceptors;
 using Handfire.Core.Worker;
 using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
@@ -12,8 +13,12 @@ namespace Handfire.Core;
 
 public static class ServiceConfiguration
 {
-    private static readonly ForUpdateSkipLockedCommandInterceptor _interceptor = new();
-    public static void AddHandfire<TContext>(this IServiceCollection services, int workerCount)
+    private static readonly PostgresRowLockInterceptor _postgresInterceptor = new();
+    private static readonly SqlServerRowLockInterceptor _sqlServerInterceptor = new();
+
+    private static readonly SaveChangesConcurrencyTokenInterceptor _saveChangesInterceptor = new();
+
+    public static IServiceCollection AddHandfire<TContext>(this IServiceCollection services, int workerCount)
         where TContext : DbContext
     {
         var assembly = typeof(ServiceConfiguration).Assembly;
@@ -30,14 +35,33 @@ public static class ServiceConfiguration
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IRecurringJobPublisher>(x => new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IHandfireService>(x => new HandfireService<TContext>(x.GetRequiredService<TContext>()));
+        services.AddTransient<IHandfireWorkerService, HandfireWorkerService<TContext>>();
 
         for (var i = 0; i < workerCount; i++)
         {
             services.AddSingleton<IHostedService, HandfireWorker<TContext>>();
         }
+
+        return services;
     }
 
-    public static void AddHandfireInterceptors(this DbContextOptionsBuilder optionsBuilder) => optionsBuilder.AddInterceptors(_interceptor);
+    public static DbContextOptionsBuilder AddHandfireInterceptors(this DbContextOptionsBuilder optionsBuilder, DatabaseType databaseType)
+    {
+        if(databaseType is DatabaseType.Postgres)
+        {
+            optionsBuilder.AddInterceptors(_postgresInterceptor);
+        }
+        else if(databaseType is DatabaseType.SqlServer)
+        {
+            optionsBuilder.AddInterceptors(_sqlServerInterceptor);
+        }
+
+        optionsBuilder.AddInterceptors(_saveChangesInterceptor);
+
+        optionsBuilder.ConfigureWarnings(w => w.Ignore(SqlServerEventId.SavepointsDisabledBecauseOfMARS));
+
+        return optionsBuilder;
+    }
 
     public static void AddOutboxStateEntity(this ModelBuilder modelBuilder)
     {
@@ -49,6 +73,7 @@ public static class ServiceConfiguration
     private static void AddJobEntity(ModelBuilder modelBuilder)
     {
         var job = modelBuilder.Entity<Job>();
+        job.ToTable(nameof(Job));
 
         job.Property(p => p.Id);
         job.HasKey(p => p.Id);
@@ -57,7 +82,6 @@ public static class ServiceConfiguration
         job.Property(p => p.Message);
         job.Property(p => p.CreateTime);
         job.Property(p => p.ScheduleTime);
-        job.Property(p => p.ProcessedTime);
         job.Property(p => p.CurrentState);
 
         job.HasMany(p => p.JobStates)
@@ -67,6 +91,7 @@ public static class ServiceConfiguration
     private static void AddJobStateEntity(ModelBuilder modelBuilder)
     {
         var jobState = modelBuilder.Entity<JobState>();
+        jobState.ToTable(nameof(JobState));
 
         jobState.Property(p => p.Id);
         jobState.HasKey(p => p.Id);
@@ -82,6 +107,7 @@ public static class ServiceConfiguration
     private static void AddRecurringJobEntity(ModelBuilder modelBuilder)
     {
         var recurringJob = modelBuilder.Entity<RecurringJob>();
+        recurringJob.ToTable(nameof(RecurringJob));
 
         recurringJob.Property(p => p.Id);
         recurringJob.HasKey(p => p.Id);
@@ -98,6 +124,6 @@ public static class ServiceConfiguration
         recurringJob.HasOne(p => p.NextJob);
         recurringJob.HasOne(p => p.LastJob);
 
-        recurringJob.Property(p => p.Version).IsRowVersion();
+        recurringJob.Property(p => p.Version).IsConcurrencyToken();
     }
 }

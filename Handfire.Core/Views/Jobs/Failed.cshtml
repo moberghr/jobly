@@ -22,7 +22,7 @@
     <div style="margin: 1rem;">
         @for (var i = 0; i < Model.PageCount; i++)
         {
-            <a class="pagination-btn" asp-controller="Jobs" asp-action="Created" asp-route-page="@i" asp-route-pageSize="20">@(i + 1)</a>
+            <a class="pagination-btn" asp-controller="Jobs" asp-action="Failed" asp-route-page="@i" asp-route-pageSize="20">@(i + 1)</a>
         }
     </div>
 </body>

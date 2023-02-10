@@ -20,7 +20,8 @@ public interface IHandfireService
     Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request);
 
     Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request);
-    Task SetRetry(int jobId);
+    
+    Task SetRetry(string jobId);
 }
 
 public class HandfireService<TContext> : IHandfireService
@@ -77,7 +78,7 @@ public class HandfireService<TContext> : IHandfireService
         return jobs;
     }
 
-    public async Task SetRetry(int jobId)
+    public async Task SetRetry(string jobId)
     {
         var job = _context.Set<Job>()
             .Where(x => x.Id == jobId)
@@ -89,13 +90,13 @@ public class HandfireService<TContext> : IHandfireService
             throw new ArgumentException("Invalid job id.");
         }
 
-        job.CurrentState = State.Retry;
+        job.CurrentState = State.Enqueued;
 
         var jobState = new JobState
         {
             Job = job,
             DateTime = DateTime.UtcNow,
-            State = State.Retry
+            State = State.Enqueued
         };
 
         _context.Set<Job>().Update(job);
@@ -125,7 +126,6 @@ public class HandfireService<TContext> : IHandfireService
     private IQueryable<JobModel> GetScheduledJobs()
     {
         var query = _context.Set<Job>()
-            .Where(x => x.ProcessedTime == null)
             .Where(x => x.ScheduleTime > DateTime.UtcNow)
             .Select(x =>
                 new JobModel
@@ -134,7 +134,6 @@ public class HandfireService<TContext> : IHandfireService
                     CurrentState = x.CurrentState,
                     CreateTime = x.CreateTime,
                     Message = x.Message,
-                    ProcessedTime = x.ProcessedTime,
                     ScheduleTime = x.ScheduleTime,
                     Type = x.Type
                 })
@@ -146,7 +145,6 @@ public class HandfireService<TContext> : IHandfireService
     private IQueryable<JobModel> GetPendingJobs()
     {
         var query = _context.Set<Job>()
-            .Where(x => x.ProcessedTime == null)
             .Where(x => x.ScheduleTime < DateTime.UtcNow)
             .Select(x =>
                 new JobModel
@@ -155,7 +153,6 @@ public class HandfireService<TContext> : IHandfireService
                     CurrentState = x.CurrentState,
                     CreateTime = x.CreateTime,
                     Message = x.Message,
-                    ProcessedTime = x.ProcessedTime,
                     ScheduleTime = x.ScheduleTime,
                     Type = x.Type
                 })
@@ -175,7 +172,6 @@ public class HandfireService<TContext> : IHandfireService
                     CurrentState = x.CurrentState,
                     CreateTime = x.CreateTime,
                     Message = x.Message,
-                    ProcessedTime = x.ProcessedTime,
                     ScheduleTime = x.ScheduleTime,
                     Type = x.Type
                 })

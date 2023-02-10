@@ -48,16 +48,18 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
 
         var jobStats = new List<JobState>
         {
-            new() { State = State.Created, DateTime = DateTime.UtcNow}
+            new() { State = State.Enqueued, DateTime = DateTime.UtcNow}
         };
 
+        var jobId = Guid.NewGuid().ToString();
         var job = new Job
         {
+            Id = jobId,
             Message = jobMessage!,
             Type = jobType!,
             CreateTime = DateTime.UtcNow,
             ScheduleTime = nextJobScheduleTime,
-            CurrentState = State.Created,
+            CurrentState = State.Enqueued,
             JobStates = jobStats
         };
 
@@ -77,15 +79,13 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             // if nextJob is LOCKED in HandfireWorker it will WAIT and timeout (after 30 sec)
             var nextJob = await _context.Set<Job>()
                 .Where(x => x.Id == recurringJob.NextJobId)
-                .TagWith(ForUpdateSkipLockedCommandInterceptor.Label)
+                .TagWith(InterceptorConstants.RowLock)
                 .FirstAsync();
 
-            if (nextJob.ProcessedTime == null)
+            if (nextJob.CurrentState == State.Enqueued)
             {
-                var deletedTime = DateTime.UtcNow;
-                nextJob.ProcessedTime = deletedTime;
                 nextJob.CurrentState = State.Deleted;
-                nextJob.JobStates.Add(new() { DateTime = deletedTime, State = State.Deleted });
+                nextJob.JobStates.Add(new() { DateTime = DateTime.UtcNow, State = State.Deleted });
             }
 
             recurringJob.Cron = cronExpression;

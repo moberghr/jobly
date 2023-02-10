@@ -19,7 +19,7 @@ public class JobsController : Controller
     [HttpGet("created")]
     public async Task<IActionResult> Created(BaseListRequest request)
     {
-        var model = await _handfireService.GetJobsList(request, State.Created);
+        var model = await _handfireService.GetJobsList(request, State.Enqueued);
 
         return View(model);
     }
@@ -41,7 +41,7 @@ public class JobsController : Controller
     }
 
     [HttpGet("retry")]
-    public async Task<IActionResult> Retry(int jobId)
+    public async Task<IActionResult> Retry(string jobId)
     {
         await _handfireService.SetRetry(jobId);
 

@@ -1,9 +1,10 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Handfire.Core.Entities;
+using Handfire.Core.Interfaces;
 
 namespace Handfire.Core.Data.Entities;
-public class RecurringJob
+public class RecurringJob : IConcurrencyToken
 {
     public int Id { get; set; }
     
@@ -23,17 +24,20 @@ public class RecurringJob
 
     public DateTime? LastExecution { get; set; }
 
+    [MaxLength(50)]
     [ForeignKey(nameof(NextJob))]
-    public int? NextJobId { get; set; }
+    public string? NextJobId { get; set; }
 
     public Job? NextJob { get; set; }
 
+    [MaxLength(50)]
     [ForeignKey(nameof(LastJob))]
-    public int? LastJobId { get; set; }
+    public string? LastJobId { get; set; }
 
     public Job? LastJob { get; set; }
 
     public ICollection<Job>? Jobs { get; set; }
 
-    public uint Version { get; set; }
+    [ConcurrencyCheck]
+    public Guid Version { get; set; }
 }

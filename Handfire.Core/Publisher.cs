@@ -12,9 +12,9 @@ namespace Handfire.Core;
 
 public interface IPublisher
 {
-    Task Publish<T>(T message) where T : class;
+    Task<string> Publish<T>(T message) where T : class;
 
-    Task Publish<T>(T message, DateTime scheduleTime) where T : class;
+    Task<string> Publish<T>(T message, DateTime scheduleTime) where T : class;
 }
 
 public class Publisher<TContext> : IPublisher
@@ -27,38 +27,44 @@ public class Publisher<TContext> : IPublisher
         _context = context;
     }
 
-    public async Task Publish<T>(T message)
+    public async Task<string> Publish<T>(T message)
         where T : class
     {
-        await CreateJobAndJobState<T>(message, scheduleTime: null);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null);
     }
 
-    public async Task Publish<T>(T message, DateTime scheduleTime)
+    public async Task<string> Publish<T>(T message, DateTime scheduleTime)
         where T : class
     {
-        await CreateJobAndJobState<T>(message, scheduleTime);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime);
     }
 
-    private async Task CreateJobAndJobState<T>(T message, DateTime? scheduleTime)
+    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime)
         where T : class
     {
+        var createdTime = DateTime.UtcNow;
+
+        var jobId = Guid.NewGuid().ToString();
+
         var job = new Job
         {
-            CreateTime = DateTime.UtcNow,
+            Id = jobId,
+            CreateTime = createdTime,
             Message = JsonSerializer.Serialize(message),
             Type = message.GetType().AssemblyQualifiedName!,
             ScheduleTime = scheduleTime,
-            CurrentState = Enums.State.Created
+            CurrentState = Enums.State.Enqueued
         };
 
         var jobState = new JobState
         {
             Job = job,
-            State = Enums.State.Created,
-            DateTime = DateTime.UtcNow,
+            State = Enums.State.Enqueued,
+            DateTime = createdTime,
         };
 
-        await _context.Set<Job>().AddAsync(job);
         await _context.Set<JobState>().AddAsync(jobState);
+
+        return jobId;
     }
 }
