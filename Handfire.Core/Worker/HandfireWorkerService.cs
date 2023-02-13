@@ -47,21 +47,21 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         _logger = logger;
     }
 
-    public async Task GetAndProcessJob(CancellationToken cancellationToken)
+    public async Task GetAndProcessJob(CancellationToken stoppingToken)
     {
         using var scope = _serviceScopeFactory.CreateScope();
 
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
-        using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        using var transaction = await context.Database.BeginTransactionAsync(stoppingToken);
 
         var job = await context.GetJobs()
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(stoppingToken);
 
         // if we didn't find any messages then we wait, otherwise we query again immediately 
         if (job == null)
         {
-            await Task.Delay(1000, cancellationToken);
+            await Task.Delay(1000, stoppingToken);
 
             return;
         }
@@ -72,21 +72,21 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         {
             if (job.RecurringJobId.HasValue)
             {
-                await CreateNextJob(job, cancellationToken);
+                await CreateNextJob(job, stoppingToken);
             }
 
-            await ProcessOutboxMessage(job, cancellationToken);
+            await ProcessOutboxMessage(job, stoppingToken);
         }
         catch (Exception e)
         {
-            await UpdateJobData(context, job, State.Failed, e.Message, cancellationToken);
+            await UpdateJobData(context, job, State.Failed, e.Message, stoppingToken);
 
             transaction.Commit();
 
             return;
         }
 
-        await UpdateJobData(context, job, State.Completed, message: null, cancellationToken);
+        await UpdateJobData(context, job, State.Completed, message: null, stoppingToken);
         transaction.Commit();
     }
 

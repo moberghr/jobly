@@ -18,7 +18,7 @@ public static class ServiceConfiguration
 
     private static readonly SaveChangesConcurrencyTokenInterceptor _saveChangesInterceptor = new();
 
-    public static IServiceCollection AddHandfire<TContext>(this IServiceCollection services, int workerCount)
+    public static IServiceCollection AddHandfire<TContext>(this IServiceCollection services, int workerCount, int retry)
         where TContext : DbContext
     {
         var assembly = typeof(ServiceConfiguration).Assembly;

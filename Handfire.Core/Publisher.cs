@@ -1,20 +1,14 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
-using System.Xml.Linq;
-using Cronos;
-using Handfire.Core.Data.Entities;
+﻿using System.Text.Json;
 using Handfire.Core.Entities;
-using Handfire.Core.Enums;
-using Microsoft.AspNetCore.SignalR.Protocol;
 using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Core;
 
 public interface IPublisher
 {
-    Task<string> Publish<T>(T message) where T : class;
+    Task<string> Publish<T>(T message, int? jobRetry) where T : class;
 
-    Task<string> Publish<T>(T message, DateTime scheduleTime) where T : class;
+    Task<string> Publish<T>(T message, DateTime scheduleTime, int? jobRetry) where T : class;
 }
 
 public class Publisher<TContext> : IPublisher
@@ -27,19 +21,19 @@ public class Publisher<TContext> : IPublisher
         _context = context;
     }
 
-    public async Task<string> Publish<T>(T message)
+    public async Task<string> Publish<T>(T message, int? jobRetry)
         where T : class
     {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, jobRetry);
     }
 
-    public async Task<string> Publish<T>(T message, DateTime scheduleTime)
+    public async Task<string> Publish<T>(T message, DateTime scheduleTime, int? jobRetry)
         where T : class
     {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, jobRetry);
     }
 
-    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime)
+    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? jobRetry)
         where T : class
     {
         var createdTime = DateTime.UtcNow;
