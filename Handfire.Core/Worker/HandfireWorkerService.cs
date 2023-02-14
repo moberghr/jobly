@@ -8,6 +8,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Handfire.Core;
 
@@ -74,19 +75,19 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             {
                 await CreateNextJob(job, stoppingToken);
             }
-
+            throw new Exception();
             await ProcessOutboxMessage(job, stoppingToken);
         }
         catch (Exception e)
         {
-            await UpdateJobData(context, job, State.Failed, e.Message, stoppingToken);
+            await UpdateJobData(context, job, e.Message, stoppingToken);
 
             transaction.Commit();
 
             return;
         }
 
-        await UpdateJobData(context, job, State.Completed, message: null, stoppingToken);
+        await UpdateJobData(context, job, message: null, stoppingToken);
         transaction.Commit();
     }
 
@@ -160,8 +161,14 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         await mediator.Send(request, cancellationToken);
     }
 
-    private static async Task UpdateJobData(TContext context, Job job, State state, string? message, CancellationToken cancellationToken)
+    private static async Task UpdateJobData(TContext context, Job job, string? message, CancellationToken cancellationToken)
     {
+        var state = message != null ? State.Failed : State.Completed;
+        if (job.Retried < job.PossibleRetries && !message.IsNullOrEmpty())
+        {
+            state = State.Enqueued;
+            job.Retried += 1;
+        }
         UpdateJob(context, job, state);
 
         await CreateJobState(context, job.Id, state, message, cancellationToken);

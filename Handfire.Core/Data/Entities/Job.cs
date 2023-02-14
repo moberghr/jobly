@@ -24,7 +24,6 @@ public class Job
     public RecurringJob? RecurringJob { get; set; }
 
     public List<JobState> JobStates { get; set; } = new();
-    public int? PossibleRetrys { get; set; }
-    public int? CurrentRetry { get; set; }
-
+    public int PossibleRetries { get; set; }
+    public int Retried { get; set; } = 0;  
 }

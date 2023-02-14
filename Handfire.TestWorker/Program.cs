@@ -5,7 +5,7 @@ var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
         services.AddServices(context.Configuration);
-        services.AddHandfire<TestContext>(10);
+        services.AddHandfire<TestContext>(10, 2);
     })
     .Build();
 

@@ -18,7 +18,7 @@ public static class ServiceConfiguration
 
     private static readonly SaveChangesConcurrencyTokenInterceptor _saveChangesInterceptor = new();
 
-    public static IServiceCollection AddHandfire<TContext>(this IServiceCollection services, int workerCount, int retry)
+    public static IServiceCollection AddHandfire<TContext>(this IServiceCollection services, int workerCount, int possibleRetrys)
         where TContext : DbContext
     {
         var assembly = typeof(ServiceConfiguration).Assembly;
@@ -32,7 +32,7 @@ public static class ServiceConfiguration
             options.FileProviders.Add(new EmbeddedFileProvider(assembly));
         });
 
-        services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>()));
+        services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(), possibleRetrys));
         services.AddScoped<IRecurringJobPublisher>(x => new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IHandfireService>(x => new HandfireService<TContext>(x.GetRequiredService<TContext>()));
         services.AddTransient<IHandfireWorkerService, HandfireWorkerService<TContext>>();
@@ -83,6 +83,8 @@ public static class ServiceConfiguration
         job.Property(p => p.CreateTime);
         job.Property(p => p.ScheduleTime);
         job.Property(p => p.CurrentState);
+        job.Property(p => p.Retried);
+        job.Property(p => p.PossibleRetries);
 
         job.HasMany(p => p.JobStates)
             .WithOne(p => p.Job);

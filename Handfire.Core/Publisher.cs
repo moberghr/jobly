@@ -15,10 +15,11 @@ public class Publisher<TContext> : IPublisher
     where TContext : DbContext
 {
     private readonly TContext _context;
-
-    public Publisher(TContext context)
+    private readonly int _possibleRetrys;    
+    public Publisher(TContext context, int possibleRetrys)
     {
         _context = context;
+        _possibleRetrys = possibleRetrys;   
     }
 
     public async Task<string> Publish<T>(T message, int? jobRetry)
@@ -47,7 +48,8 @@ public class Publisher<TContext> : IPublisher
             Message = JsonSerializer.Serialize(message),
             Type = message.GetType().AssemblyQualifiedName!,
             ScheduleTime = scheduleTime,
-            CurrentState = Enums.State.Enqueued
+            CurrentState = Enums.State.Enqueued,
+            PossibleRetries = jobRetry ?? _possibleRetrys,
         };
 
         var jobState = new JobState
