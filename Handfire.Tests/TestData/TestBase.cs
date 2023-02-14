@@ -18,7 +18,7 @@ public abstract class TestBase
         var services = new ServiceCollection();
         var provider = services.AddMediatR(typeof(TestBase))
             .AddTransient<TestContext>(x => CreateContext())
-            .AddHandfire<TestContext>(0)
+            .AddHandfire<TestContext>(0, 0)
             .AddSingleton<CounterService>()
             .BuildServiceProvider();
 
@@ -26,7 +26,7 @@ public abstract class TestBase
 
         var providerWithNoLocking = services.AddMediatR(typeof(TestBase))
             .AddTransient<TestContext>(x => CreateContextWithoutJobLocking())
-            .AddHandfire<TestContext>(0)
+            .AddHandfire<TestContext>(0, 0)
             .AddSingleton<CounterService>()
             .BuildServiceProvider();
 
@@ -39,9 +39,9 @@ public abstract class TestBase
 
     protected async Task<string> CreateProcessLogJob(TestContext context, int testLogId)
     {
-        var publisher = new Publisher<TestContext>(context);
+        var publisher = new Publisher<TestContext>(context, 0);
         var processLogJob = new PrecessLogRequest { TestTaskId = testLogId };
-        var jobId = await publisher.Publish(processLogJob);
+        var jobId = await publisher.Publish(processLogJob, null);
 
         await context.SaveChangesAsync();
 
@@ -50,11 +50,11 @@ public abstract class TestBase
 
     protected async Task<string> CreateFailedJob(TestContext context)
     {
-        var publisher = new Publisher<TestContext>(context);
+        var publisher = new Publisher<TestContext>(context, 0);
 
         var throwExceptionRequest = new ThrowExceptionRequest();
 
-        var jobId = await publisher.Publish(throwExceptionRequest);
+        var jobId = await publisher.Publish(throwExceptionRequest, null);
 
         await context.SaveChangesAsync();
 
@@ -65,11 +65,11 @@ public abstract class TestBase
     {
         var context = CreateContext();
 
-        var publisher = new Publisher<TestContext>(context);
+        var publisher = new Publisher<TestContext>(context, 0);
 
         var request = new CounterRequest();
 
-        await publisher.Publish(request);
+        await publisher.Publish(request, null);
 
         await context.SaveChangesAsync();
     }
