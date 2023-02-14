@@ -13,8 +13,8 @@ public static class ServiceConfiguration
         services.AddMediatR(typeof(ServiceConfiguration));
 
         services.AddDbContextPool<TestContext>(options => options
-            //.UseNpgsql(configuration.GetConnectionString(nameof(TestContext))!)
-            .UseSqlServer(configuration.GetConnectionString(nameof(TestContext))!)
+            .UseNpgsql(configuration.GetConnectionString(nameof(TestContext))!)
+            //.UseSqlServer(configuration.GetConnectionString(nameof(TestContext))!)
             .UseSnakeCaseNamingConvention()
             .AddHandfireInterceptors(Core.Interceptors.DatabaseType.SqlServer));
     }

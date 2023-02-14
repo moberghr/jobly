@@ -80,6 +80,9 @@ public class SqlServerRowLockInterceptor : DbCommandInterceptor
         if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLock}", StringComparison.Ordinal))
         {
             command.CommandText = command.CommandText.Replace($"FROM [{nameof(Job)}] AS [j]", $"FROM [{nameof(Job)}] AS [j] WITH (ROWLOCK, UPDLOCK)");
+            string e = $"FROM [{nameof(Job)}] AS [j]";
+            string sdagfsdg = $"FROM [{nameof(Job)}] AS [j] WITH (ROWLOCK, UPDLOCK)";
+            string s = command.CommandText;
         }
     }
 }
