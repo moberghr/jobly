@@ -8,7 +8,6 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Handfire.Core;
 
@@ -32,7 +31,7 @@ public static class JobQueryHelper
 
 public interface IHandfireWorkerService
 {
-    Task GetAndProcessJob(CancellationToken stoppingToken);
+    Task GetAndProcessJob(CancellationToken cancellationToken);
 }
 
 public class HandfireWorkerService<TContext> : IHandfireWorkerService
@@ -48,21 +47,21 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         _logger = logger;
     }
 
-    public async Task GetAndProcessJob(CancellationToken stoppingToken)
+    public async Task GetAndProcessJob(CancellationToken cancellationToken)
     {
         using var scope = _serviceScopeFactory.CreateScope();
 
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
-        using var transaction = await context.Database.BeginTransactionAsync(stoppingToken);
+        using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
         var job = await context.GetJobs()
-            .FirstOrDefaultAsync(stoppingToken);
+            .FirstOrDefaultAsync(cancellationToken);
 
         // if we didn't find any messages then we wait, otherwise we query again immediately 
         if (job == null)
         {
-            await Task.Delay(1000, stoppingToken);
+            await Task.Delay(1000, cancellationToken);
 
             return;
         }
@@ -73,21 +72,20 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         {
             if (job.RecurringJobId.HasValue)
             {
-                await CreateNextJob(job, stoppingToken);
+                await CreateNextJob(job, cancellationToken);
             }
-            throw new Exception();
-            await ProcessOutboxMessage(job, stoppingToken);
+            await ProcessOutboxMessage(job, cancellationToken);
         }
         catch (Exception e)
         {
-            await UpdateJobData(context, job, e.Message, stoppingToken);
+            await UpdateJobData(context, job, e.Message, cancellationToken);
 
             transaction.Commit();
 
             return;
         }
 
-        await UpdateJobData(context, job, message: null, stoppingToken);
+        await UpdateJobData(context, job, message: null, cancellationToken);
         transaction.Commit();
     }
 
@@ -164,10 +162,10 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
     private static async Task UpdateJobData(TContext context, Job job, string? message, CancellationToken cancellationToken)
     {
         var state = message != null ? State.Failed : State.Completed;
-        if (job.Retried < job.PossibleRetries && !message.IsNullOrEmpty())
+        if (job.RetriedTimes < job.MaxRetries && !string.IsNullOrEmpty(message))
         {
             state = State.Enqueued;
-            job.Retried += 1;
+            job.RetriedTimes += 1;
         }
         UpdateJob(context, job, state);
 

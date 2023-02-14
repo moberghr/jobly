@@ -22,7 +22,7 @@ public class JobPublisherPostgres : PostgreSqlTestBase
 
         var publisher = new Publisher<TestContext>(context, 0);
         var jobRequest = new UnitRequest();
-        var jobId = await publisher.Publish(jobRequest, null);
+        var jobId = await publisher.Publish(jobRequest);
 
         await context.SaveChangesAsync();
 

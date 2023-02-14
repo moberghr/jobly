@@ -56,7 +56,7 @@ public class ScheduleRegisterCommand : IRequestHandler<ScheduleRegisterRequest, 
 
         for (var i = 0; i < 10; i++)
         {
-            await _publisher.Publish(sendEmailRequest, request.ScheduleTime, null);
+            await _publisher.Publish(sendEmailRequest, request.ScheduleTime);
         }
 
         await _context.SaveChangesAsync();

@@ -6,35 +6,49 @@ namespace Handfire.Core;
 
 public interface IPublisher
 {
-    Task<string> Publish<T>(T message, int? jobRetry) where T : class;
+    Task<string> Publish<T>(T message) where T : class;
 
-    Task<string> Publish<T>(T message, DateTime scheduleTime, int? jobRetry) where T : class;
+    Task<string> Publish<T>(T message, DateTime scheduleTime) where T : class;
+
+    Task<string> Publish<T>(T message, int retriedTimes) where T : class;
+
+    Task<string> Publish<T>(T message, DateTime scheduleTime, int retriedTimes) where T : class;
 }
 
 public class Publisher<TContext> : IPublisher
     where TContext : DbContext
 {
     private readonly TContext _context;
-    private readonly int _possibleRetrys;    
-    public Publisher(TContext context, int possibleRetrys)
+    private readonly int? _retries;    
+    public Publisher(TContext context, int? retries)
     {
         _context = context;
-        _possibleRetrys = possibleRetrys;   
+        _retries = retries;   
     }
 
-    public async Task<string> Publish<T>(T message, int? jobRetry)
+    public async Task<string> Publish<T>(T message)
         where T : class
     {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, jobRetry);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, retriedTimes: null);
     }
 
-    public async Task<string> Publish<T>(T message, DateTime scheduleTime, int? jobRetry)
+    public async Task<string> Publish<T>(T message, DateTime scheduleTime)
         where T : class
     {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, jobRetry);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, retriedTimes: null);
     }
 
-    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? jobRetry)
+    public async Task<string> Publish<T>(T message, int retriedTimes) where T : class
+    {
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, retriedTimes);
+    }
+
+    public async Task<string> Publish<T>(T message, DateTime scheduleTime, int retriedTimes) where T : class
+    {
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, retriedTimes);
+    }
+
+    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? retriedTimes)
         where T : class
     {
         var createdTime = DateTime.UtcNow;
@@ -49,7 +63,7 @@ public class Publisher<TContext> : IPublisher
             Type = message.GetType().AssemblyQualifiedName!,
             ScheduleTime = scheduleTime,
             CurrentState = Enums.State.Enqueued,
-            PossibleRetries = jobRetry ?? _possibleRetrys,
+            MaxRetries = retriedTimes ?? _retries ?? 0,
         };
 
         var jobState = new JobState

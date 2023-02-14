@@ -21,7 +21,7 @@ public class Job
 
     public int? RecurringJobId { get; set; }
 
-    public int RetriedTimes { get; set; } = 0;
+    public int RetriedTimes { get; set; }
 
     public int MaxRetries { get; set; }
 

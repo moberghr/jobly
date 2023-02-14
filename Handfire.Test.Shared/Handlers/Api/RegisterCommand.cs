@@ -43,7 +43,7 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
 
         for (var i = 0; i < 100; i++)
         {
-            await _publisher.Publish(sendEmailRequest, null);
+            await _publisher.Publish(sendEmailRequest);
         }
 
         await _context.SaveChangesAsync();

@@ -27,7 +27,7 @@ public class FailedCommand : IRequestHandler<FailedJobRequest, FailedJobResponse
     {
         if (request.SchedululeTime.HasValue)
         {
-            await _publisher.Publish(new ThrowExceptionRequest(), request.SchedululeTime.Value, null);
+            await _publisher.Publish(new ThrowExceptionRequest(), request.SchedululeTime.Value);
 
             await _context.SaveChangesAsync();
 
@@ -36,7 +36,7 @@ public class FailedCommand : IRequestHandler<FailedJobRequest, FailedJobResponse
 
         for (var i = 0; i < 10; i++)
         {
-            await _publisher.Publish(new ThrowExceptionRequest(), null);
+            await _publisher.Publish(new ThrowExceptionRequest());
         }
 
         await _context.SaveChangesAsync();

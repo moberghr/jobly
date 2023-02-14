@@ -18,8 +18,19 @@ public static class ServiceConfiguration
 
     private static readonly SaveChangesConcurrencyTokenInterceptor _saveChangesInterceptor = new();
 
-    public static IServiceCollection AddHandfire<TContext>(this IServiceCollection services, int workerCount, int possibleRetrys)
+    public static IServiceCollection AddHandfire<TContext>(this IServiceCollection services, int workerCount, int retries)
         where TContext : DbContext
+    {
+        return CreateHandfireServices<TContext>(services, workerCount, retries);
+    }
+
+    public static IServiceCollection AddHandfire<TContext>(this IServiceCollection services, int workerCount)
+        where TContext : DbContext
+    {
+        return CreateHandfireServices<TContext>(services, workerCount, retries: null);
+    }
+
+    private static IServiceCollection CreateHandfireServices<TContext>(this IServiceCollection services, int workerCount, int? retries) where TContext : DbContext
     {
         var assembly = typeof(ServiceConfiguration).Assembly;
 
@@ -32,7 +43,7 @@ public static class ServiceConfiguration
             options.FileProviders.Add(new EmbeddedFileProvider(assembly));
         });
 
-        services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(), possibleRetrys));
+        services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(), retries));
         services.AddScoped<IRecurringJobPublisher>(x => new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IHandfireService>(x => new HandfireService<TContext>(x.GetRequiredService<TContext>()));
         services.AddTransient<IHandfireWorkerService, HandfireWorkerService<TContext>>();
@@ -83,8 +94,8 @@ public static class ServiceConfiguration
         job.Property(p => p.CreateTime);
         job.Property(p => p.ScheduleTime);
         job.Property(p => p.CurrentState);
-        job.Property(p => p.Retried);
-        job.Property(p => p.PossibleRetries);
+        job.Property(p => p.RetriedTimes);
+        job.Property(p => p.MaxRetries);
 
         job.HasMany(p => p.JobStates)
             .WithOne(p => p.Job);

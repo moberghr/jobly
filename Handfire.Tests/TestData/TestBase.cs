@@ -41,7 +41,7 @@ public abstract class TestBase
     {
         var publisher = new Publisher<TestContext>(context, 0);
         var processLogJob = new PrecessLogRequest { TestTaskId = testLogId };
-        var jobId = await publisher.Publish(processLogJob, null);
+        var jobId = await publisher.Publish(processLogJob);
 
         await context.SaveChangesAsync();
 
@@ -54,7 +54,7 @@ public abstract class TestBase
 
         var throwExceptionRequest = new ThrowExceptionRequest();
 
-        var jobId = await publisher.Publish(throwExceptionRequest, null);
+        var jobId = await publisher.Publish(throwExceptionRequest);
 
         await context.SaveChangesAsync();
 
@@ -69,7 +69,7 @@ public abstract class TestBase
 
         var request = new CounterRequest();
 
-        await publisher.Publish(request, null);
+        await publisher.Publish(request);
 
         await context.SaveChangesAsync();
     }
