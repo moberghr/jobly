@@ -27,10 +27,10 @@ public static class ServiceConfiguration
     public static IServiceCollection AddHandfire<TContext>(this IServiceCollection services, int workerCount)
         where TContext : DbContext
     {
-        return CreateHandfireServices<TContext>(services, workerCount, retries: null);
+        return CreateHandfireServices<TContext>(services, workerCount, retries: 0);
     }
 
-    private static IServiceCollection CreateHandfireServices<TContext>(this IServiceCollection services, int workerCount, int? retries) where TContext : DbContext
+    private static IServiceCollection CreateHandfireServices<TContext>(this IServiceCollection services, int workerCount, int retries) where TContext : DbContext
     {
         var assembly = typeof(ServiceConfiguration).Assembly;
 

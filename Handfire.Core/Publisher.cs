@@ -10,17 +10,17 @@ public interface IPublisher
 
     Task<string> Publish<T>(T message, DateTime scheduleTime) where T : class;
 
-    Task<string> Publish<T>(T message, int retriedTimes) where T : class;
+    Task<string> Publish<T>(T message, int maxRetries) where T : class;
 
-    Task<string> Publish<T>(T message, DateTime scheduleTime, int retriedTimes) where T : class;
+    Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries) where T : class;
 }
 
 public class Publisher<TContext> : IPublisher
     where TContext : DbContext
 {
     private readonly TContext _context;
-    private readonly int? _retries;    
-    public Publisher(TContext context, int? retries)
+    private readonly int _retries;    
+    public Publisher(TContext context, int retries)
     {
         _context = context;
         _retries = retries;   
@@ -29,26 +29,26 @@ public class Publisher<TContext> : IPublisher
     public async Task<string> Publish<T>(T message)
         where T : class
     {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, retriedTimes: null);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, maxRetries: null);
     }
 
     public async Task<string> Publish<T>(T message, DateTime scheduleTime)
         where T : class
     {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, retriedTimes: null);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, maxRetries: null);
     }
 
-    public async Task<string> Publish<T>(T message, int retriedTimes) where T : class
+    public async Task<string> Publish<T>(T message, int maxRetries) where T : class
     {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, retriedTimes);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, maxRetries);
     }
 
-    public async Task<string> Publish<T>(T message, DateTime scheduleTime, int retriedTimes) where T : class
+    public async Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries) where T : class
     {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, retriedTimes);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, maxRetries);
     }
 
-    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? retriedTimes)
+    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? maxRetries)
         where T : class
     {
         var createdTime = DateTime.UtcNow;
@@ -63,7 +63,7 @@ public class Publisher<TContext> : IPublisher
             Type = message.GetType().AssemblyQualifiedName!,
             ScheduleTime = scheduleTime,
             CurrentState = Enums.State.Enqueued,
-            MaxRetries = retriedTimes ?? _retries ?? 0,
+            MaxRetries = maxRetries ?? _retries,
         };
 
         var jobState = new JobState
