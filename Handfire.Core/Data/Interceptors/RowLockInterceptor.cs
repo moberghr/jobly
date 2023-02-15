@@ -4,12 +4,6 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Handfire.Core.Interceptors;
 
-public enum DatabaseType
-{
-    Postgres,
-    SqlServer
-}
-
 public static class InterceptorConstants
 {
     public static readonly string RowLock = "LOCK ROW";
