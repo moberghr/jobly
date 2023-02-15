@@ -5,6 +5,7 @@ using Handfire.Core.Worker;
 using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.SqlServer.Infrastructure.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
@@ -49,16 +50,31 @@ public static class ServiceConfiguration
 
     public static DbContextOptionsBuilder AddHandfireInterceptors(this DbContextOptionsBuilder optionsBuilder)
     {
-        var dbType = optionsBuilder.Options.Extensions.ElementAtOrDefault(1);
-        if (dbType is NpgsqlOptionsExtension)
+        var extensions = optionsBuilder.Options.Extensions;
+
+        foreach (var extension in extensions)
         {
-            optionsBuilder.AddInterceptors(_postgresInterceptor);
+            if (extension is NpgsqlOptionsExtension)
+            {
+                optionsBuilder.AddInterceptors(_postgresInterceptor);
+                break;
+            }
+
+            if (extension is SqlServerOptionsExtension)
+            {
+                optionsBuilder.AddInterceptors(_sqlServerInterceptor);
+                break;
+            }
         }
-        else if (dbType is SqlServerOptionsExtension)
+
+        var builderExtension = optionsBuilder.Options.FindExtension<CoreOptionsExtension>();
+
+        if (builderExtension == null)
         {
-            optionsBuilder.AddInterceptors(_sqlServerInterceptor);
+            throw new ArgumentException("No CoreOptionsExtension found");
         }
-        else
+
+        if (builderExtension.Interceptors == null)
         {
             throw new ArgumentException("Interceptors don't contains the configuration for this database type");
         }
