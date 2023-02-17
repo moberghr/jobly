@@ -16,6 +16,6 @@ public static class ServiceConfiguration
             .UseNpgsql(configuration.GetConnectionString(nameof(TestContext))!)
             //.UseSqlServer(configuration.GetConnectionString(nameof(TestContext))!)
             .UseSnakeCaseNamingConvention()
-            .AddHandfireInterceptors(Core.Interceptors.DatabaseType.SqlServer));
+            .AddHandfireInterceptors());
     }
 }

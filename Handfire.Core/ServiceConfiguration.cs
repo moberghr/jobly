@@ -5,9 +5,12 @@ using Handfire.Core.Worker;
 using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.SqlServer.Infrastructure.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.Internal;
 
 namespace Handfire.Core;
 
@@ -56,15 +59,35 @@ public static class ServiceConfiguration
         return services;
     }
 
-    public static DbContextOptionsBuilder AddHandfireInterceptors(this DbContextOptionsBuilder optionsBuilder, DatabaseType databaseType)
+    public static DbContextOptionsBuilder AddHandfireInterceptors(this DbContextOptionsBuilder optionsBuilder)
     {
-        if(databaseType is DatabaseType.Postgres)
+        var extensions = optionsBuilder.Options.Extensions;
+
+        foreach (var extension in extensions)
         {
-            optionsBuilder.AddInterceptors(_postgresInterceptor);
+            if (extension is NpgsqlOptionsExtension)
+            {
+                optionsBuilder.AddInterceptors(_postgresInterceptor);
+                break;
+            }
+
+            if (extension is SqlServerOptionsExtension)
+            {
+                optionsBuilder.AddInterceptors(_sqlServerInterceptor);
+                break;
+            }
         }
-        else if(databaseType is DatabaseType.SqlServer)
+
+        var builderExtension = optionsBuilder.Options.FindExtension<CoreOptionsExtension>();
+
+        if (builderExtension == null)
         {
-            optionsBuilder.AddInterceptors(_sqlServerInterceptor);
+            throw new ArgumentException("No CoreOptionsExtension found");
+        }
+
+        if (builderExtension.Interceptors == null)
+        {
+            throw new ArgumentException("Interceptors don't contains the configuration for this database type");
         }
 
         optionsBuilder.AddInterceptors(_saveChangesInterceptor);
