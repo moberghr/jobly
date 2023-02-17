@@ -119,6 +119,7 @@ public static class ServiceConfiguration
         job.Property(p => p.CurrentState);
         job.Property(p => p.RetriedTimes);
         job.Property(p => p.MaxRetries);
+        job.Property(p => p.ParentJobId);
 
         job.HasMany(p => p.JobStates)
             .WithOne(p => p.Job);

@@ -25,6 +25,8 @@ public class Job
 
     public int MaxRetries { get; set; }
 
+    public string? ParentJobId { get; set; }
+
     public RecurringJob? RecurringJob { get; set; }
 
     public List<JobState> JobStates { get; set; } = new();
