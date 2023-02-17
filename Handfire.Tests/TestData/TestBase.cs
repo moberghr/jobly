@@ -61,6 +61,31 @@ public abstract class TestBase
         return jobId;
     }
 
+    protected async Task<string> CreateFailedRetryJob(TestContext context, int retries, int? maxRetries)
+    {
+        var publisher = new Publisher<TestContext>(context, retries);
+
+        var throwExceptionRequest = new ThrowExceptionRequest();
+
+        var jobId = maxRetries != null ? await publisher.Publish(throwExceptionRequest, (int)maxRetries) : await publisher.Publish(throwExceptionRequest);
+
+        await context.SaveChangesAsync();
+
+        return jobId;
+    }
+
+    protected async Task ChangeJobFromException(string jobId)
+    {
+        var jobRequest = new UnitRequest();
+        var context = CreateContext();
+        var currentJob = await GetJob(jobId);
+        currentJob.Type = jobRequest.GetType().AssemblyQualifiedName!;
+
+        context.Set<Job>().Update(currentJob);
+
+        await context.SaveChangesAsync();
+    }
+
     protected async Task CreateCounterJob()
     {
         var context = CreateContext();

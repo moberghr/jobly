@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using Handfire.Core;
+
 using Handfire.Core.Enums;
 using Handfire.Tests.TestData.Handlers;
 
@@ -103,5 +104,137 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
         var counter = await GetCounter();
         Assert.Equal(1, counter);
+    }
+
+    [Fact]
+    public async Task Publish_RetryJobWithStateFailed_RetriedTimesShouldBeEqualToMaxRetries()
+    {
+        int retries = 5;
+        var context = CreateContext();
+        string jobId = await CreateFailedRetryJob(context, retries, null);
+        
+        for (int i = 0; i <= 10; i++)
+        {
+            await ProcessJobWithoutLocking();
+        }
+
+        var currentJob = await GetJob(jobId);
+
+        Assert.NotNull(currentJob);
+        Assert.Equal(State.Failed, currentJob.CurrentState);
+        Assert.Equal(retries, currentJob.MaxRetries);
+        Assert.Equal(retries, currentJob.RetriedTimes);
+    }
+
+    [Fact]
+    public async Task Publish_WithoutRetryJob_WithStateFailed()
+    {
+        int retries = 0;
+        var context = CreateContext();
+        string jobId = await CreateFailedRetryJob(context, retries, null);
+       
+        for (int i = 0; i <= 10; i++)
+        {
+            await ProcessJobWithoutLocking();
+        }
+
+        var currentJob = await GetJob(jobId);
+
+        Assert.NotNull(currentJob);
+        Assert.Equal(State.Failed, currentJob.CurrentState);
+        Assert.Equal(retries, currentJob.MaxRetries);
+        Assert.Equal(retries, currentJob.RetriedTimes);
+    }
+
+    [Fact]
+    public async Task Publish_RetryJob_UsePublisherMaxRetriesParameter()
+    {
+        int retries = 0;
+        var context = CreateContext();
+        int maxRetries = 2;
+        string jobId = await CreateFailedRetryJob(context, retries, maxRetries);
+
+        for (int i = 0; i <= 10; i++)
+        {
+            await ProcessJobWithoutLocking();
+        }
+
+        var currentJob = await GetJob(jobId);
+
+        Assert.NotNull(currentJob);
+        Assert.Equal(State.Failed, currentJob.CurrentState);
+        Assert.Equal(maxRetries, currentJob.MaxRetries);
+        Assert.Equal(maxRetries, currentJob.RetriedTimes);
+    }
+
+    [Fact]
+    public async Task Publish_RetryJob_UsePublisherMaxRetriesAndGlobalRetryParameter()
+    {
+        int retries = 5;
+        var context = CreateContext();
+        int maxRetries = 1;
+        string jobId = await CreateFailedRetryJob(context, retries, maxRetries);
+
+        for (int i = 0; i <= 10; i++)
+        {
+            await ProcessJobWithoutLocking();
+        }
+
+        var currentJob = await GetJob(jobId);
+
+        Assert.NotNull(currentJob);
+        Assert.Equal(State.Failed, currentJob.CurrentState);
+        Assert.Equal(maxRetries, currentJob.MaxRetries);
+        Assert.Equal(maxRetries, currentJob.RetriedTimes);
+    }
+
+    [Fact]
+    public async Task Publish_WithoutRetryJob_WithStateComplited()
+    {
+        int retries = 0;
+        var context = CreateContext();
+        var publisher = new Publisher<TestContext>(context, retries);
+        var jobRequest = new UnitRequest();
+        string jobId = await publisher.Publish(jobRequest);
+        
+        await context.SaveChangesAsync();
+
+        for (int i = 0; i <= 10; i++)
+        {
+            await ProcessJobWithoutLocking();
+        }
+
+        var currentJob = await GetJob(jobId);
+
+        Assert.NotNull(currentJob);
+        Assert.Equal(State.Completed, currentJob.CurrentState);
+        Assert.Equal(retries, currentJob.MaxRetries);
+        Assert.Equal(retries, currentJob.RetriedTimes);
+    }
+
+    [Fact]
+    public async Task Publish_RetryJobWithStateComplated_RetriedTimesShouldNotBeEqualToMaxRetries()
+    {
+        int retries = 5;
+        int successIteration = 3;
+        var context = CreateContext();
+        string jobId = await CreateFailedRetryJob(context, retries, null);
+
+        for (int i = 0; i <= 10; i++)
+        {
+            if (i == successIteration)
+            {
+                await ChangeJobFromException(jobId);
+            }
+
+            await ProcessJobWithoutLocking();
+        }
+
+        var currentJob = await GetJob(jobId);
+
+        Assert.NotNull(currentJob);
+        Assert.Equal(State.Completed, currentJob.CurrentState);
+        Assert.Equal(retries, currentJob.MaxRetries);
+        Assert.Equal(successIteration, currentJob.RetriedTimes);
     }
 }

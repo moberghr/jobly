@@ -161,7 +161,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
     private static async Task UpdateJobData(TContext context, Job job, string? message, CancellationToken cancellationToken)
     {
-        var state = message != null ? State.Failed : State.Completed;
+        var state = !string.IsNullOrEmpty(message) ? State.Failed : State.Completed;
         if (job.RetriedTimes < job.MaxRetries && !string.IsNullOrEmpty(message))
         {
             state = State.Enqueued;
