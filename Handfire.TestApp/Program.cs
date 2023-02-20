@@ -15,7 +15,7 @@ builder.Services.AddHandfire<TestContext>(10);
 var app = builder.Build();
 
 // comment after db is created
-await Migrate();
+await Migrate(); 
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

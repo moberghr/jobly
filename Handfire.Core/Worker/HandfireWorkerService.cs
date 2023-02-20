@@ -31,7 +31,7 @@ public static class JobQueryHelper
 
 public interface IHandfireWorkerService
 {
-    Task GetAndProcessJob(CancellationToken stoppingToken);
+    Task GetAndProcessJob(CancellationToken cancellationToken);
 }
 
 public class HandfireWorkerService<TContext> : IHandfireWorkerService
@@ -74,19 +74,18 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             {
                 await CreateNextJob(job, cancellationToken);
             }
-
             await ProcessOutboxMessage(job, cancellationToken);
         }
         catch (Exception e)
         {
-            await UpdateJobData(context, job, State.Failed, e.Message, cancellationToken);
+            await UpdateJobData(context, job, e.Message, cancellationToken);
 
             transaction.Commit();
 
             return;
         }
 
-        await UpdateJobData(context, job, State.Completed, message: null, cancellationToken);
+        await UpdateJobData(context, job, message: null, cancellationToken);
         transaction.Commit();
     }
 
@@ -160,8 +159,14 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         await mediator.Send(request, cancellationToken);
     }
 
-    private static async Task UpdateJobData(TContext context, Job job, State state, string? message, CancellationToken cancellationToken)
+    private static async Task UpdateJobData(TContext context, Job job, string? message, CancellationToken cancellationToken)
     {
+        var state = !string.IsNullOrEmpty(message) ? State.Failed : State.Completed;
+        if (job.RetriedTimes < job.MaxRetries && !string.IsNullOrEmpty(message))
+        {
+            state = State.Enqueued;
+            job.RetriedTimes += 1;
+        }
         UpdateJob(context, job, state);
 
         await CreateJobState(context, job.Id, state, message, cancellationToken);

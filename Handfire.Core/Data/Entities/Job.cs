@@ -21,6 +21,10 @@ public class Job
 
     public int? RecurringJobId { get; set; }
 
+    public int RetriedTimes { get; set; }
+
+    public int MaxRetries { get; set; }
+
     public RecurringJob? RecurringJob { get; set; }
 
     public List<JobState> JobStates { get; set; } = new();

@@ -18,7 +18,7 @@ public abstract class TestBase
         var services = new ServiceCollection();
         var provider = services.AddMediatR(typeof(TestBase))
             .AddTransient<TestContext>(x => CreateContext())
-            .AddHandfire<TestContext>(0)
+            .AddHandfire<TestContext>(0, 0)
             .AddSingleton<CounterService>()
             .BuildServiceProvider();
 
@@ -26,7 +26,7 @@ public abstract class TestBase
 
         var providerWithNoLocking = services.AddMediatR(typeof(TestBase))
             .AddTransient<TestContext>(x => CreateContextWithoutJobLocking())
-            .AddHandfire<TestContext>(0)
+            .AddHandfire<TestContext>(0, 0)
             .AddSingleton<CounterService>()
             .BuildServiceProvider();
 
@@ -39,7 +39,7 @@ public abstract class TestBase
 
     protected async Task<string> CreateProcessLogJob(TestContext context, int testLogId)
     {
-        var publisher = new Publisher<TestContext>(context);
+        var publisher = new Publisher<TestContext>(context, 0);
         var processLogJob = new PrecessLogRequest { TestTaskId = testLogId };
         var jobId = await publisher.Publish(processLogJob);
 
@@ -50,7 +50,7 @@ public abstract class TestBase
 
     protected async Task<string> CreateFailedJob(TestContext context)
     {
-        var publisher = new Publisher<TestContext>(context);
+        var publisher = new Publisher<TestContext>(context, 0);
 
         var throwExceptionRequest = new ThrowExceptionRequest();
 
@@ -61,11 +61,36 @@ public abstract class TestBase
         return jobId;
     }
 
+    protected async Task<string> CreateFailedRetryJob(TestContext context, int retries, int? maxRetries)
+    {
+        var publisher = new Publisher<TestContext>(context, retries);
+
+        var throwExceptionRequest = new ThrowExceptionRequest();
+
+        var jobId = maxRetries != null ? await publisher.Publish(throwExceptionRequest, (int)maxRetries) : await publisher.Publish(throwExceptionRequest);
+
+        await context.SaveChangesAsync();
+
+        return jobId;
+    }
+
+    protected async Task ChangeJobFromException(string jobId)
+    {
+        var jobRequest = new UnitRequest();
+        var context = CreateContext();
+        var currentJob = await GetJob(jobId);
+        currentJob.Type = jobRequest.GetType().AssemblyQualifiedName!;
+
+        context.Set<Job>().Update(currentJob);
+
+        await context.SaveChangesAsync();
+    }
+
     protected async Task CreateCounterJob()
     {
         var context = CreateContext();
 
-        var publisher = new Publisher<TestContext>(context);
+        var publisher = new Publisher<TestContext>(context, 0);
 
         var request = new CounterRequest();
 

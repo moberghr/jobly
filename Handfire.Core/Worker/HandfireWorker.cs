@@ -16,7 +16,7 @@ public class HandfireWorker<TContext> : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
-        {
+        {   
             await _handfireWorkerService.GetAndProcessJob(stoppingToken);
         }
     }
