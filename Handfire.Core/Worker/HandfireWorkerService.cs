@@ -170,11 +170,8 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         UpdateJob(context, job, state);
 
-        if (state == State.Completed && !string.IsNullOrEmpty(job.ParentJobId))
-        {
-            UpdateChildJobs(context, job.Id);
-        }
-
+        UpdateChildJobs(context, job.Id, state);
+        
         await CreateJobState(context, job.Id, state, message, cancellationToken);
     }
 
@@ -199,18 +196,18 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private static void UpdateChildJobs(TContext context, string parentJobId)
+    private static void UpdateChildJobs(TContext context, string parentJobId, State state)
     {
         var jobs = context.Set<Job>()
             .Where(x => x.ParentJobId == parentJobId)
             .Where(x => x.CurrentState == State.Awaiting)
             .AsQueryable();
 
-        if (jobs != null)
+        if (jobs.Any())
         {
             foreach (var job in jobs)
             {
-                job.CurrentState = State.Enqueued;
+                job.CurrentState = state == State.Completed ? State.Enqueued : State.Failed;
             }
         }
     }

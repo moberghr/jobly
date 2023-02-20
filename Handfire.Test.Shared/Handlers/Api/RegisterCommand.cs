@@ -41,9 +41,16 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
             EmailLogId = emailLog.Id
         };
 
-        for (var i = 0; i < 100; i++)
+        for (var i = 0; i < 3; i++)
         {
             await _publisher.Publish(sendEmailRequest);
+        }
+
+        string parentId = await _publisher.Publish(sendEmailRequest);
+
+        for (int i = 0; i < 4; i++)
+        {
+            await _publisher.Publish(sendEmailRequest, parentId);
         }
 
         await _context.SaveChangesAsync();
