@@ -3,6 +3,9 @@ using Handfire.Core;
 
 using Handfire.Core.Enums;
 using Handfire.Tests.TestData.Handlers;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Microsoft.Identity.Client;
+using NuGet.Frameworks;
 
 namespace Handfire.Tests.Jobs;
 
@@ -236,5 +239,29 @@ public class JobPublisherSqlServer : SqlServerTestBase
         Assert.Equal(State.Completed, currentJob.CurrentState);
         Assert.Equal(retries, currentJob.MaxRetries);
         Assert.Equal(successIteration, currentJob.RetriedTimes);
+    }
+
+    [Fact]
+    public async Task Publish_Continuations_ChildJobCurrentStateShouldSwitchForAwaitToCompleted()
+    {
+        var context = CreateContext();
+        var publisher = new Publisher<TestContext>(context, 0);
+        var jobRequest = new UnitRequest();
+        string jobId = await publisher.Publish(jobRequest);
+        string childJobId = await publisher.Publish(jobRequest, jobId);
+        await context.SaveChangesAsync();
+        var childJob = await GetJob(childJobId);
+
+        Assert.NotNull(childJob);
+        Assert.Equal(State.Awaiting, childJob.CurrentState);
+        Assert.Equal(jobId, childJob.ParentJobId);
+
+        for (int i = 0; i < 2; i++)
+        {
+            await ProcessJob();
+        }
+        childJob = await GetJob(childJobId);
+        Assert.NotNull(childJob);
+        Assert.Equal(State.Completed, childJob.CurrentState);
     }
 }
