@@ -1,11 +1,12 @@
-﻿using System.Text.Json;
+﻿using Handfire.Core.Enums;
 using Handfire.Core;
-using Handfire.Core.Enums;
 using Handfire.Tests.TestData.Handlers;
+using System.Text.Json;
+using Shouldly;
 
 namespace Handfire.Tests.Jobs;
 
-public class JobPublisherSqlServer : SqlServerTestBase
+public abstract class JobPublisher : TestBase
 {
     [Fact]
     public async Task Publish_AddJob_ShouldHaveCreatedStatusInDb()
@@ -20,13 +21,12 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
         var jobFromDb = await GetJobWithStates(context, jobId);
 
-        Assert.NotNull(jobFromDb);
-        Assert.Equal(State.Enqueued, jobFromDb.CurrentState);
-        Assert.Equal(jobRequest.GetType().AssemblyQualifiedName!, jobFromDb.Type);
-        Assert.Equal(JsonSerializer.Serialize(jobRequest), jobFromDb.Message);
-
-        Assert.Single(jobFromDb.JobStates);
-        Assert.Equal(State.Enqueued, jobFromDb.JobStates.Single().State);
+        jobFromDb.ShouldNotBeNull();
+        jobFromDb.CurrentState.ShouldBe(State.Enqueued);
+        jobFromDb.Type.ShouldBe(jobRequest.GetType().AssemblyQualifiedName!);
+        jobFromDb.Message.ShouldBe(JsonSerializer.Serialize(jobRequest));
+        jobFromDb.JobStates.ShouldHaveSingleItem();
+        jobFromDb.JobStates.Single().State.ShouldBe(State.Enqueued);
     }
 
     [Fact]
@@ -42,14 +42,11 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
         var jobFromDb = await GetJobWithStates(context, jobId);
         var logFromDb = await GetTestLog(context, testLogId);
-
-        Assert.Equal(State.Completed, jobFromDb.CurrentState);
-        Assert.Equal(2, jobFromDb.JobStates.Count);
-
-        Assert.Equal(State.Enqueued, jobFromDb.JobStates.First().State);
-        Assert.Equal(State.Completed, jobFromDb.JobStates.Last().State);
-
-        Assert.NotNull(logFromDb.ProcessedTime);
+        jobFromDb.CurrentState.ShouldBe(State.Completed);
+        jobFromDb.JobStates.Count.ShouldBe(2);
+        jobFromDb.JobStates.First().State.ShouldBe(State.Enqueued);
+        jobFromDb.JobStates.Last().State.ShouldBe(State.Completed);
+        logFromDb.ProcessedTime.ShouldNotBeNull();
     }
 
     [Fact]
@@ -63,11 +60,10 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
         var jobFromDb = await GetJobWithStates(context, jobId);
 
-        Assert.Equal(State.Failed, jobFromDb.CurrentState);
-
-        Assert.Equal(2, jobFromDb.JobStates.Count);
-        Assert.Equal(State.Enqueued, jobFromDb.JobStates.First().State);
-        Assert.Equal(State.Failed, jobFromDb.JobStates.Last().State);
+        jobFromDb.CurrentState.ShouldBe(State.Failed);
+        jobFromDb.JobStates.Count.ShouldBe(2);
+        jobFromDb.JobStates.First().State.ShouldBe(State.Enqueued);
+        jobFromDb.JobStates.Last().State.ShouldBe(State.Failed);
     }
 
     [Fact]
@@ -85,7 +81,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
 
         var counter = await GetCounterForNoLocking();
-        Assert.NotEqual(1, counter);
+        counter.ShouldNotBe(1);
     }
 
     [Fact]
@@ -102,7 +98,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
         Task.WaitAll(tasks.ToArray());
 
         var counter = await GetCounter();
-        Assert.Equal(1, counter);
+        counter.ShouldBe(1);
     }
 
     [Fact]
@@ -111,7 +107,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
         int retries = 5;
         var context = CreateContext();
         string jobId = await CreateFailedRetryJob(context, retries, null);
-        
+
         for (int i = 0; i <= 10; i++)
         {
             await ProcessJob();
@@ -119,10 +115,10 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
         var currentJob = await GetJob(jobId);
 
-        Assert.NotNull(currentJob);
-        Assert.Equal(State.Failed, currentJob.CurrentState);
-        Assert.Equal(retries, currentJob.MaxRetries);
-        Assert.Equal(retries, currentJob.RetriedTimes);
+        currentJob.ShouldNotBeNull();
+        currentJob.CurrentState.ShouldBe(State.Failed);
+        currentJob.MaxRetries.ShouldBe(retries);
+        currentJob.RetriedTimes.ShouldBe(retries);
     }
 
     [Fact]
@@ -131,7 +127,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
         int retries = 0;
         var context = CreateContext();
         string jobId = await CreateFailedRetryJob(context, retries, null);
-       
+
         for (int i = 0; i <= 10; i++)
         {
             await ProcessJob();
@@ -139,10 +135,10 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
         var currentJob = await GetJob(jobId);
 
-        Assert.NotNull(currentJob);
-        Assert.Equal(State.Failed, currentJob.CurrentState);
-        Assert.Equal(retries, currentJob.MaxRetries);
-        Assert.Equal(retries, currentJob.RetriedTimes);
+        currentJob.ShouldNotBeNull();
+        currentJob.CurrentState.ShouldBe(State.Failed);
+        currentJob.MaxRetries.ShouldBe(retries);
+        currentJob.RetriedTimes.ShouldBe(retries);
     }
 
     [Fact]
@@ -160,10 +156,10 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
         var currentJob = await GetJob(jobId);
 
-        Assert.NotNull(currentJob);
-        Assert.Equal(State.Failed, currentJob.CurrentState);
-        Assert.Equal(maxRetries, currentJob.MaxRetries);
-        Assert.Equal(maxRetries, currentJob.RetriedTimes);
+        currentJob.ShouldNotBeNull();
+        currentJob.CurrentState.ShouldBe(State.Failed);
+        currentJob.MaxRetries.ShouldBe(maxRetries);
+        currentJob.RetriedTimes.ShouldBe(maxRetries);
     }
 
     [Fact]
@@ -181,10 +177,10 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
         var currentJob = await GetJob(jobId);
 
-        Assert.NotNull(currentJob);
-        Assert.Equal(State.Failed, currentJob.CurrentState);
-        Assert.Equal(maxRetries, currentJob.MaxRetries);
-        Assert.Equal(maxRetries, currentJob.RetriedTimes);
+        currentJob.ShouldNotBeNull();
+        currentJob.CurrentState.ShouldBe(State.Failed);
+        currentJob.MaxRetries.ShouldBe(maxRetries);
+        currentJob.RetriedTimes.ShouldBe(maxRetries);
     }
 
     [Fact]
@@ -195,7 +191,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
         var publisher = new Publisher<TestContext>(context, retries);
         var jobRequest = new UnitRequest();
         string jobId = await publisher.Publish(jobRequest);
-        
+
         await context.SaveChangesAsync();
 
         for (int i = 0; i <= 10; i++)
@@ -205,10 +201,10 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
         var currentJob = await GetJob(jobId);
 
-        Assert.NotNull(currentJob);
-        Assert.Equal(State.Completed, currentJob.CurrentState);
-        Assert.Equal(retries, currentJob.MaxRetries);
-        Assert.Equal(retries, currentJob.RetriedTimes);
+        currentJob.ShouldNotBeNull();
+        currentJob.CurrentState.ShouldBe(State.Completed);
+        currentJob.MaxRetries.ShouldBe(retries);
+        currentJob.RetriedTimes.ShouldBe(retries);
     }
 
     [Fact]
@@ -231,9 +227,10 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
         var currentJob = await GetJob(jobId);
 
-        Assert.NotNull(currentJob);
-        Assert.Equal(State.Completed, currentJob.CurrentState);
-        Assert.Equal(retries, currentJob.MaxRetries);
-        Assert.Equal(successIteration, currentJob.RetriedTimes);
+        currentJob.ShouldNotBeNull();
+        currentJob.CurrentState.ShouldBe(State.Completed);
+        currentJob.MaxRetries.ShouldBe(retries);
+        currentJob.RetriedTimes.ShouldBe(successIteration);
     }
 }
+
