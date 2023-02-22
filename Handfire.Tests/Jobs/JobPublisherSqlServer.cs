@@ -114,7 +114,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
         
         for (int i = 0; i <= 10; i++)
         {
-            await ProcessJobWithoutLocking();
+            await ProcessJob();
         }
 
         var currentJob = await GetJob(jobId);
@@ -134,7 +134,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
        
         for (int i = 0; i <= 10; i++)
         {
-            await ProcessJobWithoutLocking();
+            await ProcessJob();
         }
 
         var currentJob = await GetJob(jobId);
@@ -155,7 +155,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
         for (int i = 0; i <= 10; i++)
         {
-            await ProcessJobWithoutLocking();
+            await ProcessJob();
         }
 
         var currentJob = await GetJob(jobId);
@@ -176,7 +176,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
         for (int i = 0; i <= 10; i++)
         {
-            await ProcessJobWithoutLocking();
+            await ProcessJob();
         }
 
         var currentJob = await GetJob(jobId);
@@ -200,7 +200,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
 
         for (int i = 0; i <= 10; i++)
         {
-            await ProcessJobWithoutLocking();
+            await ProcessJob();
         }
 
         var currentJob = await GetJob(jobId);
@@ -226,7 +226,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
                 await ChangeJobFromException(jobId);
             }
 
-            await ProcessJobWithoutLocking();
+            await ProcessJob();
         }
 
         var currentJob = await GetJob(jobId);
