@@ -1,11 +1,7 @@
 ﻿using System.Text.Json;
 using Handfire.Core;
-
 using Handfire.Core.Enums;
 using Handfire.Tests.TestData.Handlers;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Microsoft.Identity.Client;
-using NuGet.Frameworks;
 
 namespace Handfire.Tests.Jobs;
 

@@ -79,7 +79,7 @@ public class Publisher<TContext> : IPublisher
         return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, maxRetries, parentId);
     }
 
-    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? maxRetries, string? parantId)
+    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? maxRetries, string? parentId)
         where T : class
     {
         var createdTime = DateTime.UtcNow;
@@ -93,9 +93,9 @@ public class Publisher<TContext> : IPublisher
             Message = JsonSerializer.Serialize(message),
             Type = message.GetType().AssemblyQualifiedName!,
             ScheduleTime = scheduleTime,
-            CurrentState = string.IsNullOrEmpty(parantId) ? Enums.State.Enqueued : Enums.State.Awaiting,
+            CurrentState = string.IsNullOrEmpty(parentId) ? Enums.State.Enqueued : Enums.State.Awaiting,
             MaxRetries = maxRetries ?? _retries,
-            ParentJobId = parantId,
+            ParentJobId = parentId,
         };
 
         var jobState = new JobState

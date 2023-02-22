@@ -10,7 +10,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddServices(builder.Configuration);
-builder.Services.AddHandfire<TestContext>(2);
+builder.Services.AddHandfire<TestContext>(1);
 
 var app = builder.Build();
 
