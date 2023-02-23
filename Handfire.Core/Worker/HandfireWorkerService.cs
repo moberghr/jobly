@@ -18,14 +18,15 @@ public static class JobQueryHelper
         return context.Set<Job>()
                 .WhereIsPendingOrRetry()
                 .TagWith(InterceptorConstants.RowLock)
-                .AsNoTracking();
+                .AsNoTracking(); 
     }
 
     private static IQueryable<Job> WhereIsPendingOrRetry(this IQueryable<Job> query)
     {
         return query
-            .Where(x => x.CurrentState == State.Enqueued)
-            .Where(x => x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null);
+            .Where(x => x.CurrentState == State.Enqueued || x.CurrentState == State.Awaiting)
+            .Where(x => x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
+            .OrderBy(x => x.CreateTime);
     }
 }
 
@@ -55,15 +56,22 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var job = await context.GetJobs()
-            .FirstOrDefaultAsync(cancellationToken);
+        var jobs = context.GetJobs();
+        var job = jobs.FirstOrDefault();
 
         // if we didn't find any messages then we wait, otherwise we query again immediately 
-        if (job == null)
+        if (job == null || job.CurrentState == State.Awaiting)
         {
             await Task.Delay(1000, cancellationToken);
 
             return;
+        }
+      
+        var jobIsParent = jobs.Select(x => x.ParentJobId == job.Id);
+
+        if (jobIsParent != null)
+        {
+            job.IsParent = true;
         }
 
         _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
@@ -170,7 +178,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         UpdateJob(context, job, state);
 
-        if (job.CurrentState == State.Completed)
+        if (job.CurrentState == State.Completed && job.IsParent)
         {
             await UpdateChildJobs(context, job.Id);
         }

@@ -110,7 +110,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
     {
         int retries = 5;
         var context = CreateContext();
-        string jobId = await CreateFailedRetryJob(context, retries, null);
+        string jobId = await CreateFailedRetryJob(context, retries, null, null);
         
         for (int i = 0; i <= 10; i++)
         {
@@ -130,7 +130,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
     {
         int retries = 0;
         var context = CreateContext();
-        string jobId = await CreateFailedRetryJob(context, retries, null);
+        string jobId = await CreateFailedRetryJob(context, retries, null, null);
        
         for (int i = 0; i <= 10; i++)
         {
@@ -151,7 +151,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
         int retries = 0;
         var context = CreateContext();
         int maxRetries = 2;
-        string jobId = await CreateFailedRetryJob(context, retries, maxRetries);
+        string jobId = await CreateFailedRetryJob(context, retries, maxRetries, null);
 
         for (int i = 0; i <= 10; i++)
         {
@@ -172,7 +172,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
         int retries = 5;
         var context = CreateContext();
         int maxRetries = 1;
-        string jobId = await CreateFailedRetryJob(context, retries, maxRetries);
+        string jobId = await CreateFailedRetryJob(context, retries, maxRetries, null);
 
         for (int i = 0; i <= 10; i++)
         {
@@ -217,7 +217,7 @@ public class JobPublisherSqlServer : SqlServerTestBase
         int retries = 5;
         int successIteration = 3;
         var context = CreateContext();
-        string jobId = await CreateFailedRetryJob(context, retries, null);
+        string jobId = await CreateFailedRetryJob(context, retries, null, null);
 
         for (int i = 0; i <= 10; i++)
         {
@@ -252,12 +252,35 @@ public class JobPublisherSqlServer : SqlServerTestBase
         Assert.Equal(State.Awaiting, childJob.CurrentState);
         Assert.Equal(jobId, childJob.ParentJobId);
 
+        for (int i = 0; i < 3; i++)
+        {
+            await ProcessJob();
+        }
+
+        childJob = await GetJob(childJobId);
+        Assert.NotNull(childJob);
+        Assert.Equal(State.Completed, childJob.CurrentState);
+    }
+
+    [Fact]
+    public async Task Publish_Continuations_ParentJobFailChildJobShouldBeStateAwait()
+    {
+        var context = CreateContext();
+        var publisher = new Publisher<TestContext>(context, 0);
+        var jobRequest = new UnitRequest();
+
+        string jobId = await CreateFailedRetryJob(context, 0, 0, null);
+        string childJobId = await publisher.Publish(jobRequest, jobId);
+        await context.SaveChangesAsync();
+
         for (int i = 0; i < 2; i++)
         {
             await ProcessJob();
         }
-        childJob = await GetJob(childJobId);
+
+        var childJob = await GetJob(childJobId);
+
         Assert.NotNull(childJob);
-        Assert.Equal(State.Completed, childJob.CurrentState);
+        Assert.Equal(State.Awaiting, childJob.CurrentState);
     }
 }

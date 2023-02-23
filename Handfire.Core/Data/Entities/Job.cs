@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Handfire.Core.Data.Entities;
 using Handfire.Core.Enums;
 
@@ -30,4 +31,7 @@ public class Job
     public RecurringJob? RecurringJob { get; set; }
 
     public List<JobState> JobStates { get; set; } = new();
+
+    [NotMapped]
+    public bool IsParent { get; set; }
 }
