@@ -11,25 +11,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Handfire.Core;
 
-public static class JobQueryHelper
-{
-    public static IQueryable<Job> GetJobs<TContext>(this TContext context) where TContext : DbContext
-    {
-        return context.Set<Job>()
-                .WhereIsPendingOrRetry()
-                .TagWith(InterceptorConstants.RowLock)
-                .AsNoTracking(); 
-    }
-
-    private static IQueryable<Job> WhereIsPendingOrRetry(this IQueryable<Job> query)
-    {
-        return query
-            .Where(x => x.CurrentState == State.Enqueued || x.CurrentState == State.Awaiting)
-            .Where(x => x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
-            .OrderBy(x => x.CreateTime);
-    }
-}
-
 public interface IHandfireWorkerService
 {
     Task GetAndProcessJob(CancellationToken cancellationToken);
@@ -56,46 +37,59 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var jobs = context.GetJobs();
-        var job = jobs.FirstOrDefault();
+        var jobObj = context.Set<Job>()
+            .Where(x => x.CurrentState == State.Enqueued)
+            .Where(x => x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
+            .Select(x => 
+                    new 
+                    { 
+                        Job = x,
+                        IsParent = x.ChildJobs.Any()
+                    })
+            .TagWith(InterceptorConstants.RowLock)
+            .FirstOrDefault();
 
         // if we didn't find any messages then we wait, otherwise we query again immediately 
-        if (job == null || job.CurrentState == State.Awaiting)
+        if (jobObj == null)
         {
             await Task.Delay(1000, cancellationToken);
 
             return;
         }
-      
-        var jobIsParent = jobs.Select(x => x.ParentJobId == job.Id);
 
-        if (jobIsParent != null)
-        {
-            job.IsParent = true;
-        }
-
-        _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
+        _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, jobObj.Job.Id);
 
         try
         {
-            if (job.RecurringJobId.HasValue)
+            if (jobObj.Job.RecurringJobId.HasValue)
             {
-                await CreateNextJob(job, cancellationToken);
+                await CreateNextJob(jobObj.Job, cancellationToken);
             }
-            await ProcessOutboxMessage(job, cancellationToken);
+            await ProcessOutboxMessage(jobObj.Job, cancellationToken);
         }
         catch (Exception e)
         {
-            await UpdateJobData(context, job, e.Message, cancellationToken);
+            await UpdateJobData(context, jobObj.Job, jobObj.IsParent, e.Message, cancellationToken);
 
             transaction.Commit();
 
             return;
         }
 
-        await UpdateJobData(context, job, message: null, cancellationToken);
+        await UpdateJobData(context, jobObj.Job, jobObj.IsParent, message: null, cancellationToken);
         transaction.Commit();
     }
+
+    public static bool IsQueryingDatabase(IEnumerable<Job> jobs, Func<Job, bool> predicate)
+    {
+        var queryProvider = ((IQueryable<Job>)jobs)
+            .Provider;
+
+        return queryProvider.GetType()
+            .Name
+            .Equals("EntityQueryProvider`1");
+    }
+
 
     private async Task CreateNextJob(Job job, CancellationToken cancellationToken)
     {
@@ -167,7 +161,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         await mediator.Send(request, cancellationToken);
     }
 
-    private static async Task UpdateJobData(TContext context, Job job, string? message, CancellationToken cancellationToken)
+    private static async Task UpdateJobData(TContext context, Job job, bool IsParent, string? message, CancellationToken cancellationToken)
     {
         var state = !string.IsNullOrEmpty(message) ? State.Failed : State.Completed;
         if (job.RetriedTimes < job.MaxRetries && !string.IsNullOrEmpty(message))
@@ -178,11 +172,11 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         UpdateJob(context, job, state);
 
-        if (job.CurrentState == State.Completed && job.IsParent)
+        if (job.CurrentState == State.Completed && IsParent)
         {
             await UpdateChildJobs(context, job.Id);
         }
-        
+
         await CreateJobState(context, job.Id, state, message, cancellationToken);
     }
 

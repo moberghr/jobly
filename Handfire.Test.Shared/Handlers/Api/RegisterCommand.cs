@@ -41,14 +41,14 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
             EmailLogId = emailLog.Id
         };
 
-        for (var i = 0; i < 2; i++)
+        for (var i = 0; i < 20; i++)
         {
             await _publisher.Publish(sendEmailRequest);
         }
 
         string parentId = await _publisher.Publish(sendEmailRequest);
 
-        for (int i = 0; i < 44; i++)
+        for (int i = 0; i < 4; i++)
         {
             await _publisher.Publish(sendEmailRequest, parentId);
         }

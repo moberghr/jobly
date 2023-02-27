@@ -121,6 +121,10 @@ public static class ServiceConfiguration
         job.Property(p => p.MaxRetries);
         job.Property(p => p.ParentJobId);
 
+        job.HasMany(x => x.ChildJobs)
+            .WithOne( x => x.ParentJob)
+            .HasForeignKey(x => x.ParentJobId);
+
         job.HasMany(p => p.JobStates)
             .WithOne(p => p.Job);
     }

@@ -1,7 +1,10 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Data.Common;
 using Handfire.Core.Data.Entities;
 using Handfire.Core.Enums;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Core.Entities;
 
@@ -32,6 +35,8 @@ public class Job
 
     public List<JobState> JobStates { get; set; } = new();
 
-    [NotMapped]
-    public bool IsParent { get; set; }
+
+    public Job? ParentJob { get; set; }
+    public List<Job> ChildJobs { get; set; } = new();
+    
 }
