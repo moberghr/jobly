@@ -1,10 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Data.Common;
 using Handfire.Core.Data.Entities;
 using Handfire.Core.Enums;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Core.Entities;
 
@@ -29,13 +25,7 @@ public class Job
 
     public int MaxRetries { get; set; }
 
-    public string? ParentJobId { get; set; }
-
     public RecurringJob? RecurringJob { get; set; }
 
     public List<JobState> JobStates { get; set; } = new();
-
-    public Job? ParentJob { get; set; }
-
-    public List<Job> ChildJobs { get; set; } = new();
 }

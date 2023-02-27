@@ -61,26 +61,13 @@ public abstract class TestBase
         return jobId;
     }
 
-    protected async Task<string> CreateFailedRetryJob(TestContext context, int retries, int? maxRetries, string? parentJobId)
+    protected async Task<string> CreateFailedRetryJob(TestContext context, int retries, int? maxRetries)
     {
         var publisher = new Publisher<TestContext>(context, retries);
 
         var throwExceptionRequest = new ThrowExceptionRequest();
-        string jobId = "";
-        if (maxRetries != null)
-        {
-            jobId = await publisher.Publish(throwExceptionRequest, (int)maxRetries);
-        }
 
-        if (!string.IsNullOrEmpty(parentJobId))
-        {
-            jobId = await publisher.Publish(throwExceptionRequest, parentJobId);
-        }
-
-        if (maxRetries == null && string.IsNullOrEmpty(parentJobId))
-        {
-           jobId = await publisher.Publish(throwExceptionRequest);
-        }
+        var jobId = maxRetries != null ? await publisher.Publish(throwExceptionRequest, (int)maxRetries) : await publisher.Publish(throwExceptionRequest);
 
         await context.SaveChangesAsync();
 

@@ -6,7 +6,6 @@ namespace Handfire.Core;
 
 public interface IPublisher
 {
-
     Task<string> Publish<T>(T message) where T : class;
 
     Task<string> Publish<T>(T message, DateTime scheduleTime) where T : class;
@@ -14,14 +13,6 @@ public interface IPublisher
     Task<string> Publish<T>(T message, int maxRetries) where T : class;
 
     Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries) where T : class;
-
-    Task<string> Publish<T>(T message, string parentId) where T : class;
-
-    Task<string> Publish<T>(T message, DateTime scheduleTime, string parentId) where T : class;
-
-    Task<string> Publish<T>(T message, int maxRetries, string parentId) where T : class;
-
-    Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries, string parentId) where T : class;
 }
 
 public class Publisher<TContext> : IPublisher
@@ -38,48 +29,26 @@ public class Publisher<TContext> : IPublisher
     public async Task<string> Publish<T>(T message)
         where T : class
     {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, maxRetries: null, null);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, maxRetries: null);
     }
 
     public async Task<string> Publish<T>(T message, DateTime scheduleTime)
         where T : class
     {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, maxRetries: null, null);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, maxRetries: null);
     }
 
     public async Task<string> Publish<T>(T message, int maxRetries) where T : class
     {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, maxRetries, null);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, maxRetries);
     }
 
     public async Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries) where T : class
     {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, maxRetries, null);
+        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, maxRetries);
     }
 
-    public async Task<string> Publish<T>(T message, string parentId)
-       where T : class
-    {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, maxRetries: null, parentId);
-    }
-
-    public async Task<string> Publish<T>(T message, DateTime scheduleTime, string parentId)
-        where T : class
-    {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, maxRetries: null, parentId);
-    }
-
-    public async Task<string> Publish<T>(T message, int maxRetries, string parentId) where T : class
-    {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime: null, maxRetries, parentId);
-    }
-
-    public async Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries, string parentId) where T : class
-    {
-        return await CreateJobAndJobState<T>(message, name: string.Empty, scheduleTime, maxRetries, parentId);
-    }
-
-    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? maxRetries, string? parentId)
+    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? maxRetries)
         where T : class
     {
         var createdTime = DateTime.UtcNow;
@@ -93,9 +62,8 @@ public class Publisher<TContext> : IPublisher
             Message = JsonSerializer.Serialize(message),
             Type = message.GetType().AssemblyQualifiedName!,
             ScheduleTime = scheduleTime,
-            CurrentState = string.IsNullOrEmpty(parentId) ? Enums.State.Enqueued : Enums.State.Awaiting,
+            CurrentState = Enums.State.Enqueued,
             MaxRetries = maxRetries ?? _retries,
-            ParentJobId = parentId,
         };
 
         var jobState = new JobState
