@@ -37,7 +37,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var jobObj = context.Set<Job>()
+        var jobData = context.Set<Job>()
             .Where(x => x.CurrentState == State.Enqueued)
             .Where(x => x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
             .Select(x => 
@@ -49,47 +49,38 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             .TagWith(InterceptorConstants.RowLock)
             .FirstOrDefault();
 
+        var job = jobData?.Job;
+
         // if we didn't find any messages then we wait, otherwise we query again immediately 
-        if (jobObj == null)
+        if (job == null)
         {
             await Task.Delay(1000, cancellationToken);
 
             return;
         }
 
-        _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, jobObj.Job.Id);
+        _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
 
         try
         {
-            if (jobObj.Job.RecurringJobId.HasValue)
+            if (job.RecurringJobId.HasValue)
             {
-                await CreateNextJob(jobObj.Job, cancellationToken);
+                await CreateNextJob(job, cancellationToken);
             }
-            await ProcessOutboxMessage(jobObj.Job, cancellationToken);
+            await ProcessOutboxMessage(job, cancellationToken);
         }
         catch (Exception e)
         {
-            await UpdateJobData(context, jobObj.Job, jobObj.IsParent, e.Message, cancellationToken);
+            await UpdateJobData(context, job, jobData!.IsParent, e.Message, cancellationToken);
 
             transaction.Commit();
 
             return;
         }
 
-        await UpdateJobData(context, jobObj.Job, jobObj.IsParent, message: null, cancellationToken);
+        await UpdateJobData(context, job, jobData!.IsParent, message: null, cancellationToken);
         transaction.Commit();
     }
-
-    public static bool IsQueryingDatabase(IEnumerable<Job> jobs, Func<Job, bool> predicate)
-    {
-        var queryProvider = ((IQueryable<Job>)jobs)
-            .Provider;
-
-        return queryProvider.GetType()
-            .Name
-            .Equals("EntityQueryProvider`1");
-    }
-
 
     private async Task CreateNextJob(Job job, CancellationToken cancellationToken)
     {
@@ -161,7 +152,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         await mediator.Send(request, cancellationToken);
     }
 
-    private static async Task UpdateJobData(TContext context, Job job, bool IsParent, string? message, CancellationToken cancellationToken)
+    private static async Task UpdateJobData(TContext context, Job job, bool isParent, string? message, CancellationToken cancellationToken)
     {
         var state = !string.IsNullOrEmpty(message) ? State.Failed : State.Completed;
         if (job.RetriedTimes < job.MaxRetries && !string.IsNullOrEmpty(message))
@@ -170,21 +161,14 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             job.RetriedTimes += 1;
         }
 
-        UpdateJob(context, job, state);
+        job.CurrentState = state;
 
-        if (job.CurrentState == State.Completed && IsParent)
+        if (job.CurrentState == State.Completed && isParent)
         {
-            await UpdateChildJobs(context, job.Id);
+            await UpdateChildJobs(context, job.Id, cancellationToken);
         }
 
         await CreateJobState(context, job.Id, state, message, cancellationToken);
-    }
-
-    private static void UpdateJob(TContext context, Job job, State state)
-    {
-        job.CurrentState = state;
-
-        context.Set<Job>().Update(job);
     }
 
     private static async Task CreateJobState(TContext context, string jobId, State state, string? message, CancellationToken cancellationToken)
@@ -201,11 +185,11 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private async static Task UpdateChildJobs(TContext context, string parentJobId)
+    private async static Task UpdateChildJobs(TContext context, string parentJobId, CancellationToken cancellationToken)
     {
         await context.Set<Job>()
              .Where(x => x.ParentJobId == parentJobId)
              .Where(x => x.CurrentState == State.Awaiting)
-             .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued));
+             .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
     }
 }

@@ -2,10 +2,12 @@
 using DotNet.Testcontainers.Configurations;
 using DotNet.Testcontainers.Containers;
 using Handfire.Core.Interceptors;
+using Handfire.Tests.Jobs;
 using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Tests;
-public class SqlServerTestBase : TestBase, IAsyncLifetime
+
+public class SqlServerTestBase : JobPublisher, IAsyncLifetime
 {
     private static readonly SqlServerRowLockInterceptor _interceptor = new();
     private static readonly SaveChangesConcurrencyTokenInterceptor _concurrencyTokenInterceptor = new();
