@@ -7,27 +7,27 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Tests;
 
-public class SqlServerTestBase : JobPublisher, IAsyncLifetime
+public class PostgreSqlTests : HandfireTests, IAsyncLifetime
 {
-    private static readonly SqlServerRowLockInterceptor _interceptor = new();
+    private static readonly PostgresRowLockInterceptor _interceptor = new();
     private static readonly SaveChangesConcurrencyTokenInterceptor _concurrencyTokenInterceptor = new();
 
-    private readonly MsSqlTestcontainer _dbContainer = new TestcontainersBuilder<MsSqlTestcontainer>()
+    private readonly PostgreSqlTestcontainer _dbContainer = new TestcontainersBuilder<PostgreSqlTestcontainer>()
         .WithDatabase(
-            new MsSqlTestcontainerConfiguration
+            new PostgreSqlTestcontainerConfiguration
             {
                 Database = "Handfire",
+                Username = "postgres",
                 Password = Guid.NewGuid().ToString("D"),
             })
-        .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
-        .WithEnvironment("ACCEPT_EULA", "Y")
+        .WithImage("postgres")  // latest
         .WithCleanUp(true)
         .Build();
 
     protected override TestContext CreateContext()
     {
         var testContext = new TestContext(new DbContextOptionsBuilder<TestContext>()
-           .UseSqlServer(_dbContainer.ConnectionString + ";Encrypt=False;")
+           .UseNpgsql(_dbContainer.ConnectionString)
            .AddInterceptors(_interceptor, _concurrencyTokenInterceptor).Options);
 
         testContext.Database.EnsureCreated();
@@ -38,7 +38,7 @@ public class SqlServerTestBase : JobPublisher, IAsyncLifetime
     protected override TestContext CreateContextWithoutJobLocking()
     {
         var testContext = new TestContext(new DbContextOptionsBuilder<TestContext>()
-           .UseSqlServer(_dbContainer.ConnectionString + ";Encrypt=False;")
+           .UseNpgsql(_dbContainer.ConnectionString)
            .AddInterceptors(_concurrencyTokenInterceptor).Options);
 
         testContext.Database.EnsureCreated();

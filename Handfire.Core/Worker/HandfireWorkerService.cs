@@ -67,6 +67,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             {
                 await CreateNextJob(job, cancellationToken);
             }
+
             await ProcessOutboxMessage(job, cancellationToken);
         }
         catch (Exception e)

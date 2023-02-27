@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Tests.RecurringJobs;
-public class RecurringJobPublisherSqlServer : SqlServerTestBase
+public class RecurringJobPublisherSqlServer : SqlServerTests
 {
     private readonly string _cronExpression = "* * * * *";
 
