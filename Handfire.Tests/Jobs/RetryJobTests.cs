@@ -5,7 +5,7 @@ using Shouldly;
 
 namespace Handfire.Tests.Jobs;
 
-public abstract partial class JobPublisher : TestBase
+public abstract partial class HandfireTests : TestBase
 {
     [Fact]
     public async Task Publish_RetryJobWithStateFailed_RetriedTimesShouldBeEqualToMaxRetries()

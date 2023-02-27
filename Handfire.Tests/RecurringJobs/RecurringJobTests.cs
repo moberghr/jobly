@@ -1,8 +1,9 @@
 ﻿using Handfire.Core.Data.Entities;
 using Microsoft.EntityFrameworkCore;
+using Shouldly;
 
-namespace Handfire.Tests.RecurringJobs;
-public class RecurringJobPublisherPostgres : PostgreSqlTestBase
+namespace Handfire.Tests.Jobs;
+public abstract partial class HandfireTests : TestBase
 {
     private readonly string _cronExpression = "* * * * *";
 
@@ -20,13 +21,13 @@ public class RecurringJobPublisherPostgres : PostgreSqlTestBase
         var nextJob = await GetJob(nextJobId);
 
         // check RecurringJob
-        Assert.NotNull(recurringJobEntity);
-        Assert.Equal(_cronExpression, recurringJobEntity.Cron);
-        Assert.Equal(recurringJobName, recurringJobEntity.Name);
+        recurringJobEntity.ShouldNotBeNull();
+        recurringJobEntity.Cron.ShouldBe(_cronExpression);
+        recurringJobEntity.Name.ShouldBe(recurringJobName);
 
         // check Job
-        Assert.True(nextJob != null);
-        Assert.Equal(nextJob.ScheduleTime, recurringJobEntity.NextExecution);
+        nextJob.ShouldNotBeNull();
+        recurringJobEntity.NextExecution.ShouldBe(nextJob.ScheduleTime);
     }
 
     [Fact]
@@ -49,7 +50,6 @@ public class RecurringJobPublisherPostgres : PostgreSqlTestBase
         version2.Message = "new message 2";
 
         await context1.SaveChangesAsync();
-
-        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => context2.SaveChangesAsync());
+        context2.SaveChangesAsync().ShouldThrow<DbUpdateConcurrencyException>();
     }
 }
