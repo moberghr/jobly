@@ -8,9 +8,9 @@ public class BatchContinuation
 
     public Job Job { get; set; } = null!;
 
-    public int JobId { get; set; }
+    public string JobId { get; set; } = null!;
 
     public Batch Batch { get; set; } = null!;
 
-    public int BatchId { get; set; }
+    public string BatchId { get; set; } = null!;
 }

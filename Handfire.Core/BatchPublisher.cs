@@ -1,5 +1,4 @@
-﻿using System.Text.Json;
-using Handfire.Core.Data.Entities;
+﻿using Handfire.Core.Data.Entities;
 using Handfire.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,51 +6,46 @@ namespace Handfire.Core;
 
 public interface IBatchPublisher
 {
-    Task AddBatchAndBatchContinationJobs<T>(List<T> batchJobs, List<T> batchContinationJobs) where T : class;
-
-    Task UpdateBatch(Batch batch);
+    Task AddBatchAndBatchContinuationJobs<T>(List<T> batchJobs, List<T> batchContinationJobs) where T : class;
 }
 
 public class BatchPublisher<TContext> : IBatchPublisher
     where TContext : DbContext
 {
     private readonly TContext _context;
-    private readonly int _retries;
+    private readonly IPublisher _publisher;
 
-    public BatchPublisher(TContext context, int retries)
+    public BatchPublisher(TContext context, IPublisher publisher)
     {
         _context = context;
-        _retries = retries;
+        _publisher = publisher;
     }
 
-    public async Task AddBatchAndBatchContinationJobs<T>(List<T> batchJobs, List<T> batchContinationJobs) where T : class
+    public async Task AddBatchAndBatchContinuationJobs<T>(List<T> batchJobMessages, List<T> batchContinuationJobMessages) where T : class
     {
         var createdTime = DateTime.UtcNow;
 
-        var newBatchJobs = batchJobs.Select(
-            x => new Job
-            {
-                Id = Guid.NewGuid().ToString(),
-                CreateTime = createdTime,
-                Message = JsonSerializer.Serialize(x),
-                Type = x.GetType().AssemblyQualifiedName!,
-                CurrentState = Enums.State.Enqueued,
-                MaxRetries = _retries,
-            })
-            .ToList();
+        var newBatchJobs = new List<Job>();
+        var newBatchContinuationJobs = new List<Job>();
 
-        var newBatchContinations = batchContinationJobs.Select(
-            x => new BatchContinuation
+        foreach (var batchJobMessage in batchJobMessages)
+        {
+            var newJobState = await _publisher.CreateJobAndJobState<T>(batchJobMessage, name: string.Empty, scheduleTime: null, maxRetries: null, null);
+
+            newBatchJobs.Add(newJobState.Job);
+        }
+
+        foreach (var batchContinuationJobMessage in batchContinuationJobMessages)
+        {
+            var newJobState = await _publisher.CreateJobAndJobState<T>(batchContinuationJobMessage, name: string.Empty, scheduleTime: null, maxRetries: null, null);
+
+            newBatchContinuationJobs.Add(newJobState.Job);
+        }
+
+        var newBatchContinuations = newBatchContinuationJobs.Select(x =>
+            new BatchContinuation
             {
-                Job = new Job
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    CreateTime = createdTime,
-                    Message = JsonSerializer.Serialize(x),
-                    Type = x.GetType().AssemblyQualifiedName!,
-                    CurrentState = Enums.State.Awaiting,
-                    MaxRetries = _retries,
-                },
+                Job = x,
             })
             .ToList();
 
@@ -60,25 +54,10 @@ public class BatchPublisher<TContext> : IBatchPublisher
             BatchStatus = Enums.State.Enqueued,
             Counter = newBatchJobs.Count,
             Jobs = newBatchJobs,
-            BatchContinuations = newBatchContinations,
+            BatchContinuations = newBatchContinuations,
         };
 
         await _context.Set<Batch>().AddAsync(newBatch);
-
-        await _context.SaveChangesAsync();
-    }
-
-    public async Task UpdateBatch(Batch batch)
-    {
-        batch.Counter = batch.Jobs.Where(x => x.CurrentState != Enums.State.Completed).Count();
-
-        if (batch.Counter == 0)
-        {
-            foreach (var batchContination in batch.BatchContinuations)
-            {
-                batchContination.Job.CurrentState = Enums.State.Enqueued;
-            }
-        }
 
         await _context.SaveChangesAsync();
     }

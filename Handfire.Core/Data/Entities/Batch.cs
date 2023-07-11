@@ -11,7 +11,7 @@ public class Batch
 
     public int Counter { get; set; }
 
-    public ICollection<BatchContinuation> BatchContinuations { get; set; } = new HashSet<BatchContinuation>();
+    public List<BatchContinuation> BatchContinuations { get; set; } = new();
 
-    public ICollection<Job> Jobs { get; set; } = new HashSet<Job>();
+    public List<Job> Jobs { get; set; } = new();
 }

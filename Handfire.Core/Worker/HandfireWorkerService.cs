@@ -8,6 +8,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Handfire.Core;
 
@@ -40,9 +41,9 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         var jobData = context.Set<Job>()
             .Where(x => x.CurrentState == State.Enqueued)
             .Where(x => x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
-            .Select(x => 
-                    new 
-                    { 
+            .Select(x =>
+                    new
+                    {
                         Job = x,
                         IsParent = x.ChildJobs.Any()
                     })
@@ -169,6 +170,8 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             await UpdateChildJobs(context, job.Id, cancellationToken);
         }
 
+        await UpdateBatch(context, job, cancellationToken);
+
         await CreateJobState(context, job.Id, state, message, cancellationToken);
     }
 
@@ -192,5 +195,38 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
              .Where(x => x.ParentJobId == parentJobId)
              .Where(x => x.CurrentState == State.Awaiting)
              .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
+    }
+
+    private async static Task UpdateBatch(TContext context, Job job, CancellationToken cancellationToken)
+    {
+        var batchAndBatchContinuationsDatas = await context.Set<Batch>()
+            .Where(x => x.BatchStatus != State.Completed)
+            .Where(x => x.Jobs.Any(y => y.Id == job.Id))
+            .Select(x =>
+                new
+                {
+                    Batch = x,
+                    Jobs = x.Jobs,
+                    BatchContinuationJobs = x.BatchContinuations.Select(y => y.Job).ToList(),
+                })
+            .ToListAsync(cancellationToken);
+
+        if (!batchAndBatchContinuationsDatas.IsNullOrEmpty())
+        {
+            foreach (var batchAndBatchContinuationsData in batchAndBatchContinuationsDatas)
+            {
+                batchAndBatchContinuationsData.Batch.Counter = batchAndBatchContinuationsData.Jobs.Where(x => x.CurrentState != State.Completed).Count();
+
+                if (batchAndBatchContinuationsData.Batch.Counter == 0)
+                {
+                    batchAndBatchContinuationsData.Batch.BatchStatus = State.Completed;
+
+                    foreach (var batchContinuationJob in batchAndBatchContinuationsData.BatchContinuationJobs)
+                    {
+                        batchContinuationJob.CurrentState = State.Enqueued;
+                    }
+                }
+            }
+        }
     }
 }

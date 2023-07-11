@@ -35,7 +35,7 @@ public class Job
 
     public List<Job> ChildJobs { get; set; } = new();
 
-    public ICollection<BatchContinuation> BatchContinuations { get; set; } = new HashSet<BatchContinuation>();
+    public List<BatchContinuation> BatchContinuations { get; set; } = new();
 
-    public ICollection<Batch> Batches { get; set; } = new HashSet<Batch>();
+    public List<Batch> Batches { get; set; } = new();
 }

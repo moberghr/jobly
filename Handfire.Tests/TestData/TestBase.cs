@@ -79,7 +79,7 @@ public abstract class TestBase
 
         if (maxRetries == null && string.IsNullOrEmpty(parentJobId))
         {
-           jobId = await publisher.Publish(throwExceptionRequest);
+            jobId = await publisher.Publish(throwExceptionRequest);
         }
 
         await context.SaveChangesAsync();
