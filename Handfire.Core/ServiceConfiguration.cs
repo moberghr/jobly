@@ -50,6 +50,7 @@ public static class ServiceConfiguration
         services.AddScoped<IRecurringJobPublisher>(x => new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IHandfireService>(x => new HandfireService<TContext>(x.GetRequiredService<TContext>()));
         services.AddTransient<IHandfireWorkerService, HandfireWorkerService<TContext>>();
+        services.AddTransient<IBatchPublisher, BatchPublisher<TContext>>();
 
         for (var i = 0; i < workerCount; i++)
         {
