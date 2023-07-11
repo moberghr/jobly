@@ -102,6 +102,8 @@ public static class ServiceConfiguration
         AddJobEntity(modelBuilder);
         AddJobStateEntity(modelBuilder);
         AddRecurringJobEntity(modelBuilder);
+        AddBatchEntity(modelBuilder);
+        AddBatchContinuationEntity(modelBuilder);
     }
 
     private static void AddJobEntity(ModelBuilder modelBuilder)
@@ -122,11 +124,18 @@ public static class ServiceConfiguration
         job.Property(p => p.ParentJobId);
 
         job.HasMany(x => x.ChildJobs)
-            .WithOne( x => x.ParentJob)
+            .WithOne(x => x.ParentJob)
             .HasForeignKey(x => x.ParentJobId);
 
         job.HasMany(p => p.JobStates)
             .WithOne(p => p.Job);
+
+        job.HasMany(p => p.Batches)
+            .WithMany(p => p.Jobs);
+
+        job.HasMany(p => p.BatchContinuations)
+            .WithOne(p => p.Job)
+            .HasForeignKey(p => p.JobId);
     }
 
     private static void AddJobStateEntity(ModelBuilder modelBuilder)
@@ -166,5 +175,42 @@ public static class ServiceConfiguration
         recurringJob.HasOne(p => p.LastJob);
 
         recurringJob.Property(p => p.Version).IsConcurrencyToken();
+    }
+
+    private static void AddBatchEntity(ModelBuilder modelBuilder)
+    {
+        var batch = modelBuilder.Entity<Batch>();
+        batch.ToTable(nameof(Batch));
+
+        batch.Property(p => p.Id);
+        batch.HasKey(p => p.Id);
+
+        batch.Property(p => p.Counter);
+
+        batch.Property(p => p.BatchStatus);
+
+        batch.HasMany(p => p.BatchContinuations)
+            .WithOne(p => p.Batch)
+            .HasForeignKey(p => p.BatchId);
+
+        batch.HasMany(p => p.Jobs)
+            .WithMany(p => p.Batches);
+    }
+
+    private static void AddBatchContinuationEntity(ModelBuilder modelBuilder)
+    {
+        var batchContinuation = modelBuilder.Entity<BatchContinuation>();
+        batchContinuation.ToTable(nameof(BatchContinuation));
+
+        batchContinuation.Property(p => p.Id);
+        batchContinuation.HasKey(p => p.Id);
+
+        batchContinuation.HasOne(p => p.Job)
+            .WithMany(p => p.BatchContinuations)
+            .HasForeignKey(p => p.JobId);
+
+        batchContinuation.HasOne(p => p.Batch)
+            .WithMany(p => p.BatchContinuations)
+            .HasForeignKey(p => p.BatchId);
     }
 }

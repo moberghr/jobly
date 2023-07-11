@@ -1,10 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Data.Common;
 using Handfire.Core.Data.Entities;
 using Handfire.Core.Enums;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Core.Entities;
 
@@ -38,4 +34,8 @@ public class Job
     public Job? ParentJob { get; set; }
 
     public List<Job> ChildJobs { get; set; } = new();
+
+    public ICollection<BatchContinuation> BatchContinuations { get; set; } = new HashSet<BatchContinuation>();
+
+    public ICollection<Batch> Batches { get; set; } = new HashSet<Batch>();
 }
