@@ -1,5 +1,6 @@
 ﻿using Handfire.Core.Data.Entities;
 using Handfire.Core.Entities;
+using Handfire.Core.Helper;
 using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Core;
@@ -13,12 +14,10 @@ public class BatchPublisher<TContext> : IBatchPublisher
     where TContext : DbContext
 {
     private readonly TContext _context;
-    private readonly IPublisher _publisher;
 
-    public BatchPublisher(TContext context, IPublisher publisher)
+    public BatchPublisher(TContext context)
     {
         _context = context;
-        _publisher = publisher;
     }
 
     public async Task AddBatchAndBatchContinuationJobs<T>(List<T> batchJobMessages, List<T> batchContinuationJobMessages) where T : class
@@ -30,14 +29,18 @@ public class BatchPublisher<TContext> : IBatchPublisher
 
         foreach (var batchJobMessage in batchJobMessages)
         {
-            var newJobState = await _publisher.CreateJobAndJobState<T>(batchJobMessage, name: string.Empty, scheduleTime: null, maxRetries: null, null);
+            var newJobState = CreateJobAndJobStateService.CreateJobAndJobState(batchJobMessage, 0, string.Empty, null, null, null, Enums.State.Enqueued);
+
+            await _context.Set<JobState>().AddAsync(newJobState);
 
             newBatchJobs.Add(newJobState.Job);
         }
 
         foreach (var batchContinuationJobMessage in batchContinuationJobMessages)
         {
-            var newJobState = await _publisher.CreateJobAndJobState<T>(batchContinuationJobMessage, name: string.Empty, scheduleTime: null, maxRetries: null, null);
+            var newJobState = CreateJobAndJobStateService.CreateJobAndJobState(batchContinuationJobMessage, 0, string.Empty, null, null, null, Enums.State.Awaiting);
+
+            await _context.Set<JobState>().AddAsync(newJobState);
 
             newBatchContinuationJobs.Add(newJobState.Job);
         }

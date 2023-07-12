@@ -121,6 +121,24 @@ public abstract class TestBase
         return logInDb.Id;
     }
 
+    protected async Task CreateBatch(int numberOfJobs)
+    {
+        var context = CreateContext();
+
+        var requests = new List<UnitRequest>();
+
+        for (int i = 0; i < numberOfJobs; i++)
+        {
+            var request = new UnitRequest();
+
+            requests.Add(request);
+        }
+
+        var batchPublisher = new BatchPublisher<TestContext>(context);
+
+        await batchPublisher.AddBatchAndBatchContinuationJobs(requests, requests);
+    }
+
     protected async Task<Job> GetJobWithStates(TestContext context, string jobId)
     {
         var job = await context.Set<Job>()

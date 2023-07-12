@@ -3,7 +3,6 @@ using Handfire.Core;
 using Handfire.Tests.TestData.Handlers;
 using System.Text.Json;
 using Shouldly;
-using Moq;
 using Handfire.Core.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -107,40 +106,7 @@ public abstract partial class HandfireTests : TestBase
     [Fact]
     public async Task GivenGetAndProcessJob_WhenJobIsBeingUpdatedWhileHavingBatch_ThenCounterShouldBeUpdated()
     {
-        var context = CreateContext();
-
-        var publisher = new Publisher<TestContext>(context, 0);
-
-        var requestAndJobDatas = new List<RequestAndJobStateData>();
-
-        for (int i = 0; i < 10; i++)
-        {
-            var request = new UnitRequest();
-            var jobState = await publisher.CreateJobAndJobState(request, name: string.Empty, scheduleTime: null, maxRetries: null, null);
-
-
-            var requestAndJobData = new RequestAndJobStateData
-            {
-                JobState = jobState,
-                Request = request,
-            };
-
-            requestAndJobDatas.Add(requestAndJobData);
-        }
-
-        var _mockPublisher = new Mock<IPublisher>();
-
-        foreach (var requestAndJobData in requestAndJobDatas)
-        {
-            _mockPublisher.Setup(x => x.CreateJobAndJobState(requestAndJobData.Request, string.Empty, null, null, null))
-                .ReturnsAsync(requestAndJobData.JobState);
-        }
-
-        var batchPublisher = new BatchPublisher<TestContext>(context, _mockPublisher.Object);
-
-        var requests = requestAndJobDatas.Select(x => x.Request).ToList();
-
-        await batchPublisher.AddBatchAndBatchContinuationJobs(requests, requests);
+        await CreateBatch(10);
 
         await ProcessJob();
 
@@ -152,40 +118,7 @@ public abstract partial class HandfireTests : TestBase
     [Fact]
     public async Task GivenGetAndProcessJob_WhenAllJobsInBatchAreFinished_ThenCounterShouldBeZero()
     {
-        var context = CreateContext();
-
-        var publisher = new Publisher<TestContext>(context, 0);
-
-        var requestAndJobDatas = new List<RequestAndJobStateData>();
-
-        for (int i = 0; i < 2; i++)
-        {
-            var request = new UnitRequest();
-            var jobState = await publisher.CreateJobAndJobState(request, name: string.Empty, scheduleTime: null, maxRetries: null, null);
-
-
-            var requestAndJobData = new RequestAndJobStateData
-            {
-                JobState = jobState,
-                Request = request,
-            };
-
-            requestAndJobDatas.Add(requestAndJobData);
-        }
-
-        var _mockPublisher = new Mock<IPublisher>();
-
-        foreach (var requestAndJobData in requestAndJobDatas)
-        {
-            _mockPublisher.Setup(x => x.CreateJobAndJobState(requestAndJobData.Request, string.Empty, null, null, null))
-                .ReturnsAsync(requestAndJobData.JobState);
-        }
-
-        var batchPublisher = new BatchPublisher<TestContext>(context, _mockPublisher.Object);
-
-        var requests = requestAndJobDatas.Select(x => x.Request).ToList();
-
-        await batchPublisher.AddBatchAndBatchContinuationJobs(requests, requests);
+        await CreateBatch(2);
 
         await ProcessJob();
         await ProcessJob();
@@ -198,40 +131,7 @@ public abstract partial class HandfireTests : TestBase
     [Fact]
     public async Task GivenGetAndProcessJob_WhenAllJobsInBatchAreFinished_ThenBatchStatusShouldBeUpdatedToCompleted()
     {
-        var context = CreateContext();
-
-        var publisher = new Publisher<TestContext>(context, 0);
-
-        var requestAndJobDatas = new List<RequestAndJobStateData>();
-
-        for (int i = 0; i < 2; i++)
-        {
-            var request = new UnitRequest();
-            var jobState = await publisher.CreateJobAndJobState(request, name: string.Empty, scheduleTime: null, maxRetries: null, null);
-
-
-            var requestAndJobData = new RequestAndJobStateData
-            {
-                JobState = jobState,
-                Request = request,
-            };
-
-            requestAndJobDatas.Add(requestAndJobData);
-        }
-
-        var _mockPublisher = new Mock<IPublisher>();
-
-        foreach (var requestAndJobData in requestAndJobDatas)
-        {
-            _mockPublisher.Setup(x => x.CreateJobAndJobState(requestAndJobData.Request, string.Empty, null, null, null))
-                .ReturnsAsync(requestAndJobData.JobState);
-        }
-
-        var batchPublisher = new BatchPublisher<TestContext>(context, _mockPublisher.Object);
-
-        var requests = requestAndJobDatas.Select(x => x.Request).ToList();
-
-        await batchPublisher.AddBatchAndBatchContinuationJobs(requests, requests);
+        await CreateBatch(2);
 
         await ProcessJob();
         await ProcessJob();
@@ -244,40 +144,7 @@ public abstract partial class HandfireTests : TestBase
     [Fact]
     public async Task GivenGetAndProcessJob_WhenAllJobsInBatchAreFinished_ThenAllJobsCurrentStateInBatchContinuationShouldBeUpdatedToEnqueued()
     {
-        var context = CreateContext();
-
-        var publisher = new Publisher<TestContext>(context, 0);
-
-        var requestAndJobDatas = new List<RequestAndJobStateData>();
-
-        for (int i = 0; i < 2; i++)
-        {
-            var request = new UnitRequest();
-            var jobState = await publisher.CreateJobAndJobState(request, name: string.Empty, scheduleTime: null, maxRetries: null, null);
-
-
-            var requestAndJobData = new RequestAndJobStateData
-            {
-                JobState = jobState,
-                Request = request,
-            };
-
-            requestAndJobDatas.Add(requestAndJobData);
-        }
-
-        var _mockPublisher = new Mock<IPublisher>();
-
-        foreach (var requestAndJobData in requestAndJobDatas)
-        {
-            _mockPublisher.Setup(x => x.CreateJobAndJobState(requestAndJobData.Request, string.Empty, null, null, null))
-                .ReturnsAsync(requestAndJobData.JobState);
-        }
-
-        var batchPublisher = new BatchPublisher<TestContext>(context, _mockPublisher.Object);
-
-        var requests = requestAndJobDatas.Select(x => x.Request).ToList();
-
-        await batchPublisher.AddBatchAndBatchContinuationJobs(requests, requests);
+        await CreateBatch(2);
 
         await ProcessJob();
         await ProcessJob();

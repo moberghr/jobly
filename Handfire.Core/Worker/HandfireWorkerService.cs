@@ -45,7 +45,8 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
                     new
                     {
                         Job = x,
-                        IsParent = x.ChildJobs.Any()
+                        IsParent = x.ChildJobs.Any(),
+                        IsInBatch = x.Batches.Any(),
                     })
             .TagWith(InterceptorConstants.RowLock)
             .FirstOrDefault();
@@ -73,14 +74,14 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         }
         catch (Exception e)
         {
-            await UpdateJobData(context, job, jobData!.IsParent, e.Message, cancellationToken);
+            await UpdateJobData(context, job, jobData!.IsParent, jobData!.IsInBatch, e.Message, cancellationToken);
 
             transaction.Commit();
 
             return;
         }
 
-        await UpdateJobData(context, job, jobData!.IsParent, message: null, cancellationToken);
+        await UpdateJobData(context, job, jobData!.IsParent, jobData!.IsInBatch, message: null, cancellationToken);
         transaction.Commit();
     }
 
@@ -154,7 +155,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         await mediator.Send(request, cancellationToken);
     }
 
-    private static async Task UpdateJobData(TContext context, Job job, bool isParent, string? message, CancellationToken cancellationToken)
+    private static async Task UpdateJobData(TContext context, Job job, bool isParent, bool isInBatch, string? message, CancellationToken cancellationToken)
     {
         var state = !string.IsNullOrEmpty(message) ? State.Failed : State.Completed;
         if (job.RetriedTimes < job.MaxRetries && !string.IsNullOrEmpty(message))
@@ -170,7 +171,10 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             await UpdateChildJobs(context, job.Id, cancellationToken);
         }
 
-        await UpdateBatch(context, job, cancellationToken);
+        if (isInBatch)
+        {
+            await UpdateBatch(context, job, cancellationToken);
+        }
 
         await CreateJobState(context, job.Id, state, message, cancellationToken);
     }

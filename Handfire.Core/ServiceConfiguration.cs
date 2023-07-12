@@ -190,6 +190,8 @@ public static class ServiceConfiguration
 
         batch.Property(p => p.BatchStatus);
 
+        batch.Property(p => p.Version).IsConcurrencyToken();
+
         batch.HasMany(p => p.BatchContinuations)
             .WithOne(p => p.Batch)
             .HasForeignKey(p => p.BatchId);
