@@ -29,7 +29,7 @@ public class BatchPublisher<TContext> : IBatchPublisher
 
         foreach (var batchJobMessage in batchJobMessages)
         {
-            var newJobState = CreateJobAndJobStateService.CreateJobAndJobState(batchJobMessage, 0, string.Empty, null, null, null, Enums.State.Enqueued);
+            var newJobState = JobHelper.CreateJobAndJobState(batchJobMessage, 0, string.Empty, null, null, null, Enums.State.Enqueued);
 
             await _context.Set<JobState>().AddAsync(newJobState);
 
@@ -38,7 +38,7 @@ public class BatchPublisher<TContext> : IBatchPublisher
 
         foreach (var batchContinuationJobMessage in batchContinuationJobMessages)
         {
-            var newJobState = CreateJobAndJobStateService.CreateJobAndJobState(batchContinuationJobMessage, 0, string.Empty, null, null, null, Enums.State.Awaiting);
+            var newJobState = JobHelper.CreateJobAndJobState(batchContinuationJobMessage, 0, string.Empty, null, null, null, Enums.State.Awaiting);
 
             await _context.Set<JobState>().AddAsync(newJobState);
 

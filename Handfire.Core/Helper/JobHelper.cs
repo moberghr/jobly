@@ -4,7 +4,7 @@ using Handfire.Core.Enums;
 
 namespace Handfire.Core.Helper;
 
-internal static class CreateJobAndJobStateService
+internal static class JobHelper
 {
     public static JobState CreateJobAndJobState<T>(T message, int retries, string name, DateTime? scheduleTime, int? maxRetries, string? parentId, State? state)
         where T : class
