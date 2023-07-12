@@ -131,8 +131,9 @@ public static class ServiceConfiguration
         job.HasMany(p => p.JobStates)
             .WithOne(p => p.Job);
 
-        job.HasMany(p => p.Batches)
-            .WithMany(p => p.Jobs);
+        job.HasOne(p => p.Batch)
+            .WithMany(p => p.Jobs)
+            .HasForeignKey(p => p.BatchId);
 
         job.HasMany(p => p.BatchContinuations)
             .WithOne(p => p.Job)
@@ -195,7 +196,8 @@ public static class ServiceConfiguration
             .HasForeignKey(p => p.BatchId);
 
         batch.HasMany(p => p.Jobs)
-            .WithMany(p => p.Batches);
+            .WithOne(p => p.Batch)
+            .HasForeignKey(p => p.BatchId);
     }
 
     private static void AddBatchContinuationEntity(ModelBuilder modelBuilder)

@@ -8,7 +8,6 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Handfire.Core;
 
@@ -46,7 +45,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
                     {
                         Job = x,
                         IsParent = x.ChildJobs.Any(),
-                        IsInBatch = x.Batches.Any(),
+                        BatchId = x.BatchId,
                     })
             .TagWith(InterceptorConstants.RowLock)
             .FirstOrDefault();
@@ -171,9 +170,9 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             await UpdateChildJobs(context, jobData.Job.Id, cancellationToken);
         }
 
-        if (jobData.IsInBatch)
+        if (jobData.BatchId != null)
         {
-            await UpdateBatch(context, jobData.Job, cancellationToken);
+            await UpdateBatch(context, jobData.BatchId, cancellationToken);
         }
 
         await CreateJobState(context, jobData.Job.Id, state, message, cancellationToken);
@@ -201,35 +200,37 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
              .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
     }
 
-    private async static Task UpdateBatch(TContext context, Job job, CancellationToken cancellationToken)
+    private async static Task UpdateBatch(TContext context, string batchId, CancellationToken cancellationToken)
     {
-        var batchAndBatchContinuationsDatas = await context.Set<Batch>()
+        var batchData = await context.Set<Batch>()
             .Where(x => x.BatchStatus != State.Completed)
-            .Where(x => x.Jobs.Any(y => y.Id == job.Id))
+            .Where(x => x.Id == batchId)
             .Select(x =>
                 new
                 {
                     Batch = x,
                     Jobs = x.Jobs,
-                    BatchContinuationJobs = x.BatchContinuations.Select(y => y.Job).ToList(),
                 })
             .TagWith(InterceptorConstants.RowLock)
-            .ToListAsync(cancellationToken);
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (!batchAndBatchContinuationsDatas.IsNullOrEmpty())
+        if (batchData != null)
         {
-            foreach (var batchAndBatchContinuationsData in batchAndBatchContinuationsDatas)
+            batchData.Batch.Counter = batchData.Jobs.Where(x => x.CurrentState != State.Completed).Count();
+
+            if (batchData.Batch.Counter == 0)
             {
-                batchAndBatchContinuationsData.Batch.Counter = batchAndBatchContinuationsData.Jobs.Where(x => x.CurrentState != State.Completed).Count();
+                batchData.Batch.BatchStatus = State.Completed;
 
-                if (batchAndBatchContinuationsData.Batch.Counter == 0)
+                var batchContinuationJobs = await context.Set<BatchContinuation>()
+                    .Where(x => x.BatchId == batchData.Batch.Id)
+                    .Select(x => x.Job)
+                    .TagWith(InterceptorConstants.RowLock)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var batchContinuationJob in batchContinuationJobs)
                 {
-                    batchAndBatchContinuationsData.Batch.BatchStatus = State.Completed;
-
-                    foreach (var batchContinuationJob in batchAndBatchContinuationsData.BatchContinuationJobs)
-                    {
-                        batchContinuationJob.CurrentState = State.Enqueued;
-                    }
+                    batchContinuationJob.CurrentState = State.Enqueued;
                 }
             }
         }
@@ -241,6 +242,6 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         public bool IsParent { get; set; }
 
-        public bool IsInBatch { get; set; }
+        public string? BatchId { get; set; }
     }
 }
