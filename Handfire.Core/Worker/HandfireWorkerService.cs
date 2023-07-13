@@ -45,7 +45,6 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
                     {
                         Job = x,
                         IsParent = x.ChildJobs.Any(),
-                        BatchId = x.BatchId,
                     })
             .TagWith(InterceptorConstants.RowLock)
             .FirstOrDefault();
@@ -170,9 +169,9 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             await UpdateChildJobs(context, jobData.Job.Id, cancellationToken);
         }
 
-        if (jobData.BatchId != null)
+        if (jobData.Job.BatchId != null)
         {
-            await UpdateBatch(context, jobData.BatchId, cancellationToken);
+            await UpdateBatch(context, jobData.Job.BatchId, cancellationToken);
         }
 
         await CreateJobState(context, jobData.Job.Id, state, message, cancellationToken);
@@ -203,7 +202,6 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
     private async static Task UpdateBatch(TContext context, string batchId, CancellationToken cancellationToken)
     {
         var batchData = await context.Set<Batch>()
-            .Where(x => x.BatchStatus != State.Completed)
             .Where(x => x.Id == batchId)
             .Select(x =>
                 new
@@ -216,10 +214,11 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         if (batchData != null)
         {
-            batchData.Batch.Counter = batchData.Jobs.Where(x => x.CurrentState != State.Completed).Count();
+            batchData.Batch.Counter--;
 
-            if (batchData.Batch.Counter == 0)
+            if (batchData.Batch.Counter <= 0)
             {
+                batchData.Batch.Counter = 0;
                 batchData.Batch.BatchStatus = State.Completed;
 
                 var batchContinuationJobs = await context.Set<BatchContinuation>()
@@ -241,7 +240,5 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         public Job Job { get; set; } = null!;
 
         public bool IsParent { get; set; }
-
-        public string? BatchId { get; set; }
     }
 }
