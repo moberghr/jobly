@@ -201,28 +201,22 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
     private async static Task UpdateBatch(TContext context, string batchId, CancellationToken cancellationToken)
     {
-        var batchData = await context.Set<Batch>()
+        var batch = await context.Set<Batch>()
             .Where(x => x.Id == batchId)
-            .Select(x =>
-                new
-                {
-                    Batch = x,
-                    Jobs = x.Jobs,
-                })
             .TagWith(InterceptorConstants.RowLock)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (batchData != null)
+        if (batch != null)
         {
-            batchData.Batch.Counter--;
+            batch.Counter--;
 
-            if (batchData.Batch.Counter <= 0)
+            if (batch.Counter <= 0)
             {
-                batchData.Batch.Counter = 0;
-                batchData.Batch.BatchStatus = State.Completed;
+                batch.Counter = 0;
+                batch.BatchStatus = State.Completed;
 
                 var batchContinuationJobs = await context.Set<BatchContinuation>()
-                    .Where(x => x.BatchId == batchData.Batch.Id)
+                    .Where(x => x.BatchId == batch.Id)
                     .Select(x => x.Job)
                     .TagWith(InterceptorConstants.RowLock)
                     .ToListAsync(cancellationToken);
