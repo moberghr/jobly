@@ -3,6 +3,8 @@ using Handfire.Core;
 using Handfire.Tests.TestData.Handlers;
 using System.Text.Json;
 using Shouldly;
+using Handfire.Core.Data.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Handfire.Tests.Jobs;
 
@@ -99,6 +101,62 @@ public abstract partial class HandfireTests : TestBase
 
         var counter = await GetCounter();
         counter.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task GivenGetAndProcessJob_WhenJobIsBeingUpdatedWhileHavingBatch_ThenCounterShouldBeUpdated()
+    {
+        await CreateBatch(10);
+
+        await ProcessJob();
+
+        var batch = await CreateContext().Set<Batch>().FirstAsync();
+
+        batch.Counter.ShouldBe(9);
+    }
+
+    [Fact]
+    public async Task GivenGetAndProcessJob_WhenAllJobsInBatchAreFinished_ThenCounterShouldBeZero()
+    {
+        await CreateBatch(2);
+
+        await ProcessJob();
+        await ProcessJob();
+
+        var batch = await CreateContext().Set<Batch>().FirstAsync();
+
+        batch.Counter.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task GivenGetAndProcessJob_WhenAllJobsInBatchAreFinished_ThenBatchStatusShouldBeUpdatedToCompleted()
+    {
+        await CreateBatch(2);
+
+        await ProcessJob();
+        await ProcessJob();
+
+        var batch = await CreateContext().Set<Batch>().FirstAsync();
+
+        batch.BatchStatus.ShouldBe(State.Completed);
+    }
+
+    [Fact]
+    public async Task GivenGetAndProcessJob_WhenAllJobsInBatchAreFinished_ThenAllJobsCurrentStateInBatchContinuationShouldBeUpdatedToEnqueued()
+    {
+        await CreateBatch(2);
+
+        await ProcessJob();
+        await ProcessJob();
+
+        var batchContinuationJobs = await CreateContext().Set<BatchContinuation>()
+            .Select(x => x.Job)
+            .ToListAsync();
+
+        foreach (var batchContinuationJob in batchContinuationJobs)
+        {
+            batchContinuationJob.CurrentState.ShouldBe(State.Enqueued);
+        }
     }
 }
 

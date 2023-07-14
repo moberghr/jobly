@@ -40,11 +40,11 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         var jobData = context.Set<Job>()
             .Where(x => x.CurrentState == State.Enqueued)
             .Where(x => x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
-            .Select(x => 
-                    new 
-                    { 
+            .Select(x =>
+                    new JobData
+                    {
                         Job = x,
-                        IsParent = x.ChildJobs.Any()
+                        IsParent = x.ChildJobs.Any(),
                     })
             .TagWith(InterceptorConstants.RowLock)
             .FirstOrDefault();
@@ -72,14 +72,14 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         }
         catch (Exception e)
         {
-            await UpdateJobData(context, job, jobData!.IsParent, e.Message, cancellationToken);
+            await UpdateJobData(context, jobData!, e.Message, cancellationToken);
 
             transaction.Commit();
 
             return;
         }
 
-        await UpdateJobData(context, job, jobData!.IsParent, message: null, cancellationToken);
+        await UpdateJobData(context, jobData!, message: null, cancellationToken);
         transaction.Commit();
     }
 
@@ -153,23 +153,28 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         await mediator.Send(request, cancellationToken);
     }
 
-    private static async Task UpdateJobData(TContext context, Job job, bool isParent, string? message, CancellationToken cancellationToken)
+    private static async Task UpdateJobData(TContext context, JobData jobData, string? message, CancellationToken cancellationToken)
     {
         var state = !string.IsNullOrEmpty(message) ? State.Failed : State.Completed;
-        if (job.RetriedTimes < job.MaxRetries && !string.IsNullOrEmpty(message))
+        if (jobData.Job.RetriedTimes < jobData.Job.MaxRetries && !string.IsNullOrEmpty(message))
         {
             state = State.Enqueued;
-            job.RetriedTimes += 1;
+            jobData.Job.RetriedTimes += 1;
         }
 
-        job.CurrentState = state;
+        jobData.Job.CurrentState = state;
 
-        if (job.CurrentState == State.Completed && isParent)
+        if (jobData.Job.CurrentState == State.Completed && jobData.IsParent)
         {
-            await UpdateChildJobs(context, job.Id, cancellationToken);
+            await UpdateChildJobs(context, jobData.Job.Id, cancellationToken);
         }
 
-        await CreateJobState(context, job.Id, state, message, cancellationToken);
+        if (jobData.Job.BatchId != null)
+        {
+            await UpdateBatch(context, jobData.Job.BatchId, cancellationToken);
+        }
+
+        await CreateJobState(context, jobData.Job.Id, state, message, cancellationToken);
     }
 
     private static async Task CreateJobState(TContext context, string jobId, State state, string? message, CancellationToken cancellationToken)
@@ -192,5 +197,42 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
              .Where(x => x.ParentJobId == parentJobId)
              .Where(x => x.CurrentState == State.Awaiting)
              .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
+    }
+
+    private async static Task UpdateBatch(TContext context, string batchId, CancellationToken cancellationToken)
+    {
+        var batch = await context.Set<Batch>()
+            .Where(x => x.Id == batchId)
+            .TagWith(InterceptorConstants.RowLock)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (batch != null)
+        {
+            batch.Counter--;
+
+            if (batch.Counter <= 0)
+            {
+                batch.Counter = 0;
+                batch.BatchStatus = State.Completed;
+
+                var batchContinuationJobs = await context.Set<BatchContinuation>()
+                    .Where(x => x.BatchId == batch.Id)
+                    .Select(x => x.Job)
+                    .TagWith(InterceptorConstants.RowLock)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var batchContinuationJob in batchContinuationJobs)
+                {
+                    batchContinuationJob.CurrentState = State.Enqueued;
+                }
+            }
+        }
+    }
+
+    private class JobData
+    {
+        public Job Job { get; set; } = null!;
+
+        public bool IsParent { get; set; }
     }
 }
