@@ -6,25 +6,28 @@
 
 <h3>Job State History</h3>
 
-<table>
-    <tr class="header-tr">
-        <td>Id</td>
-        <td>State</td>
-        <td>DateTime</td>
-        <td>Message</td>
-        <td>Job Id</td>
-    </tr>
-    @foreach (var Job in Model.Items)
-    {
-        <tr>
-            <td>@Job.Id</td>
-            <td>@Job.State</td>
-            <td>@Job.DateTime</td>
-            <td>@Job.Message</td>
-            <td>@Job.JobId</td>
+@if (Model != null)
+{
+    <table>
+        <tr class="header-tr">
+            <td>Id</td>
+            <td>State</td>
+            <td>DateTime</td>
+            <td>Message</td>
+            <td>Job Id</td>
         </tr>
-    }
-</table>
+        @foreach (var Job in Model.Items)
+        {
+            <tr>
+                <td>@Job.Id</td>
+                <td>@Job.State</td>
+                <td>@Job.DateTime</td>
+                <td>@Job.Message</td>
+                <td>@Job.JobId</td>
+            </tr>
+        }
+    </table>
+}
 
 <style>
     table {

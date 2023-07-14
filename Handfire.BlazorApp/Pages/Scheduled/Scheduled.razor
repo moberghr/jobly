@@ -5,16 +5,19 @@
 @using Handfire.Core.Models;
 @using Handfire.Core.Enums
 
-<h3>Completed</h3>
+<h3>Scheduled</h3>
 
-<JobTable Model=Model />
+@if (Model != null)
+{
+    <JobTable Model=Model />
 
-<div style="margin: 1rem;">
-    @for (var i = 0; i < Model.PageCount; i++)
-    {
-        <a class="pagination-btn" href="@($"/scheduled/{i}")">@(i + 1)</a>
-    }
-</div>
+    <div style="margin: 1rem;">
+        @for (var i = 0; i < Model.PageCount; i++)
+        {
+            <a class="pagination-btn" href="@($"/scheduled/{i}")">@(i + 1)</a>
+        }
+    </div>
+}
 
 <style>
     .pagination-btn {
@@ -41,7 +44,6 @@
     protected override async Task OnInitializedAsync()
     {
         await GetScheduledJobs();
-        await RefreshDataPeriodically();
     }
 
     private async Task GetScheduledJobs()
@@ -52,15 +54,5 @@
         };
 
         Model = await HandfireService.GetScheduledJobs(request);
-    }
-
-    private async Task RefreshDataPeriodically()
-    {
-        while (true)
-        {
-            await Task.Delay(1000);
-            await GetScheduledJobs();
-            StateHasChanged();
-        }
     }
 }

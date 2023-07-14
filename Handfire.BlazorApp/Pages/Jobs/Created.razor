@@ -7,14 +7,17 @@
 
 <h3>Created</h3>
 
-<JobTable Model=Model />
+@if (Model != null)
+{
+    <JobTable Model=Model />
 
-<div style="margin: 1rem;">
-    @for (var i = 0; i < Model.PageCount; i++)
-    {
-        <a class="pagination-btn" href="@($"/jobs/created/{i}")">@(i + 1)</a>
-    }
-</div>
+    <div style="margin: 1rem;">
+        @for (var i = 0; i < Model.PageCount; i++)
+        {
+            <a class="pagination-btn" href="@($"/jobs/created/{i}")">@(i + 1)</a>
+        }
+    </div>
+}
 
 <style>
     .pagination-btn {

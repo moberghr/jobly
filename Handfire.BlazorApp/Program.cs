@@ -1,8 +1,19 @@
+using Handfire.BlazorApp.Data;
+using Handfire.Core;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+
+builder.Services.AddDbContextPool<TestContext>(options => options
+    .UseNpgsql(builder.Configuration.GetConnectionString(nameof(TestContext))!)
+    //.UseSqlServer(configuration.GetConnectionString(nameof(TestContext))!)
+    .UseSnakeCaseNamingConvention()
+    .AddHandfireInterceptors());
+builder.Services.AddHandfire<TestContext>(10);
 
 var app = builder.Build();
 

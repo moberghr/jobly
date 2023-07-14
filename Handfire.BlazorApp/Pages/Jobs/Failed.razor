@@ -7,14 +7,17 @@
 
 <h3>Failed</h3>
 
-<JobTable Model=Model />
+@if (Model != null)
+{
+    <JobTable Model=Model />
 
-<div style="margin: 1rem;">
-    @for (var i = 0; i < Model.PageCount; i++)
-    {
-        <a class="pagination-btn" href="@($"/jobs/failed/{i}")">@(i + 1)</a>
-    }
-</div>
+    <div style="margin: 1rem;">
+        @for (var i = 0; i < Model.PageCount; i++)
+        {
+            <a class="pagination-btn" href="@($"/jobs/failed/{i}")">@(i + 1)</a>
+        }
+    </div>
+}
 
 <style>
     .pagination-btn {
@@ -41,7 +44,6 @@
     protected override async Task OnInitializedAsync()
     {
         await GetFailedJobs();
-        await RefreshDataPeriodically();
     }
 
     private async Task GetFailedJobs()
@@ -52,15 +54,5 @@
         };
 
         Model = await HandfireService.GetJobsList(request, State.Failed);
-    }
-
-    private async Task RefreshDataPeriodically()
-    {
-        while (true)
-        {
-            await Task.Delay(1000);
-            await GetFailedJobs();
-            StateHasChanged();
-        }
     }
 }
