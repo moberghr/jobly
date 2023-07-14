@@ -1,0 +1,53 @@
+﻿@page "/dashboard"
+@inject IHandfireService HandfireService
+
+@using Handfire.Core.Models
+@using Handfire.Core.Enums
+@using Handfire.Core
+
+<h3>Total: @Model.Total</h3>
+<h3>Pending: @Model.Pending</h3>
+<h3>Scheduled: @Model.Scheduled</h3>
+<h3>Created: @Model.Created</h3>
+<h3>Completed: @Model.Completed</h3>
+<h3>Failed: @Model.Failed</h3>
+
+@code {
+    private DashboardStatistics Model { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetDashboardStatistics();
+        await RefreshDataPeriodically();
+    }
+
+    private async Task GetDashboardStatistics()
+    {
+        var total = await HandfireService.GetTotalJobsCount();
+        var pending = await HandfireService.GetPendingJobsCount();
+        var scheduled = await HandfireService.GetScheduledJobsCount();
+        var created = await HandfireService.GetJobsCount(State.Enqueued);
+        var completed = await HandfireService.GetJobsCount(State.Completed);
+        var failed = await HandfireService.GetJobsCount(State.Failed);
+
+        Model = new DashboardStatistics
+        {
+            Total = total,
+            Pending = pending,
+            Scheduled = scheduled,
+            Created = created,
+            Completed = completed,
+            Failed = failed
+        };
+    }
+
+    private async Task RefreshDataPeriodically()
+    {
+        while (true)
+        {
+            await Task.Delay(1000);
+            await GetDashboardStatistics();
+            StateHasChanged();
+        }
+    }
+}

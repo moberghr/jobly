@@ -1,0 +1,58 @@
+﻿@using Handfire.Core;
+@using Handfire.Core.Models;
+@using Microsoft.AspNetCore.Http.Extensions
+
+<table>
+    <tr class="header-tr">
+        <td>Id</td>
+        <td>Type</td>
+        <td>Message</td>
+        <td>Create Time</td>
+        <td>Schedule Time</td>
+        <td>Processed Time</td>
+        <td>Current State</td>
+        <td>Link</td>
+    </tr>
+    @foreach (var job in Model.Items)
+    {
+        <tr>
+            <td>@job.Id</td>
+            <td>@job.Type</td>
+            <td>@job.Message</td>
+            <td>@job.CreateTime</td>
+            <td>@job.ScheduleTime</td>
+            <td>@job.ProcessedTime</td>
+            <td>@job.CurrentState</td>
+            <td><a href="@($"/details/{job.Id}/0")">Details</a></td>
+            @if (job.CurrentState == Handfire.Core.Enums.State.Failed)
+            {
+                <td><a href="@($"/jobs/retry/{job.Id}")">Retry</a></td>
+            }
+        </tr>
+    }
+</table>
+
+<style>
+    table {
+        border: 1px solid gray;
+        margin: 1rem;
+    }
+
+    td {
+        padding: 0.2rem;
+        border: 1px solid gray;
+    }
+    
+    td:hover {
+        background-color: lightgray;
+    }
+
+    .header-tr {
+        background-color: lightgray;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public PagedList<JobModel> Model { get; set; } = null!;
+}

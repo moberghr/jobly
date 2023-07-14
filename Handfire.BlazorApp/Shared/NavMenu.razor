@@ -1,0 +1,51 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">Handfire</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="oi oi-home" aria-hidden="true"></span> Dashboard
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <span class="nav-link nav-menu-parent" @onclick="ToggleSubMenu">
+                <span class="oi oi-plus" aria-hidden="true"></span> Jobs
+            </span>
+            <ul class="submenu" style="display: @SubMenuCssDisplay;">
+                <li><NavLink class="nav-link" href="jobs/created/0">Created</NavLink></li>
+                <li><NavLink class="nav-link" href="jobs/failed/0">Failed</NavLink></li>
+                <li><NavLink class="nav-link" href="jobs/completed/0">Completed</NavLink></li>
+            </ul>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="scheduled/0">
+                <span class="oi oi-list-rich" aria-hidden="true"></span> Scheduled
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+    private bool collapseSubMenu = true;
+
+    private string? SubMenuCssDisplay => collapseSubMenu ? "none" : null;
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    private void ToggleSubMenu()
+    {
+        collapseSubMenu = !collapseSubMenu;
+    }
+}

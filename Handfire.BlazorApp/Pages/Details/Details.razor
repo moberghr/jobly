@@ -1,0 +1,68 @@
+﻿@page "/details/{jobId}/{page:int}"
+@inject IHandfireService HandfireService
+
+@using Handfire.Core
+@using Handfire.Core.Models
+
+<h3>Job State History</h3>
+
+<table>
+    <tr class="header-tr">
+        <td>Id</td>
+        <td>State</td>
+        <td>DateTime</td>
+        <td>Message</td>
+        <td>Job Id</td>
+    </tr>
+    @foreach (var Job in Model.Items)
+    {
+        <tr>
+            <td>@Job.Id</td>
+            <td>@Job.State</td>
+            <td>@Job.DateTime</td>
+            <td>@Job.Message</td>
+            <td>@Job.JobId</td>
+        </tr>
+    }
+</table>
+
+<style>
+    table {
+        border: 1px solid gray;
+        margin: 1rem;
+    }
+
+    td {
+        padding: 0.2rem;
+        border: 1px solid gray;
+    }
+    
+    td:hover {
+        background-color: lightgray;
+    }
+
+    .header-tr {
+        background-color: lightgray;
+    }
+</style>
+
+@code{
+    [Parameter]
+    public string JobId { get; set; } = null!;
+
+    [Parameter]
+    public int Page { get; set; }
+
+    private PagedList<JobStateModel> Model { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var request = new JobStateRequest
+        {
+            JobId = JobId,
+            Page = Page,
+        };
+
+        Model = await HandfireService.GetJobStates(request);
+    }
+}

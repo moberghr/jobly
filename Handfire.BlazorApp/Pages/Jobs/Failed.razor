@@ -1,0 +1,66 @@
+﻿@page "/jobs/failed/{page:int}"
+@inject IHandfireService HandfireService
+
+@using Handfire.Core;
+@using Handfire.Core.Models;
+@using Handfire.Core.Enums
+
+<h3>Failed</h3>
+
+<JobTable Model=Model />
+
+<div style="margin: 1rem;">
+    @for (var i = 0; i < Model.PageCount; i++)
+    {
+        <a class="pagination-btn" href="@($"/jobs/failed/{i}")">@(i + 1)</a>
+    }
+</div>
+
+<style>
+    .pagination-btn {
+        background-color: whitesmoke;
+        border: 2px solid whitesmoke;
+        padding: 0.2rem;
+        border-radius: 2px;
+        cursor: pointer;
+        text-decoration: none;
+        color: black;
+    }
+    
+    .pagination-btn:hover {
+        border: 2px solid lightgray;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public int Page { get; set; }
+
+    private PagedList<JobModel> Model { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetFailedJobs();
+        await RefreshDataPeriodically();
+    }
+
+    private async Task GetFailedJobs()
+    {
+        var request = new BaseListRequest
+        {
+            Page = Page,
+        };
+
+        Model = await HandfireService.GetJobsList(request, State.Failed);
+    }
+
+    private async Task RefreshDataPeriodically()
+    {
+        while (true)
+        {
+            await Task.Delay(1000);
+            await GetFailedJobs();
+            StateHasChanged();
+        }
+    }
+}
