@@ -42,7 +42,7 @@ public static class ServiceConfiguration
 
     public static void AddHangfireDashboard(this WebApplication app)
     {
-        app.UsePathBase("/dashboard");
+        app.UsePathBase("/handfire");
         app.UseStaticFiles();
         app.UseRouting();
         app.MapBlazorHub();
