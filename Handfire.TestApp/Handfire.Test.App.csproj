@@ -14,6 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Handfire.BlazorApp\Handfire.BlazorApp.csproj" />
     <ProjectReference Include="..\Handfire.Core\Handfire.Core.csproj" />
     <ProjectReference Include="..\Handfire.Test.Shared\Handfire.Test.Shared.csproj" />
   </ItemGroup>

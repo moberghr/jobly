@@ -2,6 +2,7 @@
 using Handfire.Core.Entities;
 using Handfire.Core.Interceptors;
 using Handfire.Core.Worker;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -31,6 +32,21 @@ public static class ServiceConfiguration
         where TContext : DbContext
     {
         return CreateHandfireServices<TContext>(services, workerCount, retries: 0);
+    }
+
+    public static void RegisterRazorServices(this IServiceCollection services)
+    {
+        services.AddRazorPages();
+        services.AddServerSideBlazor();
+    }
+
+    public static void AddHangfireDashboard(this WebApplication app)
+    {
+        app.UsePathBase("/dashboard");
+        app.UseStaticFiles();
+        app.UseRouting();
+        app.MapBlazorHub();
+        app.MapFallbackToPage("/_Host");
     }
 
     private static IServiceCollection CreateHandfireServices<TContext>(this IServiceCollection services, int workerCount, int retries) where TContext : DbContext
