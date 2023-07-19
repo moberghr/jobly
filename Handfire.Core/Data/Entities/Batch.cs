@@ -11,7 +11,7 @@ public class Batch
 
     public int Counter { get; set; }
 
-    public List<BatchContinuation> BatchContinuations { get; set; } = new();
-
     public List<Job> Jobs { get; set; } = new();
+
+    public string JobId { get; set; } = null!;
 }

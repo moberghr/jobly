@@ -104,7 +104,6 @@ public static class ServiceConfiguration
         AddJobStateEntity(modelBuilder);
         AddRecurringJobEntity(modelBuilder);
         AddBatchEntity(modelBuilder);
-        AddBatchContinuationEntity(modelBuilder);
     }
 
     private static void AddJobEntity(ModelBuilder modelBuilder)
@@ -134,10 +133,6 @@ public static class ServiceConfiguration
         job.HasOne(p => p.Batch)
             .WithMany(p => p.Jobs)
             .HasForeignKey(p => p.BatchId);
-
-        job.HasMany(p => p.BatchContinuations)
-            .WithOne(p => p.Job)
-            .HasForeignKey(p => p.JobId);
     }
 
     private static void AddJobStateEntity(ModelBuilder modelBuilder)
@@ -191,29 +186,8 @@ public static class ServiceConfiguration
 
         batch.Property(p => p.BatchStatus);
 
-        batch.HasMany(p => p.BatchContinuations)
-            .WithOne(p => p.Batch)
-            .HasForeignKey(p => p.BatchId);
-
         batch.HasMany(p => p.Jobs)
             .WithOne(p => p.Batch)
-            .HasForeignKey(p => p.BatchId);
-    }
-
-    private static void AddBatchContinuationEntity(ModelBuilder modelBuilder)
-    {
-        var batchContinuation = modelBuilder.Entity<BatchContinuation>();
-        batchContinuation.ToTable(nameof(BatchContinuation));
-
-        batchContinuation.Property(p => p.Id);
-        batchContinuation.HasKey(p => p.Id);
-
-        batchContinuation.HasOne(p => p.Job)
-            .WithMany(p => p.BatchContinuations)
-            .HasForeignKey(p => p.JobId);
-
-        batchContinuation.HasOne(p => p.Batch)
-            .WithMany(p => p.BatchContinuations)
             .HasForeignKey(p => p.BatchId);
     }
 }

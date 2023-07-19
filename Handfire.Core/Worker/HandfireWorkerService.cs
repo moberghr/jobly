@@ -201,29 +201,65 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
     private async static Task UpdateBatch(TContext context, string batchId, CancellationToken cancellationToken)
     {
-        var batch = await context.Set<Batch>()
+        var firstBatch = await context.Set<Batch>()
             .Where(x => x.Id == batchId)
             .TagWith(InterceptorConstants.RowLock)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (batch != null)
+        // Check if this is a batch job
+        if (firstBatch != null)
         {
-            batch.Counter--;
+            firstBatch.Counter--;
 
-            if (batch.Counter <= 0)
+            // If all jobs in a single batch are finished
+            if (firstBatch.Counter <= 0)
             {
-                batch.Counter = 0;
-                batch.BatchStatus = State.Completed;
+                firstBatch.Counter = 0;
+                firstBatch.BatchStatus = State.Completed;
 
-                var batchContinuationJobs = await context.Set<BatchContinuation>()
-                    .Where(x => x.BatchId == batch.Id)
-                    .Select(x => x.Job)
-                    .TagWith(InterceptorConstants.RowLock)
-                    .ToListAsync(cancellationToken);
+                var firstPlaceholderBatchJob = await context.Set<Job>()
+                    .Where(x => x.Id == firstBatch.JobId)
+                    .FirstAsync(cancellationToken);
 
-                foreach (var batchContinuationJob in batchContinuationJobs)
+                firstPlaceholderBatchJob.CurrentState = State.Completed;
+
+                var secondPlaceholderJob = await context.Set<Job>()
+                    .Where(x => x.ParentJobId == firstPlaceholderBatchJob.Id)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                // Check if another parent placeholder exists
+                // If yes, then start another batch jobs process
+                // if no, then no more jobs exists that need to be started (this is the last one)
+                if (secondPlaceholderJob != null)
                 {
-                    batchContinuationJob.CurrentState = State.Enqueued;
+                    var secondBatch = await context.Set<Batch>()
+                        .Where(x => x.JobId == secondPlaceholderJob.Id)
+                        .FirstOrDefaultAsync(cancellationToken);
+
+                    // Check if this is another batch of jobs or...
+                    if (secondBatch != null)
+                    {
+                        secondBatch.BatchStatus = State.Enqueued;
+
+                        var secondBatchJobs = await context.Set<Job>()
+                        .Where(x => x.BatchId == secondBatch.Id)
+                        .ToListAsync(cancellationToken);
+
+                        foreach (var batchJob in secondBatchJobs)
+                        {
+                            batchJob.CurrentState = State.Enqueued;
+                        }
+                    }
+
+                    var secondSingleJob = await context.Set<Job>()
+                        .Where(x => x.ParentJobId == secondPlaceholderJob.Id)
+                        .FirstOrDefaultAsync(cancellationToken);
+
+                    // ...A single job
+                    if (secondSingleJob != null)
+                    {
+                        secondSingleJob.CurrentState = State.Enqueued;
+                    }
                 }
             }
         }

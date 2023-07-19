@@ -82,7 +82,7 @@ public class Publisher<TContext> : IPublisher
     private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? maxRetries, string? parentId)
         where T : class
     {
-        var jobState = JobHelper.CreateJobAndJobState(message, _retries, name, scheduleTime, maxRetries, parentId, State.Enqueued);
+        var jobState = JobHelper.CreateJobAndJobState(message, _retries, name, scheduleTime, maxRetries, parentId, State.Enqueued, null);
 
         await _context.Set<JobState>().AddAsync(jobState);
 

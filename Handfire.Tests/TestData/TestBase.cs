@@ -136,7 +136,7 @@ public abstract class TestBase
 
         var batchPublisher = new BatchPublisher<TestContext>(context);
 
-        await batchPublisher.AddBatchAndBatchContinuationJobs(requests, requests);
+        await batchPublisher.CreateBatchJobs(requests, requests);
     }
 
     protected async Task<Job> GetJobWithStates(TestContext context, string jobId)

@@ -35,8 +35,6 @@ public class Job
 
     public List<Job> ChildJobs { get; set; } = new();
 
-    public List<BatchContinuation> BatchContinuations { get; set; } = new();
-
     public string? BatchId { get; set; }
 
     public Batch? Batch { get; set; }
