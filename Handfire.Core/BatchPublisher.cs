@@ -8,7 +8,9 @@ namespace Handfire.Core;
 
 public interface IBatchPublisher
 {
-    Task CreateBatchJobs<T>(List<T> firstBatchJobMessages, List<T> secondBatchJobMessages) where T : class;
+    Task<string> StartNew<T>(List<T> batchJobMessages) where T : class;
+
+    Task<string> ContinueBatchWith<T>(List<T> batchJobMessages, string placeholderJobId) where T : class;
 }
 
 public class BatchPublisher<TContext> : IBatchPublisher
@@ -21,61 +23,73 @@ public class BatchPublisher<TContext> : IBatchPublisher
         _context = context;
     }
 
-    public async Task CreateBatchJobs<T>(List<T> firstBatchJobMessages, List<T> secondBatchJobMessages) where T : class
+    public async Task<string> StartNew<T>(List<T> batchJobMessages) where T : class
     {
-        if (firstBatchJobMessages.IsNullOrEmpty() || secondBatchJobMessages.IsNullOrEmpty())
+        if (batchJobMessages.IsNullOrEmpty())
         {
-            return;
+            throw new Exception("List cannot be empty");
         }
 
-        var newFirstBatchJobs = new List<Job>();
-        var newSecondBatchJobs = new List<Job>();
+        var batchJobs = new List<Job>();
 
-        var placeholderJobForFirstBatch = JobHelper.CreateJobAndJobState(firstBatchJobMessages[0], 0, string.Empty, null, null, null, Enums.State.Awaiting, null);
+        var placeholderJobForBatch = JobHelper.CreateJobAndJobState(batchJobMessages[0], 0, string.Empty, null, null, null, Enums.State.Awaiting, null);
 
-        var newFirstBatch = new Batch
+        var newBatch = new Batch
         {
             BatchStatus = Enums.State.Enqueued,
-            JobId = placeholderJobForFirstBatch.Job.Id,
-            Counter = firstBatchJobMessages.Count,
+            JobId = placeholderJobForBatch.Job.Id,
+            Counter = batchJobMessages.Count,
         };
 
-        foreach (var batchJobMessage in firstBatchJobMessages)
+        foreach (var batchJobMessage in batchJobMessages)
         {
-            var newJobState = JobHelper.CreateJobAndJobState(batchJobMessage, 0, string.Empty, null, null, null, Enums.State.Enqueued, newFirstBatch.Id);
+            var newJobState = JobHelper.CreateJobAndJobState(batchJobMessage, 0, string.Empty, null, null, null, Enums.State.Enqueued, newBatch.Id);
 
             await _context.Set<JobState>().AddAsync(newJobState);
 
-            newFirstBatchJobs.Add(newJobState.Job);
+            batchJobs.Add(newJobState.Job);
         }
 
-        newFirstBatch.Jobs = newFirstBatchJobs;
+        newBatch.Jobs = batchJobs;
 
-        var placeholderJobForSecondBatch = JobHelper.CreateJobAndJobState(secondBatchJobMessages[0], 0, string.Empty, null, null, newFirstBatch.JobId, Enums.State.Awaiting, null);
+        await _context.Set<JobState>().AddAsync(placeholderJobForBatch);
+        await _context.Set<Batch>().AddAsync(newBatch);
 
-        var newSecondBatch = new Batch
+        return newBatch.JobId;
+    }
+
+    public async Task<string> ContinueBatchWith<T>(List<T> batchJobMessages, string placeholderJobId) where T : class
+    {
+        if (batchJobMessages.IsNullOrEmpty())
+        {
+            throw new Exception("List cannot be empty");
+        }
+
+        var batchJobs = new List<Job>();
+
+        var placeholderJobForBatch = JobHelper.CreateJobAndJobState(batchJobMessages[0], 0, string.Empty, null, null, placeholderJobId, Enums.State.Awaiting, null);
+
+        var newBatch = new Batch
         {
             BatchStatus = Enums.State.Awaiting,
-            JobId = placeholderJobForSecondBatch.Job.Id,
-            Counter = secondBatchJobMessages.Count,
+            JobId = placeholderJobForBatch.Job.Id,
+            Counter = batchJobMessages.Count,
         };
 
-        foreach (var batchJobMessage in secondBatchJobMessages)
+        foreach (var batchJobMessage in batchJobMessages)
         {
-            var newJobState = JobHelper.CreateJobAndJobState(batchJobMessage, 0, string.Empty, null, null, null, Enums.State.Awaiting, newSecondBatch.Id);
+            var newJobState = JobHelper.CreateJobAndJobState(batchJobMessage, 0, string.Empty, null, null, null, Enums.State.Awaiting, newBatch.Id);
 
             await _context.Set<JobState>().AddAsync(newJobState);
 
-            newSecondBatchJobs.Add(newJobState.Job);
+            batchJobs.Add(newJobState.Job);
         }
 
-        newSecondBatch.Jobs = newSecondBatchJobs;
+        newBatch.Jobs = batchJobs;
 
-        await _context.Set<JobState>().AddAsync(placeholderJobForFirstBatch);
-        await _context.Set<JobState>().AddAsync(placeholderJobForSecondBatch);
-        await _context.Set<Batch>().AddAsync(newFirstBatch);
-        await _context.Set<Batch>().AddAsync(newSecondBatch);
+        await _context.Set<JobState>().AddAsync(placeholderJobForBatch);
+        await _context.Set<Batch>().AddAsync(newBatch);
 
-        await _context.SaveChangesAsync();
+        return newBatch.JobId;
     }
 }

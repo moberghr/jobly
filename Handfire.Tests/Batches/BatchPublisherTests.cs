@@ -9,9 +9,15 @@ namespace Handfire.Tests.Jobs;
 public abstract partial class HandfireTests : TestBase
 {
     [Fact]
-    public async Task GivenCreateBatchJobs_WhenFirstAndSecondBatchAreCreated_ThenBothBatchesMustBeInDb()
+    public async Task GivenCreateBatchJobs_WhenNewBatchAndContinuationBatchAreCreated_ThenBothBatchesMustBeInDb()
     {
-        await CreateBatch(10);
+        var context = CreateContext();
+
+        var placeholderJobId = await CreateBatch(context, 10);
+
+        await ContinueBatchWith(context, 10, placeholderJobId);
+
+        await context.SaveChangesAsync();
 
         var newBatches = await CreateContext().Set<Batch>()
             .ToListAsync();
@@ -20,9 +26,15 @@ public abstract partial class HandfireTests : TestBase
     }
 
     [Fact]
-    public async Task GivenCreateBatchJobs_WhenFirstAndSecondBatchAreCreated_ThenCounterOnBothShouldBe10()
+    public async Task GivenCreateBatchJobs_WhenNewBatchAndContinuationBatchAreCreated_ThenCounterOnBothShouldBe10()
     {
-        await CreateBatch(10);
+        var context = CreateContext();
+
+        var placeholderJobId = await CreateBatch(context, 10);
+
+        await ContinueBatchWith(context, 10, placeholderJobId);
+
+        await context.SaveChangesAsync();
 
         var newBatches = await CreateContext().Set<Batch>()
             .ToListAsync();
@@ -34,13 +46,18 @@ public abstract partial class HandfireTests : TestBase
     }
 
     [Fact]
-    public async Task GivenCreateBatchJobs_WhenFirstAndSecondPlaceholderJobIsCreated_ThenPlaceholdedJobIdMustbeJobIdInBatchTable()
+    public async Task GivenCreateBatchJobs_WhenNewBatchAndContinuationBatchAreCreated_ThenPlaceholdedJobIdMustbeJobIdInBatchTable()
     {
-        await CreateBatch(2);
+        var context = CreateContext();
+
+        var firstPlaceholderJobId = await CreateBatch(context, 2);
+
+        var secondPlaceholderJobId = await ContinueBatchWith(context, 2, firstPlaceholderJobId);
+
+        await context.SaveChangesAsync();
 
         var firstPlaceholderJob = await CreateContext().Set<Job>()
-            .Where(x => x.BatchId == null)
-            .Where(x => x.ParentJobId == null)
+            .Where(x => x.Id == firstPlaceholderJobId)
             .FirstOrDefaultAsync();
 
         firstPlaceholderJob.ShouldNotBeNull();
