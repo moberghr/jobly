@@ -105,6 +105,26 @@ public abstract partial class HandfireTests : TestBase
     }
 
     [Fact]
+    public async Task GivenGetAndProcessJob_WhenJobWithParentIdIsCreated_ThenChildJobStateShouldBeAwaiting()
+    {
+        var context = CreateContext();
+
+        var testLogId = await CreateLogInDb(context);
+
+        var jobId = await CreateProcessLogJob(context, testLogId);
+
+        var childJobId = await CreateJobWithParentId(context, jobId);
+
+        await context.SaveChangesAsync();
+
+        var childJob = await CreateContext().Set<Job>()
+            .Where(x => x.Id == childJobId)
+            .FirstAsync();
+
+        childJob.CurrentState.ShouldBe(State.Awaiting);
+    }
+
+    [Fact]
     public async Task GivenGetAndProcessJob_WhenBatchJobIsBeingUpdated_ThenFirstBatchCounterShouldBeUpdatedWhileSecondBatchIsNot()
     {
         var context = CreateContext();
@@ -281,6 +301,70 @@ public abstract partial class HandfireTests : TestBase
         {
             batchJob.CurrentState.ShouldBe(State.Completed);
         }
+    }
+
+    [Fact]
+    public async Task GivenGetAndProcessJob_WhenFirstBatchJobHasSingleJobAsNextJobToProcess_ThenSingleJobShouldBeCreated()
+    {
+        var context = CreateContext();
+
+        var firstPlaceholderJobId = await CreateBatch(context, 2);
+
+        var singleJobId = await CreateJobWithParentId(context, firstPlaceholderJobId);
+
+        var secondPlaceholderJobId = await ContinueBatchWith(context, 2, singleJobId);
+
+        await context.SaveChangesAsync();
+
+        var singleJob = await CreateContext().Set<Job>()
+            .Where(x => x.Id == singleJobId)
+            .FirstAsync();
+
+        singleJob.ParentJobId.ShouldBe(firstPlaceholderJobId);
+    }
+
+    [Fact]
+    public async Task GivenGetAndProcessJob_WhenFirstBatchJobHasSingleJobAsNextJobToProcess_ThenSecondBatchPlaceholderJobParentIdEqualsSingleJobId()
+    {
+        var context = CreateContext();
+
+        var firstPlaceholderJobId = await CreateBatch(context, 2);
+
+        var singleJobId = await CreateJobWithParentId(context, firstPlaceholderJobId);
+
+        var secondPlaceholderJobId = await ContinueBatchWith(context, 2, singleJobId);
+
+        await context.SaveChangesAsync();
+
+        var secondPlaceholderJob = await CreateContext().Set<Job>()
+            .Where(x => x.Id == secondPlaceholderJobId)
+            .FirstAsync();
+
+        secondPlaceholderJob.ParentJobId.ShouldBe(singleJobId);
+    }
+
+    [Fact]
+    public async Task GivenGetAndProcessJob_WhenFirstBatchJobsAndSingleJobHaveFinished_ThenSingleJobStatusShouldBeUpdatedToCompleted()
+    {
+        var context = CreateContext();
+
+        var firstPlaceholderJobId = await CreateBatch(context, 2);
+
+        var singleJobId = await CreateJobWithParentId(context, firstPlaceholderJobId);
+
+        var secondPlaceholderJobId = await ContinueBatchWith(context, 2, singleJobId);
+
+        await context.SaveChangesAsync();
+
+        await ProcessJob();
+        await ProcessJob();
+        await ProcessJob();
+
+        var singleJob = await CreateContext().Set<Job>()
+            .Where(x => x.Id == singleJobId)
+            .FirstAsync();
+
+        singleJob.CurrentState.ShouldBe(State.Completed);
     }
 }
 

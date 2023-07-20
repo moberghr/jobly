@@ -171,7 +171,12 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         if (jobData.Job.BatchId != null)
         {
-            await UpdateBatch(context, jobData.Job.BatchId, cancellationToken);
+            await UpdateBatchFromBatchId(context, jobData.Job.BatchId, cancellationToken);
+        }
+
+        if (jobData.Job.ParentJobId != null)
+        {
+            await UpdateBatchFromJobId(context, jobData.Job.Id, cancellationToken);
         }
 
         await CreateJobState(context, jobData.Job.Id, state, message, cancellationToken);
@@ -199,13 +204,36 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
              .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
     }
 
-    private async static Task UpdateBatch(TContext context, string batchId, CancellationToken cancellationToken)
+    private async static Task UpdateBatchFromJobId(TContext context, string jobId, CancellationToken cancellationToken)
+    {
+        var job = await context.Set<Job>()
+            .Where(x => x.ParentJobId ==  jobId)
+            .TagWith(InterceptorConstants.RowLock)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (job != null)
+        {
+            var firstBatch = await context.Set<Batch>()
+                .Where(x => x.JobId == job.Id)
+                .TagWith(InterceptorConstants.RowLock)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            await UpdateBatchBase(context, firstBatch, cancellationToken);
+        }
+    }
+
+    private async static Task UpdateBatchFromBatchId(TContext context, string batchId, CancellationToken cancellationToken)
     {
         var firstBatch = await context.Set<Batch>()
             .Where(x => x.Id == batchId)
             .TagWith(InterceptorConstants.RowLock)
             .FirstOrDefaultAsync(cancellationToken);
 
+        await UpdateBatchBase(context, firstBatch, cancellationToken);
+    }
+
+    private async static Task UpdateBatchBase(TContext context, Batch? firstBatch, CancellationToken cancellationToken)
+    {
         // Check if this is a batch job
         if (firstBatch != null)
         {
@@ -250,15 +278,10 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
                             batchJob.CurrentState = State.Enqueued;
                         }
                     }
-
-                    var secondSingleJob = await context.Set<Job>()
-                        .Where(x => x.ParentJobId == secondPlaceholderJob.Id)
-                        .FirstOrDefaultAsync(cancellationToken);
-
                     // ...A single job
-                    if (secondSingleJob != null)
+                    else
                     {
-                        secondSingleJob.CurrentState = State.Enqueued;
+                        secondPlaceholderJob.CurrentState = State.Enqueued;
                     }
                 }
             }

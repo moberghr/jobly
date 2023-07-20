@@ -121,6 +121,17 @@ public abstract class TestBase
         return logInDb.Id;
     }
 
+    protected async Task<string> CreateJobWithParentId(TestContext context, string parentJobId)
+    {
+        var requests = new UnitRequest();
+
+        var publisher = new Publisher<TestContext>(context, 0);
+
+        var jobId = await publisher.Publish(requests, parentJobId);
+
+        return jobId;
+    }
+
     protected async Task<string> CreateBatch(TestContext context, int numberOfJobs)
     {
         var requests = new List<UnitRequest>();
