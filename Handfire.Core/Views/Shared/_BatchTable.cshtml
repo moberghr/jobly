@@ -1,0 +1,45 @@
+@using Handfire.Core;
+@using Handfire.Core.Models;
+@using Microsoft.AspNetCore.Http.Extensions
+
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+
+@model PagedList<BatchModel>
+
+<table>
+    <tr class="header-tr">
+        <td>Id</td>
+        <td>Non-finished</td>
+        <td>Link</td>
+    </tr>
+    @foreach (var Batch in Model.Items)
+    {
+        <tr>
+            <td>@Batch.BatchId</td>
+            <td>@Batch.NonFinished</td>
+            <td><a asp-controller="Batches" asp-action="BatchJobs" asp-route-page="0" asp-route-pageSize="20" asp-route-jobId="@Batch.BatchId.ToString()">Details</a></td>
+        </tr>
+    }
+</table>
+
+<style>
+    table{
+        border: 1px solid gray;
+
+        margin: 1rem;
+    }
+
+    td{
+        padding: 0.2rem;
+        border: 1px solid gray;
+    }
+
+    td:hover{
+        background-color: lightgray;
+    }
+
+    .header-tr{
+        background-color: lightgray;
+    }
+</style>

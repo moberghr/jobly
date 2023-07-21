@@ -37,4 +37,10 @@ public class TestController : ControllerBase
     {
         return await _mediator.Send(request);
     }
+
+    [HttpPost("register-batch-jobs")]
+    public async Task<RegisterBatchJobsResponse> RegisterBatchJobs(RegisterBatchJobsRequest request)
+    {
+        return await _mediator.Send(request);
+    }
 }

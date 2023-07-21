@@ -29,7 +29,7 @@
             <td>@Job.ProcessedTime</td>
             <td>@Job.CurrentState</td>
             <td><a asp-controller="Details" asp-action="Index" asp-route-page="0" asp-route-pageSize="20" asp-route-jobId="@Job.Id.ToString()">Details</a></td>
-            @if(Job.CurrentState == Handfire.Core.Enums.State.Failed)
+            @if (Job.CurrentState == Handfire.Core.Enums.State.Failed)
             {
                 <td><a asp-controller="Jobs" asp-action="Retry" asp-route-jobId="@Job.Id.ToString()">Retry</a></td>
             }

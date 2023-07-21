@@ -1,4 +1,5 @@
-﻿using Handfire.Core.Entities;
+﻿using Handfire.Core.Data.Entities;
+using Handfire.Core.Entities;
 using Handfire.Core.Enums;
 using Handfire.Core.Models;
 using Microsoft.EntityFrameworkCore;
@@ -20,8 +21,10 @@ public interface IHandfireService
     Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request);
 
     Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request);
-    
+
     Task SetRetry(string jobId);
+
+    Task<PagedList<BatchModel>> GetBatchList(BaseListRequest request);
 }
 
 public class HandfireService<TContext> : IHandfireService
@@ -85,7 +88,7 @@ public class HandfireService<TContext> : IHandfireService
             .Where(x => x.CurrentState == State.Failed)
             .FirstOrDefault();
 
-        if(job == null)
+        if (job == null)
         {
             throw new ArgumentException("Invalid job id.");
         }
@@ -121,6 +124,20 @@ public class HandfireService<TContext> : IHandfireService
             .ToPagedListAsync(request);
 
         return history;
+    }
+
+    public async Task<PagedList<BatchModel>> GetBatchList(BaseListRequest request)
+    {
+        var batches = await _context.Set<Batch>()
+            .Select(x =>
+                new BatchModel
+                {
+                    BatchId = x.Id,
+                    NonFinished = $"{x.Counter}/{x.Jobs.Count}",
+                })
+            .ToPagedListAsync(request);
+
+        return batches;
     }
 
     private IQueryable<JobModel> GetScheduledJobs()
