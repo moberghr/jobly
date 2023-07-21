@@ -138,11 +138,11 @@ public abstract partial class HandfireTests : TestBase
         await ProcessJob();
 
         var firstBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.JobId == firstPlaceholderJobId)
+            .Where(x => x.Id == firstPlaceholderJobId)
             .FirstAsync();
 
         var secondBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.JobId == secondPlaceholderJobId)
+            .Where(x => x.Id == secondPlaceholderJobId)
             .FirstAsync();
 
         firstBatch.Counter.ShouldBe(9);
@@ -164,11 +164,11 @@ public abstract partial class HandfireTests : TestBase
         await ProcessJob();
 
         var firstBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.JobId == firstPlaceholderJobId)
+            .Where(x => x.Id == firstPlaceholderJobId)
             .FirstAsync();
 
         var secondBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.JobId == secondPlaceholderJobId)
+            .Where(x => x.Id == secondPlaceholderJobId)
             .FirstAsync();
 
         firstBatch.Counter.ShouldBe(0);
@@ -199,7 +199,7 @@ public abstract partial class HandfireTests : TestBase
     }
 
     [Fact]
-    public async Task GivenGetAndProcessJob_WhenAllJobsInFirstBatchAreFinished_ThenFirstBatchStatusShouldBeUpdatedToCompleted()
+    public async Task GivenGetAndProcessJob_WhenAllJobsInFirstBatchAreFinished_ThenCUrrentBatchJobStatusShouldBeUpdatedToCompleted()
     {
         var context = CreateContext();
 
@@ -212,11 +212,11 @@ public abstract partial class HandfireTests : TestBase
         await ProcessJob();
         await ProcessJob();
 
-        var firstBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.JobId == firstPlaceholderJobId)
+        var currentBatchJob = await CreateContext().Set<Job>()
+            .Where(x => x.Id == firstPlaceholderJobId)
             .FirstAsync();
 
-        firstBatch.BatchStatus.ShouldBe(State.Completed);
+        currentBatchJob.CurrentState.ShouldBe(State.Completed);
     }
 
     [Fact]
@@ -234,7 +234,7 @@ public abstract partial class HandfireTests : TestBase
         await ProcessJob();
 
         var secondBatchJobs = await CreateContext().Set<Batch>()
-            .Where(x => x.JobId == secondPlaceholderJobId)
+            .Where(x => x.Id == secondPlaceholderJobId)
             .Select(x => x.Jobs)
             .FirstAsync();
 
@@ -267,10 +267,8 @@ public abstract partial class HandfireTests : TestBase
         firstPlaceholderJob.CurrentState.ShouldBe(State.Completed);
 
         var firstBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.JobId == firstPlaceholderJobId)
+            .Where(x => x.Id == firstPlaceholderJobId)
             .FirstAsync();
-
-        firstBatch.BatchStatus.ShouldBe(State.Completed);
 
         var firstBatchJobs = await CreateContext().Set<Job>()
             .Where(x => x.BatchId == firstBatch.Id)
@@ -288,10 +286,8 @@ public abstract partial class HandfireTests : TestBase
         secondPlaceholderJob.CurrentState.ShouldBe(State.Completed);
 
         var secondBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.JobId == secondPlaceholderJobId)
+            .Where(x => x.Id == secondPlaceholderJobId)
             .FirstAsync();
-
-        secondBatch.BatchStatus.ShouldBe(State.Completed);
 
         var secondBatchJobs = await CreateContext().Set<Job>()
             .Where(x => x.BatchId == secondBatch.Id)

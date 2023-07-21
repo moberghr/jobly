@@ -25,71 +25,41 @@ public class BatchPublisher<TContext> : IBatchPublisher
 
     public async Task<string> StartNew<T>(List<T> batchJobMessages) where T : class
     {
-        if (batchJobMessages.IsNullOrEmpty())
-        {
-            throw new Exception("List cannot be empty");
-        }
-
-        var batchJobs = new List<Job>();
-
-        var placeholderJobForBatch = JobHelper.CreateJobAndJobState(batchJobMessages[0], 0, string.Empty, null, null, null, Enums.State.Awaiting, null);
-
-        var newBatch = new Batch
-        {
-            BatchStatus = Enums.State.Enqueued,
-            JobId = placeholderJobForBatch.Job.Id,
-            Counter = batchJobMessages.Count,
-        };
-
-        foreach (var batchJobMessage in batchJobMessages)
-        {
-            var newJobState = JobHelper.CreateJobAndJobState(batchJobMessage, 0, string.Empty, null, null, null, Enums.State.Enqueued, newBatch.Id);
-
-            await _context.Set<JobState>().AddAsync(newJobState);
-
-            batchJobs.Add(newJobState.Job);
-        }
-
-        newBatch.Jobs = batchJobs;
-
-        await _context.Set<JobState>().AddAsync(placeholderJobForBatch);
-        await _context.Set<Batch>().AddAsync(newBatch);
-
-        return newBatch.JobId;
+        return await BaseCreateBatch(batchJobMessages, Enums.State.Enqueued, null);
     }
 
     public async Task<string> ContinueBatchWith<T>(List<T> batchJobMessages, string placeholderJobId) where T : class
+    {
+        return await BaseCreateBatch(batchJobMessages, Enums.State.Awaiting, placeholderJobId);
+    }
+
+    private async Task<string> BaseCreateBatch<T>(List<T> batchJobMessages, Enums.State batchJobsState, string? placeholderJobId) where T : class
     {
         if (batchJobMessages.IsNullOrEmpty())
         {
             throw new Exception("List cannot be empty");
         }
 
-        var batchJobs = new List<Job>();
-
         var placeholderJobForBatch = JobHelper.CreateJobAndJobState(batchJobMessages[0], 0, string.Empty, null, null, placeholderJobId, Enums.State.Awaiting, null);
 
         var newBatch = new Batch
         {
-            BatchStatus = Enums.State.Awaiting,
-            JobId = placeholderJobForBatch.Job.Id,
+            Id = placeholderJobForBatch.Job.Id,
             Counter = batchJobMessages.Count,
         };
 
-        foreach (var batchJobMessage in batchJobMessages)
+        var batchJobs = batchJobMessages.Select(batchJobMessage =>
         {
-            var newJobState = JobHelper.CreateJobAndJobState(batchJobMessage, 0, string.Empty, null, null, null, Enums.State.Awaiting, newBatch.Id);
-
-            await _context.Set<JobState>().AddAsync(newJobState);
-
-            batchJobs.Add(newJobState.Job);
-        }
+            var newJobState = JobHelper.CreateJobAndJobState(batchJobMessage, 0, string.Empty, null, null, null, batchJobsState, newBatch.Id);
+            _context.Set<JobState>().AddAsync(newJobState);
+            return newJobState.Job;
+        }).ToList();
 
         newBatch.Jobs = batchJobs;
 
         await _context.Set<JobState>().AddAsync(placeholderJobForBatch);
         await _context.Set<Batch>().AddAsync(newBatch);
 
-        return newBatch.JobId;
+        return newBatch.Id;
     }
 }

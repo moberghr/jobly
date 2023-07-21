@@ -184,8 +184,6 @@ public static class ServiceConfiguration
 
         batch.Property(p => p.Counter);
 
-        batch.Property(p => p.BatchStatus);
-
         batch.HasMany(p => p.Jobs)
             .WithOne(p => p.Batch)
             .HasForeignKey(p => p.BatchId);
