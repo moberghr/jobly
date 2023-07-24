@@ -54,8 +54,12 @@ public class HandfireService<TContext> : IHandfireService
 
     public async Task<int> GetPendingJobsCount()
     {
+        var batchIds = await _context.Set<Batch>()
+            .Select(x => x.Id)
+            .ToListAsync();
 
         var counter = await GetPendingJobs()
+            .Where(x => !batchIds.Contains(x.Id))
             .CountAsync();
 
         return counter;
@@ -63,13 +67,23 @@ public class HandfireService<TContext> : IHandfireService
 
     public async Task<int> GetScheduledJobsCount()
     {
+        var batchIds = await _context.Set<Batch>()
+            .Select(x => x.Id)
+            .ToListAsync();
+
         return await GetScheduledJobs()
+            .Where(x => !batchIds.Contains(x.Id))
             .CountAsync();
     }
 
     public async Task<int> GetJobsCount(State state)
     {
+        var batchIds = await _context.Set<Batch>()
+            .Select(x => x.Id)
+            .ToListAsync();
+
         return await GetJobsByState(state)
+            .Where(x => !batchIds.Contains(x.Id))
             .CountAsync();
     }
 
