@@ -1,6 +1,4 @@
-﻿using Handfire.Core.Entities;
-
-namespace Handfire.Core.Data.Entities;
+﻿namespace Handfire.Core.Entities;
 
 public class Batch
 {

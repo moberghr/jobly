@@ -6,7 +6,8 @@ namespace Handfire.Core.Interceptors;
 
 public static class InterceptorConstants
 {
-    public static readonly string RowLock = "LOCK ROW";
+    public static readonly string RowLockTableJob = "LOCK ROW TABLE JOB";
+    public static readonly string RowLockTableBatch = "LOCK ROW TABLE BATCH";
 }
 
 public class PostgresRowLockInterceptor : DbCommandInterceptor
@@ -39,9 +40,13 @@ public class PostgresRowLockInterceptor : DbCommandInterceptor
     /// <param name="command"></param>
     private static void ManipulateCommand(DbCommand command)
     {
-        if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLock}", StringComparison.Ordinal))
+        if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJob}", StringComparison.Ordinal))
         {
             command.CommandText += " FOR NO KEY UPDATE SKIP LOCKED";
+        }
+        else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableBatch}", StringComparison.Ordinal))
+        {
+            command.CommandText += " FOR NO KEY UPDATE";
         }
     }
 }
@@ -71,9 +76,13 @@ public class SqlServerRowLockInterceptor : DbCommandInterceptor
 
     private static void ManipulateCommand(DbCommand command)
     {
-        if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLock}", StringComparison.Ordinal))
+        if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJob}", StringComparison.Ordinal))
         {
             command.CommandText = command.CommandText.Replace($"FROM [{nameof(Job)}] AS [j]", $"FROM [{nameof(Job)}] AS [j] WITH (ROWLOCK, UPDLOCK)");
+        }
+        else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableBatch}", StringComparison.Ordinal))
+        {
+            command.CommandText = command.CommandText.Replace($"FROM [{nameof(Batch)}] AS [b]", $"FROM [{nameof(Batch)}] AS [b] WITH (ROWLOCK, UPDLOCK)");
         }
     }
 }
