@@ -46,7 +46,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
                         Job = x,
                         IsParent = x.ChildJobs.Any(),
                     })
-            .TagWith(InterceptorConstants.RowLock)
+            .TagWith(InterceptorConstants.RowLockTableJob)
             .FirstOrDefault();
 
         var job = jobData?.Job;
@@ -208,14 +208,14 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
     {
         var job = await context.Set<Job>()
             .Where(x => x.ParentJobId ==  jobId)
-            .TagWith(InterceptorConstants.RowLock)
+            .TagWith(InterceptorConstants.RowLockTableJob)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (job != null)
         {
             var firstBatch = await context.Set<Batch>()
                 .Where(x => x.Id == job.Id)
-                .TagWith(InterceptorConstants.RowLock)
+                .TagWith(InterceptorConstants.RowLockTableBatch)
                 .FirstOrDefaultAsync(cancellationToken);
 
             await UpdateBatchBase(context, firstBatch, cancellationToken);
@@ -226,7 +226,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
     {
         var firstBatch = await context.Set<Batch>()
             .Where(x => x.Id == batchId)
-            .TagWith(InterceptorConstants.RowLock)
+            .TagWith(InterceptorConstants.RowLockTableBatch)
             .FirstOrDefaultAsync(cancellationToken);
 
         await UpdateBatchBase(context, firstBatch, cancellationToken);
