@@ -28,19 +28,19 @@ public class BatchPublisher<TContext> : IBatchPublisher
         return await BaseCreateBatch(batchJobMessages, Enums.State.Enqueued, null);
     }
 
-    public async Task<string> ContinueBatchWith<T>(List<T> batchJobMessages, string placeholderJobId) where T : class
+    public async Task<string> ContinueBatchWith<T>(List<T> batchJobMessages, string parentId) where T : class
     {
-        return await BaseCreateBatch(batchJobMessages, Enums.State.Awaiting, placeholderJobId);
+        return await BaseCreateBatch(batchJobMessages, Enums.State.Awaiting, parentId);
     }
 
-    private async Task<string> BaseCreateBatch<T>(List<T> batchJobMessages, Enums.State batchJobsState, string? placeholderJobId) where T : class
+    private async Task<string> BaseCreateBatch<T>(List<T> batchJobMessages, Enums.State batchJobsState, string? parentId) where T : class
     {
         if (batchJobMessages.IsNullOrEmpty())
         {
             throw new Exception("List cannot be empty");
         }
 
-        var placeholderJobForBatch = JobHelper.CreateJobAndJobState(batchJobMessages[0], 0, string.Empty, null, null, placeholderJobId, Enums.State.Awaiting, null);
+        var placeholderJobForBatch = JobHelper.CreateJobAndJobState(batchJobMessages[0], 0, string.Empty, null, null, parentId, Enums.State.Awaiting, null);
 
         var newBatch = new Batch
         {
@@ -48,15 +48,14 @@ public class BatchPublisher<TContext> : IBatchPublisher
             Counter = batchJobMessages.Count,
         };
 
-        var batchJobs = batchJobMessages.Select(batchJobMessage =>
-        {
-            var newJobState = JobHelper.CreateJobAndJobState(batchJobMessage, 0, string.Empty, null, null, null, batchJobsState, newBatch.Id);
-            _context.Set<JobState>().AddAsync(newJobState);
-            return newJobState.Job;
-        }).ToList();
+        var batchStateJobs = batchJobMessages.Select(x => JobHelper.CreateJobAndJobState(x, 0, string.Empty, null, null, null, batchJobsState, newBatch.Id))
+            .ToList();
+
+        var batchJobs = batchStateJobs.Select(x => x.Job).ToList();
 
         newBatch.Jobs = batchJobs;
 
+        await _context.Set<JobState>().AddRangeAsync(batchStateJobs);
         await _context.Set<JobState>().AddAsync(placeholderJobForBatch);
         await _context.Set<Batch>().AddAsync(newBatch);
 
