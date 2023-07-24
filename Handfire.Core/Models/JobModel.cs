@@ -16,4 +16,6 @@ public class JobModel
     public DateTime? ProcessedTime { get; set; }
 
     public State CurrentState { get; set; }
+
+    public string? BatchId { get; set; }
 }

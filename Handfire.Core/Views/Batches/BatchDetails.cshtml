@@ -20,7 +20,7 @@
     <div style="margin: 1rem;">
         @for (var i = 0; i < Model.PageCount; i++)
         {
-            <a class="pagination-btn" asp-controller="Batches" asp-action="BatchDetails" asp-route-page="@i" asp-route-pageSize="20">@(i + 1)</a>
+            <a class="pagination-btn" asp-controller="Batches" asp-action="BatchDetails" asp-route-page="@i" asp-route-pageSize="20" asp-route-batchId="@Model.Items[i].BatchId?.ToString()">@(i + 1)</a>
         }
     </div>
 </body>

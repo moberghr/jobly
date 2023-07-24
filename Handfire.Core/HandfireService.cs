@@ -159,6 +159,7 @@ public class HandfireService<TContext> : IHandfireService
                     Message = x.Message,
                     ScheduleTime = x.ScheduleTime,
                     Type = x.Type,
+                    BatchId = x.BatchId,
                 })
             .ToPagedListAsync(request);
 
