@@ -18,7 +18,7 @@
         <tr>
             <td>@Batch.BatchId</td>
             <td>@Batch.NonFinished</td>
-            <td><a asp-controller="Batches" asp-action="BatchJobs" asp-route-page="0" asp-route-pageSize="20" asp-route-jobId="@Batch.BatchId.ToString()">Details</a></td>
+            <td><a asp-controller="Batches" asp-action="BatchDetails" asp-route-page="0" asp-route-pageSize="20" asp-route-batchId="@Batch.BatchId.ToString()">Details</a></td>
         </tr>
     }
 </table>

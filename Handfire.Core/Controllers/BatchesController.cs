@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Handfire.Core.Models;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Handfire.Core.Controllers;
 
@@ -17,6 +18,14 @@ public class BatchesController : Controller
     public async Task<IActionResult> Index(BaseListRequest request)
     {
         var model = await _handfireService.GetBatchList(request);
+
+        return View(model);
+    }
+
+    [HttpGet("batch-details")]
+    public async Task<IActionResult> BatchDetails(BatchStateRequest request)
+    {
+        var model = await _handfireService.GetBatchJobStates(request);
 
         return View(model);
     }

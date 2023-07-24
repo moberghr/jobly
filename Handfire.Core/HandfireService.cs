@@ -25,6 +25,8 @@ public interface IHandfireService
     Task SetRetry(string jobId);
 
     Task<PagedList<BatchModel>> GetBatchList(BaseListRequest request);
+
+    Task<PagedList<JobModel>> GetBatchJobStates(BatchStateRequest request);
 }
 
 public class HandfireService<TContext> : IHandfireService
@@ -39,8 +41,12 @@ public class HandfireService<TContext> : IHandfireService
 
     public async Task<int> GetTotalJobsCount()
     {
+        var batchIds = await _context.Set<Batch>()
+            .Select(x => x.Id)
+            .ToListAsync();
 
         var counter = await _context.Set<Job>()
+            .Where(x => !batchIds.Contains(x.Id))
             .CountAsync();
 
         return counter;
@@ -138,6 +144,25 @@ public class HandfireService<TContext> : IHandfireService
             .ToPagedListAsync(request);
 
         return batches;
+    }
+
+    public async Task<PagedList<JobModel>> GetBatchJobStates(BatchStateRequest request)
+    {
+        var jobs = await _context.Set<Job>()
+            .Where(x => x.BatchId == request.BatchId)
+            .Select(x =>
+                new JobModel
+                {
+                    Id = x.Id,
+                    CurrentState = x.CurrentState,
+                    CreateTime = x.CreateTime,
+                    Message = x.Message,
+                    ScheduleTime = x.ScheduleTime,
+                    Type = x.Type,
+                })
+            .ToPagedListAsync(request);
+
+        return jobs;
     }
 
     private IQueryable<JobModel> GetScheduledJobs()
