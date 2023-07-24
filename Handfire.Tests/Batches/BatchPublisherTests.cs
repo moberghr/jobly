@@ -64,24 +64,23 @@ public abstract partial class HandfireTests : TestBase
         firstPlaceholderJob.CurrentState.ShouldBe(State.Awaiting);
 
         var firstBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.JobId == firstPlaceholderJob.Id)
+            .Where(x => x.Id == firstPlaceholderJob.Id)
             .FirstOrDefaultAsync();
 
         firstBatch.ShouldNotBeNull();
-        firstBatch.BatchStatus.ShouldBe(State.Enqueued);
 
         var secondPlaceholderJob = await CreateContext().Set<Job>()
-            .Where(x => x.ParentJobId == firstBatch.JobId)
+            .Where(x => x.ParentJobId == firstBatch.Id)
             .FirstOrDefaultAsync();
 
         secondPlaceholderJob.ShouldNotBeNull();
         secondPlaceholderJob.CurrentState.ShouldBe(State.Awaiting);
+        secondPlaceholderJob.Id.ShouldBe(secondPlaceholderJobId);
 
         var secondBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.JobId == secondPlaceholderJob.Id)
+            .Where(x => x.Id == secondPlaceholderJob.Id)
             .FirstOrDefaultAsync();
 
         secondBatch.ShouldNotBeNull();
-        secondBatch.BatchStatus.ShouldBe(State.Awaiting);
     }
 }
