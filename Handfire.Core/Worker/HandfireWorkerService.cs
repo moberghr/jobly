@@ -8,7 +8,6 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Handfire.Core;
 
@@ -172,13 +171,10 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         if (jobData.Job.BatchId != null)
         {
-            await UpdateBatchFromBatchId(context, jobData.Job.BatchId, cancellationToken);
+            await UpdateCurrentAndNextBatch(context, jobData.Job.BatchId, cancellationToken);
         }
 
-        if (jobData.Job.ParentJobId != null)
-        {
-            await UpdateBatchFromJobId(context, jobData.Job.Id, cancellationToken);
-        }
+        await UpdateBatchFromChildJob(context, jobData.Job.Id, cancellationToken);
 
         await CreateJobState(context, jobData.Job.Id, state, message, cancellationToken);
     }
@@ -204,7 +200,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             .Select(x => x.Id)
             .ToListAsync(cancellationToken);
 
-        if (childJobIds.IsNullOrEmpty())
+        if (childJobIds == null)
         {
             return;
         }
@@ -222,20 +218,20 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
     }
 
-    private async static Task UpdateBatchFromJobId(TContext context, string jobId, CancellationToken cancellationToken)
+    private async static Task UpdateBatchFromChildJob(TContext context, string? jobId, CancellationToken cancellationToken)
     {
-        var parentJobId = await context.Set<Job>()
+        var childJobId = await context.Set<Job>()
             .Where(x => x.ParentJobId ==  jobId)
             .Select(x => x.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (parentJobId == null)
+        if (childJobId == null)
         {
             return;
         }
 
         var nextBatch = await context.Set<Batch>()
-            .Where(x => x.Id == parentJobId)
+            .Where(x => x.Id == childJobId)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (nextBatch == null)
@@ -253,7 +249,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         }
     }
 
-    private async static Task UpdateBatchFromBatchId(TContext context, string batchId, CancellationToken cancellationToken)
+    private async static Task UpdateCurrentAndNextBatch(TContext context, string batchId, CancellationToken cancellationToken)
     {
         var currentBatch = await context.Set<Batch>()
             .Where(x => x.Id == batchId)

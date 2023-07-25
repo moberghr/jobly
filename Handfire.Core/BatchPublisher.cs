@@ -1,5 +1,4 @@
-﻿using Handfire.Core.Data.Entities;
-using Handfire.Core.Entities;
+﻿using Handfire.Core.Entities;
 using Handfire.Core.Helper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -10,7 +9,7 @@ public interface IBatchPublisher
 {
     Task<string> StartNew<T>(List<T> batchJobMessages) where T : class;
 
-    Task<string> ContinueBatchWith<T>(List<T> batchJobMessages, string placeholderJobId) where T : class;
+    Task<string> ContinueBatchWith<T>(List<T> batchJobMessages, string parentId) where T : class;
 }
 
 public class BatchPublisher<TContext> : IBatchPublisher
