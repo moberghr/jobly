@@ -8,6 +8,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Handfire.Core;
 
@@ -198,29 +199,26 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
     private async static Task UpdateChildJobs(TContext context, string parentJobId, CancellationToken cancellationToken)
     {
-        var batchId = await context.Set<Job>()
+        var childJobIds = await context.Set<Job>()
             .Where(x => x.ParentJobId == parentJobId)
             .Select(x => x.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        if (batchId == null)
+        if (childJobIds.IsNullOrEmpty())
         {
             return;
         }
 
-        var nextBatch = await context.Set<Batch>()
-            .Where(x => x.Id == batchId)
-            .FirstOrDefaultAsync(cancellationToken);
+        var batchIds = await context.Set<Batch>()
+            .Where(x => childJobIds.Contains(x.Id))
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
 
         // If the next child job is a batch (placeholder job), don't change the child job status to Enqueued
-        if (nextBatch != null)
-        {
-            return;
-        }
-
         await context.Set<Job>()
             .Where(x => x.ParentJobId == parentJobId)
             .Where(x => x.CurrentState == State.Awaiting)
+            .Where(x => !batchIds.Contains(x.Id))
             .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
     }
 
