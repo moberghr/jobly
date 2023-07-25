@@ -260,26 +260,26 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         await UpdateBatchBase(context, currentBatch, cancellationToken);
     }
 
-    private async static Task UpdateBatchBase(TContext context, Batch? currentBranch, CancellationToken cancellationToken)
+    private async static Task UpdateBatchBase(TContext context, Batch? currentBatch, CancellationToken cancellationToken)
     {
         // Check if this is a batch job
-        if (currentBranch == null)
+        if (currentBatch == null)
         {
             return;
         }
 
-        currentBranch.Counter--;
+        currentBatch.Counter--;
 
         // If all jobs in a single batch are finished
-        if (currentBranch.Counter > 0)
+        if (currentBatch.Counter > 0)
         {
             return;
         }
 
-        currentBranch.Counter = 0;
+        currentBatch.Counter = 0;
 
         var currentBatchJob = await context.Set<Job>()
-            .Where(x => x.Id == currentBranch.Id)
+            .Where(x => x.Id == currentBatch.Id)
             .FirstAsync(cancellationToken);
 
         currentBatchJob.CurrentState = State.Completed;
