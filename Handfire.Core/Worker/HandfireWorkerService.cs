@@ -167,16 +167,12 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         if (jobData.Job.CurrentState == State.Completed && jobData.IsParent)
         {
             await UpdateChildJobs(context, jobData.Job.Id, cancellationToken);
+            await UpdateNextBatchFromChildJobs(context, jobData.Job.Id, cancellationToken);
         }
 
         if (jobData.Job.BatchId != null)
         {
             await UpdateCurrentAndNextBatchFromChildJob(context, jobData.Job.BatchId, cancellationToken);
-        }
-
-        if (jobData.IsParent)
-        {
-            await UpdateNextBatchFromChildJobs(context, jobData.Job.Id, cancellationToken);
         }
 
         await CreateJobState(context, jobData.Job.Id, state, message, cancellationToken);
