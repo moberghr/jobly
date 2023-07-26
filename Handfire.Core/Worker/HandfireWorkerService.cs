@@ -257,11 +257,6 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             .TagWith(InterceptorConstants.RowLockTableBatch)
             .FirstOrDefaultAsync(cancellationToken);
 
-        await UpdateBatchBase(context, currentBatch, cancellationToken);
-    }
-
-    private async static Task UpdateBatchBase(TContext context, Batch? currentBatch, CancellationToken cancellationToken)
-    {
         // Check if this is a batch job
         if (currentBatch == null)
         {
