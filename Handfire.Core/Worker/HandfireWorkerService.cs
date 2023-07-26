@@ -166,8 +166,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         if (jobData.Job.CurrentState == State.Completed && jobData.IsParent)
         {
-            await UpdateChildJobs(context, jobData.Job.Id, cancellationToken);
-            await UpdateNextBatchFromChildJobs(context, jobData.Job.Id, cancellationToken);
+            await UpdateChildJobsAndNextBatchFromChildJobs(context, jobData.Job.Id, cancellationToken);
         }
 
         if (jobData.Job.BatchId != null)
@@ -192,7 +191,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private async static Task UpdateChildJobs(TContext context, string parentJobId, CancellationToken cancellationToken)
+    private async static Task UpdateChildJobsAndNextBatchFromChildJobs(TContext context, string parentJobId, CancellationToken cancellationToken)
     {
         var childJobIds = await context.Set<Job>()
             .Where(x => x.ParentJobId == parentJobId)
@@ -215,32 +214,10 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             .Where(x => x.CurrentState == State.Awaiting)
             .Where(x => !batchIds.Contains(x.Id))
             .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
-    }
 
-    private async static Task UpdateNextBatchFromChildJobs(TContext context, string? jobId, CancellationToken cancellationToken)
-    {
-        var childJobIds = await context.Set<Job>()
-            .Where(x => x.ParentJobId ==  jobId)
-            .Select(x => x.Id)
-            .ToListAsync(cancellationToken);
-
-        if (childJobIds == null)
-        {
-            return;
-        }
-
-        var nextBatchIds = await context.Set<Batch>()
-            .Where(x => childJobIds.Contains(x.Id))
-            .Select(x => x.Id)
-            .ToListAsync(cancellationToken);
-
-        if (nextBatchIds == null)
-        {
-            return;
-        }
-
+        // If the next child job is a batch, then change it's jobs status to Enqueued
         var nextBatchJobs = await context.Set<Job>()
-            .Where(x => nextBatchIds.Contains(x.BatchId))
+            .Where(x => batchIds.Contains(x.BatchId))
             .ToListAsync(cancellationToken);
 
         foreach (var batchJob in nextBatchJobs)
