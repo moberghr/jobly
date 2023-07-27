@@ -166,7 +166,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         if (jobData.Job.CurrentState == State.Completed && jobData.IsParent)
         {
-            await UpdateChildJobsAndNextBatchFromChildJobs(context, jobData.Job.Id, cancellationToken);
+            await UpdateChildJobs(context, jobData.Job.Id, cancellationToken);
         }
 
         if (jobData.Job.BatchId != null)
@@ -191,7 +191,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private async static Task UpdateChildJobsAndNextBatchFromChildJobs(TContext context, string parentJobId, CancellationToken cancellationToken)
+    private async static Task UpdateChildJobs(TContext context, string parentJobId, CancellationToken cancellationToken)
     {
         var childJobIds = await context.Set<Job>()
             .Where(x => x.ParentJobId == parentJobId)
