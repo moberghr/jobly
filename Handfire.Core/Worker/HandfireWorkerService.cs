@@ -194,25 +194,11 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
     private async static Task UpdateChildJobs(TContext context, string parentJobId, CancellationToken cancellationToken)
     {
         await context.Set<Job>()
-            .Where(x => x.ParentJobId == parentJobId)
+            .Where(x => x.ParentJobId == parentJobId || x.ParentBatch.Job.ParentJobId == parentJobId)
             .Where(x => x.CurrentState == State.Awaiting)
             // If a job has Batch property in it, then it's a placeholder job, and we don't want to change current status of a placeholder job
             .Where(x => x.Batch == null)
             .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
-
-        // If the next child job is a batch, then change all of it's jobs status to Enqueued
-        var batchJobs = await context.Set<Batch>()
-            .Where(x => x.Job.ParentJobId == parentJobId)
-            .Select(x => x.Jobs)
-            .ToListAsync();
-
-        foreach (var jobs in batchJobs)
-        {
-            foreach (var job in jobs)
-            {
-                job.CurrentState = State.Enqueued;
-            }
-        }
     }
 
     private async static Task UpdateCurrentAndNextBatchFromChildJob(TContext context, string batchId, CancellationToken cancellationToken)
