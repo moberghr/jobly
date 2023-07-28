@@ -1,17 +1,12 @@
-﻿using Handfire.Core.Entities;
-using Handfire.Core.Enums;
-
-namespace Handfire.Core.Data.Entities;
+﻿namespace Handfire.Core.Entities;
 
 public class Batch
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-
-    public State BatchStatus { get; set; }
+    public string Id { get; set; } = string.Empty;
 
     public int Counter { get; set; }
 
-    public List<BatchContinuation> BatchContinuations { get; set; } = new();
-
     public List<Job> Jobs { get; set; } = new();
+
+    public Job Job { get; set; } = null!;
 }

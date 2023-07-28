@@ -27,6 +27,8 @@ public class Job
 
     public string? ParentJobId { get; set; }
 
+    public string? BatchId { get; set; }
+
     public RecurringJob? RecurringJob { get; set; }
 
     public List<JobState> JobStates { get; set; } = new();
@@ -35,9 +37,7 @@ public class Job
 
     public List<Job> ChildJobs { get; set; } = new();
 
-    public List<BatchContinuation> BatchContinuations { get; set; } = new();
-
-    public string? BatchId { get; set; }
-
     public Batch? Batch { get; set; }
+
+    public Batch? ParentBatch { get; set; }
 }

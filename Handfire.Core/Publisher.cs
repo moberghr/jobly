@@ -1,5 +1,4 @@
 ﻿using Handfire.Core.Entities;
-using Handfire.Core.Enums;
 using Handfire.Core.Helper;
 using Microsoft.EntityFrameworkCore;
 
@@ -82,7 +81,7 @@ public class Publisher<TContext> : IPublisher
     private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? maxRetries, string? parentId)
         where T : class
     {
-        var jobState = JobHelper.CreateJobAndJobState(message, _retries, name, scheduleTime, maxRetries, parentId, State.Enqueued);
+        var jobState = JobHelper.CreateJobAndJobState(message, _retries, name, scheduleTime, maxRetries, parentId, null, null);
 
         await _context.Set<JobState>().AddAsync(jobState);
 

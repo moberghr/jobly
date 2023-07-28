@@ -46,7 +46,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
                         Job = x,
                         IsParent = x.ChildJobs.Any(),
                     })
-            .TagWith(InterceptorConstants.RowLock)
+            .TagWith(InterceptorConstants.RowLockTableJob)
             .FirstOrDefault();
 
         var job = jobData?.Job;
@@ -171,7 +171,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         if (jobData.Job.BatchId != null)
         {
-            await UpdateBatch(context, jobData.Job.BatchId, cancellationToken);
+            await UpdateCurrentAndNextBatchFromChildJob(context, jobData.Job.BatchId, cancellationToken);
         }
 
         await CreateJobState(context, jobData.Job.Id, state, message, cancellationToken);
@@ -194,38 +194,74 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
     private async static Task UpdateChildJobs(TContext context, string parentJobId, CancellationToken cancellationToken)
     {
         await context.Set<Job>()
-             .Where(x => x.ParentJobId == parentJobId)
-             .Where(x => x.CurrentState == State.Awaiting)
-             .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
+            .Where(x => x.ParentJobId == parentJobId || x.ParentBatch.Job.ParentJobId == parentJobId)
+            .Where(x => x.CurrentState == State.Awaiting)
+            // If a job has Batch property in it, then it's a placeholder job, and we don't want to change current status of a placeholder job
+            .Where(x => x.Batch == null)
+            .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
     }
 
-    private async static Task UpdateBatch(TContext context, string batchId, CancellationToken cancellationToken)
+    private async static Task UpdateCurrentAndNextBatchFromChildJob(TContext context, string batchId, CancellationToken cancellationToken)
     {
-        var batch = await context.Set<Batch>()
+        var currentBatch = await context.Set<Batch>()
             .Where(x => x.Id == batchId)
-            .TagWith(InterceptorConstants.RowLock)
+            .TagWith(InterceptorConstants.RowLockTableBatch)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (batch != null)
+        // Check if this is a batch job
+        if (currentBatch == null)
         {
-            batch.Counter--;
+            return;
+        }
 
-            if (batch.Counter <= 0)
+        currentBatch.Counter--;
+
+        // If all jobs in a single batch are finished
+        if (currentBatch.Counter > 0)
+        {
+            return;
+        }
+
+        currentBatch.Counter = 0;
+
+        var currentBatchJob = await context.Set<Job>()
+            .Where(x => x.Id == currentBatch.Id)
+            .FirstAsync(cancellationToken);
+
+        currentBatchJob.CurrentState = State.Completed;
+
+        var nextBatchJob = await context.Set<Job>()
+            .Where(x => x.ParentJobId == currentBatchJob.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Check if another parent job exists
+        // If yes, then start another batch jobs process
+        // if no, then no more jobs exists that need to be started (this is the last one)
+        if (nextBatchJob == null)
+        {
+            return;
+        }
+
+        var nextBatch = await context.Set<Batch>()
+            .Where(x => x.Id == nextBatchJob.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Check if this is another batch of jobs or...
+        if (nextBatch != null)
+        {
+            var nextBatchJobs = await context.Set<Job>()
+                .Where(x => x.BatchId == nextBatch.Id)
+                .ToListAsync(cancellationToken);
+
+            foreach (var batchJob in nextBatchJobs)
             {
-                batch.Counter = 0;
-                batch.BatchStatus = State.Completed;
-
-                var batchContinuationJobs = await context.Set<BatchContinuation>()
-                    .Where(x => x.BatchId == batch.Id)
-                    .Select(x => x.Job)
-                    .TagWith(InterceptorConstants.RowLock)
-                    .ToListAsync(cancellationToken);
-
-                foreach (var batchContinuationJob in batchContinuationJobs)
-                {
-                    batchContinuationJob.CurrentState = State.Enqueued;
-                }
+                batchJob.CurrentState = State.Enqueued;
             }
+        }
+        // ...A single job
+        else
+        {
+            nextBatchJob.CurrentState = State.Enqueued;
         }
     }
 

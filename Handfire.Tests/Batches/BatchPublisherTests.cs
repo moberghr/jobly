@@ -1,4 +1,5 @@
 ﻿using Handfire.Core.Data.Entities;
+using Handfire.Core.Entities;
 using Handfire.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -8,66 +9,78 @@ namespace Handfire.Tests.Jobs;
 public abstract partial class HandfireTests : TestBase
 {
     [Fact]
-    public async Task GivenAddBatchAndBatchContinuationJobs_WhenNewBatchIsCreated_ThenNewBatchIsCreated()
+    public async Task GivenCreateBatchJobs_WhenNewBatchAndContinuationBatchAreCreated_ThenBothBatchesMustBeInDb()
     {
-        await CreateBatch(10);
+        var context = CreateContext();
 
-        var newBatchData = await CreateContext().Set<Batch>()
-            .Select(x =>
-                new
-                {
-                    Batch = x,
-                    Jobs = x.Jobs,
-                    BatchContinuations = x.BatchContinuations,
-                })
+        var placeholderJobId = await CreateBatch(context, 10);
+
+        await ContinueBatchWith(context, 10, placeholderJobId);
+
+        await context.SaveChangesAsync();
+
+        var newBatches = await CreateContext().Set<Batch>()
+            .ToListAsync();
+
+        newBatches.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task GivenCreateBatchJobs_WhenNewBatchAndContinuationBatchAreCreated_ThenCounterOnBothShouldBe10()
+    {
+        var context = CreateContext();
+
+        var placeholderJobId = await CreateBatch(context, 10);
+
+        await ContinueBatchWith(context, 10, placeholderJobId);
+
+        await context.SaveChangesAsync();
+
+        var newBatches = await CreateContext().Set<Batch>()
+            .ToListAsync();
+
+        foreach (var newBatch in newBatches)
+        {
+            newBatch.Counter = 10;
+        }
+    }
+
+    [Fact]
+    public async Task GivenCreateBatchJobs_WhenNewBatchAndContinuationBatchAreCreated_ThenPlaceholdedJobIdMustbeJobIdInBatchTable()
+    {
+        var context = CreateContext();
+
+        var firstPlaceholderJobId = await CreateBatch(context, 2);
+
+        var secondPlaceholderJobId = await ContinueBatchWith(context, 2, firstPlaceholderJobId);
+
+        await context.SaveChangesAsync();
+
+        var firstPlaceholderJob = await CreateContext().Set<Job>()
+            .Where(x => x.Id == firstPlaceholderJobId)
             .FirstOrDefaultAsync();
 
-        newBatchData.ShouldNotBeNull();
+        firstPlaceholderJob.ShouldNotBeNull();
+        firstPlaceholderJob.CurrentState.ShouldBe(State.Awaiting);
 
-        newBatchData.Batch.BatchStatus.ShouldBe(State.Enqueued);
-        newBatchData.Batch.Counter.ShouldBe(10);
+        var firstBatch = await CreateContext().Set<Batch>()
+            .Where(x => x.Id == firstPlaceholderJob.Id)
+            .FirstOrDefaultAsync();
 
-        newBatchData.Jobs.Count.ShouldBe(10);
-    }
+        firstBatch.ShouldNotBeNull();
 
-    [Fact]
-    public async Task GivenAddBatchAndBatchContinuationJobs_WhenNewBatchIsCreated_ThenBatchJobsStateShouldBeEnqueued()
-    {
-        await CreateBatch(10);
+        var secondPlaceholderJob = await CreateContext().Set<Job>()
+            .Where(x => x.ParentJobId == firstBatch.Id)
+            .FirstOrDefaultAsync();
 
-        var batchJobs = await CreateContext().Set<Batch>()
-            .Select(x => x.Jobs)
-            .FirstAsync();
+        secondPlaceholderJob.ShouldNotBeNull();
+        secondPlaceholderJob.CurrentState.ShouldBe(State.Awaiting);
+        secondPlaceholderJob.Id.ShouldBe(secondPlaceholderJobId);
 
-        foreach (var batchJob in batchJobs)
-        {
-            batchJob.CurrentState.ShouldBe(State.Enqueued);
-        }
-    }
+        var secondBatch = await CreateContext().Set<Batch>()
+            .Where(x => x.Id == secondPlaceholderJob.Id)
+            .FirstOrDefaultAsync();
 
-    [Fact]
-    public async Task GivenAddBatchAndBatchContinuationJobs_WhenNewBatchIsCreated_ThenNewBatchContinuationIsCreated()
-    {
-        await CreateBatch(10);
-
-        var newBatchContinuations = await CreateContext().Set<BatchContinuation>()
-            .ToListAsync();
-
-        newBatchContinuations.Count.ShouldBe(10);
-    }
-
-    [Fact]
-    public async Task GivenAddBatchAndBatchContinuationJobs_WhenNewBatchIsCreated_ThenBatchContinuationJobsStateShouldBeAwaiting()
-    {
-        await CreateBatch(10);
-
-        var batchContinuationJobStates = await CreateContext().Set<BatchContinuation>()
-            .Select(x => x.Job.CurrentState)
-            .ToListAsync();
-
-        foreach (var batchContinuationJobState in batchContinuationJobStates)
-        {
-            batchContinuationJobState.ShouldBe(State.Awaiting);
-        }
+        secondBatch.ShouldNotBeNull();
     }
 }

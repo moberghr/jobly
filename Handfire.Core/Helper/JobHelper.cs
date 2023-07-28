@@ -6,7 +6,7 @@ namespace Handfire.Core.Helper;
 
 internal static class JobHelper
 {
-    public static JobState CreateJobAndJobState<T>(T message, int retries, string name, DateTime? scheduleTime, int? maxRetries, string? parentId, State? state)
+    public static JobState CreateJobAndJobState<T>(T message, int retries, string name, DateTime? scheduleTime, int? maxRetries, string? parentId, State? state, string? batchId)
         where T : class
     {
         var createdTime = DateTime.UtcNow;
@@ -23,6 +23,7 @@ internal static class JobHelper
             CurrentState = state != null ? state.Value : string.IsNullOrEmpty(parentId) ? State.Enqueued : State.Awaiting,
             MaxRetries = maxRetries ?? retries,
             ParentJobId = parentId,
+            BatchId = batchId,
         };
 
         var jobState = new JobState

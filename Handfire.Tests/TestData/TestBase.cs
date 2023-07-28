@@ -121,10 +121,19 @@ public abstract class TestBase
         return logInDb.Id;
     }
 
-    protected async Task CreateBatch(int numberOfJobs)
+    protected async Task<string> CreateJobWithParentId(TestContext context, string parentJobId)
     {
-        var context = CreateContext();
+        var requests = new UnitRequest();
 
+        var publisher = new Publisher<TestContext>(context, 0);
+
+        var jobId = await publisher.Publish(requests, parentJobId);
+
+        return jobId;
+    }
+
+    protected async Task<string> CreateBatch(TestContext context, int numberOfJobs)
+    {
         var requests = new List<UnitRequest>();
 
         for (int i = 0; i < numberOfJobs; i++)
@@ -136,7 +145,27 @@ public abstract class TestBase
 
         var batchPublisher = new BatchPublisher<TestContext>(context);
 
-        await batchPublisher.AddBatchAndBatchContinuationJobs(requests, requests);
+        var placeholderJobId = await batchPublisher.StartNew(requests);
+
+        return placeholderJobId;
+    }
+
+    protected async Task<string> ContinueBatchWith(TestContext context, int numberOfJobs, string placeholderJobId)
+    {
+        var requests = new List<UnitRequest>();
+
+        for (int i = 0; i < numberOfJobs; i++)
+        {
+            var request = new UnitRequest();
+
+            requests.Add(request);
+        }
+
+        var batchPublisher = new BatchPublisher<TestContext>(context);
+
+        var newPlaceholderJobId = await batchPublisher.ContinueBatchWith(requests, placeholderJobId);
+
+        return newPlaceholderJobId;
     }
 
     protected async Task<Job> GetJobWithStates(TestContext context, string jobId)
