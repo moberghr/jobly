@@ -7,4 +7,6 @@ public class Batch
     public int Counter { get; set; }
 
     public List<Job> Jobs { get; set; } = new();
+
+    public Job Job { get; set; } = null!;
 }

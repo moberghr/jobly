@@ -193,36 +193,25 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
     private async static Task UpdateChildJobs(TContext context, string parentJobId, CancellationToken cancellationToken)
     {
-        var childJobIds = await context.Set<Job>()
-            .Where(x => x.ParentJobId == parentJobId)
-            .Select(x => x.Id)
-            .ToListAsync(cancellationToken);
-
-        if (childJobIds == null)
-        {
-            return;
-        }
-
-        var batchIds = await context.Set<Batch>()
-            .Where(x => childJobIds.Contains(x.Id))
-            .Select(x => x.Id)
-            .ToListAsync(cancellationToken);
-
-        // If the next child job is a batch (placeholder job), don't change the child job status to Enqueued
         await context.Set<Job>()
             .Where(x => x.ParentJobId == parentJobId)
             .Where(x => x.CurrentState == State.Awaiting)
-            .Where(x => !batchIds.Contains(x.Id))
+            // If a job has Batch property in it, then it's a placeholder job, and we don't want to change current status of a placeholder job
+            .Where(x => x.Batch == null)
             .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
 
-        // If the next child job is a batch, then change it's jobs status to Enqueued
-        var nextBatchJobs = await context.Set<Job>()
-            .Where(x => batchIds.Contains(x.BatchId))
-            .ToListAsync(cancellationToken);
+        // If the next child job is a batch, then change all of it's jobs status to Enqueued
+        var batchJobs = await context.Set<Batch>()
+            .Where(x => x.Job.ParentJobId == parentJobId)
+            .Select(x => x.Jobs)
+            .ToListAsync();
 
-        foreach (var batchJob in nextBatchJobs)
+        foreach (var jobs in batchJobs)
         {
-            batchJob.CurrentState = State.Enqueued;
+            foreach (var job in jobs)
+            {
+                job.CurrentState = State.Enqueued;
+            }
         }
     }
 

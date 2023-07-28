@@ -375,6 +375,15 @@ public abstract partial class HandfireTests : TestBase
 
         await context.SaveChangesAsync();
 
+        var aaa = await CreateContext().Set<Batch>()
+            .Select(x => new
+            {
+                Batch = x,
+                BatchJob = x.Job,
+                BatchJobs = x.Jobs,
+            })
+            .ToListAsync();
+
         await ProcessJob();
         await ProcessJob();
         await ProcessJob();
