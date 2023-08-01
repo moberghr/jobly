@@ -123,6 +123,9 @@ public static class ServiceConfiguration
         job.Property(p => p.MaxRetries);
         job.Property(p => p.ParentJobId);
 
+        job.HasOne(p => p.Batch)
+            .WithOne(p => p.Job);
+
         job.HasMany(x => x.ChildJobs)
             .WithOne(x => x.ParentJob)
             .HasForeignKey(x => x.ParentJobId);
@@ -130,7 +133,7 @@ public static class ServiceConfiguration
         job.HasMany(p => p.JobStates)
             .WithOne(p => p.Job);
 
-        job.HasOne(p => p.Batch)
+        job.HasOne(p => p.ParentBatch)
             .WithMany(p => p.Jobs)
             .HasForeignKey(p => p.BatchId);
     }
@@ -184,8 +187,8 @@ public static class ServiceConfiguration
 
         batch.Property(p => p.Counter);
 
-        batch.HasMany(p => p.Jobs)
+        batch.HasOne(p => p.Job)
             .WithOne(p => p.Batch)
-            .HasForeignKey(p => p.BatchId);
+            .HasForeignKey<Batch>(p => p.Id);
     }
 }
