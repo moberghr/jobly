@@ -20,7 +20,11 @@ public interface IHandfireService
     Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request);
 
     Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request);
-    
+
+    Task<PagedList<JobModel>> GetJobStatesInProcess(BaseListRequest request);
+
+    Task<int> CountProcessingJobs();
+
     Task SetRetry(string jobId);
 }
 
@@ -85,7 +89,7 @@ public class HandfireService<TContext> : IHandfireService
             .Where(x => x.CurrentState == State.Failed)
             .FirstOrDefault();
 
-        if(job == null)
+        if (job == null)
         {
             throw new ArgumentException("Invalid job id.");
         }
@@ -103,6 +107,40 @@ public class HandfireService<TContext> : IHandfireService
         await _context.Set<JobState>().AddAsync(jobState);
 
         await _context.SaveChangesAsync();
+    }
+
+    public async Task<int> CountProcessingJobs()
+    {
+        return await GetProcessingStates().CountAsync();
+    }
+
+    private IQueryable<string> GetProcessingStates()
+    {
+        var query = _context.Set<JobState>()
+            .Where(x => x.State == State.Processing)
+            .Select(x => x.JobId).AsQueryable();
+        return query;
+    }
+
+    public async Task<PagedList<JobModel>> GetJobStatesInProcess(BaseListRequest request)
+    {
+        var jobIds = await _context.Set<JobState>()
+            .Where(x => x.State == State.Processing)
+            .Select(x => x.JobId).ToListAsync();
+
+        var jobs = await _context.Set<Job>()
+            .Where(x => jobIds.Contains(x.Id))
+            .Select(x => new JobModel
+            {
+                Id = x.Id,
+                CurrentState = x.CurrentState,
+                CreateTime = x.CreateTime,
+                Message = x.Message,
+                ScheduleTime = x.ScheduleTime,
+                Type = x.Type
+            })
+            .AsQueryable().ToPagedListAsync(request);
+        return jobs;
     }
 
     public async Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request)

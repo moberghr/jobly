@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Security.Cryptography.Xml;
+using System.Text.Json;
 using Cronos;
 using Handfire.Core.Data.Entities;
 using Handfire.Core.Entities;
@@ -27,6 +28,41 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
     {
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
+    }
+
+    public async Task UpdateJobStatus(Job job)
+    {
+        using var scope = _serviceScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TContext>();
+
+        // To do vidjet s medom dal je bolje dohvatiti set pa onda il preko tablice
+        var jobStatus = context.Set<JobState>()
+            .Where(x => x.JobId == job.Id)
+            .FirstOrDefault();
+
+        if (jobStatus != null) {
+            jobStatus.State = State.Processing;
+            jobStatus.DateTime = DateTime.UtcNow;
+            jobStatus.Message = $"The job is being processed";
+            context.SaveChanges();
+        }
+
+    }
+
+    public async Task RemoveProcessStatuses(Job job)
+    {
+        using var scope = _serviceScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TContext>();
+
+        var jobStatus = context.Set<JobState>()
+            .Where(x => x.JobId == job.Id && x.State == State.Processing)
+            .FirstOrDefault();
+
+        if (jobStatus != null)
+        {
+            context.Remove(jobStatus);
+            context.SaveChanges();
+        }
     }
 
     public async Task GetAndProcessJob(CancellationToken cancellationToken)
@@ -63,11 +99,15 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         try
         {
+            await UpdateJobStatus(job);
+            // Used to make tasks longer for debugging
+            Task.Delay(1000, cancellationToken).Wait();
+
             if (job.RecurringJobId.HasValue)
             {
                 await CreateNextJob(job, cancellationToken);
             }
-
+            
             await ProcessOutboxMessage(job, cancellationToken);
         }
         catch (Exception e)
@@ -75,11 +115,12 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             await UpdateJobData(context, jobData!, e.Message, cancellationToken);
 
             transaction.Commit();
-
+            RemoveProcessStatuses(job);
             return;
         }
 
         await UpdateJobData(context, jobData!, message: null, cancellationToken);
+        RemoveProcessStatuses(job);
         transaction.Commit();
     }
 

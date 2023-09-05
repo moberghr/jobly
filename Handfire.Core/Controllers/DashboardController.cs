@@ -24,6 +24,7 @@ public class DashboardController : Controller
         var created = await _handfireService.GetJobsCount(State.Enqueued);
         var completed = await _handfireService.GetJobsCount(State.Completed);
         var failed = await _handfireService.GetJobsCount(State.Failed);
+        var processing = await _handfireService.CountProcessingJobs();
 
         var model = new DashboardStatistics
         {
@@ -32,7 +33,8 @@ public class DashboardController : Controller
             Scheduled = scheduled,
             Created = created,
             Completed = completed,
-            Failed = failed
+            Failed = failed,
+            Processing = processing,
         };
 
         return View(model);
