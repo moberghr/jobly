@@ -1,28 +1,17 @@
-@using Handfire.Core.Models;
-
-@model DashboardStatistics
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <title>Dashboard</title>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>Handfire</title>
+    <script defer="defer" src="/static/js/main.93921179.js"></script>
+    <link href="/static/css/main.014e65d0.css" rel="stylesheet">
 </head>
 <body>
-
-    <!-- Navigation -->
-    @await Html.PartialAsync("../Shared/_Nav")
-
-    <h3>Total : @Model.Total</h3>
-    <h3>Pending : @Model.Pending</h3>
-    <h3>Scheduled : @Model.Scheduled</h3>
-    <h3>Created : @Model.Created</h3>
-    <h3>Completed : @Model.Completed</h3>
-    <h3>Failed : @Model.Failed</h3>
+    <div id="root"></div>
 </body>
-
-<script type="text/javascript">
-    setTimeout(function () {
-        window.location.reload();
-    }, 1000)
-</script>
 </html>

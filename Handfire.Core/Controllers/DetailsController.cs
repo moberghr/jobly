@@ -20,6 +20,6 @@ public class DetailsController : Controller
     {
         var model = await _handfireService.GetJobStates(request);
 
-        return View(model);
+        return Ok(model);
     }
 }

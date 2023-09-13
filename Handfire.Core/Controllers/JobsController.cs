@@ -21,7 +21,7 @@ public class JobsController : Controller
     {
         var model = await _handfireService.GetJobsList(request, State.Enqueued);
 
-        return View(model);
+        return Ok(model);
     }
 
     [HttpGet("completed")]
@@ -29,7 +29,7 @@ public class JobsController : Controller
     {
         var model = await _handfireService.GetJobsList(request, State.Completed);
 
-        return View(model);
+        return Ok(model);
     }
 
     [HttpGet("failed")]
@@ -37,7 +37,7 @@ public class JobsController : Controller
     {
         var model = await _handfireService.GetJobsList(request, State.Failed);
 
-        return View(model);
+        return Ok(model);
     }
 
     [HttpGet("retry")]
