@@ -101,6 +101,11 @@ namespace Handfire.Core
             htmlString = htmlString.Replace("href=\"favicon", $"href=\"{_options.RoutePrefix}/favicon");
             htmlString = htmlString.Replace("src=\"static", $"src=\"{_options.RoutePrefix}/static");
 
+            var headEndIndex = htmlString.IndexOf("</head>");
+
+            var appSettingsString = $"<script> window.apiPath = \"{_options.RoutePrefix}/api/\";</script>";
+            htmlString = htmlString.Insert(headEndIndex, appSettingsString);
+
             await response.WriteAsync(htmlString, Encoding.UTF8);
         }
 
