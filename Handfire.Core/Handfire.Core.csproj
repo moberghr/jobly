@@ -9,48 +9,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<EmbeddedResource Include="Views\Dashboard\Index.cshtml" />
-		<EmbeddedResource Include="Views\Jobs\Created.cshtml" />
-		<EmbeddedResource Include="Views\Jobs\Completed.cshtml" />
-		<EmbeddedResource Include="Views\Jobs\Failed.cshtml" />
-		<EmbeddedResource Include="Views\Shared\_Nav.cshtml" />
-		<EmbeddedResource Include="Views\Jobs\Partial\SideNav.cshtml" />
-		<EmbeddedResource Include="Views\Scheduled\Index.cshtml" />
-		<EmbeddedResource Include="Views\Shared\_JobTable.cshtml" />
-		<EmbeddedResource Include="Views\Details\Index.cshtml" />
-	</ItemGroup>
-
-	<ItemGroup>
 		<EmbeddedResource Include="UI/**/*" />
-	</ItemGroup>
-	<ItemGroup>
-		<Content Include="Views\Dashboard\Index.cshtml">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
-		<Content Include="Views\Jobs\Failed.cshtml">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
-		<Content Include="Views\Jobs\Completed.cshtml">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
-		<Content Include="Views\Jobs\Created.cshtml">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
-		<Content Include="Views\Jobs\Partial\SideNav.cshtml">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
-		<Content Include="Views\Scheduled\Index.cshtml">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
-		<Content Include="Views\Shared\_JobTable.cshtml">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
-		<Content Include="Views\Shared\_Nav.cshtml">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
-		<Content Include="Views\Details\Index.cshtml">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
 	</ItemGroup>
 
 	<ItemGroup>
