@@ -12,7 +12,7 @@ namespace Handfire.Core
 	{
 		public string RoutePrefix { get; set; } = "/handfire";
 		public Func<Stream> IndexStream { get; set; } = () => typeof(HandfireUIOptions).GetTypeInfo().Assembly
-			.GetManifestResourceStream("Swashbuckle.AspNetCore.SwaggerUI.index.html");
+			.GetManifestResourceStream("Handfire.Core.UI.index.html");
 
 	}
 }
