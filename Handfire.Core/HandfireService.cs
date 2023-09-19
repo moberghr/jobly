@@ -7,220 +7,220 @@ namespace Handfire.Core;
 
 public interface IHandfireService
 {
-	Task<int> GetPendingJobsCount();
+    Task<int> GetPendingJobsCount();
 
-	Task<int> GetTotalJobsCount();
+    Task<int> GetTotalJobsCount();
 
-	Task<int> GetScheduledJobsCount();
+    Task<int> GetScheduledJobsCount();
 
-	Task<int> GetJobsCount(State state);
+    Task<int> GetJobsCount(State state);
 
-	Task<PagedList<JobModel>> GetJobsList(BaseListRequest request, State state);
+    Task<PagedList<JobModel>> GetJobsList(BaseListRequest request, State state);
 
-	Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request);
+    Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request);
 
-	Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request);
+    Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request);
 
-	Task<PagedList<JobModel>> GetJobStatesInProcess(BaseListRequest request);
+    Task<PagedList<JobModel>> GetJobStatesInProcess(BaseListRequest request);
 
-	Task<int> CountProcessingJobs();
+    Task<int> CountProcessingJobs();
 
-	Task SetRetry(string jobId);
+    Task SetRetry(string jobId);
 }
 
 public class HandfireService<TContext> : IHandfireService
-	where TContext : DbContext
+    where TContext : DbContext
 {
-	private readonly TContext _context;
+    private readonly TContext _context;
 
-	public HandfireService(TContext context)
-	{
-		_context = context;
-	}
+    public HandfireService(TContext context)
+    {
+        _context = context;
+    }
 
-	public async Task<int> GetTotalJobsCount()
-	{
+    public async Task<int> GetTotalJobsCount()
+    {
 
-		var counter = await _context.Set<Job>()
-			.CountAsync();
+        var counter = await _context.Set<Job>()
+            .CountAsync();
 
-		return counter;
-	}
+        return counter;
+    }
 
-	public async Task<int> GetPendingJobsCount()
-	{
+    public async Task<int> GetPendingJobsCount()
+    {
 
-		var counter = await GetPendingJobs()
-			.CountAsync();
+        var counter = await GetPendingJobs()
+            .CountAsync();
 
-		return counter;
-	}
+        return counter;
+    }
 
-	public async Task<int> GetScheduledJobsCount()
-	{
-		return await GetScheduledJobs()
-			.CountAsync();
-	}
+    public async Task<int> GetScheduledJobsCount()
+    {
+        return await GetScheduledJobs()
+            .CountAsync();
+    }
 
-	public async Task<int> GetJobsCount(State state)
-	{
-		return await GetJobsByState(state)
-			.CountAsync();
-	}
+    public async Task<int> GetJobsCount(State state)
+    {
+        return await GetJobsByState(state)
+            .CountAsync();
+    }
 
-	public async Task<PagedList<JobModel>> GetJobsList(BaseListRequest request, State state)
-	{
-		return await GetJobsByState(state)
-			.ToPagedListAsync(request);
-	}
+    public async Task<PagedList<JobModel>> GetJobsList(BaseListRequest request, State state)
+    {
+        return await GetJobsByState(state)
+            .ToPagedListAsync(request);
+    }
 
-	public async Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request)
-	{
-		var jobs = await GetScheduledJobs()
-			.ToPagedListAsync(request);
+    public async Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request)
+    {
+        var jobs = await GetScheduledJobs()
+            .ToPagedListAsync(request);
 
-		return jobs;
-	}
+        return jobs;
+    }
 
-	public async Task SetRetry(string jobId)
-	{
-		var job = _context.Set<Job>()
-			.Where(x => x.Id == jobId)
-			.Where(x => x.CurrentState == State.Failed)
-			.FirstOrDefault();
+    public async Task SetRetry(string jobId)
+    {
+        var job = _context.Set<Job>()
+            .Where(x => x.Id == jobId)
+            .Where(x => x.CurrentState == State.Failed)
+            .FirstOrDefault();
 
-		if (job == null)
-		{
-			throw new ArgumentException("Invalid job id.");
-		}
+        if (job == null)
+        {
+            throw new ArgumentException("Invalid job id.");
+        }
 
-		job.CurrentState = State.Enqueued;
+        job.CurrentState = State.Enqueued;
 
-		var jobState = new JobState
-		{
-			Job = job,
-			DateTime = DateTime.UtcNow,
-			State = State.Enqueued
-		};
+        var jobState = new JobState
+        {
+            Job = job,
+            DateTime = DateTime.UtcNow,
+            State = State.Enqueued
+        };
 
-		_context.Set<Job>().Update(job);
-		await _context.Set<JobState>().AddAsync(jobState);
+        _context.Set<Job>().Update(job);
+        await _context.Set<JobState>().AddAsync(jobState);
 
-		await _context.SaveChangesAsync();
-	}
+        await _context.SaveChangesAsync();
+    }
 
-	public async Task<int> CountProcessingJobs()
-	{
-		return await GetProcessingStates().CountAsync();
-	}
+    public async Task<int> CountProcessingJobs()
+    {
+        return await GetProcessingStates().CountAsync();
+    }
 
-	private IQueryable<string> GetProcessingStates()
-	{
-		var query = _context.Set<JobState>()
-			.Where(x => x.State == State.Processing)
-			.Select(x => x.JobId).AsQueryable();
-		return query;
-	}
+    private IQueryable<string> GetProcessingStates()
+    {
+        var query = _context.Set<JobState>()
+            .Where(x => x.State == State.Processing)
+            .Select(x => x.JobId).AsQueryable();
+        return query;
+    }
 
-	public async Task<PagedList<JobModel>> GetJobStatesInProcess(BaseListRequest request)
-	{
-		var proccesingJobIds = await _context.Set<JobState>()
-			.Where(x => x.State == State.Processing)
-			.Select(x => x.JobId).ToListAsync();
+    public async Task<PagedList<JobModel>> GetJobStatesInProcess(BaseListRequest request)
+    {
+        var proccesingJobIds = await _context.Set<JobState>()
+            .Where(x => x.State == State.Processing)
+            .Select(x => x.JobId).ToListAsync();
 
-		var completedJobIds = await _context.Set<JobState>()
-			.Where(x => x.State == State.Completed || x.State == State.Failed)
-			.Select(x => x.JobId).ToListAsync();
+        var completedJobIds = await _context.Set<JobState>()
+            .Where(x => x.State == State.Completed || x.State == State.Failed)
+            .Select(x => x.JobId).ToListAsync();
 
-		proccesingJobIds.RemoveAll(jobState => completedJobIds.Contains(jobState));
+        proccesingJobIds.RemoveAll(jobState => completedJobIds.Contains(jobState));
 
-		var jobs = await _context.Set<Job>()
-			.Where(x => proccesingJobIds.Contains(x.Id))
-			.Select(x => new JobModel
-			{
-				Id = x.Id,
-				CurrentState = x.CurrentState,
-				CreateTime = x.CreateTime,
-				Message = x.Message,
-				ScheduleTime = x.ScheduleTime,
-				Type = x.Type
-			})
-			.AsQueryable().ToPagedListAsync(request);
-		return jobs;
-	}
+        var jobs = await _context.Set<Job>()
+            .Where(x => proccesingJobIds.Contains(x.Id))
+            .Select(x => new JobModel
+            {
+                Id = x.Id,
+                CurrentState = x.CurrentState,
+                CreateTime = x.CreateTime,
+                Message = x.Message,
+                ScheduleTime = x.ScheduleTime,
+                Type = x.Type
+            })
+            .AsQueryable().ToPagedListAsync(request);
+        return jobs;
+    }
 
-	public async Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request)
-	{
-		var history = await _context.Set<JobState>()
-			.Where(x => x.JobId == request.JobId)
-			.Select(x =>
-				new JobStateModel
-				{
-					Id = x.Id,
-					JobId = x.JobId,
-					DateTime = x.DateTime,
-					Message = x.Message,
-					State = x.State,
-				})
-			.ToPagedListAsync(request);
+    public async Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request)
+    {
+        var history = await _context.Set<JobState>()
+            .Where(x => x.JobId == request.JobId)
+            .Select(x =>
+                new JobStateModel
+                {
+                    Id = x.Id,
+                    JobId = x.JobId,
+                    DateTime = x.DateTime,
+                    Message = x.Message,
+                    State = x.State,
+                })
+            .ToPagedListAsync(request);
 
-		return history;
-	}
+        return history;
+    }
 
-	private IQueryable<JobModel> GetScheduledJobs()
-	{
-		var query = _context.Set<Job>()
-			.Where(x => x.ScheduleTime > DateTime.UtcNow)
-			.Select(x =>
-				new JobModel
-				{
-					Id = x.Id,
-					CurrentState = x.CurrentState,
-					CreateTime = x.CreateTime,
-					Message = x.Message,
-					ScheduleTime = x.ScheduleTime,
-					Type = x.Type
-				})
-			.AsQueryable();
+    private IQueryable<JobModel> GetScheduledJobs()
+    {
+        var query = _context.Set<Job>()
+            .Where(x => x.ScheduleTime > DateTime.UtcNow)
+            .Select(x =>
+                new JobModel
+                {
+                    Id = x.Id,
+                    CurrentState = x.CurrentState,
+                    CreateTime = x.CreateTime,
+                    Message = x.Message,
+                    ScheduleTime = x.ScheduleTime,
+                    Type = x.Type
+                })
+            .AsQueryable();
 
-		return query;
-	}
+        return query;
+    }
 
-	private IQueryable<JobModel> GetPendingJobs()
-	{
-		var query = _context.Set<Job>()
-			.Where(x => x.ScheduleTime < DateTime.UtcNow)
-			.Select(x =>
-				new JobModel
-				{
-					Id = x.Id,
-					CurrentState = x.CurrentState,
-					CreateTime = x.CreateTime,
-					Message = x.Message,
-					ScheduleTime = x.ScheduleTime,
-					Type = x.Type
-				})
-			.AsQueryable();
+    private IQueryable<JobModel> GetPendingJobs()
+    {
+        var query = _context.Set<Job>()
+            .Where(x => x.ScheduleTime < DateTime.UtcNow)
+            .Select(x =>
+                new JobModel
+                {
+                    Id = x.Id,
+                    CurrentState = x.CurrentState,
+                    CreateTime = x.CreateTime,
+                    Message = x.Message,
+                    ScheduleTime = x.ScheduleTime,
+                    Type = x.Type
+                })
+            .AsQueryable();
 
-		return query;
-	}
+        return query;
+    }
 
-	private IQueryable<JobModel> GetJobsByState(State state)
-	{
-		var query = _context.Set<Job>()
-			.Where(x => x.CurrentState == state)
-			.Select(x =>
-				new JobModel
-				{
-					Id = x.Id,
-					CurrentState = x.CurrentState,
-					CreateTime = x.CreateTime,
-					Message = x.Message,
-					ScheduleTime = x.ScheduleTime,
-					Type = x.Type
-				})
-			.AsQueryable();
+    private IQueryable<JobModel> GetJobsByState(State state)
+    {
+        var query = _context.Set<Job>()
+            .Where(x => x.CurrentState == state)
+            .Select(x =>
+                new JobModel
+                {
+                    Id = x.Id,
+                    CurrentState = x.CurrentState,
+                    CreateTime = x.CreateTime,
+                    Message = x.Message,
+                    ScheduleTime = x.ScheduleTime,
+                    Type = x.Type
+                })
+            .AsQueryable();
 
-		return query;
-	}
+        return query;
+    }
 }
