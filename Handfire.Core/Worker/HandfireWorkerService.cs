@@ -44,8 +44,6 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         await context.Set<JobState>().AddAsync(jobState, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
-
-        context.SaveChanges();
     }
 
     public async Task GetAndProcessJob(CancellationToken cancellationToken)
