@@ -18,6 +18,6 @@ public class ScheduledController : Controller
     {
         var model = await _handfireService.GetScheduledJobs(request);
 
-        return View(model);
+        return Ok(model);
     }
 }

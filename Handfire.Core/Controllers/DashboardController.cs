@@ -15,8 +15,8 @@ public class DashboardController : Controller
         _handfireService = handfireService;
     }
 
-    [HttpGet("dashboard")]
-    public async Task<IActionResult> Index()
+    [HttpGet("status")]
+    public async Task<IActionResult> Status()
     {
         var total = await _handfireService.GetTotalJobsCount();
         var pending = await _handfireService.GetPendingJobsCount();
@@ -37,6 +37,12 @@ public class DashboardController : Controller
             Processing = processing,
         };
 
-        return View(model);
+        return Ok(model);
+
+    }
+    [HttpGet("dashboard")]
+    public IActionResult Index()
+    {
+        return View();
     }
 }
