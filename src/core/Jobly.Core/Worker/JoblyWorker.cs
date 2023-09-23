@@ -6,18 +6,18 @@ namespace Jobly.Core.Worker;
 public class JoblyWorker<TContext> : BackgroundService
     where TContext : DbContext
 {
-    private readonly IJoblyWorkerService _handfireWorkerService;
+    private readonly IJoblyWorkerService _joblyWorkerService;
 
-    public JoblyWorker(IJoblyWorkerService handfireWorkerService)
+    public JoblyWorker(IJoblyWorkerService joblyWorkerService)
     {
-        _handfireWorkerService = handfireWorkerService;
+        _joblyWorkerService = joblyWorkerService;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {   
-            await _handfireWorkerService.GetAndProcessJob(stoppingToken);
+            await _joblyWorkerService.GetAndProcessJob(stoppingToken);
         }
     }
 }

@@ -10,14 +10,14 @@ public static class JoblyEndpoints
     {
         var aurCardsGroup = app.MapGroup($"{options.RoutePrefix}/api");
 
-        aurCardsGroup.MapGet("status", async (IJoblyService handfireService) =>
+        aurCardsGroup.MapGet("status", async (IJoblyService joblyService) =>
         {
-            var total = await handfireService.GetTotalJobsCount();
-            var pending = await handfireService.GetPendingJobsCount();
-            var scheduled = await handfireService.GetScheduledJobsCount();
-            var created = await handfireService.GetJobsCount(State.Enqueued);
-            var completed = await handfireService.GetJobsCount(State.Completed);
-            var failed = await handfireService.GetJobsCount(State.Failed);
+            var total = await joblyService.GetTotalJobsCount();
+            var pending = await joblyService.GetPendingJobsCount();
+            var scheduled = await joblyService.GetScheduledJobsCount();
+            var created = await joblyService.GetJobsCount(State.Enqueued);
+            var completed = await joblyService.GetJobsCount(State.Completed);
+            var failed = await joblyService.GetJobsCount(State.Failed);
 
             var model = new DashboardStatistics
             {

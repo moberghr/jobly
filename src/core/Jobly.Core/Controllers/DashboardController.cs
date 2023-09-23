@@ -8,23 +8,23 @@ namespace Jobly.Core.Controllers;
 [ApiExplorerSettings(IgnoreApi = true)]
 public class DashboardController : Controller
 {
-    private readonly IJoblyService _handfireService;
+    private readonly IJoblyService _joblyService;
 
-    public DashboardController(IJoblyService handfireService)
+    public DashboardController(IJoblyService joblyService)
     {
-        _handfireService = handfireService;
+        _joblyService = joblyService;
     }
 
     [HttpGet("status")]
     public async Task<IActionResult> Status()
     {
-        var total = await _handfireService.GetTotalJobsCount();
-        var pending = await _handfireService.GetPendingJobsCount();
-        var scheduled = await _handfireService.GetScheduledJobsCount();
-        var created = await _handfireService.GetJobsCount(State.Enqueued);
-        var completed = await _handfireService.GetJobsCount(State.Completed);
-        var failed = await _handfireService.GetJobsCount(State.Failed);
-        var processing = await _handfireService.CountProcessingJobs() - completed - failed;
+        var total = await _joblyService.GetTotalJobsCount();
+        var pending = await _joblyService.GetPendingJobsCount();
+        var scheduled = await _joblyService.GetScheduledJobsCount();
+        var created = await _joblyService.GetJobsCount(State.Enqueued);
+        var completed = await _joblyService.GetJobsCount(State.Completed);
+        var failed = await _joblyService.GetJobsCount(State.Failed);
+        var processing = await _joblyService.CountProcessingJobs() - completed - failed;
 
         var model = new DashboardStatistics
         {

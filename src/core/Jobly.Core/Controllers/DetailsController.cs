@@ -8,17 +8,17 @@ namespace Jobly.Core.Controllers;
 [ApiExplorerSettings(IgnoreApi = true)]
 public class DetailsController : Controller
 {
-    private readonly IJoblyService _handfireService;
+    private readonly IJoblyService _joblyService;
 
-    public DetailsController(IJoblyService handfireService)
+    public DetailsController(IJoblyService joblyService)
     {
-        _handfireService = handfireService;
+        _joblyService = joblyService;
     }
 
     [HttpGet("details")]
     public async Task<IActionResult> Index(JobStateRequest request)
     {
-        var model = await _handfireService.GetJobStates(request);
+        var model = await _joblyService.GetJobStates(request);
 
         return Ok(model);
     }
