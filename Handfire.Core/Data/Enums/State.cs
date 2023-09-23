@@ -3,6 +3,7 @@ public enum State
 {
     Enqueued,
     Awaiting,
+    Processing,
     Completed,
     Failed,
     Deleted,

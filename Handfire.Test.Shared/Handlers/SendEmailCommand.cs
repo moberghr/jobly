@@ -21,7 +21,6 @@ public class SendEmailCommand : IRequestHandler<SendEmailRequest, SendEmailRespo
         emailLog.ProcessedTime = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
-
         return new();
     }
 }
