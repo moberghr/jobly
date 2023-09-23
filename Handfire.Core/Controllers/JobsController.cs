@@ -39,6 +39,12 @@ public class JobsController : Controller
 
         return View(model);
     }
+    [HttpGet("processing")]
+    public async Task<IActionResult> Processing(BaseListRequest request)
+    {
+        var model = await _handfireService.GetJobStatesInProcess(request);
+        return View(model);
+    }
 
     [HttpGet("retry")]
     public async Task<IActionResult> Retry(string jobId)

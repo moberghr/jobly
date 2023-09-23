@@ -29,6 +29,23 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
         _logger = logger;
     }
 
+    public async Task UpdateJobStatus(Job job, CancellationToken cancellationToken)
+    {
+        using var scope = _serviceScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TContext>();
+
+        var jobState = new JobState
+        {
+            JobId = job.Id,
+            DateTime = DateTime.UtcNow,
+            State = State.Processing,
+            Message = $"The job {job.Id} is being processed"
+        };
+
+        await context.Set<JobState>().AddAsync(jobState, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task GetAndProcessJob(CancellationToken cancellationToken)
     {
         using var scope = _serviceScopeFactory.CreateScope();
@@ -63,6 +80,8 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
 
         try
         {
+            await UpdateJobStatus(job, cancellationToken);
+
             if (job.RecurringJobId.HasValue)
             {
                 await CreateNextJob(job, cancellationToken);
@@ -75,7 +94,6 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             await UpdateJobData(context, jobData!, e.Message, cancellationToken);
 
             transaction.Commit();
-
             return;
         }
 
@@ -174,7 +192,7 @@ public class HandfireWorkerService<TContext> : IHandfireWorkerService
             await UpdateCurrentAndNextBatchFromChildJob(context, jobData.Job.BatchId, cancellationToken);
         }
 
-        await CreateJobState(context, jobData.Job.Id, state, message, cancellationToken);
+        await CreateJobState(context, jobData.Job.Id, state, string.IsNullOrEmpty(message) ? $"Job {jobData.Job.Id} is completed" : message, cancellationToken);
     }
 
     private static async Task CreateJobState(TContext context, string jobId, State state, string? message, CancellationToken cancellationToken)
