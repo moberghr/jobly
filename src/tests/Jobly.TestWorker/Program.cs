@@ -5,7 +5,7 @@ var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
         services.AddServices(context.Configuration);
-        services.AddJobly<TestContext>(10, 2);
+        services.AddJobly<TestContext>(2);
     })
     .Build();
 

@@ -2,6 +2,7 @@
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Tests.TestData.Handlers;
+using Jobly.Worker;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +19,8 @@ public abstract class TestBase
         var services = new ServiceCollection();
         var provider = services.AddMediatR(typeof(TestBase))
             .AddTransient<TestContext>(x => CreateContext())
-            .AddJobly<TestContext>(0, 0)
+            .AddJobly<TestContext>(0)
+            .AddJoblyWorker<TestContext>(0)
             .AddSingleton<CounterService>()
             .BuildServiceProvider();
 
@@ -26,7 +28,8 @@ public abstract class TestBase
 
         var providerWithNoLocking = services.AddMediatR(typeof(TestBase))
             .AddTransient<TestContext>(x => CreateContextWithoutJobLocking())
-            .AddJobly<TestContext>(0, 0)
+            .AddJobly<TestContext>(0)
+            .AddJoblyWorker<TestContext>(0)
             .AddSingleton<CounterService>()
             .BuildServiceProvider();
 

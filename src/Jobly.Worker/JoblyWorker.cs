@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 
-namespace Jobly.Core.Worker;
+namespace Jobly.Worker;
 
 public class JoblyWorker<TContext> : BackgroundService
     where TContext : DbContext
