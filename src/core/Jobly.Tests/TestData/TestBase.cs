@@ -9,12 +9,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Jobly.Tests;
+
 public abstract class TestBase
 {
-    private IServiceScopeFactory _serviceScopeFactory;
-    private IServiceScopeFactory _serviceScopeFactoryNoLocking;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
+    private readonly IServiceScopeFactory _serviceScopeFactoryNoLocking;
 
-    public TestBase()
+    protected TestBase()
     {
         var services = new ServiceCollection();
         var provider = services.AddMediatR(typeof(TestBase))
@@ -40,7 +41,7 @@ public abstract class TestBase
 
     protected abstract TestContext CreateContextWithoutJobLocking();
 
-    protected async Task<string> CreateProcessLogJob(TestContext context, int testLogId)
+    protected static async Task<string> CreateProcessLogJob(TestContext context, int testLogId)
     {
         var publisher = new Publisher<TestContext>(context, 0);
         var processLogJob = new PrecessLogRequest { TestTaskId = testLogId };
@@ -69,7 +70,7 @@ public abstract class TestBase
         var publisher = new Publisher<TestContext>(context, retries);
 
         var throwExceptionRequest = new ThrowExceptionRequest();
-        string jobId = "";
+        var jobId = "";
         if (maxRetries != null)
         {
             jobId = await publisher.Publish(throwExceptionRequest, (int)maxRetries);
@@ -139,7 +140,7 @@ public abstract class TestBase
     {
         var requests = new List<UnitRequest>();
 
-        for (int i = 0; i < numberOfJobs; i++)
+        for (var i = 0; i < numberOfJobs; i++)
         {
             var request = new UnitRequest();
 
@@ -157,7 +158,7 @@ public abstract class TestBase
     {
         var requests = new List<UnitRequest>();
 
-        for (int i = 0; i < numberOfJobs; i++)
+        for (var i = 0; i < numberOfJobs; i++)
         {
             var request = new UnitRequest();
 
