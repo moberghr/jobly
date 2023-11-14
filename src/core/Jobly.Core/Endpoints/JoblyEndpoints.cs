@@ -65,7 +65,7 @@ public static class JoblyEndpoints
             return model;
         });
 
-        apiGroup.MapGet("retry", async ([FromServices] IJoblyService joblyService, [FromBody] string jobId) =>
+        apiGroup.MapPost("retry", async ([FromServices] IJoblyService joblyService, [FromQuery] string jobId) =>
         {
             await joblyService.SetRetry(jobId);
         });
