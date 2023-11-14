@@ -22,19 +22,19 @@ public static class ServiceConfiguration
 
     private static readonly SaveChangesConcurrencyTokenInterceptor _saveChangesInterceptor = new();
 
-    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services, int retries)
+    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services, int retryCount)
         where TContext : DbContext
     {
-        return CreateJoblyServices<TContext>(services, retries);
+        return CreateJoblyServices<TContext>(services, retryCount);
     }
 
     public static IServiceCollection AddJobly<TContext>(this IServiceCollection services)
         where TContext : DbContext
     {
-        return CreateJoblyServices<TContext>(services, retries: 0);
+        return CreateJoblyServices<TContext>(services, retryCount: 0);
     }
 
-    private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services, int retries) where TContext : DbContext
+    private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services, int retryCount) where TContext : DbContext
     {
         var assembly = typeof(ServiceConfiguration).Assembly;
 
@@ -47,7 +47,7 @@ public static class ServiceConfiguration
             options.FileProviders.Add(new EmbeddedFileProvider(assembly));
         });
 
-        services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(), retries));
+        services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(), retryCount));
         services.AddScoped<IRecurringJobPublisher>(x => new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IJoblyService>(x => new JoblyService<TContext>(x.GetRequiredService<TContext>()));
         services.AddTransient<IBatchPublisher, BatchPublisher<TContext>>();
