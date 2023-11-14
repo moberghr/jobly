@@ -12,18 +12,11 @@ namespace Jobly.Worker;
 
 public static class ServiceConfiguration
 {
-    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services, int workerCount, int retryCount = 0)
+    public static IServiceCollection AddJoblyWorker<TContext>(this IServiceCollection services, int workerCount, int retryCount = 0)
         where TContext : DbContext
     {
-        services.AddJoblyCore<TContext>(retryCount);
-        services.AddJoblyWorker<TContext>(workerCount);
+        services.AddJobly<TContext>(retryCount);
 
-        return services;
-    }
-
-    public static IServiceCollection AddJoblyWorker<TContext>(this IServiceCollection services, int workerCount)
-        where TContext : DbContext
-    {
         services.AddTransient<IJoblyWorkerService, JoblyWorkerService<TContext>>();
 
         for (var i = 0; i < workerCount; i++)

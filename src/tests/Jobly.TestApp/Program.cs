@@ -12,7 +12,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddServices(builder.Configuration);
-builder.Services.AddJobly<TestContext>(10);
+builder.Services.AddJoblyWorker<TestContext>(10);
 
 var app = builder.Build();
 
