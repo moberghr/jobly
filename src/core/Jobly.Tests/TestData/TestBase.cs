@@ -21,7 +21,6 @@ public abstract class TestBase
         var provider = services.AddMediatR(typeof(TestBase))
             .AddTransient<TestContext>(x => CreateContext())
             .AddJobly<TestContext>(0)
-            .AddJoblyWorker<TestContext>(0)
             .AddSingleton<CounterService>()
             .BuildServiceProvider();
 
@@ -30,7 +29,6 @@ public abstract class TestBase
         var providerWithNoLocking = services.AddMediatR(typeof(TestBase))
             .AddTransient<TestContext>(x => CreateContextWithoutJobLocking())
             .AddJobly<TestContext>(0)
-            .AddJoblyWorker<TestContext>(0)
             .AddSingleton<CounterService>()
             .BuildServiceProvider();
 
@@ -243,6 +241,7 @@ public abstract class TestBase
 
         return name;
     }
+
     protected async Task<RecurringJob> GetRecurringJob(string name)
     {
         var context = CreateContext();
