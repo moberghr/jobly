@@ -1,6 +1,6 @@
 ﻿using System.Reflection;
 
-namespace Jobly.Core
+namespace Jobly.UI.UIMiddleware
 {
     public class JoblyUIOptions
     {

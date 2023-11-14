@@ -1,9 +1,9 @@
-﻿using Jobly.Core.Endpoints;
+﻿using Jobly.UI.Endpoints;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace Jobly.Core
+namespace Jobly.UI.UIMiddleware
 {
     public static class JoblyUIBuilder
     {

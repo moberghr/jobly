@@ -12,6 +12,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\core\Jobly.Core\Jobly.Core.csproj" />
+		<ProjectReference Include="..\Jobly.Core\Jobly.Core.csproj" />
 	</ItemGroup>
 </Project>
