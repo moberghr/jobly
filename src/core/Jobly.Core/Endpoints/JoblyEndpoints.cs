@@ -13,25 +13,7 @@ public static class JoblyEndpoints
 
         apiGroup.MapGet("status", async ([FromServices] IJoblyService joblyService) =>
         {
-            var total = await joblyService.GetTotalJobsCount();
-            var pending = await joblyService.GetPendingJobsCount();
-            var scheduled = await joblyService.GetScheduledJobsCount();
-            var created = await joblyService.GetJobsCount(State.Enqueued);
-            var completed = await joblyService.GetJobsCount(State.Completed);
-            var failed = await joblyService.GetJobsCount(State.Failed);
-            var processing = await joblyService.CountProcessingJobs() - completed - failed;
-
-            var model = new DashboardStatistics
-            {
-                Total = total,
-                Pending = pending,
-                Scheduled = scheduled,
-                Created = created,
-                Completed = completed,
-                Failed = failed,
-                Processing = processing
-            };
-
+            var model = await joblyService.GetJoblyStatus();
             return model;
         });
 

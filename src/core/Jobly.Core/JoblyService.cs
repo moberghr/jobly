@@ -15,6 +15,8 @@ public interface IJoblyService
 
     Task<int> GetJobsCount(State state);
 
+    Task<DashboardStatistics> GetJoblyStatus();
+
     Task<PagedList<JobModel>> GetJobsList(BaseListRequest request, State state);
 
     Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request);
@@ -66,6 +68,30 @@ public class JoblyService<TContext> : IJoblyService
     {
         return await GetJobsByState(state)
             .CountAsync();
+    }
+
+    public async Task<DashboardStatistics> GetJoblyStatus()
+    {
+        var total = await GetTotalJobsCount();
+        var pending = await GetPendingJobsCount();
+        var scheduled = await GetScheduledJobsCount();
+        var created = await GetJobsCount(State.Enqueued);
+        var completed = await GetJobsCount(State.Completed);
+        var failed = await GetJobsCount(State.Failed);
+        var processing = await CountProcessingJobs() - completed - failed;
+
+        var model = new DashboardStatistics
+        {
+            Total = total,
+            Pending = pending,
+            Scheduled = scheduled,
+            Created = created,
+            Completed = completed,
+            Failed = failed,
+            Processing = processing
+        };
+
+        return model;
     }
 
     public async Task<PagedList<JobModel>> GetJobsList(BaseListRequest request, State state)
