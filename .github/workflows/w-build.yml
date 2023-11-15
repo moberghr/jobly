@@ -20,11 +20,7 @@ jobs:
     
     - name: Add the GitHub NuGet Source
       run: |
-        dotnet nuget add source "https://nuget.pkg.github.com/moberghr/index.json"
-          --name github
-          --username {{ github.actor}}
-          --password ${{ secrets.GITHUB_TOKEN }}
-          --store-password-in-clear-text
+        dotnet nuget add source "https://nuget.pkg.github.com/moberghr/index.json" --name github --username {{ github.actor}} --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text
 
     # - name: Jobly - Run tests
     #   run: |
