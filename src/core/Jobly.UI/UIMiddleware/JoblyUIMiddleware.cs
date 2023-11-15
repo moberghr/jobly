@@ -8,7 +8,7 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Jobly.Core
+namespace Jobly.UI.UIMiddleware
 {
     public class JoblyUIMiddleware
     {

@@ -38,6 +38,8 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\Jobly.Core\Jobly.Core.csproj" />
+	  <ProjectReference Include="..\Jobly.Worker\Jobly.Worker.csproj" />
+	  <ProjectReference Include="..\Jobly.UI\Jobly.UI.csproj" />
 	</ItemGroup>
 
 </Project>

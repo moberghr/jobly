@@ -1,7 +1,6 @@
 ﻿using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Interceptors;
-using Jobly.Core.Worker;
 using MediatR;
 using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
 using Microsoft.EntityFrameworkCore;
@@ -23,19 +22,20 @@ public static class ServiceConfiguration
 
     private static readonly SaveChangesConcurrencyTokenInterceptor _saveChangesInterceptor = new();
 
-    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services, int workerCount, int retries)
+    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services, int retryCount)
         where TContext : DbContext
     {
-        return CreateJoblyServices<TContext>(services, workerCount, retries);
+        return CreateJoblyServices<TContext>(services, retryCount);
     }
 
-    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services, int workerCount)
+    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services)
         where TContext : DbContext
     {
-        return CreateJoblyServices<TContext>(services, workerCount, retries: 0);
+        return AddJobly<TContext>(services, 0);
     }
 
-    private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services, int workerCount, int retries) where TContext : DbContext
+    private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services, int retryCount)
+        where TContext : DbContext
     {
         var assembly = typeof(ServiceConfiguration).Assembly;
 
@@ -48,16 +48,11 @@ public static class ServiceConfiguration
             options.FileProviders.Add(new EmbeddedFileProvider(assembly));
         });
 
-        services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(), retries));
-        services.AddScoped<IRecurringJobPublisher>(x => new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
+        services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(), retryCount));
+        services.AddScoped<IRecurringJobPublisher>(x =>
+            new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IJoblyService>(x => new JoblyService<TContext>(x.GetRequiredService<TContext>()));
-        services.AddTransient<IJoblyWorkerService, JoblyWorkerService<TContext>>();
         services.AddTransient<IBatchPublisher, BatchPublisher<TContext>>();
-
-        for (var i = 0; i < workerCount; i++)
-        {
-            services.AddSingleton<IHostedService, JoblyWorker<TContext>>();
-        }
 
         return services;
     }

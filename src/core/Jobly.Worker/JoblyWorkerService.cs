@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using Cronos;
+using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
@@ -9,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Jobly.Core;
+namespace Jobly.Worker;
 
 public interface IJoblyWorkerService
 {
@@ -52,7 +53,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
-        using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
         var jobData = context.Set<Job>()
             .Where(x => x.CurrentState == State.Enqueued)
@@ -93,12 +94,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         {
             await UpdateJobData(context, jobData!, e.Message, cancellationToken);
 
-            transaction.Commit();
+            await transaction.CommitAsync(cancellationToken);
             return;
         }
 
         await UpdateJobData(context, jobData!, message: null, cancellationToken);
-        transaction.Commit();
+        await transaction.CommitAsync(cancellationToken);
     }
 
     private async Task CreateNextJob(Job job, CancellationToken cancellationToken)
@@ -209,7 +210,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private async static Task UpdateChildJobs(TContext context, string parentJobId, CancellationToken cancellationToken)
+    private static async Task UpdateChildJobs(TContext context, string parentJobId, CancellationToken cancellationToken)
     {
         await context.Set<Job>()
             .Where(x => x.ParentJobId == parentJobId || x.ParentBatch.Job.ParentJobId == parentJobId)
@@ -219,7 +220,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
     }
 
-    private async static Task UpdateCurrentAndNextBatchFromChildJob(TContext context, string batchId, CancellationToken cancellationToken)
+    private static async Task UpdateCurrentAndNextBatchFromChildJob(TContext context, string batchId, CancellationToken cancellationToken)
     {
         var currentBatch = await context.Set<Batch>()
             .Where(x => x.Id == batchId)
@@ -285,8 +286,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
     private class JobData
     {
-        public Job Job { get; set; } = null!;
+        public Job Job { get; init; } = null!;
 
-        public bool IsParent { get; set; }
+        public bool IsParent { get; init; }
     }
 }
