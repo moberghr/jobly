@@ -41,7 +41,7 @@ jobs:
 
     - name: "Jobly.Core - Push NuGet package"
       working-directory: src/core/Jobly.Core
-      run: dotnet nuget push "bin/Release/Jobly.Core.{{github.ref_name}}.nupkg" --source "github"
+      run: dotnet nuget push "bin/Release/Jobly.Core.${{github.ref_name}}.nupkg" --source "github"
 
     - name: Jobly.UI - Install dependencies
       working-directory: src/core/Jobly.UI
@@ -53,7 +53,7 @@ jobs:
 
     - name: "Jobly.UI - Push NuGet package"
       working-directory: src/core/Jobly.UI
-      run: dotnet nuget push "bin/Release/Jobly.UI.{{github.ref_name}}.nupkg" --source "github"
+      run: dotnet nuget push "bin/Release/Jobly.UI.${{github.ref_name}}.nupkg" --source "github"
 
     - name: Jobly.Worker - Install dependencies
       working-directory: src/core/Jobly.Worker
@@ -65,7 +65,7 @@ jobs:
 
     - name: "Jobly.Worker - Push NuGet package"
       working-directory: src/core/Jobly.Worker
-      run: dotnet nuget push "bin/Release/Jobly.Worker.{{github.ref_name}}.nupkg" --source "github"
+      run: dotnet nuget push "bin/Release/Jobly.Worker.${{github.ref_name}}.nupkg" --source "github"
 
     - name: "Cleanup - Remove NuGet Source"
       run: dotnet nuget remove source github
