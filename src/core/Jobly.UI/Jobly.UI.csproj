@@ -16,8 +16,14 @@
 		<PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="7.0.2" />
 	</ItemGroup>
 
-	<ItemGroup>
+	<ItemGroup Condition="'$(Configuration)'!='Debug'">
 		<PackageReference Include="Jobly.Core" Version="0.1.0" />
 	</ItemGroup>
+
+	<ItemGroup Condition="'$(Configuration)'=='Debug'">
+		<ProjectReference Include="..\Jobly.Core\Jobly.Core.csproj" />
+	</ItemGroup>
+
+
 
 </Project>
