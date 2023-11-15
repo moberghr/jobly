@@ -7,17 +7,15 @@ function App() {
   const switchComponent = () => {
     switch (display) {
       case 1:
-        return <Table url="/completed" />;
+        return <Table url="/dashboard/api/completed" />;
       case 2:
-        return <Table url="/created" />;
+        return <Table url="/dashboard/api/created" />;
       case 3:
-        return <Table url="/failed" />;
+        return <Table url="/dashboard/api/failed" />;
       case 4:
-        return <Table url="/scheduled" />;
+        return <Table url="/dashboard/api/scheduled" />;
       case 5:
-        return <Table url="/retry" />;
-      case 6:
-        return <Table url="/processing" />;
+        return <Table url="/dashboard/api/processing" />;
       default:
         return <EventsCount />;
     }
@@ -71,14 +69,6 @@ function App() {
             setDisplay(5);
           }}
         >
-          Display retried jobs
-        </button>
-        <button
-          className={display === 6 ? "active" : ""}
-          onClick={() => {
-            setDisplay(6);
-          }}
-        >
           Display jobs in progress
         </button>
       </nav>
@@ -97,7 +87,7 @@ function Table(props) {
 
   useEffect(() => {
     setTimeout(() => {
-      fetch(`${props.url}?page=${currentPage}`)
+      fetch(`${props.url}?page=${currentPage}&pageSize=20`)
         .then((response) => response.json())
         .then((json) => {
           setTableData({
@@ -176,7 +166,7 @@ function EventsCount() {
 
   useEffect(() => {
     setTimeout(() => {
-      fetch("/status")
+      fetch("/dashboard/api/status")
         .then((response) => response.json())
         .then((temp) => {
           setCount({
