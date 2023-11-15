@@ -22,10 +22,16 @@ public static class ServiceConfiguration
 
     private static readonly SaveChangesConcurrencyTokenInterceptor _saveChangesInterceptor = new();
 
-    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services, int retryCount = 0)
+    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services, int retryCount)
         where TContext : DbContext
     {
         return CreateJoblyServices<TContext>(services, retryCount);
+    }
+
+    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services)
+        where TContext : DbContext
+    {
+        return AddJobly<TContext>(services, 0);
     }
 
     private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services, int retryCount)
