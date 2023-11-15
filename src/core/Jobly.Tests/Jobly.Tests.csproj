@@ -37,9 +37,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\Jobly.Core\Jobly.Core.csproj" />
-	  <ProjectReference Include="..\Jobly.Worker\Jobly.Worker.csproj" />
-	  <ProjectReference Include="..\Jobly.UI\Jobly.UI.csproj" />
+		<PackageReference Include="Jobly.Core" Version="0.1.0" />
+		<PackageReference Include="Jobly.Worker" Version="0.1.0" />
+		<PackageReference Include="Jobly.UI" Version="0.1.0" />
 	</ItemGroup>
 
 </Project>
