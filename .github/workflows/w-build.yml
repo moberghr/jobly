@@ -32,40 +32,39 @@ jobs:
     #     dotnet test
 
     - name: Jobly.Core - Install dependencies
-      run: |
-        cd src
-        cd core
-        cd Jobly.Core
-        dotnet restore
+      working-directory: src/core/Jobly.Core
+      run: dotnet restore
 
     - name: "Jobly.Core - Create a NuGet package"
+      working-directory: src/core/Jobly.Core
       run: dotnet pack -p:PackageVersion=${{github.ref_name}} --configuration Release
 
     - name: "Jobly.Core - Push NuGet package"
+      working-directory: src/core/Jobly.Core
       run: dotnet nuget push "bin/Release/Jobly.Core.{{github.ref_name}}.nupkg" --source "github"
 
     - name: Jobly.UI - Install dependencies
-      run: |
-        cd ..
-        cd Jobly.UI
-        dotnet restore
+      working-directory: src/core/Jobly.UI
+      run: dotnet restore
 
     - name: "Jobly.UI - Create a NuGet package"
+      working-directory: src/core/Jobly.UI
       run: dotnet pack -p:PackageVersion=${{github.ref_name}} --configuration Release
 
     - name: "Jobly.UI - Push NuGet package"
+      working-directory: src/core/Jobly.UI
       run: dotnet nuget push "bin/Release/Jobly.UI.{{github.ref_name}}.nupkg" --source "github"
 
     - name: Jobly.Worker - Install dependencies
-      run: |
-        cd ..
-        cd Jobly.Worker
-        dotnet restore
+      working-directory: src/core/Jobly.Worker
+      run: dotnet restore
 
     - name: "Jobly.Worker - Create a NuGet package"
+      working-directory: src/core/Jobly.Worker
       run: dotnet pack -p:PackageVersion=${{github.ref_name}} --configuration Release
 
     - name: "Jobly.Worker - Push NuGet package"
+      working-directory: src/core/Jobly.Worker
       run: dotnet nuget push "bin/Release/Jobly.Worker.{{github.ref_name}}.nupkg" --source "github"
 
     - name: "Cleanup - Remove NuGet Source"
