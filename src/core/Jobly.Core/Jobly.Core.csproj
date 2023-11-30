@@ -6,6 +6,7 @@
 		<Nullable>enable</Nullable>
 		<AddRazorSupportForMvc>true</AddRazorSupportForMvc>
 		<GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+		<RepositoryUrl>https://github.com/moberghr/jobly</RepositoryUrl>
 	</PropertyGroup>
 
 	<ItemGroup>

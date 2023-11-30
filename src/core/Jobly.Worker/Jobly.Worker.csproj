@@ -1,9 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net7.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<RepositoryUrl>https://github.com/moberghr/jobly</RepositoryUrl>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -11,7 +12,11 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="7.0.0" />
 	</ItemGroup>
 
-	<ItemGroup>
+	<ItemGroup Condition="'$(Configuration)'!='Debug'">
+		<PackageReference Include="Jobly.Core" Version="0.1.0" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(Configuration)'=='Debug'">
 		<ProjectReference Include="..\Jobly.Core\Jobly.Core.csproj" />
 	</ItemGroup>
 </Project>
