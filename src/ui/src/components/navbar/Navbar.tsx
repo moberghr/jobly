@@ -6,7 +6,7 @@ import NavItem from "../navItem/NavItem";
 
 const Navbar = () => {
   return (
-    <Navigation>
+    <Navigation expand="md" >
       <Navigation.Brand
         className="px-4"
       >
