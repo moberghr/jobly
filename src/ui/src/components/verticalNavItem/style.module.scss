@@ -1,0 +1,21 @@
+.container {
+    display: flex;
+    flex-direction: row;
+    border-bottom: solid 2px whitesmoke;
+    align-items: center;
+    padding: 20px 0;
+
+    .icon {
+        margin: 0 10px;
+    }
+
+    .label {
+        margin-right: 8px;
+    }
+
+    .quantity {
+        border-radius: 15px;
+        border: solid 1px orange;
+        padding: 2px 10px;
+    }
+}
