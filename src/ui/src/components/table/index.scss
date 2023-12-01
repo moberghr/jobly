@@ -1,0 +1,29 @@
+.table {
+  & > thead {
+    border-bottom-width: 3px;
+  }
+}
+
+.table-footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 30px;
+  flex-wrap: wrap;
+  gap: 15px;
+  font-size: small;
+
+  & p,
+  ul {
+    margin: 0;
+  }
+}
+
+.items-per-page {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
