@@ -9,17 +9,15 @@ html, body, #root {
     font-family: 'Kanit', sans-serif;
 }
 
-.navbar {
-    border-bottom: solid 8px whitesmoke;
-}
-
 .navbar-brand {
     font-weight: 700;
     font-size: 1.6rem;
     letter-spacing: 2px;
     color: #FF6C22;
 }
-
+.navbar {
+    border-bottom: solid 3px whitesmoke;
+}
 .nav-item-container {
     display: flex;
     flex-direction: row;
