@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, ComponentType, ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import TableComponent from 'react-bootstrap/Table';
 import Pagination from 'react-bootstrap/Pagination';
@@ -9,24 +9,45 @@ import './index.scss';
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500];
 
-type ITableData = {
-  data: {
-    [key: string]: string | number;
-  }[];
-  totalCount: number;
+type AdditionalProps = {
+  additionalProp: any;
 };
 
-type IColumnNames = {
-  [key: string]: string;
+type WrapperComponentProps = {
+  WrappedComponent: ComponentType<any>;
+  children?: ReactNode;
+} & AdditionalProps;
+
+const WrapperComponent: React.FC<WrapperComponentProps> = ({
+  WrappedComponent,
+  additionalProp,
+  children,
+}) => {
+  return <WrappedComponent {...additionalProp}>{children}</WrappedComponent>;
+};
+
+type ITableProps = {
+  data: {
+    data: {
+      [key: string]: any;
+    }[];
+    totalCount: number;
+  };
+  columnNames: {
+    [key: string]: string;
+  };
+  specialColumns?: string[];
+  specialColumnComponents?: {
+    [key: string]: any;
+  };
 };
 
 const Table = ({
   data,
   columnNames,
-}: {
-  data: ITableData;
-  columnNames: IColumnNames;
-}) => {
+  specialColumns,
+  specialColumnComponents,
+}: ITableProps) => {
   let [searchParams, setSearchParams] = useSearchParams();
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
@@ -80,10 +101,30 @@ const Table = ({
         {data.data.length > 0 && (
           <tbody>
             {data.data.map((row, index) => (
-              <tr key={row.id ? row.id : index}>
-                {Object.keys(columnNames).map((name) => (
-                  <td key={row[name]}>{row[name]}</td>
-                ))}
+              <tr
+                key={
+                  row.id &&
+                  (typeof row.id === 'string' || typeof row.id === 'number')
+                    ? row.id
+                    : index
+                }
+              >
+                {Object.keys(columnNames).map((name) =>
+                  specialColumns &&
+                  specialColumns.includes(name) &&
+                  specialColumnComponents &&
+                  specialColumnComponents[name] &&
+                  typeof row[name] === 'object' ? (
+                    <td key={row[name].value}>
+                      <WrapperComponent
+                        WrappedComponent={specialColumnComponents.lastExecution}
+                        additionalProp={{ ...row[name] }}
+                      />
+                    </td>
+                  ) : (
+                    <td key={row[name]}>{row[name]}</td>
+                  )
+                )}
               </tr>
             ))}
           </tbody>

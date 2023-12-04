@@ -1,0 +1,15 @@
+.status-text {
+  margin: 0;
+  color: white;
+  padding: 0 6px;
+  border-radius: 6px;
+  width: fit-content;
+}
+
+.ok-status {
+  background-color: green;
+}
+
+.failed-status {
+  background-color: red;
+}

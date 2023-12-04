@@ -1,10 +1,14 @@
 .table {
+  margin-top: 30px;
+  font-size: 14px;
   & > thead {
     border-bottom-width: 3px;
   }
   & td:last-of-type,
   th:last-of-type {
     text-align: end;
+    display: flex;
+    justify-content: end;
   }
 }
 
@@ -13,7 +17,7 @@
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  margin-top: 30px;
+  margin-top: 20px;
   flex-wrap: wrap;
   gap: 20px;
   font-size: small;

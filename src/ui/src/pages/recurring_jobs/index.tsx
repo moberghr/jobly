@@ -2,6 +2,7 @@ import Button from 'react-bootstrap/Button';
 
 import Table from '../../components/table';
 import Title from '../../components/title';
+import StatusText from '../../components/statusText';
 
 const DUMMY_DATA = {
   data: [
@@ -11,7 +12,7 @@ const DUMMY_DATA = {
       timeZone: 'UTC',
       job: 'IMaintenanceService.CleanTempDirectory',
       nextExecution: 'in 33 minutes',
-      lastExecution: '27 minutes ago',
+      lastExecution: { value: '27 minutes ago', failed: true },
     },
     {
       id: 'db-clean-users',
@@ -19,7 +20,7 @@ const DUMMY_DATA = {
       timeZone: 'W. Europe Standard Time',
       job: 'IUsersService.DefragmentIndexes',
       nextExecution: 'in 7 hours',
-      lastExecution: '17 hours ago',
+      lastExecution: { value: '17 hours ago', failed: false },
     },
   ],
   totalCount: 2,
@@ -44,7 +45,12 @@ const Index = () => {
       <Button variant='outline-dark' disabled>
         Remove
       </Button>
-      <Table data={DUMMY_DATA} columnNames={COLUMN_NAMES} />
+      <Table
+        data={DUMMY_DATA}
+        columnNames={COLUMN_NAMES}
+        specialColumns={['lastExecution']}
+        specialColumnComponents={{ lastExecution: StatusText }}
+      />
     </div>
   );
 };
