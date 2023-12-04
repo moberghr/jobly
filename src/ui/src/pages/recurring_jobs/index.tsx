@@ -39,12 +39,15 @@ const Index = () => {
   return (
     <div className='content-container'>
       <Title>Recurring Jobs</Title>
-      <Button variant='primary-blue' disabled>
-        Trigger now
-      </Button>
-      <Button variant='outline-dark' disabled>
-        Remove
-      </Button>
+      <div className='actions-wrapper'>
+        <Button variant='primary-blue' disabled>
+          Trigger now
+        </Button>
+        <Button variant='outline-dark' disabled>
+          Remove
+        </Button>
+      </div>
+
       <Table
         data={DUMMY_DATA}
         columnNames={COLUMN_NAMES}
