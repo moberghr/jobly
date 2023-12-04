@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import TableComponent from 'react-bootstrap/Table';
 import Pagination from 'react-bootstrap/Pagination';
 import Dropdown from 'react-bootstrap/Dropdown';
@@ -8,76 +9,162 @@ import './index.scss';
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 200, 500];
 
-function Table() {
+type ITableData = {
+  data: {
+    [key: string]: string | number;
+  }[];
+  totalCount: number;
+};
+
+type IColumnNames = {
+  [key: string]: string;
+};
+
+const Table = ({
+  data,
+  columnNames,
+}: {
+  data: ITableData;
+  columnNames: IColumnNames;
+}) => {
+  let [searchParams, setSearchParams] = useSearchParams();
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const maxPage = Math.ceil(data.totalCount / itemsPerPage);
+
+  const deleteSearchParams = () => {
+    searchParams.delete('page');
+    searchParams.delete('items');
+    setSearchParams(searchParams);
+  };
+
+  const handlePaginationChange = (page: number) => {
+    setCurrentPage(page);
+    deleteSearchParams();
+  };
+
+  const handleItemsNumChange = (items: number) => {
+    setItemsPerPage(items);
+    deleteSearchParams();
+  };
+
+  useEffect(() => {
+    setSearchParams((params) => {
+      if (!params.get('page')) params.set('page', currentPage.toString());
+      if (!params.get('items')) params.set('items', itemsPerPage.toString());
+
+      if (
+        params.get('items') &&
+        params.get('items') !== itemsPerPage.toString()
+      )
+        setItemsPerPage(Number(params.get('items')));
+
+      if (params.get('page') && params.get('page') !== currentPage.toString())
+        setCurrentPage(Number(params.get('page')));
+
+      return params;
+    });
+  }, [currentPage, itemsPerPage, setSearchParams]);
 
   return (
     <>
-      <TableComponent hover className='table'>
+      <TableComponent hover responsive className='table'>
         <thead>
           <tr>
-            <th>#</th>
-            <th>First Name</th>
-            <th>Last Name</th>
-            <th>Username</th>
+            {Object.values(columnNames).map((name) => (
+              <th key={name}>{name}</th>
+            ))}
           </tr>
         </thead>
-        <tbody>
-          <tr>
-            <td>1</td>
-            <td>Mark</td>
-            <td>Otto</td>
-            <td>@mdo</td>
-          </tr>
-          <tr>
-            <td>2</td>
-            <td>Jacob</td>
-            <td>Thornton</td>
-            <td>@fat</td>
-          </tr>
-          <tr>
-            <td>3</td>
-            <td colSpan={2}>Larry the Bird</td>
-            <td>@twitter</td>
-          </tr>
-        </tbody>
+        {data.data.length > 0 && (
+          <tbody>
+            {data.data.map((row, index) => (
+              <tr key={row.id ? row.id : index}>
+                {Object.keys(columnNames).map((name) => (
+                  <td key={row[name]}>{row[name]}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        )}
       </TableComponent>
 
       <div className='table-footer'>
-        <p>Selected 0 of 174991</p>
-        <div className='items-per-page'>
-          <p>Items per page </p>
-          <DropdownButton
-            id='dropdown-basic-button'
-            title={itemsPerPage}
-            size='sm'
-            className='small-dropdown'
-          >
-            {ITEMS_PER_PAGE_OPTIONS.map((num) => (
-              <Dropdown.Item key={num} onClick={() => setItemsPerPage(num)}>
-                {num}
-              </Dropdown.Item>
-            ))}
-          </DropdownButton>
-        </div>
+        {data.data.length > 0 && (
+          <>
+            <p className='num-of-items'>Selected 0 of {data.totalCount}</p>
+            <div className='items-per-page'>
+              <p>Items per page </p>
+              <DropdownButton
+                id='dropdown-basic-button'
+                title={itemsPerPage}
+                size='sm'
+                className='small-dropdown'
+              >
+                {ITEMS_PER_PAGE_OPTIONS.map((num) => (
+                  <Dropdown.Item
+                    key={num}
+                    onClick={() => handleItemsNumChange(num)}
+                  >
+                    {num}
+                  </Dropdown.Item>
+                ))}
+              </DropdownButton>
+            </div>
 
-        <p>
-          1-25 of <b>174991</b>
-        </p>
-        <Pagination>
-          <Pagination.First />
-          <Pagination.Prev />
-          <Pagination.Item>{1}</Pagination.Item>
-          <Pagination.Item>{2}</Pagination.Item>
-          <Pagination.Item>{3}</Pagination.Item>
-          <Pagination.Ellipsis />
-          <Pagination.Item>{20}</Pagination.Item>
-          <Pagination.Next />
-          <Pagination.Last />
-        </Pagination>
+            <p>
+              {itemsPerPage * (currentPage - 1)}-
+              {itemsPerPage * (currentPage - 1) + data.data.length} of{' '}
+              <b>{data.totalCount}</b>
+            </p>
+
+            <Pagination size='sm'>
+              <Pagination.First
+                disabled={currentPage === 1}
+                onClick={() => handlePaginationChange(1)}
+              />
+              <Pagination.Prev
+                disabled={currentPage === 1}
+                onClick={() => handlePaginationChange(currentPage - 1)}
+              />
+              <Pagination.Item
+                active={currentPage === 1}
+                onClick={() => handlePaginationChange(1)}
+              >
+                {1}
+              </Pagination.Item>
+              {currentPage > 2 && <Pagination.Ellipsis />}
+              {currentPage !== 1 && currentPage !== maxPage && (
+                <Pagination.Item active={true}>{currentPage}</Pagination.Item>
+              )}
+              {currentPage < maxPage - 1 && <Pagination.Ellipsis />}
+              {maxPage !== 1 && (
+                <Pagination.Item
+                  active={currentPage === maxPage}
+                  onClick={() => handlePaginationChange(maxPage)}
+                >
+                  {maxPage}
+                </Pagination.Item>
+              )}
+              <Pagination.Next
+                disabled={maxPage === currentPage}
+                onClick={() => handlePaginationChange(currentPage + 1)}
+              />
+              <Pagination.Last
+                disabled={maxPage === currentPage}
+                onClick={() => handlePaginationChange(maxPage)}
+              />
+            </Pagination>
+          </>
+        )}
+        {!data.data ||
+          (data.data.length === 0 && (
+            <p className='no-data'>There is no data.</p>
+          ))}
       </div>
     </>
   );
-}
+};
 
 export default Table;
