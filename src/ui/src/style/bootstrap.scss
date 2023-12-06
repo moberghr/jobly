@@ -1,0 +1,17 @@
+//button variants
+.btn-primary-blue {
+    background-color: $blue-button;
+    color: $white;
+    &:hover {
+        background-color: $blue-button-hover;
+        color: $white;
+    }
+}
+
+.btn-outline-dark {
+    &:hover {
+        background-color: $grey-blue-light;
+        color: unset;
+    }
+}
+//button variants end

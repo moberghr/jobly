@@ -1,0 +1,60 @@
+import Button from "react-bootstrap/Button";
+import JoblyTable from "../../components/joblyTable/joblyTable";
+import JoblyTitle from "../../components/joblyTitle/joblyTitle";
+import JoblyStatusText from "../../components/joblyStatusText/joblyStatusText";
+import styles from "./recurringJobs.module.scss";
+
+const DUMMY_DATA = {
+    data: [
+        {
+            id: "clean-temp",
+            cron: "every hour",
+            timeZone: "UTC",
+            job: "IMaintenanceService.CleanTempDirectory",
+            nextExecution: "in 33 minutes",
+            lastExecution: { value: "27 minutes ago", failed: true },
+        },
+        {
+            id: "db-clean-users",
+            cron: "At 01:00 AM",
+            timeZone: "W. Europe Standard Time",
+            job: "IUsersService.DefragmentIndexes",
+            nextExecution: "in 7 hours",
+            lastExecution: { value: "17 hours ago", failed: false },
+        },
+    ],
+    totalCount: 2,
+};
+
+const COLUMN_NAMES = {
+    id: "Id",
+    cron: "Cron",
+    timeZone: "Time zone",
+    job: "Jobs",
+    nextExecution: "Next execution",
+    lastExecution: "Last execution",
+};
+
+const RecurringJobs = () => {
+    return (
+        <div className="content-container">
+            <JoblyTitle>Recurring Jobs</JoblyTitle>
+            <div className={styles["actions-wrapper"]}>
+                <Button variant="primary-blue" disabled>
+                    Trigger now
+                </Button>
+                <Button variant="outline-dark" disabled>
+                    Remove
+                </Button>
+            </div>
+
+            <JoblyTable
+                data={DUMMY_DATA}
+                columnNames={COLUMN_NAMES}
+                specialColumnComponents={{ lastExecution: JoblyStatusText }}
+            />
+        </div>
+    );
+};
+
+export default RecurringJobs;
