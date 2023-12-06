@@ -9,38 +9,5 @@ html, body, #root {
     font-family: 'Kanit', sans-serif;
 }
 
-.navbar-brand {
-    font-weight: 700;
-    font-size: 1.6rem;
-    letter-spacing: 2px;
-    color: #FF6C22;
-}
-.navbar {
-    border-bottom: solid 3px whitesmoke;
-}
-.nav-item-container {
-    display: flex;
-    flex-direction: row;
-
-    a {
-        color: #1640D6;
-        text-decoration: none;
-    }
-
-    .quantity {
-        border-radius: 20px;
-        margin-left: 5px;
-        padding: 0 8px;
-        border: solid 2px lightblue;
-        background-color: transparent;
-    }
-
-    .quantity.selected {
-        background-color: lightblue;
-        border: solid 2px lightblue;
-        color: white;
-    }
-}
-
 
 
