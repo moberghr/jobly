@@ -1,7 +1,9 @@
 const Index = () => {
-  return (
-    <div>Jobs page</div>
-  )
-}
+	return (
+		<>
+			<div>Jobs page</div>
+		</>
+	);
+};
 
-export default Index
+export default Index;
