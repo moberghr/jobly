@@ -1,19 +1,20 @@
 import Item from "react-bootstrap/NavItem";
 import { Link } from "react-router-dom";
+import styles from "./style.module.scss";
 
-interface Props {
+interface INavItemProps {
     link: string
     label: string
     quantity: number
     isSelected?: boolean
 }
 
-const NavItem: React.FC<Props> = ({link, label, quantity, isSelected}) => {
+const NavItem: React.FC<INavItemProps> = ({link, label, quantity, isSelected}) => {
   return (
-    <Item className="px-3">
-        <div className="nav-item-container">
+    <Item className={styles["nav-item"]}>
+        <div className={styles["item-container"]}>
             <Link to={link}>{label.toLocaleUpperCase()}</Link>
-            <div className={`quantity ${isSelected && "selected"}`}>
+            <div className={`${styles.quantity} ${isSelected && styles.selected}`}>
                 {quantity.toString()}
             </div>
         </div>
