@@ -1,7 +1,9 @@
-const Batches = () => {
-  return (
-    <div>Batches page</div>
-  )
-}
+import { useLocation } from "react-router";
 
-export default Batches
+const Batches = () => {
+	const { pathname } = useLocation();
+
+	return <div>Current path: {pathname}</div>;
+};
+
+export default Batches;

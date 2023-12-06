@@ -1,7 +1,9 @@
-const Jobs = () => {
-  return (
-    <div>Jobs page</div>
-  )
-}
+import { useLocation } from "react-router";
 
-export default Jobs
+const Jobs = () => {
+	const { pathname } = useLocation();
+
+	return <div>Current path: {pathname}</div>;
+};
+
+export default Jobs;
