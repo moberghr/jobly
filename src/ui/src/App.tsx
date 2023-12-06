@@ -4,21 +4,19 @@ import Batches from "./pages/batches/index";
 import Jobs from "./pages/jobs/index";
 import ReccuringJobs from "./pages/recurring_jobs/index";
 import Navbar from "./components/navbar/Navbar";
-import { ReturnedJobs, getNavigationData } from "./api";
+import { ResponseJobs, getNavigationData } from "./api";
 import { useEffect, useState } from "react";
 
 const App: React.FC = () => {
-	const [navigationData, setNavigationData] = useState({} as ReturnedJobs);
+	const [navigationData, setNavigationData] = useState({} as ResponseJobs | undefined);
 
-	const setJobsData = async () => {
-		const data = await getNavigationData();
-		setNavigationData(data);
+	const getData = async () => {
+		const navData = await getNavigationData();
+		setNavigationData(navData);
 	};
 
-	console.log(navigationData);
-
 	useEffect(() => {
-		setJobsData();
+		getData();
 	}, []);
 	return (
 		<Router>
