@@ -5,12 +5,14 @@
     font-size: 14px;
     & > thead {
         border-bottom-width: 3px;
+        font-size: 16px;
     }
     & td:last-of-type,
     th:last-of-type {
         text-align: end;
-        display: flex;
-        justify-content: end;
+        & * {
+            margin-left: auto;
+        }
     }
 }
 

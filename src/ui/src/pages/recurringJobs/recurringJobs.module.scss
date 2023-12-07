@@ -1,4 +1,9 @@
-.actions-wrapper {
+.recuring-jobs {
+    margin: 20px 10vw;
+    width: calc(100% - 2 * 10vw);
+}
+
+.recuring-jobs__actions {
     display: flex;
     gap: 15px;
 }

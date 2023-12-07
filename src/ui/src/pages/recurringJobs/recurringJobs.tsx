@@ -37,9 +37,9 @@ const COLUMN_NAMES = {
 
 const RecurringJobs = () => {
     return (
-        <div className="content-container">
+        <div className={styles["recuring-jobs"]}>
             <JoblyTitle>Recurring Jobs</JoblyTitle>
-            <div className={styles["actions-wrapper"]}>
+            <div className={styles["recuring-jobs__actions"]}>
                 <Button variant="primary-blue" disabled>
                     Trigger now
                 </Button>
