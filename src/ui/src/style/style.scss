@@ -14,41 +14,6 @@ body,
     color: $black-100;
 }
 
-.navbar {
-    border-bottom: solid 8px $white-darker;
-}
-
-.navbar-brand {
-    font-weight: 700;
-    font-size: 1.6rem;
-    letter-spacing: 2px;
-    color: $orange;
-}
-
-.nav-item-container {
-    display: flex;
-    flex-direction: row;
-
-    a {
-        color: $blue-nav;
-        text-decoration: none;
-    }
-
-    .quantity {
-        border-radius: 20px;
-        margin-left: 5px;
-        padding: 0 8px;
-        border: solid 2px $blue-light;
-        background-color: transparent;
-    }
-
-    .quantity.selected {
-        background-color: $blue-light;
-        border: solid 2px $blue-light;
-        color: $white;
-    }
-}
-
 .content-container {
     margin: 20px 10vw;
 }

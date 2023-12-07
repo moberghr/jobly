@@ -1,0 +1,29 @@
+
+.nav-item {
+    padding-right: 20px;
+    
+    .item-container {
+        display: flex;
+        flex-direction: row;
+
+        a {
+            color: darkblue;
+            text-decoration: none;
+        }
+    
+        .quantity {
+            border-radius: 20px;
+            margin-left: 5px;
+            padding: 0 8px;
+            border: solid 1px orange;
+            background-color: transparent;
+            color: orange;
+        }
+    
+        .quantity.selected {
+            background-color: darkblue;
+            border: solid 2px darkblue;
+            color: white;
+        }
+    }
+}

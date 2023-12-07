@@ -1,7 +1,7 @@
-const Index = () => {
+const Batches = () => {
   return (
     <div>Batches page</div>
   )
 }
 
-export default Index
+export default Batches

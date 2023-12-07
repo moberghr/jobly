@@ -1,7 +1,7 @@
-const Index = () => {
+const Jobs = () => {
   return (
     <div>Jobs page</div>
   )
 }
 
-export default Index
+export default Jobs
