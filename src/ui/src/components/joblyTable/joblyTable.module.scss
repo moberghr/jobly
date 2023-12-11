@@ -1,0 +1,54 @@
+@import "../../style/variables.scss";
+
+.jobly-table {
+    margin-top: 30px;
+    font-size: 14px;
+    & > thead {
+        border-bottom-width: 3px;
+        font-size: 16px;
+    }
+    & td:last-of-type,
+    th:last-of-type {
+        text-align: end;
+        & * {
+            margin-left: auto;
+        }
+    }
+}
+
+.jobly-table__footer {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    flex-wrap: wrap;
+    gap: 20px;
+    font-size: small;
+
+    & p,
+    ul {
+        margin: 0;
+    }
+}
+
+.jobly-table__items-per-page {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.jobly-table__dropdown-menu {
+    & > div {
+        --bs-dropdown-min-width: 4rem !important;
+    }
+}
+
+.jobly-table__no-data {
+    margin: auto !important;
+    font-size: medium;
+    color: $grey-normal;
+}

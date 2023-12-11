@@ -1,0 +1,12 @@
+@import "../../style/variables.scss";
+
+.title {
+    font-weight: 400;
+}
+
+.title__line {
+    width: 100%;
+    background-color: $grey-light;
+    height: 1px;
+    margin-bottom: 30px;
+}
