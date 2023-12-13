@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Paths, { JobsAndBatchesRoutesByType } from "./utils/paths";
+import Paths from "./utils/paths";
+import JobWrapper from "./components/RouteWrapper/JobWrapper";
 
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
 const Batches = lazy(() => import("./pages/batches/Batches"));
@@ -21,15 +22,8 @@ const App: React.FC = () => {
                     <Route path={recurringJobs} element={<Suspense children={<ReccuringJobs />} />} />
                     <Route path={batches} element={<Suspense children={<Batches />} />} />
                     <Route path={jobs} element={<Suspense children={<Jobs />} />} />
-
-                    {JobsAndBatchesRoutesByType.map(obj => {
-                        if (obj.mainRoute === jobs) {
-                            return <Route path={obj.path} element={<Jobs />} />;
-                        } else if (obj.mainRoute === batches) {
-                            return <Route path={obj.path} element={<Batches />} />;
-                        }
-                    })}
                 </Routes>
+                <JobWrapper />
             </Layout>
         </Router>
     );

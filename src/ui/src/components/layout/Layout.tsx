@@ -4,18 +4,13 @@ import { useLocation } from "react-router-dom";
 import VerticalNavbar from "../verticalNavbar/VerticalNavbar";
 
 interface ILayout {
-	children: React.ReactNode;
+    children: React.ReactNode;
 }
 
 const Layout: React.FC<ILayout> = ({ children }) => {
-	const { pathname } = useLocation();
+    const { pathname } = useLocation();
 
-	return (
-		<div className={style.container}>
-			{pathname != "/" && pathname != "/recurring-jobs" && <VerticalNavbar path={pathname} />}
-			{children}
-		</div>
-	);
+    return <div className={style.container}>{children}</div>;
 };
 
 export default Layout;
