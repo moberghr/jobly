@@ -4,12 +4,7 @@ import { JobRouteSubpaths } from "../../utils/paths";
 const Jobs = () => {
     const { pathname } = useLocation();
 
-    return (
-        <>
-            <VerticalNavbar currentPath={pathname} subpaths={JobRouteSubpaths} />
-            <div>Current path: {pathname}</div>
-        </>
-    );
+    return <div>Current path: {pathname}</div>;
 };
 
 export default Jobs;
