@@ -6,6 +6,7 @@ import Dropdown from "react-bootstrap/Dropdown";
 import DropdownButton from "react-bootstrap/DropdownButton";
 import { ITEMS_PER_PAGE_OPTIONS, DEFAULT_ITEMS_PER_PAGE, DEFAULT_PAGE } from "../../utils/constants";
 import styles from "./joblyTable.module.scss";
+import Form from "react-bootstrap/Form";
 
 interface IJoblyTableProps {
     data: {
@@ -20,9 +21,11 @@ interface IJoblyTableProps {
     specialColumnComponents?: {
         [key: string]: (props: any) => JSX.Element;
     };
+    selectable?: boolean;
+    onSelectRows?: (selectedRows: (number | string)[]) => void;
 }
 
-const JoblyTable = ({ data, columnNames, specialColumnComponents }: IJoblyTableProps) => {
+const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, onSelectRows }: IJoblyTableProps) => {
     let [searchParams, setSearchParams] = useSearchParams();
     const [pagination, setPagination] = useState({
         itemsPerPage: DEFAULT_ITEMS_PER_PAGE,
@@ -30,6 +33,10 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents }: IJoblyTableP
     });
 
     const maxPage = Math.ceil(data.totalCount / pagination.itemsPerPage);
+
+    const [selectededIds, setSelectedIds] = useState([] as (string | number)[]);
+
+    const [selectededAllRows, setSelectededAllRows] = useState(false);
 
     const handlePaginationChange = (page: number) => {
         setPagination(prev => ({ ...prev, currentPage: page }));
@@ -47,6 +54,24 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents }: IJoblyTableP
         });
     };
 
+    const handleSelectedAllRowsChange = () => {
+        if (!selectededAllRows) {
+            setSelectedIds(data.data.map(item => item.id));
+        } else {
+            setSelectedIds([]);
+        }
+        setSelectededAllRows(prev => {
+            return !prev;
+        });
+    };
+
+    const handleRowSelectedChange = (id: string | number) => {
+        setSelectedIds(prev => {
+            if (prev.includes(id)) return prev.filter(item => item !== id);
+            else return [...prev, id];
+        });
+    };
+
     useEffect(() => {
         setSearchParams(params => {
             if (!params.get("page")) params.set("page", DEFAULT_PAGE.toString());
@@ -61,11 +86,24 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents }: IJoblyTableP
         });
     }, []);
 
+    useEffect(() => {
+        if (onSelectRows) onSelectRows(selectededIds);
+    }, [selectededIds]);
+
     return (
         <>
             <TableComponent hover responsive className={styles["jobly-table"]}>
                 <thead>
                     <tr>
+                        {selectable && (
+                            <th key="select-action">
+                                <Form.Check
+                                    aria-label="select or deselect all rows"
+                                    onChange={handleSelectedAllRowsChange}
+                                    checked={selectededAllRows}
+                                />
+                            </th>
+                        )}
                         {Object.values(columnNames).map(name => (
                             <th key={name}>{name}</th>
                         ))}
@@ -81,6 +119,15 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents }: IJoblyTableP
                                         : index
                                 }
                             >
+                                {selectable && (
+                                    <td key="select-row-action">
+                                        <Form.Check
+                                            aria-label="select or deselect row"
+                                            checked={selectededIds.includes(row.id)}
+                                            onChange={() => handleRowSelectedChange(row.id)}
+                                        />
+                                    </td>
+                                )}
                                 {Object.keys(columnNames).map(name => {
                                     if (specialColumnComponents && specialColumnComponents[name]) {
                                         const SpecialComponent = specialColumnComponents[name];
