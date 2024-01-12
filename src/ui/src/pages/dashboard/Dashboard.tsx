@@ -1,5 +1,4 @@
 import styles from "./style.module.scss";
-import { Line } from "react-chartjs-2";
 import {
     ChartData,
     ChartOptions,
@@ -15,104 +14,127 @@ import {
     Filler,
     Tooltip,
 } from "chart.js";
-import { RealTimeScale, StreamingPlugin } from "chartjs-plugin-streaming";
+import { StreamingPlugin, RealTimeScale } from "chartjs-plugin-streaming";
 import "chartjs-adapter-luxon";
-import { useRef } from "react";
-
-Chart.register(
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    StreamingPlugin,
-    RealTimeScale,
-    LineController,
-    Filler,
-    Tooltip
-);
+import { ForwardedRef, forwardRef, useEffect, useRef, useState } from "react";
 
 interface ILine {
     data?: ChartData<"line">;
     options?: ChartOptions<"line">;
 }
 
-const data: ChartData<"line"> = {
-    datasets: [
-        {
-            data: [],
-            label: "Dataset 1",
-            fill: true,
-            borderColor: "grey",
-            backgroundColor: "rgba(48, 244, 115, 0.7)",
-        },
-    ],
-};
-
-const onRefresh = (
-    chart: Chart<keyof ChartTypeRegistry, (number | Point | [number, number] | BubbleDataPoint | null)[], unknown>
-) => {
-    chart.data.datasets.map(set => {
-        set.data.push({
-            x: Date.now(),
-            y: Math.floor(Math.random() * 10),
-        });
-    });
-};
-
-const options: ChartOptions<"line"> = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {},
-    scales: {
-        x: {
-            type: "realtime",
-            realtime: {
-                duration: 20000,
-                refresh: 1000,
-                delay: 1000,
-                onRefresh,
-            },
-        },
-    },
-};
-
-const labels = ["1", "2", "3", "4", "5", "6"];
-
-const data2: ChartData<"line"> = {
-    labels,
-    datasets: [
-        {
-            data: [
-                { x: 2, y: 3 },
-                { x: 6, y: 6 },
-                { x: 2, y: 3 },
-                { x: 6, y: 6 },
-                { x: 0, y: 0 },
-            ],
-            label: "Dataset 1",
-            fill: true,
-            tension: 0.2,
-        },
-    ],
-};
-
-const options2: ChartOptions<"line"> = {
-    responsive: true,
-    plugins: {},
-};
+const Canvas = forwardRef((props, ref: ForwardedRef<HTMLCanvasElement>) => {
+    return <canvas id="realtimeGraph" ref={ref}></canvas>;
+});
 
 const Dashboard: React.FC<ILine> = () => {
-    const ref = useRef();
+    // const pauseRef = useRef<HTMLButtonElement>(null);
+    const isPaused = useRef<boolean>(false);
+    const ref = useRef<HTMLCanvasElement>(null);
+    const chartRef = useRef<any>(null);
+
+    const togglePause = () => {
+        console.log("Pause toggled: ", isPaused.current);
+        isPaused.current = !isPaused.current;
+    };
+
+    const onRefresh = (
+        chart: Chart<keyof ChartTypeRegistry, (number | Point | [number, number] | BubbleDataPoint | null)[], unknown>
+    ) => {
+        if (!isPaused.current) {
+            chart.update("active");
+            chartRef.current.options.plugins.streaming.pause = false;
+            console.log("Uso u false isPaused");
+            chart.data.datasets.map(set => {
+                set.data.push({
+                    x: Date.now(),
+                    y: Math.floor(Math.random() * 10),
+                });
+            });
+        }
+        if (isPaused.current) {
+            chartRef.current.options.plugins.streaming.pause = true;
+            console.log("Uso u TRUE isPaused");
+            chart.update("none");
+        }
+    };
+
+    useEffect(() => {
+        const ctx = ref.current;
+
+        const options: ChartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    type: "realtime",
+                    realtime: {
+                        duration: 10000,
+                        delay: 5000,
+                        onRefresh,
+                    },
+                },
+            },
+        };
+
+        const data = {
+            labels: [],
+            datasets: [
+                {
+                    label: "# of Votes",
+                    data: [],
+                    borderWidth: 1,
+                    borderColor: "red",
+                    backgroundColor: "whitesmoke",
+                    fill: true,
+                },
+            ],
+        };
+
+        if (ctx) {
+            Chart.register(
+                LinearScale,
+                CategoryScale,
+                LineController,
+                LineElement,
+                PointElement,
+                RealTimeScale,
+                StreamingPlugin,
+                Filler,
+                Tooltip
+            );
+            const chart = new Chart(ctx, {
+                type: "line",
+                data,
+                options,
+            });
+
+            chartRef.current = chart;
+
+            return () => {
+                console.log("Return inside useEffect !");
+                console.log("Chart: ", chart);
+
+                chart.destroy(); // removes chart
+                ref.current?.remove(); // removes canvas
+            };
+        }
+    }, []);
 
     return (
         <div className={styles.container}>
             <div className={styles["graph-container"]}>
-                <div>Realtime graph</div>
-                <Line options={options} data={data} ref={ref} className={styles.graph} />
-            </div>
-            <div className={styles["graph-container"]}>
-                <div>History graph</div>
-                <Line options={options2} data={data2} />
+                <div className={styles["header-container"]}>
+                    <div>Realtime graph</div>
+                    <button type="button" onClick={togglePause}>
+                        Play/Pause
+                    </button>
+                    <div className={styles["status-container"]}>
+                        <div>{isPaused.current ? "PAUSED" : "STREAMING"}</div>
+                        <div className={styles["dot"]}></div>
+                    </div>
+                </div>
+                <Canvas ref={ref} />
             </div>
         </div>
     );

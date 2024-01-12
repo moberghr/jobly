@@ -15,4 +15,30 @@
             width: 100% !important;
         }
     }
+
+    .header-container {
+        display: flex;
+        flex-direction: row;
+        gap: 20px;
+        background-color: red;
+
+        .status-container {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 5px;
+            background-color: orange;
+
+            .dot {
+                width: 15px;
+                height: 15px;
+                border-radius: 50%;
+                background-color: green;
+
+                .paused {
+                    background-color: red;
+                }
+            }
+        }
+    }
 }
