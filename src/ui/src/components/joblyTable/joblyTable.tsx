@@ -154,7 +154,9 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, on
             <div className={styles["jobly-table__footer"]}>
                 {data.data.length > 0 && (
                     <>
-                        <p>Selected 0 of {data.totalCount}</p>
+                        <p>
+                            Selected {selectededIds.length} of {data.totalCount}
+                        </p>
                         <div className={styles["jobly-table__items-per-page"]}>
                             <p>Items per page </p>
                             <DropdownButton
