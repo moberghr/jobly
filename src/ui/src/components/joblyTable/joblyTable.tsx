@@ -36,8 +36,6 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, on
 
     const [selectededIds, setSelectedIds] = useState([] as (string | number)[]);
 
-    const [selectededAllRows, setSelectededAllRows] = useState(false);
-
     const handlePaginationChange = (page: number) => {
         setPagination(prev => ({ ...prev, currentPage: page }));
         setSearchParams(params => {
@@ -55,21 +53,15 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, on
     };
 
     const handleSelectedAllRowsChange = () => {
-        if (!selectededAllRows) {
+        if (selectededIds.length !== data.data.length) {
             setSelectedIds(data.data.map(item => item.id));
         } else {
             setSelectedIds([]);
         }
-        setSelectededAllRows(prev => {
-            return !prev;
-        });
     };
 
     const handleRowSelectedChange = (id: string | number) => {
-        setSelectedIds(prev => {
-            if (prev.includes(id)) return prev.filter(item => item !== id);
-            else return [...prev, id];
-        });
+        setSelectedIds(prev => (prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]));
     };
 
     useEffect(() => {
@@ -100,7 +92,7 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, on
                                 <Form.Check
                                     aria-label="select or deselect all rows"
                                     onChange={handleSelectedAllRowsChange}
-                                    checked={selectededAllRows}
+                                    checked={selectededIds.length === data.data.length}
                                 />
                             </th>
                         )}
