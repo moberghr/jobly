@@ -1,21 +1,16 @@
-import React from 'react'
-import style from "./style.module.scss"
-import { useLocation } from 'react-router-dom'
-import VerticalNavbar from '../verticalNavbar/VerticalNavbar'
+import React from "react";
+import style from "./style.module.scss";
+import { useLocation } from "react-router-dom";
+import VerticalNavbar from "../verticalNavbar/VerticalNavbar";
 
-interface Props {
-    children: React.ReactNode
+interface ILayout {
+    children: React.ReactNode;
 }
 
-const Layout: React.FC<Props> = ({children}) => {
-    const {pathname} = useLocation();
-    
-  return (
-    <div className={style.container}>
-        {pathname != "/" && pathname != "/recurring-jobs" && <VerticalNavbar />}
-        {children}
-    </div>
-  )
-}
+const Layout: React.FC<ILayout> = ({ children }) => {
+    const { pathname } = useLocation();
 
-export default Layout
+    return <div className={style.container}>{children}</div>;
+};
+
+export default Layout;

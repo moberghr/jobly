@@ -1,7 +1,10 @@
+import { useLocation } from "react-router";
+import VerticalNavbar from "../../components/verticalNavbar/VerticalNavbar";
+import { JobRouteSubpaths } from "../../utils/paths";
 const Jobs = () => {
-  return (
-    <div>Jobs page</div>
-  )
-}
+    const { pathname } = useLocation();
 
-export default Jobs
+    return <div>Current path: {pathname}</div>;
+};
+
+export default Jobs;
