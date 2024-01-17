@@ -3,18 +3,19 @@ import JoblyAccentText from "../../components/joblyAccentText/joblyAccentText";
 import JoblyInfo from "../../components/joblyInfo/joblyInfo";
 import JoblyTable from "../../components/joblyTable/joblyTable";
 import JoblyTitle from "../../components/joblyTitle/joblyTitle";
+import JoblyDetailsLink from "../../components/joblyDetailsLink/joblyDetailsLink";
 import { FaRotateRight, FaX } from "react-icons/fa6";
 import styles from "./jobs.module.scss";
 
 const DUMMY_DATA = {
     data: [
         {
-            id: "ff12345",
+            id: { value: "ff12345", pathId: "ff12345" },
             failed: "a minute ago",
             job: "IEmailService.SendCampaignEmail",
         },
         {
-            id: "ffabcd123",
+            id: { value: "ffabcd123", pathId: "ffabcd123" },
             failed: "a minute ago",
             job: "IEmailService.SendCampaignEmail",
         },
@@ -48,7 +49,11 @@ const FailedJobs = () => {
                     Delete selected
                 </Button>
             </div>
-            <JoblyTable data={DUMMY_DATA} columnNames={COLUMN_NAMES} specialColumnComponents={{}} />
+            <JoblyTable
+                data={DUMMY_DATA}
+                columnNames={COLUMN_NAMES}
+                specialColumnComponents={{ id: JoblyDetailsLink }}
+            />
         </>
     );
 };

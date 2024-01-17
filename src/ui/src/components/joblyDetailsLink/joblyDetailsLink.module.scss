@@ -1,0 +1,9 @@
+@import "../../style/variables.scss";
+
+.details-link {
+    color: $blue-button;
+    text-decoration: none;
+    &:hover {
+        color: $blue-button-hover;
+    }
+}
