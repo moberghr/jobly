@@ -1,0 +1,44 @@
+@import "../../style/variables.scss";
+
+.history-status {
+    background-color: $grey-light-2;
+    border-radius: 4px;
+}
+
+.history-status__title {
+    display: grid;
+    grid-template-columns: 2fr 12fr 1fr;
+    gap: 20px;
+    padding: 5px 15px;
+    border-radius: 4px 4px 0 0;
+    * {
+        margin: 0;
+    }
+
+    &--scheduled {
+        background-color: $blue-mid-light;
+        color: $white;
+    }
+
+    &--failed {
+        background-color: $red-light;
+        color: $grey-normal;
+    }
+
+    &--succeeded {
+        background-color: $green-light;
+        color: $white;
+    }
+}
+
+.history-status__content {
+    padding: 15px;
+}
+
+.history-status__status {
+    text-transform: capitalize;
+}
+
+.history-status__time {
+    justify-self: end;
+}

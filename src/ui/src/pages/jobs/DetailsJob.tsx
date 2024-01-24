@@ -2,6 +2,7 @@ import { useSearchParams } from "react-router-dom";
 import Button from "react-bootstrap/Button";
 import JoblyTitle from "../../components/joblyTitle/joblyTitle";
 import styles from "./jobs.module.scss";
+import JoblyJobHistoryStatus from "../../components/joblyJobHistoryStatus/joblyJobHistoryStatus";
 
 const DUMMY_DATA = {
     name: "IEmailService.SendCampaignEmail",
@@ -12,6 +13,27 @@ const DUMMY_DATA = {
     currentCulture: "ru-RU",
     currentUICulture: "en-US",
 };
+
+const DUMMY_HISTORY = [
+    {
+        status: "scheduled" as "scheduled" | "failed" | "succeeded",
+        description: "Retry attempt 1 of 10: Syntax error, command unrecognized.",
+        time: "+<1ms",
+        content: "Enqueue at: in a few seconds",
+    },
+    {
+        status: "failed" as "scheduled" | "failed" | "succeeded",
+        description: "Retry attempt 1 of 10: Syntax error, command unrecognized.",
+        time: "+<1ms",
+        content: "Enqueue at: in a few seconds",
+    },
+    {
+        status: "succeeded" as "scheduled" | "failed" | "succeeded",
+        description: "Retry attempt 1 of 10: Syntax error, command unrecognized.",
+        time: "+<1ms",
+        content: "Enqueue at: in a few seconds",
+    },
+];
 
 const DetailsJob = () => {
     let [searchParams, setSearchParams] = useSearchParams();
@@ -47,10 +69,11 @@ const DetailsJob = () => {
                 </div>
             </div>
             <h4>History</h4>
-            <ul>
-                <li>Scheduled card</li>
-                <li>Failed card</li>
-            </ul>
+            <div className={styles["details__history"]}>
+                {DUMMY_HISTORY.map((history, index) => (
+                    <JoblyJobHistoryStatus key={index} {...history} />
+                ))}
+            </div>
         </>
     );
 };
