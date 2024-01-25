@@ -1,84 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@200;400;500;600;700&display=swap');
-@import '~bootstrap/scss/bootstrap';
-
-$black-100: #1a1a1a;
-$blue-button: #4a62b8;
-$blue-button-hover: #5e7adf;
-$blue-accent: rgb(4, 118, 248);
-$yellow-primary: #f3e28c;
-$green-primary: rgb(60, 163, 0);
-$red-primary: #d13737;
-$light-grey: #dee6ff;
+@import url("https://fonts.googleapis.com/css2?family=Kanit:wght@200;400;500;600;700&display=swap");
+@import "~bootstrap/scss/bootstrap";
+@import "./variables.scss";
+@import "./bootstrap.scss";
 
 * {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 html,
 body,
 #root {
-  font-family: 'Kanit', sans-serif;
-  color: $black-100;
-}
-
-.navbar {
-  border-bottom: solid 8px whitesmoke;
-}
-
-.navbar-brand {
-  font-weight: 700;
-  font-size: 1.6rem;
-  letter-spacing: 2px;
-  color: #ff6c22;
-}
-
-.nav-item-container {
-  display: flex;
-  flex-direction: row;
-
-  a {
-    color: #1640d6;
-    text-decoration: none;
-  }
-
-  .quantity {
-    border-radius: 20px;
-    margin-left: 5px;
-    padding: 0 8px;
-    border: solid 2px lightblue;
-    background-color: transparent;
-  }
-
-  .quantity.selected {
-    background-color: lightblue;
-    border: solid 2px lightblue;
-    color: white;
-  }
-}
-
-.content-container {
-  margin: 20px 10vw;
-}
-
-//button variants
-.btn-primary-blue {
-  background-color: $blue-button;
-  color: white;
-  &:hover {
-    background-color: $blue-button-hover;
-    color: white;
-  }
-}
-
-.btn-outline-dark {
-  &:hover {
-    background-color: $light-grey;
-    color: unset;
-  }
-}
-//button variants end
-
-.actions-wrapper {
-  display: flex;
-  gap: 15px;
+    font-family: "Kanit", sans-serif;
+    color: $black-100;
 }
