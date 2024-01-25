@@ -110,7 +110,7 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, on
                                         ? row.id
                                         : index
                                 }
-                                onClick={() => handleRowSelectedChange(row.id)}
+                                onClick={() => selectable && handleRowSelectedChange(row.id)}
                             >
                                 {selectable && (
                                     <td key="select-row-action">
