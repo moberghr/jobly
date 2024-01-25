@@ -23,15 +23,15 @@ const DUMMY_HISTORY = [
     },
     {
         status: "failed" as "scheduled" | "failed" | "succeeded",
-        description: "Retry attempt 1 of 10: Syntax error, command unrecognized.",
+        description: "Description...",
         time: "+<1ms",
-        content: "Enqueue at: in a few seconds",
+        content: "Some content...",
     },
     {
         status: "succeeded" as "scheduled" | "failed" | "succeeded",
-        description: "Retry attempt 1 of 10: Syntax error, command unrecognized.",
+        description: "Description...",
         time: "+<1ms",
-        content: "Enqueue at: in a few seconds",
+        content: "Some content...",
     },
 ];
 

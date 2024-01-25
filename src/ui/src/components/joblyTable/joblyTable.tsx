@@ -18,7 +18,7 @@ interface IJoblyTableProps {
         [key: string]: string;
     };
     specialColumnComponents?: {
-        [key: string]: (props: any) => JSX.Element;
+        [key: string]: { component: (props: any) => JSX.Element; props?: { [key: string]: any } };
     };
 }
 
@@ -83,17 +83,22 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents }: IJoblyTableP
                             >
                                 {Object.keys(columnNames).map(name => {
                                     if (specialColumnComponents && specialColumnComponents[name]) {
-                                        const SpecialComponent = specialColumnComponents[name];
+                                        const SpecialComponent = specialColumnComponents[name].component;
                                         if (typeof row[name] === "object")
                                             return (
                                                 <td key={row[name].value}>
-                                                    <SpecialComponent {...row[name]} />
+                                                    <SpecialComponent
+                                                        {...row[name]}
+                                                        {...specialColumnComponents[name].props}
+                                                    />
                                                 </td>
                                             );
                                         else
                                             return (
                                                 <td key={row[name]}>
-                                                    <SpecialComponent>{row[name]}</SpecialComponent>
+                                                    <SpecialComponent {...specialColumnComponents[name].props}>
+                                                        {row[name]}
+                                                    </SpecialComponent>
                                                 </td>
                                             );
                                     } else return <td key={row[name]}>{row[name]}</td>;

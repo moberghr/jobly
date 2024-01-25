@@ -4,11 +4,17 @@ import styles from "./joblyDetailsLink.module.scss";
 interface IJoblyDetailsLink {
     value: string | number;
     pathId: string;
+    type: "primary" | "secondary";
 }
 
-function JoblyDetailsLink({ value, pathId }: IJoblyDetailsLink) {
+function JoblyDetailsLink({ value, pathId, type }: IJoblyDetailsLink) {
     return (
-        <Link to={"/jobs/details?id=" + pathId} className={styles["details-link"]}>
+        <Link
+            to={"/jobs/details?id=" + pathId}
+            className={`
+                ${styles["details-link"]}
+                ${styles["details-link--" + type]}`}
+        >
             {value}
         </Link>
     );

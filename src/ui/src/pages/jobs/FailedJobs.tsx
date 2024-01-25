@@ -12,12 +12,12 @@ const DUMMY_DATA = {
         {
             id: { value: "ff12345", pathId: "ff12345" },
             failed: "a minute ago",
-            job: "IEmailService.SendCampaignEmail",
+            job: { value: "IEmailService.SendCampaignEmail", pathId: "ff12345" },
         },
         {
             id: { value: "ffabcd123", pathId: "ffabcd123" },
             failed: "a minute ago",
-            job: "IEmailService.SendCampaignEmail",
+            job: { value: "IEmailService.SendCampaignEmail", pathId: "ffabcd123" },
         },
     ],
     totalCount: 2,
@@ -52,7 +52,10 @@ const FailedJobs = () => {
             <JoblyTable
                 data={DUMMY_DATA}
                 columnNames={COLUMN_NAMES}
-                specialColumnComponents={{ id: JoblyDetailsLink }}
+                specialColumnComponents={{
+                    id: { component: JoblyDetailsLink, props: { type: "primary" } },
+                    job: { component: JoblyDetailsLink, props: { type: "secondary" } },
+                }}
             />
         </>
     );

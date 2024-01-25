@@ -51,7 +51,7 @@ const RecurringJobs = () => {
             <JoblyTable
                 data={DUMMY_DATA}
                 columnNames={COLUMN_NAMES}
-                specialColumnComponents={{ lastExecution: JoblyStatusText }}
+                specialColumnComponents={{ lastExecution: { component: JoblyStatusText } }}
             />
         </div>
     );
