@@ -24,13 +24,13 @@ const App: React.FC = () => {
                     <Route path={recurringJobs} element={<Suspense children={<ReccuringJobs />} />} />
                     <Route path={jobs} element={<Suspense children={<JobWrapper />} />}>
                         {JobRouteSubpaths.map(obj => (
-                            <Route element={<Jobs />} path={`${jobs}${obj.path}`} />
+                            <Route key={obj.path} element={<Jobs />} path={`${jobs}${obj.path}`} />
                         ))}
                         <Route element={<Jobs />} path={`${jobs}/details`} />
                     </Route>
                     <Route path={batches} element={<Suspense children={<BatchesWrapper />} />}>
                         {BatchesRouteSubpaths.map(obj => (
-                            <Route element={<Batches />} path={`${batches}${obj.path}`} />
+                            <Route key={obj.path} element={<Batches />} path={`${batches}${obj.path}`} />
                         ))}
                     </Route>
                 </Routes>

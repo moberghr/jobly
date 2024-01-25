@@ -14,6 +14,7 @@ function JoblyDetailsLink({ value, pathId, type }: IJoblyDetailsLink) {
             className={`
                 ${styles["details-link"]}
                 ${styles["details-link--" + type]}`}
+            onClick={e => e.stopPropagation()}
         >
             {value}
         </Link>
