@@ -10,8 +10,6 @@ const DUMMY_DATA = {
     code: "using Hangfire.ConsoleSample; ...",
     created: "Created a few seconds ago",
     retryCount: 1,
-    currentCulture: "ru-RU",
-    currentUICulture: "en-US",
 };
 
 const DUMMY_HISTORY = [
@@ -62,10 +60,6 @@ const DetailsJob = () => {
                 <div className={styles["details__code-info__info"]}>
                     <div>RetryCount</div>
                     <div>{DUMMY_DATA.retryCount}</div>
-                    <div>CurrentCulture</div>
-                    <div>{DUMMY_DATA.currentCulture}</div>
-                    <div>CurrentUICulture</div>
-                    <div>{DUMMY_DATA.currentUICulture}</div>
                 </div>
             </div>
             <h4>History</h4>
