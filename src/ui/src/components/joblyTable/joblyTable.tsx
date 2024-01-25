@@ -110,6 +110,7 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, on
                                         ? row.id
                                         : index
                                 }
+                                onClick={() => handleRowSelectedChange(row.id)}
                             >
                                 {selectable && (
                                     <td key="select-row-action">
@@ -117,6 +118,9 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, on
                                             aria-label="select or deselect row"
                                             checked={selectededIds.includes(row.id)}
                                             onChange={() => handleRowSelectedChange(row.id)}
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                            }}
                                         />
                                     </td>
                                 )}
