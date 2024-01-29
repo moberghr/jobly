@@ -23,6 +23,11 @@ interface ILine {
     options?: ChartOptions<"line">;
 }
 
+interface IJoblyObj {
+    time: string;
+    quantity: number;
+}
+
 const Canvas = forwardRef((props, ref: ForwardedRef<HTMLCanvasElement>) => {
     return <canvas id="realtimeGraph" ref={ref}></canvas>;
 });
@@ -38,19 +43,46 @@ const Dashboard: React.FC<ILine> = () => {
         isPaused.current = !isPaused.current;
     };
 
+    const getData = async (): Promise<IJoblyObj> => {
+        const res = await fetch("http://localhost:6090/jobs");
+        const data = await res.json();
+
+        return data as IJoblyObj;
+    };
+
     const onRefresh = (
         chart: Chart<keyof ChartTypeRegistry, (number | Point | [number, number] | BubbleDataPoint | null)[], unknown>
     ) => {
         if (!isPaused.current) {
             chart.update("active");
             chartRef.current.options.plugins.streaming.pause = false;
-            console.log("Uso u false isPaused");
-            chart.data.datasets.map(set => {
-                set.data.push({
-                    x: Date.now(),
-                    y: Math.floor(Math.random() * 10),
+
+            const data: IJoblyObj = {} as IJoblyObj;
+
+            getData()
+                .then(val => {
+                    data.quantity = val.quantity;
+                    data.time = val.time;
+                })
+                .then(() => {
+                    const date = new Date(data.time);
+                    console.log("Date: ", date);
+                    const utc = Date.UTC(
+                        date.getUTCFullYear(),
+                        date.getUTCMonth(),
+                        date.getUTCDate(),
+                        date.getUTCHours(),
+                        date.getUTCMinutes(),
+                        date.getUTCSeconds()
+                    );
+
+                    chart.data.datasets.map(set => {
+                        set.data.push({
+                            x: utc,
+                            y: data.quantity,
+                        });
+                    });
                 });
-            });
         }
         if (isPaused.current) {
             chartRef.current.options.plugins.streaming.pause = true;
@@ -71,6 +103,7 @@ const Dashboard: React.FC<ILine> = () => {
                     realtime: {
                         duration: 10000,
                         delay: 5000,
+                        refresh: 4000,
                         onRefresh,
                     },
                 },
