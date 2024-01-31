@@ -1,4 +1,4 @@
-import { useSearchParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import Button from "react-bootstrap/Button";
 import JoblyTitle from "../../components/joblyTitle/joblyTitle";
 import styles from "./jobs.module.scss";
@@ -34,9 +34,8 @@ const DUMMY_HISTORY = [
 ];
 
 const DetailsJob = () => {
-    let [searchParams, setSearchParams] = useSearchParams();
-
-    //here we need to fetch data for details of job with id searchParams.get("id")
+    let { id } = useParams();
+    // use this id to fetch correct data
 
     return (
         <>

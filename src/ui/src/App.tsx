@@ -11,6 +11,7 @@ const Jobs = lazy(() => import("./pages/jobs/Jobs"));
 const ReccuringJobs = lazy(() => import("./pages/recurringJobs/recurringJobs"));
 const Navbar = lazy(() => import("./components/navbar/Navbar"));
 const Layout = lazy(() => import("./components/layout/Layout"));
+const DetailsJob = lazy(() => import("./pages/jobs/DetailsJob"));
 
 const App: React.FC = () => {
     const { dashboard, jobs, recurringJobs, batches } = Paths;
@@ -23,10 +24,11 @@ const App: React.FC = () => {
                     <Route path={dashboard} element={<Suspense children={<Dashboard />} />} />
                     <Route path={recurringJobs} element={<Suspense children={<ReccuringJobs />} />} />
                     <Route path={jobs} element={<Suspense children={<JobWrapper />} />}>
-                        {JobRouteSubpaths.map(obj => (
-                            <Route key={obj.path} element={<Jobs />} path={`${jobs}${obj.path}`} />
-                        ))}
-                        <Route element={<Jobs />} path={`${jobs}/details`} />
+                        {JobRouteSubpaths.map(obj => {
+                            const Component = obj.component ? obj.component : Jobs;
+                            return <Route key={obj.path} element={<Component />} path={`${jobs}${obj.path}`} />;
+                        })}
+                        <Route element={<DetailsJob />} path={`/jobs/details/:id`} />
                     </Route>
                     <Route path={batches} element={<Suspense children={<BatchesWrapper />} />}>
                         {BatchesRouteSubpaths.map(obj => (

@@ -10,7 +10,7 @@ interface IJoblyDetailsLink {
 function JoblyDetailsLink({ value, pathId, type }: IJoblyDetailsLink) {
     return (
         <Link
-            to={"/jobs/details?id=" + pathId}
+            to={"/jobs/details/" + pathId}
             className={`
                 ${styles["details-link"]}
                 ${styles["details-link--" + type]}`}
