@@ -28,7 +28,7 @@ const App: React.FC = () => {
                             const Component = obj.component ? obj.component : Jobs;
                             return <Route key={obj.path} element={<Component />} path={`${jobs}${obj.path}`} />;
                         })}
-                        <Route element={<DetailsJob />} path={`${jobs}/details/:id`} />
+                        <Route element={<DetailsJob />} path={`/jobs/details/:id`} />
                     </Route>
                     <Route path={batches} element={<Suspense children={<BatchesWrapper />} />}>
                         {BatchesRouteSubpaths.map(obj => (
