@@ -3,35 +3,35 @@ import Button from "react-bootstrap/Button";
 import JoblyTitle from "../../components/joblyTitle/joblyTitle";
 import styles from "./jobs.module.scss";
 import JoblyJobHistoryStatus from "../../components/joblyJobHistoryStatus/joblyJobHistoryStatus";
+import { IGetJobDetailsRes } from "../../models/JobDetails";
 
-const DUMMY_DATA = {
+const DUMMY_DATA: IGetJobDetailsRes = {
     name: "IEmailService.SendCampaignEmail",
     id: "238769-3287zri-uhfkaj-sdoq374",
     code: "using Hangfire.ConsoleSample; ...",
     created: "Created a few seconds ago",
     retryCount: 1,
+    history: [
+        {
+            status: "scheduled",
+            description: "Retry attempt 1 of 10: Syntax error, command unrecognized.",
+            time: "+<1ms",
+            content: "Enqueue at: in a few seconds",
+        },
+        {
+            status: "failed",
+            description: "Description...",
+            time: "+<1ms",
+            content: "Some content...",
+        },
+        {
+            status: "succeeded",
+            description: "Description...",
+            time: "+<1ms",
+            content: "Some content...",
+        },
+    ],
 };
-
-const DUMMY_HISTORY = [
-    {
-        status: "scheduled" as "scheduled" | "failed" | "succeeded",
-        description: "Retry attempt 1 of 10: Syntax error, command unrecognized.",
-        time: "+<1ms",
-        content: "Enqueue at: in a few seconds",
-    },
-    {
-        status: "failed" as "scheduled" | "failed" | "succeeded",
-        description: "Description...",
-        time: "+<1ms",
-        content: "Some content...",
-    },
-    {
-        status: "succeeded" as "scheduled" | "failed" | "succeeded",
-        description: "Description...",
-        time: "+<1ms",
-        content: "Some content...",
-    },
-];
 
 const DetailsJob = () => {
     let { id } = useParams();
@@ -63,7 +63,7 @@ const DetailsJob = () => {
             </div>
             <h4>History</h4>
             <div className={styles["details__history"]}>
-                {DUMMY_HISTORY.map((history, index) => (
+                {DUMMY_DATA.history.map((history, index) => (
                     <JoblyJobHistoryStatus key={index} {...history} />
                 ))}
             </div>
