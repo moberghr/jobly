@@ -1,10 +1,11 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Paths, { BatchesRouteSubpaths } from "./utils/paths";
 import JobWrapper from "./pages/jobs/JobWrapper";
 import BatchesWrapper from "./pages/batches/BatchesWrapper";
 import { JobRouteSubpaths } from "./utils/paths";
-import { getNavigationData, ResponseJobs } from "./api";
+import { deleteJob, getJobDetails, getNavigationData, ResponseJobs } from "./api";
+import CallEveryIntervall from "./hooks/callEveryInterval";
 
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
 const Batches = lazy(() => import("./pages/batches/Batches"));
@@ -15,13 +16,6 @@ const Layout = lazy(() => import("./components/layout/Layout"));
 
 const App: React.FC = () => {
     const { dashboard, jobs, recurringJobs, batches } = Paths;
-
-    const [navigationData, setNavigationData] = useState({} as ResponseJobs | undefined);
-
-    const getData = async () => {
-        const navData = await getNavigationData();
-        setNavigationData(navData);
-    };
 
     return (
         <Router>
