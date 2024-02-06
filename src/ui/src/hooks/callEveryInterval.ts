@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
-function CallEveryIntervall(fetchFunction: Promise<any>, intervall?: number) {
+function CallEveryIntervall(fetchFunction: Promise<any>, intervall: number) {
     const [state, setState] = useState({ data: null, error: false, loading: true });
 
     useEffect(() => {
