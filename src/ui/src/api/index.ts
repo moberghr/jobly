@@ -1,4 +1,5 @@
 import axios from "axios";
+import toast from "react-hot-toast";
 const API_URL_Mock = "https://3ed2154c-0443-4a3a-8e18-2575262f4d21.mock.pstmn.io";
 
 enum JobType {
@@ -43,22 +44,31 @@ export interface ResponseRecurringJobTableData {
 }
 
 export async function getNavigationData(): Promise<ResponseJobs | undefined> {
-    const data = await axios.get(`${API_URL_Mock}/navigationdata`).then(res => res.data);
+    const data = await axios
+        .get(`${API_URL_Mock}/navigationdata`)
+        .then(res => res.data)
+        .catch(error => toast.error(error));
     return data as ResponseJobs;
 }
 
 export async function getRecurringJobTableData(page: number, pageSize: number): Promise<ResponseRecurringJobTableData> {
-    const data = await axios.get(`${API_URL_Mock}/tableData`).then(res => res.data);
+    const data = await axios
+        .get(`${API_URL_Mock}/tableData?page=${page}&pageSize=${pageSize}`)
+        .then(res => res.data)
+        .catch(error => toast.error(error));
     return { data: data, totalCount: data.length } as ResponseRecurringJobTableData;
 }
 
 export async function getJobDetails(id: string): Promise<any> {
-    const data = await axios.get(`${API_URL_Mock}/job/${id}`).then(res => res.data);
+    const data = await axios
+        .get(`${API_URL_Mock}/job/${id}`)
+        .then(res => res.data)
+        .catch(error => toast.error(error));
     return { data } as any;
 }
 
 export async function deleteJob(id: string) {
-    const data = axios
+    axios
         .post(
             `${API_URL_Mock}/delete`,
             { id: id },
@@ -70,8 +80,6 @@ export async function deleteJob(id: string) {
                 },
             }
         )
-        .then(res => res.data)
-        .catch(error => console.log(error));
-
-    return data;
+        .then(res => toast.success("Job successfully delete"))
+        .catch(error => toast.error(error));
 }

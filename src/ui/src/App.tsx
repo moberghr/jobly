@@ -6,6 +6,7 @@ import BatchesWrapper from "./pages/batches/BatchesWrapper";
 import { JobRouteSubpaths } from "./utils/paths";
 import { deleteJob, getJobDetails, getNavigationData, ResponseJobs } from "./api";
 import CallEveryIntervall from "./hooks/callEveryInterval";
+import toast from "react-hot-toast";
 
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
 const Batches = lazy(() => import("./pages/batches/Batches"));
