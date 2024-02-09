@@ -15,3 +15,11 @@
     }
 }
 //button variants end
+
+//button with icon
+.btn:has(svg) {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+//button with icon end
