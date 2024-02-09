@@ -44,10 +44,17 @@ const Dashboard: React.FC<ILine> = () => {
     };
 
     const getData = async (): Promise<IJoblyObj> => {
-        const res = await fetch("http://localhost:6090/jobs");
-        const data = await res.json();
+        try {
+            const res = await fetch("http://localhost:6090/jobs");
+            if (res.ok) {
+                const data = await res.json();
+                return data as IJoblyObj;
+            }
 
-        return data as IJoblyObj;
+            return {} as IJoblyObj;
+        } catch (error) {
+            return {} as IJoblyObj;
+        }
     };
 
     const onRefresh = (
@@ -86,7 +93,6 @@ const Dashboard: React.FC<ILine> = () => {
         }
         if (isPaused.current) {
             chartRef.current.options.plugins.streaming.pause = true;
-            console.log("Uso u TRUE isPaused");
             chart.update("none");
         }
     };
