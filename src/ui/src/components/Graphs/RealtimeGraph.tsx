@@ -125,7 +125,7 @@ const RealtimeGraph = () => {
             labels: [],
             datasets: [
                 {
-                    label: "# of Votes",
+                    label: "# of Jobs",
                     data: [],
                     borderWidth: 1.5,
                     borderColor: "rgba(245, 95, 33, 0.8)",
