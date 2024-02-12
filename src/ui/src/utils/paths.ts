@@ -1,6 +1,7 @@
 import { IconType } from "react-icons";
 import { FaLayerGroup, FaCalendarAlt, FaCheckCircle, FaExclamation, FaTrash, FaClock } from "react-icons/fa";
 import { GoPulse } from "react-icons/go";
+import FailedJobs from "../pages/jobs/FailedJobs";
 
 const Routes = {
     dashboard: "/",
@@ -14,6 +15,7 @@ export interface ISubpath {
     path: string;
     icon: IconType;
     iconColor: string;
+    component?: () => JSX.Element;
 }
 
 export const JobRouteSubpaths: Array<ISubpath> = [
@@ -46,6 +48,7 @@ export const JobRouteSubpaths: Array<ISubpath> = [
         path: "/failed",
         icon: FaExclamation,
         iconColor: "black",
+        component: FailedJobs,
     },
     {
         label: "Deleted",
