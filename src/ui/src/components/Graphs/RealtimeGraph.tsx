@@ -127,9 +127,9 @@ const RealtimeGraph = () => {
                 {
                     label: "# of Votes",
                     data: [],
-                    borderWidth: 1,
-                    borderColor: "red",
-                    backgroundColor: "whitesmoke",
+                    borderWidth: 1.5,
+                    borderColor: "rgba(245, 95, 33, 0.8)",
+                    backgroundColor: "rgba(245, 95, 33, 0.25)",
                     fill: true,
                 },
             ],
@@ -174,7 +174,7 @@ const RealtimeGraph = () => {
             <div className={styles["header-container"]}>
                 <div>Realtime graph</div>
                 <button type="button" onClick={togglePause}>
-                    Play/Pause
+                    {isPausedState ? "Play" : "Pause"}
                 </button>
                 <div className={styles["status-container"]}>
                     <div>{isPausedState ? "PAUSED" : "STREAMING"}</div>

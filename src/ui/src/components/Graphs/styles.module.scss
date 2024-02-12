@@ -1,7 +1,20 @@
 .header-container {
     display: flex;
     flex-direction: row;
+    align-items: center;
     gap: 20px;
+
+    button {
+        background: whitesmoke;
+        border-radius: 5px;
+        border: none;
+        padding: 5px 10px;
+        border-bottom: solid 3px grey;
+
+        &:hover {
+            border-bottom-color: rgba(245, 95, 33, 1);
+        }
+    }
 
     .status-container {
         display: flex;
