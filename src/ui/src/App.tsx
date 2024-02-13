@@ -12,6 +12,7 @@ const Jobs = lazy(() => import("./pages/jobs/Jobs"));
 const ReccuringJobs = lazy(() => import("./pages/recurringJobs/recurringJobs"));
 const Navbar = lazy(() => import("./components/navbar/Navbar"));
 const Layout = lazy(() => import("./components/layout/Layout"));
+const DetailsJob = lazy(() => import("./pages/jobs/DetailsJob"));
 
 const App: React.FC = () => {
     const { dashboard, jobs, recurringJobs, batches } = Paths;
