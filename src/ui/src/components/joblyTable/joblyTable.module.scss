@@ -52,3 +52,23 @@
     font-size: medium;
     color: $grey-normal;
 }
+
+.jobly-table__exception {
+    color: $grey-normal;
+}
+
+.jobly-table__more-details {
+    background: none;
+    border: none;
+    color: $blue-button;
+    width: 100px;
+    &:hover {
+        color: $blue-button-hover;
+    }
+}
+
+.jobly-table__expanded-row {
+    td {
+        border: none !important;
+    }
+}

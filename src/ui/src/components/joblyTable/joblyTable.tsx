@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import TableComponent from "react-bootstrap/Table";
 import Pagination from "react-bootstrap/Pagination";
@@ -7,6 +7,7 @@ import DropdownButton from "react-bootstrap/DropdownButton";
 import { ITEMS_PER_PAGE_OPTIONS, DEFAULT_ITEMS_PER_PAGE, DEFAULT_PAGE } from "../../utils/constants";
 import styles from "./joblyTable.module.scss";
 import Form from "react-bootstrap/Form";
+import JoblyException from "../joblyException/joblyException";
 
 interface IJoblyTableProps {
     data: {
@@ -23,9 +24,17 @@ interface IJoblyTableProps {
     };
     selectable?: boolean;
     onSelectRows?: (selectedRows: (number | string)[]) => void;
+    failedJobs?: boolean;
 }
 
-const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, onSelectRows }: IJoblyTableProps) => {
+const JoblyTable = ({
+    data,
+    columnNames,
+    specialColumnComponents,
+    selectable,
+    onSelectRows,
+    failedJobs = false,
+}: IJoblyTableProps) => {
     let [searchParams, setSearchParams] = useSearchParams();
     const [pagination, setPagination] = useState({
         itemsPerPage: DEFAULT_ITEMS_PER_PAGE,
@@ -35,6 +44,7 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, on
     const maxPage = Math.ceil(data.totalCount / pagination.itemsPerPage);
 
     const [selectededIds, setSelectedIds] = useState([] as (string | number)[]);
+    const [expandedRowId, setExpandedRowId] = useState(undefined as string | number | undefined);
 
     const handlePaginationChange = (page: number) => {
         setPagination(prev => ({ ...prev, currentPage: page }));
@@ -62,6 +72,12 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, on
 
     const handleRowSelectedChange = (id: string | number) => {
         setSelectedIds(prev => (prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]));
+    };
+
+    const handleExpand = (event: React.MouseEvent<HTMLElement>, id: string | number) => {
+        event.stopPropagation();
+        if (expandedRowId === id) setExpandedRowId(undefined);
+        else setExpandedRowId(id);
     };
 
     useEffect(() => {
@@ -104,49 +120,94 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, on
                 {data.data.length > 0 && (
                     <tbody>
                         {data.data.map((row, index) => (
-                            <tr
+                            <React.Fragment
                                 key={
                                     row.id && (typeof row.id === "string" || typeof row.id === "number")
                                         ? row.id
                                         : index
                                 }
-                                onClick={() => selectable && handleRowSelectedChange(row.id)}
                             >
-                                {selectable && (
-                                    <td key="select-row-action">
-                                        <Form.Check
-                                            aria-label="select or deselect row"
-                                            checked={selectededIds.includes(row.id)}
-                                            onChange={() => handleRowSelectedChange(row.id)}
-                                            onClick={e => {
-                                                e.stopPropagation();
-                                            }}
-                                        />
-                                    </td>
+                                <tr
+                                    className={expandedRowId === row.id ? styles["jobly-table__expanded-row"] : ""}
+                                    key={
+                                        row.id && (typeof row.id === "string" || typeof row.id === "number")
+                                            ? row.id
+                                            : index
+                                    }
+                                    onClick={() => selectable && handleRowSelectedChange(row.id)}
+                                >
+                                    {selectable && (
+                                        <td key="select-row-action">
+                                            <Form.Check
+                                                aria-label="select or deselect row"
+                                                checked={selectededIds.includes(row.id)}
+                                                onChange={() => handleRowSelectedChange(row.id)}
+                                                onClick={e => {
+                                                    e.stopPropagation();
+                                                }}
+                                            />
+                                        </td>
+                                    )}
+                                    {Object.keys(columnNames).map(name => {
+                                        if (specialColumnComponents && specialColumnComponents[name]) {
+                                            const SpecialComponent = specialColumnComponents[name].component;
+                                            // this first condition is for expandable row on failed jobs page
+                                            if (name === "job" && failedJobs)
+                                                return (
+                                                    <td key={row[name].value}>
+                                                        <SpecialComponent
+                                                            {...row[name]}
+                                                            {...specialColumnComponents[name].props}
+                                                        />
+                                                        <div className={styles["jobly-table__exception"]}>
+                                                            An exception occured during performance of the job.{" "}
+                                                            <button
+                                                                className={styles["jobly-table__more-details"]}
+                                                                onClick={e => handleExpand(e, row.id)}
+                                                            >
+                                                                {expandedRowId === row.id ? (
+                                                                    <>Less details...</>
+                                                                ) : (
+                                                                    <>More details...</>
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                );
+                                            if (typeof row[name] === "object")
+                                                return (
+                                                    <td key={row[name].value}>
+                                                        <SpecialComponent
+                                                            {...row[name]}
+                                                            {...specialColumnComponents[name].props}
+                                                        />
+                                                    </td>
+                                                );
+                                            else
+                                                return (
+                                                    <td key={row[name]}>
+                                                        <SpecialComponent {...specialColumnComponents[name].props}>
+                                                            {row[name]}
+                                                        </SpecialComponent>
+                                                    </td>
+                                                );
+                                        } else if (name === "jobException") return <></>;
+                                        else return <td key={row[name]}>{row[name]}</td>;
+                                    })}
+                                </tr>
+                                {expandedRowId === row.id && (
+                                    <tr className={styles["jobly-table__expanded-row__content"]}>
+                                        <td colSpan={2}></td>
+                                        <td colSpan={2}>
+                                            <JoblyException
+                                                title={row.jobException.title}
+                                                subtitle={row.jobException.subtitle}
+                                                exception={row.jobException.exception}
+                                            />
+                                        </td>
+                                    </tr>
                                 )}
-                                {Object.keys(columnNames).map(name => {
-                                    if (specialColumnComponents && specialColumnComponents[name]) {
-                                        const SpecialComponent = specialColumnComponents[name].component;
-                                        if (typeof row[name] === "object")
-                                            return (
-                                                <td key={row[name].value}>
-                                                    <SpecialComponent
-                                                        {...row[name]}
-                                                        {...specialColumnComponents[name].props}
-                                                    />
-                                                </td>
-                                            );
-                                        else
-                                            return (
-                                                <td key={row[name]}>
-                                                    <SpecialComponent {...specialColumnComponents[name].props}>
-                                                        {row[name]}
-                                                    </SpecialComponent>
-                                                </td>
-                                            );
-                                    } else return <td key={row[name]}>{row[name]}</td>;
-                                })}
-                            </tr>
+                            </React.Fragment>
                         ))}
                     </tbody>
                 )}
