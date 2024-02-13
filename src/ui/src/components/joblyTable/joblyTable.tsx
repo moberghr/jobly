@@ -3,10 +3,11 @@ import { useSearchParams } from "react-router-dom";
 import TableComponent from "react-bootstrap/Table";
 import Pagination from "react-bootstrap/Pagination";
 import Dropdown from "react-bootstrap/Dropdown";
+import Form from "react-bootstrap/Form";
 import DropdownButton from "react-bootstrap/DropdownButton";
+
 import { ITEMS_PER_PAGE_OPTIONS, DEFAULT_ITEMS_PER_PAGE, DEFAULT_PAGE } from "../../utils/constants";
 import styles from "./joblyTable.module.scss";
-import Form from "react-bootstrap/Form";
 import JoblyException from "../joblyException/joblyException";
 
 interface IJoblyTableProps {
