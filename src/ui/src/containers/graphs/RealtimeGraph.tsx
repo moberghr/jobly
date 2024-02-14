@@ -17,7 +17,6 @@ import {
 import { StreamingPlugin, RealTimeScale } from "chartjs-plugin-streaming";
 import "chartjs-adapter-luxon";
 import styles from "./styles.module.scss";
-import { JSXElement } from "@babel/types";
 
 interface ILine {
     data?: ChartData<"line">;
@@ -156,9 +155,6 @@ const RealtimeGraph = () => {
             chartRef.current = chart;
 
             return () => {
-                console.log("Return inside useEffect !");
-                console.log("Chart: ", chart);
-
                 chart.destroy(); // removes chart
                 ref.current?.remove(); // removes canvas
             };

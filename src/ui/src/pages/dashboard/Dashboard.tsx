@@ -1,6 +1,6 @@
 import styles from "./style.module.scss";
-import RealtimeGraph from "../../components/Graphs/RealtimeGraph";
-import HistoryGraph from "../../components/Graphs/HistoryGraph";
+import RealtimeGraph from "../../containers/graphs/RealtimeGraph";
+import HistoryGraph from "../../containers/graphs/HistoryGraph";
 
 const Dashboard: React.FC = () => {
     return (

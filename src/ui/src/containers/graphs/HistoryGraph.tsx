@@ -15,8 +15,8 @@ import {
     Tooltip,
 } from "chart.js";
 import styles from "./styles.module.scss";
+import { months } from "../../utils/constants";
 
-const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MOCK_DATA = months.map(month => {
     return {
         x: month,
@@ -61,9 +61,6 @@ const HistoryGraph = () => {
             chartRef.current = chart;
 
             return () => {
-                console.log("Return inside useEffect !");
-                console.log("Chart: ", chart);
-
                 chart.destroy(); // removes chart
                 ref.current?.remove(); // removes canvas
             };

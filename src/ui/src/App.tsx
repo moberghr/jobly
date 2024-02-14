@@ -9,7 +9,7 @@ const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
 const Batches = lazy(() => import("./pages/batches/Batches"));
 const Jobs = lazy(() => import("./pages/jobs/Jobs"));
 const ReccuringJobs = lazy(() => import("./pages/recurringJobs/recurringJobs"));
-const Navbar = lazy(() => import("./components/navbar/Navbar"));
+const Navbar = lazy(() => import("./containers/navbar/Navbar"));
 const Layout = lazy(() => import("./components/layout/Layout"));
 const DetailsJob = lazy(() => import("./pages/jobs/DetailsJob"));
 

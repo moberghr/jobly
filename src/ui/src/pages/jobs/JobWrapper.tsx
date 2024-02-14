@@ -1,7 +1,7 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
 import Path, { JobRouteSubpaths } from "../../utils/paths";
-import VerticalNavbar from "../../components/verticalNavbar/VerticalNavbar";
+import VerticalNavbar from "../../containers/verticalNavbar/VerticalNavbar";
 import styles from "./jobs.module.scss";
 
 const JobWrapper: React.FC = () => {
