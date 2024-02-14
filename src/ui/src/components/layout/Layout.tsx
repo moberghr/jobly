@@ -1,7 +1,6 @@
 import React from "react";
 import style from "./style.module.scss";
 import { useLocation } from "react-router-dom";
-import VerticalNavbar from "../verticalNavbar/VerticalNavbar";
 
 interface ILayout {
     children: React.ReactNode;

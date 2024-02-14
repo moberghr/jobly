@@ -1,6 +1,6 @@
 import { Outlet } from "react-router-dom";
 import Path, { BatchesRouteSubpaths } from "../../utils/paths";
-import VerticalNavbar from "../../components/verticalNavbar/VerticalNavbar";
+import VerticalNavbar from "../../containers/verticalNavbar/VerticalNavbar";
 
 const BatchesWrapper = () => {
     return (
