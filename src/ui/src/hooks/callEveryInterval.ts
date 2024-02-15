@@ -1,27 +1,31 @@
 import { useEffect, useState } from "react";
 
 function CallEveryIntervall(fetchFunction: Promise<any>, intervall: number) {
-    const [state, setState] = useState({ data: null, error: false, loading: true });
+    const [data, setData] = useState(null);
+    const [error, setError] = useState(false);
+    const [loading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        setInterval(() => {
-            setState(state => ({ data: state.data, error: false, loading: true }));
-
+        const intervalId = setInterval(() => {
             const getData = async () => {
                 return await fetchFunction;
             };
-            getData();
 
             getData()
-                .then((newData: any) => setState({ data: newData, error: false, loading: false }))
+                .then((newData: any) => {
+                    setData(newData);
+                })
                 .catch((error: any) => {
-                    console.log(error);
-                    setState({ data: null, error: true, loading: false });
+                    setData(null);
+                    setError(true);
                 });
+            setIsLoading(false);
         }, intervall);
+
+        return () => clearInterval(intervalId);
     }, [intervall, fetchFunction]);
-    useEffect(() => () => console.log("unmount"), []);
-    return state;
+
+    return { data, error, loading };
 }
 
 export default CallEveryIntervall;
