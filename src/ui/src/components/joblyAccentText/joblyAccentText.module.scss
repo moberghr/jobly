@@ -1,0 +1,8 @@
+@import "../../style/variables.scss";
+
+.accent-text {
+    color: $red-primary;
+    background-color: $red-light;
+    border-radius: 4px;
+    font-size: 1.05rem;
+}

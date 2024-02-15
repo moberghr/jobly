@@ -6,6 +6,7 @@ import Dropdown from "react-bootstrap/Dropdown";
 import DropdownButton from "react-bootstrap/DropdownButton";
 import { ITEMS_PER_PAGE_OPTIONS, DEFAULT_ITEMS_PER_PAGE, DEFAULT_PAGE } from "../../utils/constants";
 import styles from "./joblyTable.module.scss";
+import Form from "react-bootstrap/Form";
 
 interface IJoblyTableProps {
     data: {
@@ -18,11 +19,13 @@ interface IJoblyTableProps {
         [key: string]: string;
     };
     specialColumnComponents?: {
-        [key: string]: (props: any) => JSX.Element;
+        [key: string]: { component: (props: any) => JSX.Element; props?: { [key: string]: any } };
     };
+    selectable?: boolean;
+    onSelectRows?: (selectedRows: (number | string)[]) => void;
 }
 
-const JoblyTable = ({ data, columnNames, specialColumnComponents }: IJoblyTableProps) => {
+const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, onSelectRows }: IJoblyTableProps) => {
     let [searchParams, setSearchParams] = useSearchParams();
     const [pagination, setPagination] = useState({
         itemsPerPage: DEFAULT_ITEMS_PER_PAGE,
@@ -30,6 +33,8 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents }: IJoblyTableP
     });
 
     const maxPage = Math.ceil(data.totalCount / pagination.itemsPerPage);
+
+    const [selectededIds, setSelectedIds] = useState([] as (string | number)[]);
 
     const handlePaginationChange = (page: number) => {
         setPagination(prev => ({ ...prev, currentPage: page }));
@@ -47,6 +52,18 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents }: IJoblyTableP
         });
     };
 
+    const handleSelectedAllRowsChange = () => {
+        if (selectededIds.length !== data.data.length) {
+            setSelectedIds(data.data.map(item => item.id));
+        } else {
+            setSelectedIds([]);
+        }
+    };
+
+    const handleRowSelectedChange = (id: string | number) => {
+        setSelectedIds(prev => (prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]));
+    };
+
     useEffect(() => {
         setSearchParams(params => {
             if (!params.get("page")) params.set("page", DEFAULT_PAGE.toString());
@@ -61,11 +78,24 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents }: IJoblyTableP
         });
     }, []);
 
+    useEffect(() => {
+        if (onSelectRows) onSelectRows(selectededIds);
+    }, [selectededIds]);
+
     return (
         <>
             <TableComponent hover responsive className={styles["jobly-table"]}>
                 <thead>
                     <tr>
+                        {selectable && (
+                            <th key="select-action">
+                                <Form.Check
+                                    aria-label="select or deselect all rows"
+                                    onChange={handleSelectedAllRowsChange}
+                                    checked={selectededIds.length === data.data.length}
+                                />
+                            </th>
+                        )}
                         {Object.values(columnNames).map(name => (
                             <th key={name}>{name}</th>
                         ))}
@@ -80,20 +110,38 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents }: IJoblyTableP
                                         ? row.id
                                         : index
                                 }
+                                onClick={() => selectable && handleRowSelectedChange(row.id)}
                             >
+                                {selectable && (
+                                    <td key="select-row-action">
+                                        <Form.Check
+                                            aria-label="select or deselect row"
+                                            checked={selectededIds.includes(row.id)}
+                                            onChange={() => handleRowSelectedChange(row.id)}
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                            }}
+                                        />
+                                    </td>
+                                )}
                                 {Object.keys(columnNames).map(name => {
                                     if (specialColumnComponents && specialColumnComponents[name]) {
-                                        const SpecialComponent = specialColumnComponents[name];
+                                        const SpecialComponent = specialColumnComponents[name].component;
                                         if (typeof row[name] === "object")
                                             return (
                                                 <td key={row[name].value}>
-                                                    <SpecialComponent {...row[name]} />
+                                                    <SpecialComponent
+                                                        {...row[name]}
+                                                        {...specialColumnComponents[name].props}
+                                                    />
                                                 </td>
                                             );
                                         else
                                             return (
                                                 <td key={row[name]}>
-                                                    <SpecialComponent>{row[name]}</SpecialComponent>
+                                                    <SpecialComponent {...specialColumnComponents[name].props}>
+                                                        {row[name]}
+                                                    </SpecialComponent>
                                                 </td>
                                             );
                                     } else return <td key={row[name]}>{row[name]}</td>;
@@ -107,7 +155,9 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents }: IJoblyTableP
             <div className={styles["jobly-table__footer"]}>
                 {data.data.length > 0 && (
                     <>
-                        <p>Selected 0 of {data.totalCount}</p>
+                        <p>
+                            Selected {selectededIds.length} of {data.totalCount}
+                        </p>
                         <div className={styles["jobly-table__items-per-page"]}>
                             <p>Items per page </p>
                             <DropdownButton

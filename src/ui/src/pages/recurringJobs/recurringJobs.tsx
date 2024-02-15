@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Button from "react-bootstrap/Button";
 import JoblyTable from "../../components/joblyTable/joblyTable";
 import JoblyTitle from "../../components/joblyTitle/joblyTitle";
@@ -36,11 +37,17 @@ const COLUMN_NAMES = {
 };
 
 const RecurringJobs = () => {
+    const [selectedRows, setSelectedRows] = useState<(number | string)[]>([]);
+
+    const handleTriggerNow = () => {
+        console.log("Executing function in parent with selected rows:", selectedRows);
+        // Add your logic here based on the selected rows
+    };
     return (
         <div className={styles["recuring-jobs"]}>
             <JoblyTitle>Recurring Jobs</JoblyTitle>
             <div className={styles["recuring-jobs__actions"]}>
-                <Button variant="primary-blue" disabled>
+                <Button variant="primary-blue" onClick={handleTriggerNow}>
                     Trigger now
                 </Button>
                 <Button variant="outline-dark" disabled>
@@ -51,7 +58,9 @@ const RecurringJobs = () => {
             <JoblyTable
                 data={DUMMY_DATA}
                 columnNames={COLUMN_NAMES}
-                specialColumnComponents={{ lastExecution: JoblyStatusText }}
+                specialColumnComponents={{ lastExecution: { component: JoblyStatusText } }}
+                selectable
+                onSelectRows={setSelectedRows}
             />
         </div>
     );

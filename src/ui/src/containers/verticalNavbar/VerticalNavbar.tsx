@@ -15,6 +15,7 @@ const VerticalNavbar: React.FC<IVerticalNavbar> = ({ currentPath, subpaths }) =>
         <div className={style.container}>
             {subpaths.map(obj => (
                 <NavItem
+                    key={obj.label}
                     label={obj.label}
                     link={`${currentPath}${obj.path}`}
                     Icon={obj.icon}

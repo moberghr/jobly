@@ -1,0 +1,18 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+
+    .graph-container {
+        height: 50%;
+        margin: 10px;
+        padding: 35px;
+        border-radius: 10px;
+        box-shadow: rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.06) 0px 1px 2px 0px;
+
+        .graph {
+            width: 100% !important;
+        }
+    }
+}

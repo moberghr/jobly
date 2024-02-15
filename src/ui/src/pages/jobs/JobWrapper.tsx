@@ -1,7 +1,8 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
 import Path, { JobRouteSubpaths } from "../../utils/paths";
-import VerticalNavbar from "../../components/verticalNavbar/VerticalNavbar";
+import VerticalNavbar from "../../containers/verticalNavbar/VerticalNavbar";
+import styles from "./jobs.module.scss";
 
 const JobWrapper: React.FC = () => {
     const { jobs } = Path;
@@ -9,7 +10,9 @@ const JobWrapper: React.FC = () => {
     return (
         <>
             <VerticalNavbar currentPath={jobs} subpaths={JobRouteSubpaths} />
-            <Outlet />
+            <div className={styles["jobs"]}>
+                <Outlet />
+            </div>
         </>
     );
 };
