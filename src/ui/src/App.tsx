@@ -4,6 +4,7 @@ import Paths, { BatchesRouteSubpaths } from "./utils/paths";
 import JobWrapper from "./pages/jobs/JobWrapper";
 import BatchesWrapper from "./pages/batches/BatchesWrapper";
 import { JobRouteSubpaths } from "./utils/paths";
+import BatchesDetails from "./pages/batches/BatchesDetails";
 
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
 const Batches = lazy(() => import("./pages/batches/Batches"));
@@ -34,6 +35,7 @@ const App: React.FC = () => {
                         {BatchesRouteSubpaths.map(obj => (
                             <Route key={obj.path} element={<Batches />} path={`${batches}${obj.path}`} />
                         ))}
+                        <Route element={<Suspense children={<BatchesDetails />} />} path={`/batches/details/:id`} />
                     </Route>
                 </Routes>
             </Layout>

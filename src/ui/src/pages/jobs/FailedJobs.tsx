@@ -10,14 +10,14 @@ import styles from "./jobs.module.scss";
 const DUMMY_DATA = {
     data: [
         {
-            id: { value: "ff12345", pathId: "ff12345" },
+            id: { value: "ff12345", pathId: "ff12345", mainRoute: "jobs" },
             failed: "a minute ago",
-            job: { value: "IEmailService.SendCampaignEmail", pathId: "ff12345" },
+            job: { value: "IEmailService.SendCampaignEmail", pathId: "ff12345", mainRoute: "jobs" },
         },
         {
-            id: { value: "ffabcd123", pathId: "ffabcd123" },
+            id: { value: "ffabcd123", pathId: "ffabcd123", mainRoute: "jobs" },
             failed: "a minute ago",
-            job: { value: "IEmailService.SendCampaignEmail", pathId: "ffabcd123" },
+            job: { value: "IEmailService.SendCampaignEmail", pathId: "ffabcd123", mainRoute: "jobs" },
         },
     ],
     totalCount: 2,
