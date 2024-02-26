@@ -1,5 +1,14 @@
 import { IconType } from "react-icons";
-import { FaLayerGroup, FaCalendarAlt, FaCheckCircle, FaExclamation, FaTrash, FaClock } from "react-icons/fa";
+import {
+    FaLayerGroup,
+    FaCalendarAlt,
+    FaCheckCircle,
+    FaExclamation,
+    FaTrash,
+    FaClock,
+    FaPlay,
+    FaCircleNotch,
+} from "react-icons/fa";
 import { GoPulse } from "react-icons/go";
 import FailedJobs from "../pages/jobs/FailedJobs";
 import BatchesDetails from "../pages/batches/BatchesDetails";
@@ -67,21 +76,9 @@ export const JobRouteSubpaths: Array<ISubpath> = [
 
 export const BatchesRouteSubpaths: Array<ISubpath> = [
     {
-        label: "Enqueued",
-        path: "/enqueued",
-        icon: FaLayerGroup,
-        iconColor: "black",
-    },
-    {
-        label: "Scheduled",
-        path: "/scheduled",
-        icon: FaCalendarAlt,
-        iconColor: "black",
-    },
-    {
-        label: "Processing",
-        path: "/processing",
-        icon: GoPulse,
+        label: "Started",
+        path: "/started",
+        icon: FaPlay,
         iconColor: "black",
     },
     {
@@ -91,21 +88,21 @@ export const BatchesRouteSubpaths: Array<ISubpath> = [
         iconColor: "black",
     },
     {
-        label: "Failed",
-        path: "/failed",
-        icon: FaExclamation,
-        iconColor: "black",
-    },
-    {
-        label: "Deleted",
-        path: "/deleted",
-        icon: FaTrash,
+        label: "Completed",
+        path: "/completed",
+        icon: FaCircleNotch,
         iconColor: "black",
     },
     {
         label: "Awaiting",
         path: "/awaiting",
         icon: FaClock,
+        iconColor: "black",
+    },
+    {
+        label: "Deleted",
+        path: "/deleted",
+        icon: FaTrash,
         iconColor: "black",
     },
     {
