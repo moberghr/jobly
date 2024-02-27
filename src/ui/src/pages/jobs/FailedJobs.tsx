@@ -49,14 +49,16 @@ const FailedJobs = () => {
                     Delete selected
                 </Button>
             </div>
-            <JoblyTable
-                data={DUMMY_DATA}
-                columnNames={COLUMN_NAMES}
-                specialColumnComponents={{
-                    id: { component: JoblyDetailsLink, props: { type: "primary" } },
-                    job: { component: JoblyDetailsLink, props: { type: "secondary" } },
-                }}
-            />
+            <div className={styles["table-container"]}>
+                <JoblyTable
+                    data={DUMMY_DATA}
+                    columnNames={COLUMN_NAMES}
+                    specialColumnComponents={{
+                        id: { component: JoblyDetailsLink, props: { type: "primary" } },
+                        job: { component: JoblyDetailsLink, props: { type: "secondary" } },
+                    }}
+                />
+            </div>
         </>
     );
 };

@@ -7,7 +7,7 @@ import {
     FaTrash,
     FaClock,
     FaPlay,
-    FaCircleNotch,
+    FaCircle,
 } from "react-icons/fa";
 import { GoPulse } from "react-icons/go";
 import FailedJobs from "../pages/jobs/FailedJobs";
@@ -90,7 +90,7 @@ export const BatchesRouteSubpaths: Array<ISubpath> = [
     {
         label: "Completed",
         path: "/completed",
-        icon: FaCircleNotch,
+        icon: FaCircle,
         iconColor: "black",
     },
     {

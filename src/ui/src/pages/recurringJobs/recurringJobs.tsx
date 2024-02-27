@@ -55,13 +55,15 @@ const RecurringJobs = () => {
                 </Button>
             </div>
 
-            <JoblyTable
-                data={DUMMY_DATA}
-                columnNames={COLUMN_NAMES}
-                specialColumnComponents={{ lastExecution: { component: JoblyStatusText } }}
-                selectable
-                onSelectRows={setSelectedRows}
-            />
+            <div className={styles["table-container"]}>
+                <JoblyTable
+                    data={DUMMY_DATA}
+                    columnNames={COLUMN_NAMES}
+                    specialColumnComponents={{ lastExecution: { component: JoblyStatusText } }}
+                    selectable
+                    onSelectRows={setSelectedRows}
+                />
+            </div>
         </div>
     );
 };
