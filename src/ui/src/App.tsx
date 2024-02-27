@@ -5,12 +5,13 @@ import JobWrapper from "./pages/jobs/JobWrapper";
 import BatchesWrapper from "./pages/batches/BatchesWrapper";
 import { JobRouteSubpaths } from "./utils/paths";
 import BatchesDetails from "./pages/batches/BatchesDetails";
+import { Toaster } from "react-hot-toast";
 
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
 const Batches = lazy(() => import("./pages/batches/Batches"));
 const Jobs = lazy(() => import("./pages/jobs/Jobs"));
 const ReccuringJobs = lazy(() => import("./pages/recurringJobs/recurringJobs"));
-const Navbar = lazy(() => import("./components/navbar/Navbar"));
+const Navbar = lazy(() => import("./containers/navbar/Navbar"));
 const Layout = lazy(() => import("./components/layout/Layout"));
 const DetailsJob = lazy(() => import("./pages/jobs/DetailsJob"));
 
@@ -19,6 +20,7 @@ const App: React.FC = () => {
 
     return (
         <Router>
+            <Toaster />
             <Navbar />
             <Layout>
                 <Routes>
