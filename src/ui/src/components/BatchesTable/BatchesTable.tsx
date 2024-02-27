@@ -16,35 +16,29 @@ const DUMMY_DATA = {
         {
             status: Status.pending,
             id: { value: "ff12345", pathId: "ff12345", mainRoute: "jobs" },
-            failed: "a minute ago",
+            created: "a minute ago",
             job: { value: "IEmailService.SendCampaignEmail", pathId: "ff12345", mainRoute: "jobs" },
         },
         {
             status: Status.pending,
             id: { value: "ffabcd123", pathId: "ffabcd123", mainRoute: "jobs" },
-            failed: "a minute ago",
+            created: "a minute ago",
             job: { value: "IEmailService.SendCampaignEmail", pathId: "ffabcd123", mainRoute: "jobs" },
         },
         {
             status: Status.finished,
             id: { value: "c99912", pathId: "c99912", mainRoute: "jobs" },
-            failed: "hour ago",
+            created: "hour ago",
             job: { value: "IJobService.SendJob", pathId: "c99912", mainRoute: "jobs" },
         },
         {
             status: Status.created,
             id: { value: "hsadnn23", pathId: "hsadnn23", mainRoute: "jobs" },
-            failed: "a minute ago",
+            created: "a minute ago",
             job: { value: "IEmailService.SendCampaignEmail", pathId: "ffabcd123", mainRoute: "jobs" },
         },
     ],
     totalCount: 4,
-};
-
-const COLUMN_NAMES = {
-    id: "Id",
-    failed: "Failed",
-    job: "Job",
 };
 
 const BatchesTable = () => {
@@ -67,6 +61,13 @@ const BatchesTable = () => {
         filterData();
     }, [status]);
 
+    const COLUMN_NAMES = {
+        id: "Id",
+        status: "State",
+        job: "Job",
+        created: "created",
+    };
+
     return (
         <div className={styles.container}>
             <div className={styles.navigation}>
@@ -78,18 +79,22 @@ const BatchesTable = () => {
                             className={`${styles[`nav-item`]} ${status === itemStatus && styles.active}`}
                         >
                             {itemStatus}
+
+                            <div className={styles.rectangle}></div>
                         </div>
                     );
                 })}
             </div>
-            <JoblyTable
-                data={jobs}
-                columnNames={COLUMN_NAMES}
-                specialColumnComponents={{
-                    id: { component: JoblyDetailsLink, props: { type: "primary" } },
-                    job: { component: JoblyDetailsLink, props: { type: "secondary" } },
-                }}
-            />
+            <div className={styles["table-container"]}>
+                <JoblyTable
+                    data={jobs}
+                    columnNames={COLUMN_NAMES}
+                    specialColumnComponents={{
+                        id: { component: JoblyDetailsLink, props: { type: "primary" } },
+                        job: { component: JoblyDetailsLink, props: { type: "secondary" } },
+                    }}
+                />
+            </div>
         </div>
     );
 };
