@@ -40,7 +40,7 @@ const BatchesDetails = () => {
 
     return (
         <div className={styles.container}>
-            <JoblyTitle>Batch details- {title}</JoblyTitle>
+            <JoblyTitle>Batch details - {title}</JoblyTitle>
             {batch && <JoblySummary {...batch} />}
             <BatchesTable />
         </div>

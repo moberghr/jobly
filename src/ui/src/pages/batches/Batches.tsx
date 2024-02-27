@@ -3,6 +3,7 @@ import JoblyTable from "../../components/joblyTable/joblyTable";
 import JoblyTitle from "../../components/joblyTitle/joblyTitle";
 import JoblyDetailsLink from "../../components/joblyDetailsLink/joblyDetailsLink";
 import { useState } from "react";
+import styles from "./styles.module.scss";
 
 export interface IBatch {
     id: {
@@ -58,8 +59,8 @@ const Batches = () => {
     const [selectedBatch, setSelectedBatch] = useState<IBatch | null>(null);
 
     return (
-        <div>
-            <JoblyTitle>{`${status?.toUpperCase()} Batches`}</JoblyTitle>
+        <div className={styles.container}>
+            <JoblyTitle>{`${status} batches`}</JoblyTitle>
             <JoblyTable
                 data={MOCK_DATA}
                 columnNames={COLUMNS}

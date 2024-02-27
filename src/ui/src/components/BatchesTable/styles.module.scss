@@ -13,6 +13,7 @@
         .nav-item {
             cursor: pointer;
             padding: 0px 5px;
+            text-transform: capitalize;
 
             &:hover {
                 border-bottom: lightgrey solid 2px;
