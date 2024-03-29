@@ -1,6 +1,7 @@
 ﻿using Jobly.Core.Entities;
 using Jobly.Core.Helper;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Jobly.Core;
 
@@ -28,10 +29,12 @@ public class Publisher<TContext> : IPublisher
 {
     private readonly TContext _context;
     private readonly int _retries;
-    public Publisher(TContext context, int retries)
+    
+    public Publisher(TContext context, IConfigureOptions<JoblyConfiguration> configuration)
     {
+        var options = configuration.ConfigureDefault();
+        _retries = options.RetryCount;
         _context = context;
-        _retries = retries;
     }
 
     public async Task<string> Publish<T>(T message)

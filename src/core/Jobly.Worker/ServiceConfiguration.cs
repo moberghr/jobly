@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Jobly.Core;
+﻿using Jobly.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -12,19 +7,13 @@ namespace Jobly.Worker;
 
 public static class ServiceConfiguration
 {
-    public static IServiceCollection AddJoblyWorker<TContext>(this IServiceCollection services, int workerCount, int retryCount = 0)
+    public static IServiceCollection AddJoblyWorker<TContext>(this IServiceCollection services, Action<JoblyWorkerConfiguration>? options = null)
         where TContext : DbContext
     {
-        services.AddJobly<TContext>(retryCount);
-
+        services.Configure(options ?? (_ => { }));
         services.AddTransient<IJoblyWorkerService, JoblyWorkerService<TContext>>();
         services.AddSingleton<IHostedService, JoblyWorkerPool<TContext>>();
-
-        // for (var i = 0; i < workerCount; i++)
-        // {
-        //     services.AddSingleton<IHostedService, JoblyWorker<TContext>>();
-        // }
-
+        
         return services;
     }
 }

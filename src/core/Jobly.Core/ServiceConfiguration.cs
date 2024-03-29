@@ -1,5 +1,7 @@
-﻿using Jobly.Core.Data.Entities;
+﻿using System.Security.Policy;
+using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
+using Jobly.Core.Helper;
 using Jobly.Core.Interceptors;
 using MediatR;
 using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
@@ -11,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.Internal;
 
 namespace Jobly.Core;
@@ -22,19 +25,13 @@ public static class ServiceConfiguration
 
     private static readonly SaveChangesConcurrencyTokenInterceptor _saveChangesInterceptor = new();
 
-    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services, int retryCount)
+    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services, Action<JoblyConfiguration>? options = null)
         where TContext : DbContext
     {
-        return CreateJoblyServices<TContext>(services, retryCount);
+        return CreateJoblyServices<TContext>(services, options);
     }
 
-    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services)
-        where TContext : DbContext
-    {
-        return AddJobly<TContext>(services, 0);
-    }
-
-    private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services, int retryCount)
+    private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services, Action<JoblyConfiguration>? options)
         where TContext : DbContext
     {
         var assembly = typeof(ServiceConfiguration).Assembly;
@@ -43,12 +40,15 @@ public static class ServiceConfiguration
         builder.AddApplicationPart(assembly)
             .AddRazorRuntimeCompilation();
 
+        services.Configure(options ?? (_ => { }));
+
         services.Configure<MvcRazorRuntimeCompilationOptions>(options =>
         {
             options.FileProviders.Add(new EmbeddedFileProvider(assembly));
         });
-
-        services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(), retryCount));
+        
+        services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(),
+            x.GetRequiredService<IConfigureOptions<JoblyConfiguration>>()));
         services.AddScoped<IRecurringJobPublisher>(x =>
             new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IJoblyService>(x => new JoblyService<TContext>(x.GetRequiredService<TContext>()));

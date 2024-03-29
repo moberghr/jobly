@@ -1,8 +1,11 @@
 using System.Collections.Concurrent;
+using Jobly.Core;
+using Jobly.Core.Helper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace Jobly.Worker;
@@ -13,23 +16,18 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
     private readonly IServiceProvider _serviceProvider;
 
     private Task _notifyTask;
-    // private readonly List<(JoblyWorker<TContext> service, CancellationTokenSource cancellationTokenSource)> _services = new();
     private readonly List<(Task task, CancellationTokenSource cancellationTokenSource)> _services = new();
-    private readonly object _ctsLock = new object();
+    private readonly object _ctsLock = new();
     private CancellationTokenSource _cancellationTokenSource;
-    
-    // Setting the polling interval to 10 seconds, this should be configurable. making this slow so I can test 
-    // notify feature.
-    private readonly TimeSpan _pollingInterval = TimeSpan.FromSeconds(10);
-    
-    // TODO: get from configuration
-    private int _maxWorkers = 50;
     
     // should be part of health check, if _lastTick is older then lets say 3 polling intervals, then return unhealthy
     private DateTime _lastTick = DateTime.UtcNow;
     
-    public JoblyWorkerPool(IServiceProvider serviceProvider, ILogger<JoblyWorkerPool<TContext>> logging)
+    private readonly JoblyWorkerConfiguration _configuration;
+    
+    public JoblyWorkerPool(IServiceProvider serviceProvider, ILogger<JoblyWorkerPool<TContext>> logging, IConfigureOptions<JoblyWorkerConfiguration> configuration)
     {
+        _configuration = configuration.ConfigureDefault();
         _serviceProvider = serviceProvider;
         _logging = logging;
     }
@@ -57,7 +55,7 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
             }
             
             // The problem with this approach is that it will take a while to scale up the workers.
-            if (_services.Count < _maxWorkers)
+            if (_services.Count < _configuration.WorkerCount)
             {
                 StartWorker();
             }
@@ -71,7 +69,7 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
             _logging.LogInformation("Worker count: {0}", _services.Count);
             try
             {
-                await Task.Delay(_pollingInterval, _cancellationTokenSource.Token);
+                await Task.Delay(_configuration.PollingInterval, _cancellationTokenSource.Token);
             }
             catch (TaskCanceledException e)
             {

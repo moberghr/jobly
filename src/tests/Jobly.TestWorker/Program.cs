@@ -6,7 +6,11 @@ var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
         services.AddServices(context.Configuration);
-        services.AddJoblyWorker<TestContext>(10, 2);
+        services.AddJoblyWorker<TestContext>(options =>
+        {
+            options.WorkerCount = 10;
+        });
+        
     })
     .Build();
 
