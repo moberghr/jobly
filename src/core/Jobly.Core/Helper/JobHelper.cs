@@ -19,7 +19,7 @@ internal static class JobHelper
             CreateTime = createdTime,
             Message = JsonSerializer.Serialize(message),
             Type = message!.GetType().AssemblyQualifiedName!,
-            ScheduleTime = scheduleTime,
+            ScheduleTime = scheduleTime ?? createdTime,
             CurrentState = state != null ? state.Value : string.IsNullOrEmpty(parentId) ? State.Enqueued : State.Awaiting,
             MaxRetries = maxRetries ?? retries,
             ParentJobId = parentId,

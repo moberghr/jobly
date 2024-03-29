@@ -15,9 +15,10 @@ public class JoblyWorker<TContext> : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        var isJobProcessing = true;
+        while (!stoppingToken.IsCancellationRequested && isJobProcessing)
         {   
-            await _joblyWorkerService.GetAndProcessJob(stoppingToken);
+            isJobProcessing = await _joblyWorkerService.GetAndProcessJob(stoppingToken);
         }
     }
 }

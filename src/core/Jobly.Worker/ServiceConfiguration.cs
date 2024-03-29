@@ -18,11 +18,12 @@ public static class ServiceConfiguration
         services.AddJobly<TContext>(retryCount);
 
         services.AddTransient<IJoblyWorkerService, JoblyWorkerService<TContext>>();
+        services.AddSingleton<IHostedService, JoblyWorkerPool<TContext>>();
 
-        for (var i = 0; i < workerCount; i++)
-        {
-            services.AddSingleton<IHostedService, JoblyWorker<TContext>>();
-        }
+        // for (var i = 0; i < workerCount; i++)
+        // {
+        //     services.AddSingleton<IHostedService, JoblyWorker<TContext>>();
+        // }
 
         return services;
     }

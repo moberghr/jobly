@@ -133,6 +133,12 @@ public static class ServiceConfiguration
         job.HasOne(p => p.ParentBatch)
             .WithMany(p => p.Jobs)
             .HasForeignKey(p => p.BatchId);
+        
+        job.HasIndex(p => new {p.CurrentState, p.ScheduleTime})
+            .IsDescending(false, false)
+            .HasFilter("\"current_state\" = 1");
+            
+        job.HasIndex(p => p.CurrentState);
     }
 
     private static void AddJobStateEntity(ModelBuilder modelBuilder)

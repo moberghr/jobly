@@ -14,7 +14,9 @@ namespace Jobly.Worker;
 
 public interface IJoblyWorkerService
 {
-    Task GetAndProcessJob(CancellationToken cancellationToken);
+    Task GetAndProcessJobs(CancellationToken cancellationToken);
+    
+    Task<bool> GetAndProcessJob(CancellationToken cancellationToken);
 }
 
 public class JoblyWorkerService<TContext> : IJoblyWorkerService
@@ -47,7 +49,16 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task GetAndProcessJob(CancellationToken cancellationToken)
+    public async Task GetAndProcessJobs(CancellationToken cancellationToken)
+    {
+        var isJobProcessing = true;
+        while (!cancellationToken.IsCancellationRequested && isJobProcessing)
+        {   
+            isJobProcessing = await GetAndProcessJob(cancellationToken);
+        }
+    }
+
+    public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
     {
         using var scope = _serviceScopeFactory.CreateScope();
 
@@ -57,13 +68,14 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         var jobData = context.Set<Job>()
             .Where(x => x.CurrentState == State.Enqueued)
-            .Where(x => x.ScheduleTime < DateTime.UtcNow || x.ScheduleTime == null)
+            .Where(x => x.ScheduleTime < DateTime.UtcNow)
             .Select(x =>
                     new JobData
                     {
                         Job = x,
                         IsParent = x.ChildJobs.Any(),
                     })
+            .OrderBy(x => x.Job.ScheduleTime)
             .TagWith(InterceptorConstants.RowLockTableJob)
             .FirstOrDefault();
 
@@ -72,12 +84,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         // if we didn't find any messages then we wait, otherwise we query again immediately 
         if (job == null)
         {
-            await Task.Delay(1000, cancellationToken);
+            // await Task.Delay(1000, cancellationToken);
 
-            return;
+            return false;
         }
 
-        _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
+        // _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
 
         try
         {
@@ -95,11 +107,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await UpdateJobData(context, jobData!, e.Message, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
-            return;
+            return false;
         }
 
         await UpdateJobData(context, jobData!, message: null, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     private async Task CreateNextJob(Job job, CancellationToken cancellationToken)
@@ -134,7 +147,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             Message = recurringJob.Message,
             Type = recurringJob.Type,
             CreateTime = createTime,
-            ScheduleTime = nextJobScheduleTime,
+            ScheduleTime = nextJobScheduleTime ?? createTime,
             CurrentState = State.Enqueued,
             RecurringJobId = recurringJob.Id,
             JobStates = jobStats

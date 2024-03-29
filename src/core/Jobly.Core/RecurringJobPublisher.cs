@@ -51,14 +51,15 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             new() { State = State.Enqueued, DateTime = DateTime.UtcNow}
         };
 
+        var createTime = DateTime.UtcNow;
         var jobId = Guid.NewGuid().ToString();
         var job = new Job
         {
             Id = jobId,
             Message = jobMessage!,
             Type = jobType!,
-            CreateTime = DateTime.UtcNow,
-            ScheduleTime = nextJobScheduleTime,
+            CreateTime = createTime,
+            ScheduleTime = nextJobScheduleTime ?? createTime,
             CurrentState = State.Enqueued,
             JobStates = jobStats
         };

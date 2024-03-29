@@ -32,20 +32,20 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
 
         _context.EmailLogs.Add(emailLog);
 
-        using var transaction = await _context.Database.BeginTransactionAsync();
-
-        await _context.SaveChangesAsync();
 
         var sendEmailRequest = new SendEmailRequest
         {
             EmailLogId = emailLog.Id
         };
 
-        for (var i = 0; i < 20; i++)
+        for (var i = 0; i < 5000; i++)
         {
             await _publisher.Publish(sendEmailRequest);
         }
 
+        using var transaction = await _context.Database.BeginTransactionAsync();
+
+        await _context.SaveChangesAsync();
         string parentId = await _publisher.Publish(sendEmailRequest);
 
         for (int i = 0; i < 4; i++)

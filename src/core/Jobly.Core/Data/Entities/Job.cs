@@ -15,7 +15,7 @@ public class Job
 
     public DateTime CreateTime { get; set; }
 
-    public DateTime? ScheduleTime { get; set; }
+    public DateTime ScheduleTime { get; set; }
 
     public State CurrentState { get; set; }
 
