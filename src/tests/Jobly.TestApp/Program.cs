@@ -17,7 +17,8 @@ builder.Services.AddServices(builder.Configuration);
 builder.Services.AddJoblyWorker<TestContext>(options =>
 {
     options.WorkerCount = 10;
-    options.PollingInterval = TimeSpan.FromSeconds(10);
+    // We get away with long polling because we are using a notify wakeup provider.
+    options.PollingInterval = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddPostgresNotifyWakeupProvider<TestContext>();
 

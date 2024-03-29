@@ -1,3 +1,4 @@
+using Jobly.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Jobly.Core;
@@ -11,8 +12,8 @@ public class PostgresNotifyNotifyProvider<TContext> : IJoblyNotifer where TConte
         _context = context;
     }
 
-    public async Task NotifyAsync(CancellationToken cancellationToken = default)
+    public async Task NotifyAsync(Job job, CancellationToken cancellationToken = default)
     {
-        await _context.Database.ExecuteSqlRawAsync("NOTIFY job_added;", cancellationToken: cancellationToken);        
+        await _context.Database.ExecuteSqlRawAsync($"select pg_notify('job_added', {job.Id};", cancellationToken: cancellationToken);        
     }
 }

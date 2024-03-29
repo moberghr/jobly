@@ -1,3 +1,5 @@
+using Jobly.Core.Entities;
+
 namespace Jobly.Core;
 
 /// <summary>
@@ -5,5 +7,5 @@ namespace Jobly.Core;
 /// </summary>
 public interface IJoblyNotifer
 {
-    Task NotifyAsync(CancellationToken cancellationToken = default);
+    Task NotifyAsync(Job job, CancellationToken cancellationToken = default);
 }

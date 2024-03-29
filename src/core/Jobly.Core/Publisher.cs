@@ -90,17 +90,17 @@ public class Publisher<TContext> : IPublisher
         var jobState = JobHelper.CreateJobAndJobState(message, _retries, name, scheduleTime, maxRetries, parentId, null, null);
 
         await _context.Set<JobState>().AddAsync(jobState);
-        await NotifyJob();
+        await NotifyJob(jobState.Job);
 
         return jobState.JobId;
     }
-
-    // todo: use abstraction for this, this is postgresql specific, could be a part of some notify abstraction
-    private async Task NotifyJob()
+    
+    private async Task NotifyJob(Job job)
     {
+        // todo: when we add priority, do not send notification for low priority jobs
         if (_notifier != null)
         {
-            await _notifier!.NotifyAsync();
+            await _notifier!.NotifyAsync(job);
         }
     }
 }
