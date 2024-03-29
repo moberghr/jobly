@@ -71,11 +71,12 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
             _logging.LogInformation("Worker count: {0}", _services.Count);
             try
             {
-                // todo: get time from configuration
                 await Task.Delay(_pollingInterval, _cancellationTokenSource.Token);
             }
             catch (TaskCanceledException e)
             {
+                // When we cancel the token because of a notification, Delay will throw a TaskCanceledException, that is 
+                // expected.
                 _logging.LogDebug("Task was canceled: {0}", e.Message);
             }
         }
@@ -124,6 +125,7 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
         }
     }
 
+    // This is probably a bottleneck, should be optimized, only resetting the token if we are in waiting state.
     private void ResetCancellationTokenSource(CancellationToken stoppingToken)
     {
         lock (_ctsLock)
