@@ -31,6 +31,21 @@ public static class ServiceConfiguration
         return CreateJoblyServices<TContext>(services, options);
     }
 
+    /// <summary>
+    /// Register PostgreSQL Notify/Listner provider for Jobly, it is only available on PostgreSQL
+    /// make sure you register the AddPostgresNotifyWakeupProvider in the worker service so that the
+    /// worker will be able to listen for the notification
+    /// </summary>
+    /// <param name="services">CI service</param>
+    /// <typeparam name="TContext">Db context</typeparam>
+    /// <returns></returns>
+    public static IServiceCollection AddPostgresNotifyJob<TContext>(this IServiceCollection services)
+        where TContext : DbContext
+    {
+        services.AddScoped<IJoblyNotifer>(x => new PostgresNotifyNotifyProvider<TContext>(x.GetRequiredService<TContext>()));
+        return services;
+    }
+    
     private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services, Action<JoblyConfiguration>? options)
         where TContext : DbContext
     {
@@ -48,7 +63,7 @@ public static class ServiceConfiguration
         });
         
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(),
-            x.GetRequiredService<IConfigureOptions<JoblyConfiguration>>()));
+            x.GetRequiredService<IConfigureOptions<JoblyConfiguration>>(), x));
         services.AddScoped<IRecurringJobPublisher>(x =>
             new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IJoblyService>(x => new JoblyService<TContext>(x.GetRequiredService<TContext>()));

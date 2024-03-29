@@ -10,12 +10,4 @@ public static class ConfigurationHelper
         configuration.Configure(options);
         return options;
     }
-    
-    public static JoblyWorkerConfiguration ConfigureDefault(this IConfigureOptions<JoblyWorkerConfiguration> configuration)
-    {
-        var options = new JoblyWorkerConfiguration();
-        configuration.Configure(options);
-        return options;
-    }
-    
 }

@@ -7,10 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-builder.Services.AddControllers(options =>
-{
-    
-});
+builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -20,11 +17,13 @@ builder.Services.AddJoblyWorker<TestContext>(options =>
     options.WorkerCount = 10;
     options.PollingInterval = TimeSpan.FromSeconds(10);
 });
+builder.Services.AddPostgresNotifyWakeupProvider<TestContext>();
 
 builder.Services.AddJobly<TestContext>(options =>
 {
     options.RetryCount = 0;
 });
+builder.Services.AddPostgresNotifyJob<TestContext>();
 
 
 var app = builder.Build();

@@ -16,4 +16,11 @@ public static class ServiceConfiguration
         
         return services;
     }
+    
+    public static IServiceCollection AddPostgresNotifyWakeupProvider<TContext>(this IServiceCollection services)
+        where TContext : DbContext
+    {
+        services.AddTransient<IWakeupProvider, PostgresNotifyWakeupProvider<TContext>>();
+        return services;
+    }
 }

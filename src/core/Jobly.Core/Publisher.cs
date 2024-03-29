@@ -1,6 +1,7 @@
 ﻿using Jobly.Core.Entities;
 using Jobly.Core.Helper;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Jobly.Core;
@@ -29,12 +30,14 @@ public class Publisher<TContext> : IPublisher
 {
     private readonly TContext _context;
     private readonly int _retries;
+    private readonly IJoblyNotifer? _notifier;
     
-    public Publisher(TContext context, IConfigureOptions<JoblyConfiguration> configuration)
+    public Publisher(TContext context, IConfigureOptions<JoblyConfiguration> configuration, IServiceProvider serviceProvider)
     {
         var options = configuration.ConfigureDefault();
         _retries = options.RetryCount;
         _context = context;
+        _notifier = serviceProvider.GetService<IJoblyNotifer>();
     }
 
     public async Task<string> Publish<T>(T message)
@@ -95,6 +98,9 @@ public class Publisher<TContext> : IPublisher
     // todo: use abstraction for this, this is postgresql specific, could be a part of some notify abstraction
     private async Task NotifyJob()
     {
-        await _context.Database.ExecuteSqlRawAsync("NOTIFY job_added;");
+        if (_notifier != null)
+        {
+            await _notifier!.NotifyAsync();
+        }
     }
 }
