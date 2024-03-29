@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace Jobly.Worker;
 
@@ -10,11 +11,21 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
 {
     private readonly ILogger<JoblyWorkerPool<TContext>> _logging;
     private readonly IServiceProvider _serviceProvider;
+
+    private Task _notifyTask;
     // private readonly List<(JoblyWorker<TContext> service, CancellationTokenSource cancellationTokenSource)> _services = new();
     private readonly List<(Task task, CancellationTokenSource cancellationTokenSource)> _services = new();
+    private readonly object _ctsLock = new object();
+    private CancellationTokenSource _cancellationTokenSource;
+    
+    // Setting the polling interval to 10 seconds, this should be configurable. making this slow so I can test 
+    // notify feature.
+    private readonly TimeSpan _pollingInterval = TimeSpan.FromSeconds(10);
     
     // TODO: get from configuration
     private int _maxWorkers = 50;
+    
+    // should be part of health check, if _lastTick is older then lets say 3 polling intervals, then return unhealthy
     private DateTime _lastTick = DateTime.UtcNow;
     
     public JoblyWorkerPool(IServiceProvider serviceProvider, ILogger<JoblyWorkerPool<TContext>> logging)
@@ -25,6 +36,10 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        // Starts to listen for notifications of new jobs, todo: move this to somewhere else with more robustness and health checks.
+        // Yes, I don't want to 
+        _notifyTask = ListenForUpdatesNotifications(stoppingToken);
         while (!stoppingToken.IsCancellationRequested)
         {
             _lastTick = DateTime.UtcNow;
@@ -32,7 +47,8 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
             {
                 // if (service.ExecuteTask is {IsCompleted: false}) continue;
                 // todo: handle errors
-                if (!task.IsCompleted) continue;
+                // Check if task is running, the not do anything.
+                if (task is {IsFaulted: false, IsCanceled: false, IsCompleted: false}) continue;
                 
                 // If the service is not running, scale down, this means that the queue was empty when the service 
                 // was polling for a job to process.
@@ -45,9 +61,75 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
             {
                 StartWorker();
             }
-            _logging.LogInformation("Worker count: {0}", _services.Count);
             
-            await Task.Delay(300, stoppingToken);
+            if (_notifyTask.IsFaulted || _notifyTask.IsCanceled || _notifyTask.IsCompleted)
+            {
+                _logging.LogError("Notification task failed: {0}", _notifyTask.Exception?.Message);
+                _notifyTask = ListenForUpdatesNotifications(stoppingToken);
+            }
+            
+            _logging.LogInformation("Worker count: {0}", _services.Count);
+            try
+            {
+                // todo: get time from configuration
+                await Task.Delay(_pollingInterval, _cancellationTokenSource.Token);
+            }
+            catch (TaskCanceledException e)
+            {
+                _logging.LogDebug("Task was canceled: {0}", e.Message);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Listens for notifications that will trigger a new tick, this should use notify abstraction.
+    /// </summary>
+    /// <param name="stoppingToken"></param>
+    private async Task ListenForUpdatesNotifications(CancellationToken stoppingToken)
+    {
+        // ListenForNotification should be part of some notify abstraction/interface.
+        await ListenForNotifications(stoppingToken, e =>
+        {
+            _logging.LogInformation("Received notification: {0}", e.Payload);
+            _cancellationTokenSource.Cancel();
+            ResetCancellationTokenSource(stoppingToken);
+        });
+        
+    }
+    
+    // Listens for postgresql notification, this should be part of some notify abstraction and not here.
+    private async Task ListenForNotifications(CancellationToken cancellationToken, Action<NpgsqlNotificationEventArgs> onNotification)
+    {
+        string channelName = "job_added"; // take from configuration
+        using var scope = _serviceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<TContext>();
+
+        if (dbContext.Database.GetDbConnection() is not NpgsqlConnection npgsqlConnection)
+            throw new InvalidOperationException("Database connection must be of type NpgsqlConnection");
+
+        // Ensure the connection is open
+        if (npgsqlConnection.State != System.Data.ConnectionState.Open)
+            await npgsqlConnection.OpenAsync(cancellationToken);
+        
+        npgsqlConnection.Notification += (o, e) => onNotification(e);
+
+        await using (var command = new NpgsqlCommand($"LISTEN {channelName};", npgsqlConnection))
+        {
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            await npgsqlConnection.WaitAsync(cancellationToken);
+        }
+    }
+
+    private void ResetCancellationTokenSource(CancellationToken stoppingToken)
+    {
+        lock (_ctsLock)
+        {
+            _cancellationTokenSource.Dispose();
+            _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         }
     }
     

@@ -38,7 +38,7 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
             EmailLogId = emailLog.Id
         };
 
-        for (var i = 0; i < 5000; i++)
+        for (var i = 0; i < 10; i++)
         {
             await _publisher.Publish(sendEmailRequest);
         }
