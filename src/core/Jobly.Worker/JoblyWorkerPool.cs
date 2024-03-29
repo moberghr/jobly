@@ -12,14 +12,15 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
     private readonly IServiceProvider _serviceProvider;
     private readonly IWakeupProvider? _wakeupProvider;
 
+    // Task that listens for notifications from the wakeup provider.
     private Task? _notifyTask;
 
     // Contains all the services that are running.
     private readonly List<(Task task, CancellationTokenSource cancellationTokenSource)> _services = new();
     private readonly object _ctsLock = new();
-    private CancellationTokenSource _cancellationTokenSource;
+    private CancellationTokenSource _cancellationTokenSource = null!;
 
-    // should be part of health check, if _lastTick is older then lets say 3 polling intervals, then return unhealthy
+    // should be part of health check, if _lastTick is older than lets say 3 polling intervals, then return unhealthy
     private DateTime _lastTick = DateTime.UtcNow;
 
     private readonly JoblyWorkerConfiguration _configuration;
@@ -91,7 +92,6 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
     /// <param name="stoppingToken"></param>
     private async Task ListenForUpdatesNotifications(CancellationToken stoppingToken)
     {
-        // ListenForNotification should be part of some notify abstraction/interface.
         if (_wakeupProvider is null)
         {
             return;
@@ -104,6 +104,13 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
         });
     }
 
+    /// <summary>
+    /// ResetCancellationTokenSource will dispose the old token source and create a new one.
+    /// It is uesed to combine the stoppingToken with the wakeupProvider token.
+    /// If the wakeupProvider will trigger a notification we cancel the cancellationTokenSource
+    /// so that the worker will start a new tick.
+    /// </summary>
+    /// <param name="stoppingToken">Stopping token from the background service</param>
     private void ResetCancellationTokenSource(CancellationToken stoppingToken)
     {
         if (_wakeupProvider is null)
@@ -120,7 +127,7 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
     }
 
     /// <summary>
-    /// Starts a worker that will process jobs. When the worker hasn't any jobs, it will self terminate.
+    /// Starts a worker on a background thread that will process jobs. When the worker hasn't any more jobs, it will self terminate.
     /// </summary>
     private void StartWorker()
     {

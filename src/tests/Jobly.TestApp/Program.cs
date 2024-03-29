@@ -12,6 +12,8 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddServices(builder.Configuration);
+
+// Register Jobly worker
 builder.Services.AddJoblyWorker<TestContext>(options =>
 {
     options.WorkerCount = 10;
@@ -19,6 +21,7 @@ builder.Services.AddJoblyWorker<TestContext>(options =>
 });
 builder.Services.AddPostgresNotifyWakeupProvider<TestContext>();
 
+// Register Jobly Client
 builder.Services.AddJobly<TestContext>(options =>
 {
     options.RetryCount = 0;
