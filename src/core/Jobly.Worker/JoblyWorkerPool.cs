@@ -1,3 +1,4 @@
+using Jobly.Worker.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,6 +15,7 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
 
     // Task that listens for notifications from the wakeup provider.
     private Task? _notifyTask;
+    private WakeupType? _wakeupType;
 
     // Contains all the services that are running.
     private readonly List<(Task task, CancellationTokenSource cancellationTokenSource)> _services = new();
@@ -32,6 +34,7 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
         _serviceProvider = serviceProvider;
         _logging = logging;
         _wakeupProvider = serviceProvider.GetService<IWakeupProvider>();
+        _wakeupType = WakeupType.Startup;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -48,6 +51,10 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
             {
                 // Check if task is running, the not do anything.
                 if (task is {IsFaulted: false, IsCanceled: false, IsCompleted: false}) continue;
+                if (task.IsFaulted)
+                {
+                    _logging.LogError("Worker task failed: {0}", task.Exception?.Message);
+                }
 
                 // todo: should we log the exception or should that be part of the worker service?
 
@@ -57,11 +64,25 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
                 _services.Remove((task, cancellationTokenSource));
             }
 
-            // The problem with this approach is that it will take a while to scale up the workers.
+            // If the worker count is less than the configured worker count, start a new worker so that we can
+            // always process at least one job.
             if (_services.Count < _configuration.WorkerCount)
             {
-                StartWorker();
+                // If a batch was added, then we should scale up to the configured worker count.
+                if (_wakeupType is WakeupType.BatchAdded or WakeupType.Startup) // todo: maybe startup should start at 50% of worker count?
+                {
+                    while (_configuration.WorkerCount > _services.Count)
+                    {
+                        StartWorker();
+                    }
+                }
+                else
+                {
+                    StartWorker();
+                }
             }
+            
+            _wakeupType = null;
 
             // Restart the wakeupProvider if it has failed.
             if (_wakeupProvider != null &&
@@ -97,7 +118,7 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
             return;
         }
 
-        await _wakeupProvider.ListenForUpdatesNotifications(stoppingToken, () =>
+        await _wakeupProvider.ListenForUpdatesNotifications(stoppingToken, (wakeupType) =>
         {
             _logging.LogInformation("Received notification");
             _cancellationTokenSource.Cancel();
@@ -131,7 +152,7 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
     /// </summary>
     private void StartWorker()
     {
-        _logging.LogInformation("Starting worker");
+        // _logging.LogInformation("Starting worker");
 
         var cts = new CancellationTokenSource();
         var task = Task.Run(async () =>

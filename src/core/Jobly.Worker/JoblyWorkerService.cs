@@ -32,7 +32,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         _logger = logger;
     }
 
-    public async Task UpdateJobStatus(Job job, CancellationToken cancellationToken)
+    private async Task UpdateJobStatus(Job job, CancellationToken cancellationToken)
     {
         using var scope = _serviceScopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
@@ -54,7 +54,11 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         var isJobProcessing = true;
         while (!cancellationToken.IsCancellationRequested && isJobProcessing)
         {   
+            // benchamrk this
+            var now = DateTime.UtcNow;
             isJobProcessing = await GetAndProcessJob(cancellationToken);
+            var elapsed = DateTime.UtcNow - now;
+            // _logger.LogInformation("Worker {workerId} processed job in {elapsed} ms", _workerId, elapsed.TotalMilliseconds);
         }
     }
 
@@ -75,7 +79,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
                         Job = x,
                         IsParent = x.ChildJobs.Any(),
                     })
-            .OrderBy(x => x.Job.ScheduleTime)
+            .OrderBy(x => x.Job.Priority)
+            .ThenBy(x => x.Job.ScheduleTime)
             .TagWith(InterceptorConstants.RowLockTableJob)
             .FirstOrDefault();
 
@@ -84,8 +89,6 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         // if we didn't find any messages then we wait, otherwise we query again immediately 
         if (job == null)
         {
-            // await Task.Delay(1000, cancellationToken);
-
             return false;
         }
 
@@ -119,6 +122,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     {
         using var scope = _serviceScopeFactory.CreateScope();
 
+        // todo: I don't think we should be creating a new context here but rather use the existing one
+        // we may end up with double task if exception is thrown after this method and before the commit.
         var temporaryContext = scope.ServiceProvider.GetRequiredService<TContext>();
 
         var recurringJob = await temporaryContext.Set<RecurringJob>()
@@ -148,6 +153,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             Type = recurringJob.Type,
             CreateTime = createTime,
             ScheduleTime = nextJobScheduleTime ?? createTime,
+            Priority = job.Priority,
             CurrentState = State.Enqueued,
             RecurringJobId = recurringJob.Id,
             JobStates = jobStats
@@ -226,15 +232,31 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     private static async Task UpdateChildJobs(TContext context, string parentJobId, CancellationToken cancellationToken)
     {
         await context.Set<Job>()
-            .Where(x => x.ParentJobId == parentJobId || x.ParentBatch.Job.ParentJobId == parentJobId)
+            .Where(x => x.ParentJobId == parentJobId || x.ParentBatch.Job.ParentJobId == parentJobId) // todo: we should remove this parentBatch
             .Where(x => x.CurrentState == State.Awaiting)
             // If a job has Batch property in it, then it's a placeholder job, and we don't want to change current status of a placeholder job
-            .Where(x => x.Batch == null)
+            .Where(x => x.Batch == null) // todo: how do we start it then?
             .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
     }
 
     private static async Task UpdateCurrentAndNextBatchFromChildJob(TContext context, string batchId, CancellationToken cancellationToken)
     {
+        // // Decrease the counter of the batch // todo: I'm working on getting rid of the locking if possible
+        // await context.Set<Batch>()
+        //     .Where(x => x.Id == batchId)
+        //     .ExecuteUpdateAsync(x => x.SetProperty(y => y.Counter, y => y.Counter - 1), cancellationToken);
+        //
+        // var count = await context.Set<Batch>()
+        //     .Where(x => x.Id == batchId)
+        //     .Select(x => x.Counter)
+        //     .FirstOrDefaultAsync(cancellationToken);
+        //
+        // // If all jobs in a single batch are finished
+        // if (count > 0)
+        // {
+        //     return;
+        // }
+        
         var currentBatch = await context.Set<Batch>()
             .Where(x => x.Id == batchId)
             .TagWith(InterceptorConstants.RowLockTableBatch)
@@ -257,11 +279,14 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         currentBatch.Counter = 0;
 
         var currentBatchJob = await context.Set<Job>()
-            .Where(x => x.Id == currentBatch.Id)
+            .Where(x => x.Id == batchId)
             .FirstAsync(cancellationToken);
 
         currentBatchJob.CurrentState = State.Completed;
 
+        
+        // todo: how is this any different from the UpdateChildJobs method? Why dont we start next jobs there whether
+        // they are in a batch or not?
         var nextBatchJob = await context.Set<Job>()
             .Where(x => x.ParentJobId == currentBatchJob.Id)
             .FirstOrDefaultAsync(cancellationToken);

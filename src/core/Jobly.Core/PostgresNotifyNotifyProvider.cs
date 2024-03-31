@@ -14,6 +14,13 @@ public class PostgresNotifyNotifyProvider<TContext> : IJoblyNotifer where TConte
 
     public async Task NotifyAsync(Job job, CancellationToken cancellationToken = default)
     {
-        await _context.Database.ExecuteSqlRawAsync($"select pg_notify('job_added', {job.Id};", cancellationToken: cancellationToken);        
+        await _context.Database.ExecuteSqlRawAsync($"select pg_notify('job_added', 'job:{job.Id}');",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task NotifyAsync(CancellationToken cancellationToken = default)
+    {
+        await _context.Database.ExecuteSqlRawAsync("select pg_notify('job_added', 'batch');",
+            cancellationToken: cancellationToken);
     }
 }

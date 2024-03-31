@@ -131,6 +131,7 @@ public static class ServiceConfiguration
         job.Property(p => p.CreateTime);
         job.Property(p => p.ScheduleTime);
         job.Property(p => p.CurrentState);
+        job.Property(p => p.Priority);
         job.Property(p => p.RetriedTimes);
         job.Property(p => p.MaxRetries);
         job.Property(p => p.ParentJobId);
@@ -149,8 +150,8 @@ public static class ServiceConfiguration
             .WithMany(p => p.Jobs)
             .HasForeignKey(p => p.BatchId);
         
-        job.HasIndex(p => new {p.CurrentState, p.ScheduleTime})
-            .IsDescending(false, false)
+        job.HasIndex(p => new {p.CurrentState, p.Priority, p.ScheduleTime})
+            .IsDescending(false, false, false)
             .HasFilter("\"current_state\" = 1");
             
         job.HasIndex(p => p.CurrentState);

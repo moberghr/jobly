@@ -8,4 +8,6 @@ namespace Jobly.Core;
 public interface IJoblyNotifer
 {
     Task NotifyAsync(Job job, CancellationToken cancellationToken = default);
+    
+    Task NotifyAsync(CancellationToken cancellationToken = default);
 }

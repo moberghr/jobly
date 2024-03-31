@@ -1,3 +1,4 @@
+using Jobly.Worker.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -14,7 +15,7 @@ public class PostgresNotifyWakeupProvider<TContext> : IWakeupProvider where TCon
         _serviceProvider = serviceProvider;
     }
 
-    public async Task ListenForUpdatesNotifications(CancellationToken cancellationToken, Action action)
+    public async Task ListenForUpdatesNotifications(CancellationToken cancellationToken, Action<WakeupType> action)
     {
         var channelName = "job_added"; // take from configuration
         using var scope = _serviceProvider.CreateScope();
@@ -27,7 +28,17 @@ public class PostgresNotifyWakeupProvider<TContext> : IWakeupProvider where TCon
         if (npgsqlConnection.State != System.Data.ConnectionState.Open)
             await npgsqlConnection.OpenAsync(cancellationToken);
         
-        npgsqlConnection.Notification += (o, e) => action();
+        npgsqlConnection.Notification += (o, e) =>
+        {
+            var payload = e.Payload;
+            if (payload.StartsWith("batch"))
+            {
+                action(WakeupType.BatchAdded);
+            } else if (payload.StartsWith("job"))
+            {
+                action(WakeupType.JobAdded);
+            }
+        };
 
         await using (var command = new NpgsqlCommand($"LISTEN {channelName};", npgsqlConnection))
         {

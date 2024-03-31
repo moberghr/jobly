@@ -17,6 +17,8 @@ public class Job
 
     public DateTime ScheduleTime { get; set; }
 
+    public required Priority Priority { get; set; }
+
     public State CurrentState { get; set; }
 
     public int? RecurringJobId { get; set; }

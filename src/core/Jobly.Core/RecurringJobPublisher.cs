@@ -28,7 +28,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
     {
         ValidateCronExpression(cronExpression);
 
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        await using var transaction = await _context.Database.BeginTransactionAsync();
 
         var job = CreateJobForRecurringJob(message, cronExpression);
 
@@ -60,6 +60,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             Type = jobType!,
             CreateTime = createTime,
             ScheduleTime = nextJobScheduleTime ?? createTime,
+            Priority = Priority.Low, // todo: should this be configurable in the recurring job data?
             CurrentState = State.Enqueued,
             JobStates = jobStats
         };

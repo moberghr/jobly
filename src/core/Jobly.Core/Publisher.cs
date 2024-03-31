@@ -1,4 +1,5 @@
 ﻿using Jobly.Core.Entities;
+using Jobly.Core.Enums;
 using Jobly.Core.Helper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,8 @@ public interface IPublisher
     Task<string> Publish<T>(T message, int maxRetries, string parentId) where T : class;
 
     Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries, string parentId) where T : class;
+    
+    Task<string> Publish<T>(T message, Priority? priority = null, DateTime? scheduleTime = null, int? maxRetries = null, string? parentId = null) where T : class;
 }
 
 public class Publisher<TContext> : IPublisher
@@ -43,51 +46,57 @@ public class Publisher<TContext> : IPublisher
     public async Task<string> Publish<T>(T message)
         where T : class
     {
-        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, maxRetries: null, null);
+        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, priority: null, maxRetries: null, null);
     }
 
     public async Task<string> Publish<T>(T message, DateTime scheduleTime)
         where T : class
     {
-        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, maxRetries: null, null);
+        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, null, maxRetries: null, null);
     }
 
     public async Task<string> Publish<T>(T message, int maxRetries) where T : class
     {
-        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, maxRetries, null);
+        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, null, maxRetries, null);
     }
 
     public async Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries) where T : class
     {
-        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, maxRetries, null);
+        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, null, maxRetries, null);
     }
 
     public async Task<string> Publish<T>(T message, string parentId)
        where T : class
     {
-        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, maxRetries: null, parentId);
+        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, priority:null, maxRetries: null, parentId);
     }
 
     public async Task<string> Publish<T>(T message, DateTime scheduleTime, string parentId)
         where T : class
     {
-        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, maxRetries: null, parentId);
+        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, priority: null, maxRetries: null, parentId);
     }
 
     public async Task<string> Publish<T>(T message, int maxRetries, string parentId) where T : class
     {
-        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, maxRetries, parentId);
+        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, priority: null, maxRetries, parentId);
     }
 
     public async Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries, string parentId) where T : class
     {
-        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, maxRetries, parentId);
+        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, null, maxRetries, parentId);
     }
 
-    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? maxRetries, string? parentId)
+    public async Task<string> Publish<T>(T message, Priority? priority, DateTime? scheduleTime, int? maxRetries,
+        string? parentId = null) where T : class
+    {
+        return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, priority, maxRetries, parentId);
+    }
+
+    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, Priority? priority, int? maxRetries, string? parentId)
         where T : class
     {
-        var jobState = JobHelper.CreateJobAndJobState(message, _retries, name, scheduleTime, maxRetries, parentId, null, null);
+        var jobState = JobHelper.CreateJobAndJobState(message, _retries, name, scheduleTime, priority ?? Priority.Medium, maxRetries, parentId, null, null);
 
         await _context.Set<JobState>().AddAsync(jobState);
         await NotifyJob(jobState.Job);
