@@ -1,4 +1,5 @@
 using Jobly.Core;
+using Jobly.Test.App;
 using Jobly.Test.Shared;
 using Jobly.UI.UIMiddleware;
 using Jobly.Worker;
@@ -13,12 +14,15 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddServices(builder.Configuration);
 
+builder.Services.AddTransient<LoggingInterceptor>();
+
 // Register Jobly worker
 builder.Services.AddJoblyWorker<TestContext>(options =>
 {
     options.WorkerCount = 10;
     // We get away with long polling because we are using a notify wakeup provider.
     options.PollingInterval = TimeSpan.FromSeconds(1);
+    options.Interceptors.Add<LoggingInterceptor>();
 });
 builder.Services.AddPostgresNotifyWakeupProvider<TestContext>();
 

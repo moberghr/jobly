@@ -1,4 +1,5 @@
 using Jobly.Worker.Enums;
+using Jobly.Worker.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -7,9 +8,9 @@ using Microsoft.Extensions.Options;
 
 namespace Jobly.Worker;
 
-public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbContext
+public class JoblyWorkerScheduler<TContext> : BackgroundService where TContext : DbContext
 {
-    private readonly ILogger<JoblyWorkerPool<TContext>> _logging;
+    private readonly ILogger<JoblyWorkerScheduler<TContext>> _logging;
     private readonly IServiceProvider _serviceProvider;
     private readonly IWakeupProvider? _wakeupProvider;
 
@@ -27,10 +28,10 @@ public class JoblyWorkerPool<TContext> : BackgroundService where TContext : DbCo
 
     private readonly JoblyWorkerConfiguration _configuration;
 
-    public JoblyWorkerPool(IServiceProvider serviceProvider, ILogger<JoblyWorkerPool<TContext>> logging,
-        IConfigureOptions<JoblyWorkerConfiguration> configuration)
+    public JoblyWorkerScheduler(IServiceProvider serviceProvider, ILogger<JoblyWorkerScheduler<TContext>> logging,
+        IOptions<JoblyWorkerConfiguration> configuration)
     {
-        _configuration = configuration.ConfigureDefault();
+        _configuration = configuration.Value;
         _serviceProvider = serviceProvider;
         _logging = logging;
         _wakeupProvider = serviceProvider.GetService<IWakeupProvider>();

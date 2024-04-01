@@ -40,34 +40,21 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
         {
             EmailLogId = emailLog.Id
         };
-        //
-        // for (var i = 0; i < 10; i++)
-        // {
-        //     await _publisher.Publish(sendEmailRequest);
-        // }
+        
+        for (var i = 0; i < 10; i++)
+        {
+            await _publisher.Publish(sendEmailRequest);
+        }
         
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         
-        var list = new List<SendEmailRequest>();
-        for (var i = 0; i < 2000; i++)
-        {
-            list.Add(sendEmailRequest);
-        }
-        
-        // foreach (var emailRequest in list)
-        // {
-        //     await _publisher.Publish(emailRequest);
-        // }
-        
-        await _batchPublisher.StartNew(list);
-        
         await _context.SaveChangesAsync();
-        // string parentId = await _publisher.Publish(sendEmailRequest);
-        // //
-        // for (int i = 0; i < 4; i++)
-        // {
-        //     await _publisher.Publish(sendEmailRequest, parentId);
-        // }
+        string parentId = await _publisher.Publish(sendEmailRequest);
+        //
+        for (int i = 0; i < 4; i++)
+        {
+            await _publisher.Publish(sendEmailRequest, parentId);
+        }
         
         await _context.SaveChangesAsync();
         

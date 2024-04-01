@@ -55,7 +55,10 @@ public static class ServiceConfiguration
         builder.AddApplicationPart(assembly)
             .AddRazorRuntimeCompilation();
 
-        services.Configure(options ?? (_ => { }));
+        if (options != null)
+        {
+            services.Configure(options);
+        }
 
         services.Configure<MvcRazorRuntimeCompilationOptions>(options =>
         {
@@ -63,7 +66,7 @@ public static class ServiceConfiguration
         });
         
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(),
-            x.GetRequiredService<IConfigureOptions<JoblyConfiguration>>(), x));
+            x.GetRequiredService<IOptions<JoblyConfiguration>>(), x));
         services.AddScoped<IRecurringJobPublisher>(x =>
             new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IJoblyService>(x => new JoblyService<TContext>(x.GetRequiredService<TContext>()));

@@ -35,9 +35,9 @@ public class Publisher<TContext> : IPublisher
     private readonly int _retries;
     private readonly IJoblyNotifer? _notifier;
     
-    public Publisher(TContext context, IConfigureOptions<JoblyConfiguration> configuration, IServiceProvider serviceProvider)
+    public Publisher(TContext context, IOptions<JoblyConfiguration> configuration, IServiceProvider serviceProvider)
     {
-        var options = configuration.ConfigureDefault();
+        var options = configuration.Value;
         _retries = options.RetryCount;
         _context = context;
         _notifier = serviceProvider.GetService<IJoblyNotifer>();
