@@ -148,6 +148,12 @@ public class JoblyService<TContext> : IJoblyService
         return query;
     }
 
+    // todo: This in incredibly inefficient, we should refactor this
+    // imagine have millions of jobs in the system, we are getting every sing job that has ever gotten in the processing state
+    // the find if it has ever gon in the completed state, and then we are removing the ones that have gone in the completed state
+    // even just ignoring the fact that that it is inefficient, it is also wrong, what happens if a job has gotten in 
+    // failed state and back in processing, then it wont be shown here, or if a completed job was still rerun, then 
+    // it is also not here.
     public async Task<PagedList<JobModel>> GetJobStatesInProcess(BaseListRequest request)
     {
         var proccesingJobIds = await _context.Set<JobState>()
