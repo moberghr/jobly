@@ -61,11 +61,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         var isJobProcessing = true;
         while (!cancellationToken.IsCancellationRequested && isJobProcessing)
         {   
-            // benchamrk this
-            var now = DateTime.UtcNow;
             isJobProcessing = await GetAndProcessJob(cancellationToken);
-            var elapsed = DateTime.UtcNow - now;
-            // _logger.LogInformation("Worker {workerId} processed job in {elapsed} ms", _workerId, elapsed.TotalMilliseconds);
         }
     }
 
