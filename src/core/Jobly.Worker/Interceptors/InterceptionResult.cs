@@ -1,5 +1,9 @@
 namespace Jobly.Worker.Interceptors;
 
+/// <summary>
+/// This class is based on the <see cref="InterceptionResult"/> class from the <see cref="Microsoft.EntityFrameworkCore"/> namespace.
+/// And is very much in progress.
+/// </summary>
 public readonly struct InterceptionResult
 {
     /// <summary>
