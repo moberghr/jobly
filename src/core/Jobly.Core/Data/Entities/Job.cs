@@ -42,4 +42,8 @@ public class Job
     public Batch? Batch { get; set; }
 
     public Batch? ParentBatch { get; set; }
+    
+    public Guid? CurrentServerId { get; set; }
+    
+    public Guid? CurrentWorkerId { get; set; }
 }

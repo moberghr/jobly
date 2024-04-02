@@ -150,6 +150,25 @@ public class JoblyWorkerScheduler<TContext> : BackgroundService, IJoblyWorkerSch
         }
     }
     
+    /// <summary>
+    /// Finds and marks jobs that are orphaned in error state.
+    /// We find them by two ways:
+    /// 1. Jobs that are in processing state from server that is not alive.
+    /// 2. Jobs that are in processing state from this server and the worker is not alive.
+    ///
+    /// We run those jobs through the error pipeline.
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    private async Task CleanupOrphanedJobs(CancellationToken cancellationToken)
+    {
+        // The problem with orpaned jobs is that the interceptors are not setup to handle them.
+        // so only generic error handling will be done.
+        // Or we setup a new pipeline for orphaned jobs.
+        // this may favor the EF Core interceptor approach, like we have setup here.
+        // that way we don't need to call before method on the interceptors.
+        // todo: implement
+    }
+    
     private async Task UpdateHeartbeat(CancellationToken cancellationToken)
     {
         using var scope = _serviceProvider.CreateScope();
@@ -221,7 +240,7 @@ public class JoblyWorkerScheduler<TContext> : BackgroundService, IJoblyWorkerSch
         var task = Task.Run(async () =>
         {
             var workerService = _serviceProvider.GetRequiredService<IJoblyWorkerService>();
-            await workerService.GetAndProcessJobs(cts.Token);
+            await workerService.GetAndProcessJobs(_serverId, cts.Token);
         }, cts.Token);
         _services.Add((task, cts));
     }

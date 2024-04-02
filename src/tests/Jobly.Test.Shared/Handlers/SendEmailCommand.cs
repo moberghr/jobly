@@ -14,6 +14,8 @@ public class SendEmailCommand : IRequestHandler<SendEmailRequest, SendEmailRespo
 
     public async Task<SendEmailResponse> Handle(SendEmailRequest request, CancellationToken cancellationToken)
     {
+        await Task.Delay(1000, cancellationToken);
+        return new();
         var emailLog = await _context.EmailLogs
             .Where(x => x.Id == request.EmailLogId)
             .FirstAsync();
