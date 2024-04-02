@@ -119,6 +119,7 @@ public static class ServiceConfiguration
         AddJobStateEntity(modelBuilder);
         AddRecurringJobEntity(modelBuilder);
         AddBatchEntity(modelBuilder);
+        AddServerEntity(modelBuilder);
     }
 
     private static void AddJobEntity(ModelBuilder modelBuilder)
@@ -212,5 +213,21 @@ public static class ServiceConfiguration
         batch.HasOne(p => p.Job)
             .WithOne(p => p.Batch)
             .HasForeignKey<Batch>(p => p.Id);
+    }
+    
+    private static void AddServerEntity(ModelBuilder modelBuilder)
+    {
+        var server = modelBuilder.Entity<Server>();
+        server.ToTable(nameof(Server));
+
+        server.Property(p => p.Id);
+        server.HasKey(p => p.Id);
+
+        server.Property(p => p.StartedTime);
+        
+        server.Property(p => p.LastHeartbeatTime);
+        
+        server.Property(p => p.ServiceCount);
+
     }
 }

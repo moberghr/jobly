@@ -39,10 +39,17 @@ public static class ServiceConfiguration
     private static IServiceCollection AddJoblyWorkerServices<TContext>(this IServiceCollection services) where TContext : DbContext
     {
         services.AddTransient<IJoblyWorkerService, JoblyWorkerService<TContext>>();
-        services.AddSingleton<IHostedService, JoblyWorkerScheduler<TContext>>();
+        
+        // Adding JoblyWorkerScheduler as a singleton so that the health check can access it.
+        services.AddSingleton<IJoblyWorkerScheduler, JoblyWorkerScheduler<TContext>>();
+        services.AddHostedService<IJoblyWorkerScheduler>(provider => provider.GetRequiredService<IJoblyWorkerScheduler>());
         services.AddSingleton<RetryInterceptor>();
         services.AddSingleton<ContinuationInterceptor>();
         
+        services.AddSingleton<JoblyHealthCheck>();
+        services.AddHealthChecks()
+        .AddCheck<JoblyHealthCheck>("jobly_scheduler_health_check");
+
         return services;
     }
     

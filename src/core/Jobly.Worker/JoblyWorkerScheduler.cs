@@ -1,3 +1,4 @@
+using Jobly.Core.Data.Entities;
 using Jobly.Worker.Enums;
 using Jobly.Worker.Interceptors;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +9,12 @@ using Microsoft.Extensions.Options;
 
 namespace Jobly.Worker;
 
-public class JoblyWorkerScheduler<TContext> : BackgroundService where TContext : DbContext
+public interface IJoblyWorkerScheduler : IHostedService
+{
+    bool IsHealthy { get; }
+}
+
+public class JoblyWorkerScheduler<TContext> : BackgroundService, IJoblyWorkerScheduler where TContext : DbContext
 {
     private readonly ILogger<JoblyWorkerScheduler<TContext>> _logging;
     private readonly IServiceProvider _serviceProvider;
@@ -27,6 +33,9 @@ public class JoblyWorkerScheduler<TContext> : BackgroundService where TContext :
     private DateTime _lastTick = DateTime.UtcNow;
 
     private readonly JoblyWorkerConfiguration _configuration;
+    private readonly Guid _serverId = Guid.NewGuid();
+    
+    public bool IsHealthy => DateTime.UtcNow - _lastTick < TimeSpan.FromSeconds(_configuration.PollingInterval.TotalSeconds * 3);
 
     public JoblyWorkerScheduler(IServiceProvider serviceProvider, ILogger<JoblyWorkerScheduler<TContext>> logging,
         IOptions<JoblyWorkerConfiguration> configuration)
@@ -38,8 +47,39 @@ public class JoblyWorkerScheduler<TContext> : BackgroundService where TContext :
         _wakeupType = WakeupType.Startup;
     }
 
+    // public async Task RegisterServerAsync(CancellationToken cancellationToken)
+    public override async Task StartAsync(CancellationToken cancellationToken)
+    {
+        _logging.LogInformation("Starting Jobly server");
+        using var scope = _serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TContext>();
+        var server = new Server
+        {
+            Id = _serverId,
+            StartedTime = DateTime.UtcNow,
+            LastHeartbeatTime = DateTime.UtcNow,
+            ServiceCount = 0,
+        };
+        await context.AddAsync(server, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+        await base.StartAsync(cancellationToken);
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logging.LogInformation("Stopping Jobly server");
+        using var scope = _serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TContext>();
+        await context.Set<Server>()
+            .Where(x => x.Id == _serverId)
+            .ExecuteDeleteAsync(cancellationToken: cancellationToken);
+        await base.StopAsync(cancellationToken);
+    }
+    
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // await RegisterServerAsync(stoppingToken);
         // Create a linked token source that will be used to cancel the worker when a notification is received.
         _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
 
@@ -48,6 +88,7 @@ public class JoblyWorkerScheduler<TContext> : BackgroundService where TContext :
         while (!stoppingToken.IsCancellationRequested)
         {
             _lastTick = DateTime.UtcNow;
+            await UpdateHeartbeat(_lastTick, stoppingToken);
             foreach (var (task, cancellationTokenSource) in _services.ToList())
             {
                 // Check if task is running, the not do anything.
@@ -106,6 +147,25 @@ public class JoblyWorkerScheduler<TContext> : BackgroundService where TContext :
                 _logging.LogDebug("Task was canceled: {0}", e.Message);
             }
         }
+    }
+    
+    private async Task UpdateHeartbeat(DateTime lastTick, CancellationToken cancellationToken)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TContext>();
+        var server = await context.Set<Server>()
+            .Where(x => x.Id == _serverId)
+            .FirstOrDefaultAsync(cancellationToken: cancellationToken);
+
+        if (server == null)
+        {
+            // Register as unhealthy server and self terminate
+            _logging.LogError("Server not found");
+            return;
+        }
+
+        server.LastHeartbeatTime = lastTick;
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>
