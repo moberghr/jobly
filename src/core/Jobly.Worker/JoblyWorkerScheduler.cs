@@ -88,7 +88,6 @@ public class JoblyWorkerScheduler<TContext> : BackgroundService, IJoblyWorkerSch
         while (!stoppingToken.IsCancellationRequested)
         {
             _lastTick = DateTime.UtcNow;
-            await UpdateHeartbeat(_lastTick, stoppingToken);
             foreach (var (task, cancellationTokenSource) in _services.ToList())
             {
                 // Check if task is running, the not do anything.
@@ -134,6 +133,8 @@ public class JoblyWorkerScheduler<TContext> : BackgroundService, IJoblyWorkerSch
                 _notifyTask = ListenForUpdatesNotifications(stoppingToken);
             }
 
+            await UpdateHeartbeat(stoppingToken);
+            
             _logging.LogInformation("Worker count: {0}", _services.Count);
             try
             {
@@ -149,7 +150,7 @@ public class JoblyWorkerScheduler<TContext> : BackgroundService, IJoblyWorkerSch
         }
     }
     
-    private async Task UpdateHeartbeat(DateTime lastTick, CancellationToken cancellationToken)
+    private async Task UpdateHeartbeat(CancellationToken cancellationToken)
     {
         using var scope = _serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
@@ -164,7 +165,8 @@ public class JoblyWorkerScheduler<TContext> : BackgroundService, IJoblyWorkerSch
             return;
         }
 
-        server.LastHeartbeatTime = lastTick;
+        server.LastHeartbeatTime = _lastTick;
+        server.ServiceCount = _services.Count;
         await context.SaveChangesAsync(cancellationToken);
     }
 
