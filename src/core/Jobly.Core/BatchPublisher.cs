@@ -72,7 +72,7 @@ public class BatchPublisher<TContext> : IBatchPublisher
     {
         if (_notifier != null)
         {
-            await _notifier!.NotifyAsync();
+            await _notifier.NotifyAsync();
         }
     }
 }

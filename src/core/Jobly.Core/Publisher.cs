@@ -106,10 +106,9 @@ public class Publisher<TContext> : IPublisher
     
     private async Task NotifyJob(Job job)
     {
-        // todo: when we add priority, do not send notification for low priority jobs
         if (_notifier != null)
         {
-            await _notifier!.NotifyAsync(job);
+            await _notifier.NotifyAsync(job);
         }
     }
 }

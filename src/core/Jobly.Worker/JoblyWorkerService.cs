@@ -133,11 +133,18 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             return false;
         }
         
-            UpdateJobStatusToProcessing(job);
-            
-            // Saving the job in processing state so that it is marked as processing in the db.
-            await context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+        UpdateJobStatusToProcessing(job);
+        
+        // todo: this can be moved to an interceptor
+        if (job.RecurringJobId.HasValue)
+        {
+            // todo: what if the job is rerunning
+            await CreateNextJob(context, job, cancellationToken);
+        }
+        
+        // Saving the job in processing state so that it is marked as processing in the db.
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         
         try
         {
@@ -148,12 +155,6 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             
             // Entering the processing state
             await using var processingTransaction = await context.Database.BeginTransactionAsync(cancellationToken);
-            
-            // todo: this can be moved to an interceptor
-            if (job.RecurringJobId.HasValue)
-            {
-                await CreateNextJob(job, cancellationToken);
-            }
             
             await UpdateJobData(context, job, message: null, cancellationToken);
             
@@ -183,15 +184,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         }
     }
 
-    private async Task CreateNextJob(Job job, CancellationToken cancellationToken)
+    private async Task CreateNextJob(TContext context, Job job, CancellationToken cancellationToken)
     {
-        using var scope = _serviceScopeFactory.CreateScope();
-
-        // todo: I don't think we should be creating a new context here but rather use the existing one
-        // we may end up with double task if exception is thrown after this method and before the commit.
-        var temporaryContext = scope.ServiceProvider.GetRequiredService<TContext>();
-
-        var recurringJob = await temporaryContext.Set<RecurringJob>()
+        var recurringJob = await context.Set<RecurringJob>()
             .Where(x => x.Id == job.RecurringJobId)
             .FirstAsync(cancellationToken);
 
@@ -229,8 +224,6 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         recurringJob.NextExecution = nextJobScheduleTime;
         recurringJob.NextJob = newJob;
-
-        await temporaryContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task ProcessOutboxMessage(Job message, CancellationToken cancellationToken)
