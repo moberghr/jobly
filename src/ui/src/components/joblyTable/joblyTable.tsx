@@ -84,7 +84,7 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, on
                             return (
                                 <React.Fragment key={key}>
                                     <tr
-                                        className={isRowExpanded ? styles["jobly-table__expanded-row"] : ""}
+                                        className={isRowExpanded && styles["jobly-table__expanded-row"]}
                                         key={key}
                                         onClick={() => selectable && handleRowSelectedChange(row.id)}
                                     >
@@ -128,7 +128,7 @@ const JoblyTable = ({ data, columnNames, specialColumnComponents, selectable, on
             </TableComponent>
 
             <JoblyFooter
-                dataLength={!data.data ? 0 : data.data.length}
+                dataLength={data?.data?.length ?? 0}
                 totalCount={data.totalCount}
                 selectedCount={selectededIds.length}
             />
