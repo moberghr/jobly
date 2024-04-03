@@ -8,6 +8,7 @@ import JoblyTitle from "../../components/joblyTitle/joblyTitle";
 import JoblyDetailsLink from "../../components/joblyDetailsLink/joblyDetailsLink";
 import { FaRotateRight, FaX } from "react-icons/fa6";
 import styles from "./jobs.module.scss";
+import { JoblySpecialComponentType } from "../../utils/types";
 
 const DUMMY_DATA = {
     data: [
@@ -77,12 +78,22 @@ const FailedJobs = () => {
                 data={DUMMY_DATA}
                 columnNames={COLUMN_NAMES}
                 specialColumnComponents={{
-                    id: { component: JoblyDetailsLink, props: { type: "primary" } },
-                    job: { component: JoblyDetailsLink, props: { type: "secondary" } },
+                    id: {
+                        component: JoblyDetailsLink,
+                        props: { type: "primary" },
+                        type: JoblySpecialComponentType.Object,
+                    },
+                    job: {
+                        component: JoblyDetailsLink,
+                        props: { type: "secondary" },
+                        type: JoblySpecialComponentType.FailedJob,
+                    },
+                    jobException: {
+                        type: JoblySpecialComponentType.Empty,
+                    },
                 }}
                 selectable
                 onSelectRows={setSelectedRows}
-                failedJobs
             />
         </>
     );
