@@ -15,7 +15,7 @@ public class Job
 
     public DateTime CreateTime { get; set; }
 
-    public DateTime? ScheduleTime { get; set; }
+    public DateTime ScheduleTime { get; set; }
 
     public State CurrentState { get; set; }
 
@@ -24,6 +24,8 @@ public class Job
     public int RetriedTimes { get; set; }
 
     public int MaxRetries { get; set; }
+    
+    public required Priority Priority { get; set; }
 
     public string? ParentJobId { get; set; }
 
@@ -38,6 +40,8 @@ public class Job
     public List<Job> ChildJobs { get; set; } = new();
 
     public Batch? Batch { get; set; }
+    
+    public Guid? CurrentServerId { get; set; }
 
-    public Batch? ParentBatch { get; set; }
+    public Guid? CurrentWorkerId { get; set; }
 }

@@ -1,6 +1,8 @@
 ﻿using Jobly.Core.Entities;
+using Jobly.Core.Enums;
 using Jobly.Core.Helper;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Jobly.Core;
@@ -16,10 +18,12 @@ public class BatchPublisher<TContext> : IBatchPublisher
     where TContext : DbContext
 {
     private readonly TContext _context;
+    private readonly JoblyConfiguration _joblyConfiguration;
 
-    public BatchPublisher(TContext context)
+    public BatchPublisher(TContext context, IOptions<JoblyConfiguration> configuration)
     {
         _context = context;
+        _joblyConfiguration = configuration.Value;
     }
 
     public async Task<string> StartNew<T>(List<T> batchJobMessages) where T : class
@@ -39,7 +43,7 @@ public class BatchPublisher<TContext> : IBatchPublisher
             throw new Exception("List cannot be empty");
         }
 
-        var placeholderJobForBatch = JobHelper.CreateJobAndJobState(batchJobMessages[0], 0, string.Empty, null, null, parentId, Enums.State.Awaiting, null);
+        var placeholderJobForBatch = JobHelper.CreateJobAndJobState(batchJobMessages[0], 0, string.Empty, null, null, _joblyConfiguration.DefaultBatchPriority, parentId, State.Awaiting);
 
         var newBatch = new Batch
         {
@@ -47,7 +51,7 @@ public class BatchPublisher<TContext> : IBatchPublisher
             Counter = batchJobMessages.Count,
         };
 
-        var batchStateJobs = batchJobMessages.Select(x => JobHelper.CreateJobAndJobState(x, 0, string.Empty, null, null, null, batchJobsState, newBatch.Id))
+        var batchStateJobs = batchJobMessages.Select(x => JobHelper.CreateJobAndJobState(x, 0, string.Empty, null, null, _joblyConfiguration.DefaultBatchPriority, null, batchJobsState))
             .ToList();
 
         var batchJobs = batchStateJobs.Select(x => x.Job).ToList();

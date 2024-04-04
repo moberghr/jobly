@@ -1,4 +1,5 @@
 using Jobly.Core;
+using Jobly.Core.Enums;
 using Jobly.Test.Shared;
 using Jobly.UI.UIMiddleware;
 using Jobly.Worker;
@@ -12,7 +13,13 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddServices(builder.Configuration);
-builder.Services.AddJoblyWorker<TestContext>(10);
+builder.Services.AddJoblyWorker<TestContext>(options =>
+{
+    options.RetryCount = 0;
+    options.DefaultBatchPriority = Priority.Low;
+    options.WorkerCount = 5;
+    options.PollingInterval = TimeSpan.FromSeconds(5);
+});
 
 var app = builder.Build();
 

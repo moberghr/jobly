@@ -7,11 +7,13 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
 {
     private readonly TestContext _context;
     private readonly IPublisher _publisher;
+    private readonly IBatchPublisher _batchPublisher;
 
-    public RegisterCommand(TestContext context, IPublisher publisher)
+    public RegisterCommand(TestContext context, IPublisher publisher, IBatchPublisher batchPublisher)
     {
         _context = context;
         _publisher = publisher;
+        _batchPublisher = batchPublisher;
     }
 
     public async Task<RegisterResponse> Handle(RegisterRequest request, CancellationToken cancellationToken)
@@ -40,11 +42,16 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
         {
             EmailLogId = emailLog.Id
         };
+        
+        var batch = new List<SendEmailRequest>();
 
         for (var i = 0; i < 20; i++)
         {
+            batch.Add(sendEmailRequest);
             await _publisher.Publish(sendEmailRequest);
         }
+        
+        await _batchPublisher.StartNew(batch);
 
         string parentId = await _publisher.Publish(sendEmailRequest);
 
