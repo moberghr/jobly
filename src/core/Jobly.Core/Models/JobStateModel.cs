@@ -4,7 +4,7 @@ using Jobly.Core.Enums;
 namespace Jobly.Core.Models;
 public class JobStateModel
 {
-    public int Id { get; set; }
+    public Guid Id { get; set; }
 
     public State State { get; set; }
 
@@ -12,7 +12,7 @@ public class JobStateModel
 
     public string? Message { get; set; }
 
-    public string JobId { get; set; }
+    public Guid JobId { get; set; }
 
     public Job Job { get; set; }
 }

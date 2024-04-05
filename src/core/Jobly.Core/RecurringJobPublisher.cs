@@ -52,7 +52,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         };
 
         var createTime = DateTime.UtcNow;
-        var jobId = Guid.NewGuid().ToString();
+        var jobId = Guid.NewGuid();
         var job = new Job
         {
             Id = jobId,

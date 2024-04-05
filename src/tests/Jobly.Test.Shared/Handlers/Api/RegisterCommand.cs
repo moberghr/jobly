@@ -53,7 +53,7 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
         
         await _batchPublisher.StartNew(batch);
 
-        string parentId = await _publisher.Publish(sendEmailRequest);
+        Guid parentId = await _publisher.Publish(sendEmailRequest);
 
         for (int i = 0; i < 4; i++)
         {

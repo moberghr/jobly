@@ -24,15 +24,13 @@ public class RecurringJob : IConcurrencyToken
 
     public DateTime? LastExecution { get; set; }
 
-    [MaxLength(50)]
     [ForeignKey(nameof(NextJob))]
-    public string? NextJobId { get; set; }
+    public Guid? NextJobId { get; set; }
 
     public Job? NextJob { get; set; }
-
-    [MaxLength(50)]
+    
     [ForeignKey(nameof(LastJob))]
-    public string? LastJobId { get; set; }
+    public Guid? LastJobId { get; set; }
 
     public Job? LastJob { get; set; }
 

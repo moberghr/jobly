@@ -8,33 +8,33 @@ namespace Jobly.Core;
 
 public interface IPublisher
 {
-    Task<string> Publish<T>(T message) where T : class;
-    Task<string> Publish<T>(T message, Priority priority) where T : class;
+    Task<Guid> Publish<T>(T message) where T : class;
+    Task<Guid> Publish<T>(T message, Priority priority) where T : class;
 
-    Task<string> Publish<T>(T message, DateTime scheduleTime) where T : class;
+    Task<Guid> Publish<T>(T message, DateTime scheduleTime) where T : class;
 
-    Task<string> Publish<T>(T message, DateTime scheduleTime, Priority priority) where T : class;
+    Task<Guid> Publish<T>(T message, DateTime scheduleTime, Priority priority) where T : class;
 
-    Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries, string parentId) where T : class;
+    Task<Guid> Publish<T>(T message, DateTime scheduleTime, int maxRetries, Guid parentId) where T : class;
 
-    Task<string> Publish<T>(T message, int maxRetries) where T : class;
+    Task<Guid> Publish<T>(T message, int maxRetries) where T : class;
 
-    Task<string> Publish<T>(T message, int maxRetries, Priority priority) where T : class;
+    Task<Guid> Publish<T>(T message, int maxRetries, Priority priority) where T : class;
 
-    Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries) where T : class;
+    Task<Guid> Publish<T>(T message, DateTime scheduleTime, int maxRetries) where T : class;
 
-    Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries, Priority priority) where T : class;
+    Task<Guid> Publish<T>(T message, DateTime scheduleTime, int maxRetries, Priority priority) where T : class;
 
-    Task<string> Publish<T>(T message, string parentId) where T : class;
-    Task<string> Publish<T>(T message, string parentId, Priority priority) where T : class;
+    Task<Guid> Publish<T>(T message, Guid parentId) where T : class;
+    Task<Guid> Publish<T>(T message, Guid parentId, Priority priority) where T : class;
 
-    Task<string> Publish<T>(T message, DateTime scheduleTime, string parentId) where T : class;
-    Task<string> Publish<T>(T message, DateTime scheduleTime, string parentId, Priority priority) where T : class;
+    Task<Guid> Publish<T>(T message, DateTime scheduleTime, Guid parentId) where T : class;
+    Task<Guid> Publish<T>(T message, DateTime scheduleTime, Guid parentId, Priority priority) where T : class;
 
-    Task<string> Publish<T>(T message, int maxRetries, string parentId) where T : class;
-    Task<string> Publish<T>(T message, int maxRetries, string parentId, Priority priority) where T : class;
+    Task<Guid> Publish<T>(T message, int maxRetries, Guid parentId) where T : class;
+    Task<Guid> Publish<T>(T message, int maxRetries, Guid parentId, Priority priority) where T : class;
 
-    Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries, string parentId, Priority priority)
+    Task<Guid> Publish<T>(T message, DateTime scheduleTime, int maxRetries, Guid parentId, Priority priority)
         where T : class;
 }
 
@@ -50,105 +50,105 @@ public class Publisher<TContext> : IPublisher
         _configuration = configuration.Value;
     }
 
-    public async Task<string> Publish<T>(T message)
+    public async Task<Guid> Publish<T>(T message)
         where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, maxRetries: null, null,
             null);
     }
 
-    public async Task<string> Publish<T>(T message, Priority priority)
+    public async Task<Guid> Publish<T>(T message, Priority priority)
         where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, maxRetries: null, priority,
             null);
     }
 
-    public async Task<string> Publish<T>(T message, DateTime scheduleTime)
+    public async Task<Guid> Publish<T>(T message, DateTime scheduleTime)
         where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, maxRetries: null, null, null);
     }
 
-    public async Task<string> Publish<T>(T message, DateTime scheduleTime, Priority priority)
+    public async Task<Guid> Publish<T>(T message, DateTime scheduleTime, Priority priority)
         where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, maxRetries: null, priority, null);
     }
 
-    public async Task<string> Publish<T>(T message, int maxRetries) where T : class
+    public async Task<Guid> Publish<T>(T message, int maxRetries) where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, maxRetries, null, null);
     }
 
-    public async Task<string> Publish<T>(T message, int maxRetries, Priority priority) where T : class
+    public async Task<Guid> Publish<T>(T message, int maxRetries, Priority priority) where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, maxRetries, priority, null);
     }
 
-    public async Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries) where T : class
+    public async Task<Guid> Publish<T>(T message, DateTime scheduleTime, int maxRetries) where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, maxRetries, null, null);
     }
 
-    public async Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries, Priority priority)
+    public async Task<Guid> Publish<T>(T message, DateTime scheduleTime, int maxRetries, Priority priority)
         where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, maxRetries, priority, null);
     }
 
-    public async Task<string> Publish<T>(T message, string parentId)
+    public async Task<Guid> Publish<T>(T message, Guid parentId)
         where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, maxRetries: null, null,
             parentId);
     }
 
-    public async Task<string> Publish<T>(T message, string parentId, Priority priority)
+    public async Task<Guid> Publish<T>(T message, Guid parentId, Priority priority)
         where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, maxRetries: null, priority,
             parentId);
     }
 
-    public async Task<string> Publish<T>(T message, DateTime scheduleTime, string parentId)
+    public async Task<Guid> Publish<T>(T message, DateTime scheduleTime, Guid parentId)
         where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, maxRetries: null, null, parentId);
     }
 
-    public async Task<string> Publish<T>(T message, DateTime scheduleTime, string parentId, Priority priority)
+    public async Task<Guid> Publish<T>(T message, DateTime scheduleTime, Guid parentId, Priority priority)
         where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, maxRetries: null, priority,
             parentId);
     }
 
-    public async Task<string> Publish<T>(T message, int maxRetries, string parentId) where T : class
+    public async Task<Guid> Publish<T>(T message, int maxRetries, Guid parentId) where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, maxRetries, null, parentId);
     }
 
-    public async Task<string> Publish<T>(T message, int maxRetries, string parentId, Priority priority) where T : class
+    public async Task<Guid> Publish<T>(T message, int maxRetries, Guid parentId, Priority priority) where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime: null, maxRetries, priority,
             parentId);
     }
 
-    public async Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries, string parentId)
+    public async Task<Guid> Publish<T>(T message, DateTime scheduleTime, int maxRetries, Guid parentId)
         where T : class
     {
         return await CreateJobAndJobState(message, name: string.Empty, scheduleTime, maxRetries, null, parentId);
     }
 
-    public Task<string> Publish<T>(T message, DateTime scheduleTime, int maxRetries, string parentId, Priority priority)
+    public Task<Guid> Publish<T>(T message, DateTime scheduleTime, int maxRetries, Guid parentId, Priority priority)
         where T : class
     {
         return CreateJobAndJobState(message, name: string.Empty, scheduleTime, maxRetries, priority, parentId);
     }
 
-    private async Task<string> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? maxRetries,
-        Priority? priority, string? parentId)
+    private async Task<Guid> CreateJobAndJobState<T>(T message, string name, DateTime? scheduleTime, int? maxRetries,
+        Priority? priority, Guid? parentId)
         where T : class
     {
         var jobState = JobHelper.CreateJobAndJobState(message, _configuration.RetryCount, name, scheduleTime,

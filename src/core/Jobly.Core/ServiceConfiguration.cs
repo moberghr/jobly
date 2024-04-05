@@ -125,8 +125,10 @@ public static class ServiceConfiguration
         job.Property(p => p.CurrentServerId);
         job.Property(p => p.CurrentWorkerId);
 
+        // Configure one-to-many relationship with Batch
         job.HasOne(p => p.Batch)
-            .WithOne(p => p.Job);
+            .WithMany(p => p.Jobs)
+            .HasForeignKey(p => p.BatchId); // Job has the foreign key
 
         job.HasMany(x => x.ChildJobs)
             .WithOne(x => x.ParentJob)
@@ -191,9 +193,13 @@ public static class ServiceConfiguration
 
         batch.Property(p => p.Counter);
 
-        batch.HasOne(p => p.Job)
-            .WithOne(p => p.Batch)
-            .HasForeignKey<Batch>(p => p.Id);
+        // batch.HasOne(p => p.ParentJob);
+        // .WithOne(p => p.Batch)
+        // .HasForeignKey<Batch>(p => p.Id);
+        
+        // batch.HasMany(p => p.Jobs)
+        //     .WithOne(p => p.Batch)
+        //     .HasForeignKey(p => p.BatchId); // Job has the foreign key
     }
 
     private static void AddServerEntity(ModelBuilder modelBuilder)

@@ -7,7 +7,7 @@ namespace Jobly.Core.Entities;
 public class Job
 {
     [MaxLength(50)]
-    public string Id { get; set; }
+    public Guid Id { get; set; } = Guid.NewGuid();
 
     public string Type { get; set; }
 
@@ -27,9 +27,7 @@ public class Job
     
     public required Priority Priority { get; set; }
 
-    public string? ParentJobId { get; set; }
-
-    public string? BatchId { get; set; }
+    public Guid? ParentJobId { get; set; }
 
     public RecurringJob? RecurringJob { get; set; }
 
@@ -40,6 +38,8 @@ public class Job
     public List<Job> ChildJobs { get; set; } = new();
 
     public Batch? Batch { get; set; }
+    
+    public Guid? BatchId { get; set; }
     
     public Guid? CurrentServerId { get; set; }
 

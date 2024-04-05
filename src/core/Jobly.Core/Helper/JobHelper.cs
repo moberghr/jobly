@@ -6,12 +6,12 @@ namespace Jobly.Core.Helper;
 
 internal static class JobHelper
 {
-    public static JobState CreateJobAndJobState<T>(T message, int retries, string name, DateTime? scheduleTime, int? maxRetries, Priority? priority, string? parentId, State? state)
+    public static JobState CreateJobAndJobState<T>(T message, int retries, string name, DateTime? scheduleTime, int? maxRetries, Priority? priority, Guid? parentId, State? state)
         where T : class
     {
         var createdTime = DateTime.UtcNow;
 
-        var jobId = Guid.NewGuid().ToString();
+        var jobId = Guid.NewGuid();
 
         var job = new Job
         {
@@ -20,7 +20,7 @@ internal static class JobHelper
             Message = JsonSerializer.Serialize(message),
             Type = message!.GetType().AssemblyQualifiedName!,
             ScheduleTime = scheduleTime ?? createdTime,
-            CurrentState = state != null ? state.Value : string.IsNullOrEmpty(parentId) ? State.Enqueued : State.Awaiting,
+            CurrentState = state ?? (parentId == null ? State.Enqueued : State.Awaiting),
             MaxRetries = maxRetries ?? retries,
             Priority = priority ?? Priority.Normal,
             ParentJobId = parentId,

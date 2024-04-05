@@ -124,7 +124,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             new() { State = State.Enqueued, DateTime = createTime}
         };
 
-        var newJobId = Guid.NewGuid().ToString();
+        var newJobId = Guid.NewGuid();
         var newJob = new Job
         {
             Id = newJobId,
@@ -191,13 +191,13 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         if (job.BatchId != null)
         {
-            await UpdateCurrentAndNextBatchFromChildJob(context, job.BatchId, cancellationToken);
+            await UpdateCurrentAndNextBatchFromChildJob(context, job.BatchId.Value, cancellationToken);
         }
 
         await CreateJobState(context, job.Id, state, string.IsNullOrEmpty(message) ? $"Job {job.Id} is completed" : message, cancellationToken);
     }
 
-    private static async Task CreateJobState(TContext context, string jobId, State state, string? message, CancellationToken cancellationToken)
+    private static async Task CreateJobState(TContext context, Guid jobId, State state, string? message, CancellationToken cancellationToken)
     {
         var jobState = new JobState
         {
@@ -211,7 +211,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task UpdateChildJobs(TContext context, string parentJobId, CancellationToken cancellationToken)
+    private static async Task UpdateChildJobs(TContext context, Guid parentJobId, CancellationToken cancellationToken)
     {
         await context.Set<Job>()
             .Where(x => x.ParentJobId == parentJobId)
@@ -221,7 +221,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
     }
 
-    private static async Task UpdateCurrentAndNextBatchFromChildJob(TContext context, string batchId, CancellationToken cancellationToken)
+    private static async Task UpdateCurrentAndNextBatchFromChildJob(TContext context, Guid batchId, CancellationToken cancellationToken)
     {
         var currentBatch = await context.Set<Batch>()
             .Where(x => x.Id == batchId)
