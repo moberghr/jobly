@@ -12,7 +12,7 @@ public abstract partial class JoblyTests : TestBase
     {
         int retries = 5;
         var context = CreateContext();
-        string jobId = await CreateFailedRetryJob(context, retries, null, null);
+        Guid jobId = await CreateFailedRetryJob(context, retries, null, null);
 
         for (int i = 0; i <= 10; i++)
         {
@@ -32,7 +32,7 @@ public abstract partial class JoblyTests : TestBase
     {
         int retries = 0;
         var context = CreateContext();
-        string jobId = await CreateFailedRetryJob(context, retries, null, null);
+        Guid jobId = await CreateFailedRetryJob(context, retries, null, null);
 
         for (int i = 0; i <= 10; i++)
         {
@@ -53,7 +53,7 @@ public abstract partial class JoblyTests : TestBase
         int retries = 0;
         var context = CreateContext();
         int maxRetries = 2;
-        string jobId = await CreateFailedRetryJob(context, retries, maxRetries, null);
+        Guid jobId = await CreateFailedRetryJob(context, retries, maxRetries, null);
 
         for (int i = 0; i <= 10; i++)
         {
@@ -74,7 +74,7 @@ public abstract partial class JoblyTests : TestBase
         int retries = 5;
         var context = CreateContext();
         int maxRetries = 1;
-        string jobId = await CreateFailedRetryJob(context, retries, maxRetries, null);
+        Guid jobId = await CreateFailedRetryJob(context, retries, maxRetries, null);
 
         for (int i = 0; i <= 10; i++)
         {
@@ -94,9 +94,9 @@ public abstract partial class JoblyTests : TestBase
     {
         int retries = 0;
         var context = CreateContext();
-        var publisher = new Publisher<TestContext>(context, retries);
+        var publisher = TestUtils.CreatePublisher(context, retries);
         var jobRequest = new UnitRequest();
-        string jobId = await publisher.Publish(jobRequest);
+        Guid jobId = await publisher.Publish(jobRequest);
 
         await context.SaveChangesAsync();
 
@@ -119,7 +119,7 @@ public abstract partial class JoblyTests : TestBase
         int retries = 5;
         int successIteration = 3;
         var context = CreateContext();
-        string jobId = await CreateFailedRetryJob(context, retries, null, null);
+        Guid jobId = await CreateFailedRetryJob(context, retries, null, null);
 
         for (int i = 0; i <= 10; i++)
         {

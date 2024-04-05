@@ -7,6 +7,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Jobly.Tests;
 
@@ -20,7 +21,7 @@ public abstract class TestBase
         var services = new ServiceCollection();
         var provider = services.AddMediatR(typeof(TestBase))
             .AddTransient<TestContext>(x => CreateContext())
-            .AddJoblyWorker<TestContext>(0)
+            .AddJoblyWorker<TestContext>()
             .AddSingleton<CounterService>()
             .BuildServiceProvider();
 
@@ -28,7 +29,7 @@ public abstract class TestBase
 
         var providerWithNoLocking = services.AddMediatR(typeof(TestBase))
             .AddTransient<TestContext>(x => CreateContextWithoutJobLocking())
-            .AddJoblyWorker<TestContext>(0)
+            .AddJoblyWorker<TestContext>()
             .AddSingleton<CounterService>()
             .BuildServiceProvider();
 
@@ -39,9 +40,9 @@ public abstract class TestBase
 
     protected abstract TestContext CreateContextWithoutJobLocking();
 
-    protected static async Task<string> CreateProcessLogJob(TestContext context, int testLogId)
+    protected static async Task<Guid> CreateProcessLogJob(TestContext context, int testLogId)
     {
-        var publisher = new Publisher<TestContext>(context, 0);
+        var publisher = TestUtils.CreatePublisher(context);
         var processLogJob = new PrecessLogRequest { TestTaskId = testLogId };
         var jobId = await publisher.Publish(processLogJob);
 
@@ -50,9 +51,9 @@ public abstract class TestBase
         return jobId;
     }
 
-    protected async Task<string> CreateFailedJob(TestContext context)
+    protected async Task<Guid> CreateFailedJob(TestContext context)
     {
-        var publisher = new Publisher<TestContext>(context, 0);
+        var publisher = TestUtils.CreatePublisher(context);
 
         var throwExceptionRequest = new ThrowExceptionRequest();
 
@@ -63,33 +64,34 @@ public abstract class TestBase
         return jobId;
     }
 
-    protected async Task<string> CreateFailedRetryJob(TestContext context, int retries, int? maxRetries, string? parentJobId)
+    protected async Task<Guid> CreateFailedRetryJob(TestContext context, int retries, int? maxRetries, Guid? parentJobId)
     {
-        var publisher = new Publisher<TestContext>(context, retries);
+        var publisher = TestUtils.CreatePublisher(context, retries);
 
         var throwExceptionRequest = new ThrowExceptionRequest();
-        var jobId = "";
+        Guid? jobId = null;
         if (maxRetries != null)
         {
             jobId = await publisher.Publish(throwExceptionRequest, (int)maxRetries);
         }
 
-        if (!string.IsNullOrEmpty(parentJobId))
+        if (parentJobId != null)
         {
-            jobId = await publisher.Publish(throwExceptionRequest, parentJobId);
+            jobId = await publisher.Publish(throwExceptionRequest, parentJobId.Value);
         }
 
-        if (maxRetries == null && string.IsNullOrEmpty(parentJobId))
+        if (maxRetries == null && parentJobId == null)
         {
             jobId = await publisher.Publish(throwExceptionRequest);
         }
 
         await context.SaveChangesAsync();
 
-        return jobId;
+        return jobId!.Value;
     }
+    
 
-    protected async Task ChangeJobFromException(string jobId)
+    protected async Task ChangeJobFromException(Guid jobId)
     {
         var jobRequest = new UnitRequest();
         var context = CreateContext();
@@ -105,7 +107,7 @@ public abstract class TestBase
     {
         var context = CreateContext();
 
-        var publisher = new Publisher<TestContext>(context, 0);
+        var publisher = TestUtils.CreatePublisher(context);
 
         var request = new CounterRequest();
 
@@ -123,18 +125,18 @@ public abstract class TestBase
         return logInDb.Id;
     }
 
-    protected async Task<string> CreateJobWithParentId(TestContext context, string parentJobId)
+    protected async Task<Guid> CreateJobWithParentId(TestContext context, Guid parentJobId)
     {
         var requests = new UnitRequest();
 
-        var publisher = new Publisher<TestContext>(context, 0);
+        var publisher = TestUtils.CreatePublisher(context);
 
         var jobId = await publisher.Publish(requests, parentJobId);
 
         return jobId;
     }
 
-    protected async Task<string> CreateBatch(TestContext context, int numberOfJobs)
+    protected async Task<Guid> CreateBatch(TestContext context, int numberOfJobs)
     {
         var requests = new List<UnitRequest>();
 
@@ -145,14 +147,14 @@ public abstract class TestBase
             requests.Add(request);
         }
 
-        var batchPublisher = new BatchPublisher<TestContext>(context);
+        var batchPublisher = new BatchPublisher<TestContext>(context, null);
 
         var placeholderJobId = await batchPublisher.StartNew(requests);
 
         return placeholderJobId;
     }
 
-    protected async Task<string> ContinueBatchWith(TestContext context, int numberOfJobs, string placeholderJobId)
+    protected async Task<Guid> ContinueBatchWith(TestContext context, int numberOfJobs, Guid placeholderJobId)
     {
         var requests = new List<UnitRequest>();
 
@@ -163,14 +165,14 @@ public abstract class TestBase
             requests.Add(request);
         }
 
-        var batchPublisher = new BatchPublisher<TestContext>(context);
+        var batchPublisher = TestUtils.CreateBatchPublisher(context);
 
         var newPlaceholderJobId = await batchPublisher.ContinueBatchWith(requests, placeholderJobId);
 
         return newPlaceholderJobId;
     }
 
-    protected async Task<Job> GetJobWithStates(TestContext context, string jobId)
+    protected async Task<Job> GetJobWithStates(TestContext context, Guid jobId)
     {
         var job = await context.Set<Job>()
             .Where(x => x.Id == jobId)
@@ -195,18 +197,16 @@ public abstract class TestBase
     {
         using var scope = _serviceScopeFactory.CreateScope();
 
-        var worker = new JoblyWorkerService<TestContext>(_serviceScopeFactory, new NullLogger<JoblyWorkerService<TestContext>>());
+        var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactory);
 
         await worker.GetAndProcessJob(CancellationToken.None);
-
-        return;
     }
 
     protected async Task ProcessJobWithoutLocking()
     {
         using var scope = _serviceScopeFactoryNoLocking.CreateScope();
 
-        var worker = new JoblyWorkerService<TestContext>(_serviceScopeFactoryNoLocking, new NullLogger<JoblyWorkerService<TestContext>>());
+        var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactoryNoLocking);
 
         await worker.GetAndProcessJob(CancellationToken.None);
     }
@@ -253,7 +253,7 @@ public abstract class TestBase
         return recurringJob;
     }
 
-    protected async Task<Job> GetJob(string id)
+    protected async Task<Job> GetJob(Guid id)
     {
         var context = CreateContext();
 

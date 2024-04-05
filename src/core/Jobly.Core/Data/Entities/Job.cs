@@ -6,7 +6,6 @@ namespace Jobly.Core.Entities;
 
 public class Job
 {
-    [MaxLength(50)]
     public Guid Id { get; set; } = Guid.NewGuid();
 
     public string Type { get; set; }

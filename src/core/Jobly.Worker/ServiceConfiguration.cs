@@ -24,17 +24,14 @@ public static class ServiceConfiguration
     }
 
     public static IServiceCollection AddJoblyWorker<TContext>(this IServiceCollection services,
-        Action<IServiceProvider, JoblyWorkerConfiguration>? options = null)
+        Action<IServiceProvider, JoblyWorkerConfiguration> options)
         where TContext : DbContext
     {
-        if (options != null)
+        services.AddSingleton<IHostedService, JoblyWorker<TContext>>();
+        services.Configure<JoblyWorkerConfiguration>(config =>
         {
-            services.AddSingleton<IHostedService, JoblyWorker<TContext>>();
-            services.Configure<JoblyWorkerConfiguration>(config =>
-            {
-                options(services.BuildServiceProvider(), config);
-            });
-        }
+            options(services.BuildServiceProvider(), config);
+        });
 
         services.AddJoblyWorkerServices<TContext>();
         return services;
