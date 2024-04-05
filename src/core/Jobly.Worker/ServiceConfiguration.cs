@@ -14,7 +14,7 @@ public static class ServiceConfiguration
     {
         if (options != null)
         {
-            services.Configure<JoblyWorkerConfiguration>(options);
+            services.Configure(options);
         }
 
         services.AddJobly<TContext>();
