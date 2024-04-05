@@ -17,14 +17,16 @@ builder.Services.AddJoblyWorker<TestContext>(options =>
 {
     options.RetryCount = 0;
     options.DefaultBatchPriority = Priority.Low;
-    options.WorkerCount = 5;
+    options.WorkerCount = 1;
     options.PollingInterval = TimeSpan.FromSeconds(5);
+    options.HealthCheckInterval = TimeSpan.FromSeconds(10);
+    options.HealthCheckTimeout = TimeSpan.FromSeconds(30);
 });
 
 var app = builder.Build();
 
 // comment after db is created
-await Migrate();
+// await Migrate();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

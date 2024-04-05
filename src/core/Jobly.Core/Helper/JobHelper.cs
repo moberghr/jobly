@@ -10,12 +10,9 @@ internal static class JobHelper
         where T : class
     {
         var createdTime = DateTime.UtcNow;
-
-        var jobId = Guid.NewGuid();
-
+        
         var job = new Job
         {
-            Id = jobId,
             CreateTime = createdTime,
             Message = JsonSerializer.Serialize(message),
             Type = message!.GetType().AssemblyQualifiedName!,

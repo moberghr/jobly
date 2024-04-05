@@ -135,7 +135,8 @@ public static class ServiceConfiguration
             .HasForeignKey(x => x.ParentJobId);
 
         job.HasMany(p => p.JobStates)
-            .WithOne(p => p.Job);
+            .WithOne(p => p.Job)
+            .HasForeignKey(p => p.JobId);
 
         job.HasIndex(p => new {p.CurrentState, p.Priority, p.ScheduleTime})
             .IsDescending(false, false, false)
@@ -157,7 +158,8 @@ public static class ServiceConfiguration
         jobState.Property(p => p.Message);
 
         jobState.HasOne(p => p.Job)
-            .WithMany(p => p.JobStates);
+            .WithMany(p => p.JobStates)
+            .HasForeignKey(p => p.JobId);
     }
 
     private static void AddRecurringJobEntity(ModelBuilder modelBuilder)

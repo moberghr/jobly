@@ -15,7 +15,7 @@ namespace Jobly.Worker;
 
 public interface IJoblyWorkerService
 {
-    Task GetAndProcessJob(CancellationToken cancellationToken);
+    Task<bool> GetAndProcessJob(CancellationToken cancellationToken);
 }
 
 public class JoblyWorkerService<TContext> : IJoblyWorkerService
@@ -33,7 +33,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         _configuration = configuration.Value;
     }
 
-    private void UpdateJobStatusToProcessing(Job job)
+    private void UpdateJobStatusToProcessing(TContext context, Job job)
     {
         var jobState = new JobState
         {
@@ -44,12 +44,13 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         };
         
         job.CurrentState = State.Processing;
-        job.CurrentServerId = _configuration.WorkerId;
+        job.CurrentServerId = _configuration.ServerId;
         job.CurrentWorkerId = _workerId;;
-        job.JobStates.Add(jobState);
+        
+        context.Set<JobState>().Add(jobState);
     }
 
-    public async Task GetAndProcessJob(CancellationToken cancellationToken)
+    public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
     {
         using var scope = _serviceScopeFactory.CreateScope();
 
@@ -68,14 +69,14 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         // if we didn't find any messages then we wait, otherwise we query again immediately 
         if (job == null)
         {
-            await Task.Delay(1000, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
-            return;
+            return false;
         }
         
         _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
         
-        UpdateJobStatusToProcessing(job);
+        UpdateJobStatusToProcessing(context, job);
         
         if (job.RecurringJobId.HasValue)
         {
@@ -91,15 +92,27 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             // Processing the message, we don't want to keep a transaction open during this time, it may take a while
             // and we don't want to keep a db lock open for that long. There is also no need to rollback the transaction
             // since we are not doing any db operations here. The ProcessOutboxMessage has its own scope anyway.
+            _logger.LogInformation("Worker {workerId} processing message {id}", _workerId, job.Id);
             await ProcessOutboxMessage(job, cancellationToken);
-            await UpdateJobData(context, job, message: null, cancellationToken);
+            _logger.LogInformation("Worker {workerId} processed message {id}", _workerId, job.Id);
+            
+            await using var endTransaction = await context.Database.BeginTransactionAsync(default);
+            
+            await UpdateJobData(context, job, message: null, default);
+            
+            await context.SaveChangesAsync(default);
+            await endTransaction.CommitAsync(default);
         }
         catch (Exception e)
         {
-            await UpdateJobData(context, job, e.Message, cancellationToken);
-
-            await transaction.CommitAsync(cancellationToken);
+            _logger.LogError(e, "Error processing message {id}", job.Id);
+            await using var endTransaction = await context.Database.BeginTransactionAsync(default);
+            await UpdateJobData(context, job, e.Message, default);
+            
+            await context.SaveChangesAsync(default);
+            await endTransaction.CommitAsync(default);
         }
+        return true;
     }
     
     private async Task CreateNextJob(TContext context, Job job, CancellationToken cancellationToken)
@@ -208,7 +221,6 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         };
 
         await context.Set<JobState>().AddAsync(jobState, cancellationToken);
-        await context.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task UpdateChildJobs(TContext context, Guid parentJobId, CancellationToken cancellationToken)
