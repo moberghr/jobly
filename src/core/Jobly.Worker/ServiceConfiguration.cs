@@ -2,7 +2,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 
 namespace Jobly.Worker;
 
@@ -37,10 +36,6 @@ public static class ServiceConfiguration
 
     private static void AddJoblyWorkerServices<TContext>(this IServiceCollection services) where TContext : DbContext
     {
-        services.Configure<HostOptions>(options =>
-        {
-            options.ShutdownTimeout = TimeSpan.FromSeconds(30);
-        });
         services.AddTransient<IJoblyWorkerService, JoblyWorkerService<TContext>>();
 
         services.AddTransient<IJoblyWorkerService, JoblyWorkerService<TContext>>();
