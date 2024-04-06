@@ -1,5 +1,6 @@
 using Jobly.Core;
 using Jobly.Core.Enums;
+using Jobly.Test.App;
 using Jobly.Test.Shared;
 using Jobly.UI.UIMiddleware;
 using Jobly.Worker;
@@ -13,6 +14,9 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddServices(builder.Configuration);
+
+builder.Services.AddScoped<LoggingInterceptor>();
+
 builder.Services.AddJoblyWorker<TestContext>(options =>
 {
     options.RetryCount = 0;
@@ -21,12 +25,14 @@ builder.Services.AddJoblyWorker<TestContext>(options =>
     options.PollingInterval = TimeSpan.FromSeconds(5);
     options.HealthCheckInterval = TimeSpan.FromSeconds(10);
     options.HealthCheckTimeout = TimeSpan.FromSeconds(30);
+    
+    options.Interceptors.Add<LoggingInterceptor>();
 });
 
 var app = builder.Build();
 
 // comment after db is created
-await Migrate();
+// await Migrate();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

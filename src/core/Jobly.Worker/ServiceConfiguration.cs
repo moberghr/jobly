@@ -40,6 +40,8 @@ public static class ServiceConfiguration
 
         services.AddTransient<IJoblyWorkerService, JoblyWorkerService<TContext>>();
 
+        services.AddTransient<IInterceptorService, InterceptorService>();
+
         services.AddHostedService<JoblyHealthManager<TContext>>();
 
         services.AddHostedService<JoblyWorkerSetup<TContext>>();

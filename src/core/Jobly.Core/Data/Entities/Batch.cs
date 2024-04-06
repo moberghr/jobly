@@ -3,6 +3,8 @@
 public class Batch
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    
+    public DateTime CreatedTime { get; set; } = DateTime.UtcNow;
 
     public int Counter { get; set; }
 

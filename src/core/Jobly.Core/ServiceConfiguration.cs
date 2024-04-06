@@ -194,6 +194,8 @@ public static class ServiceConfiguration
         batch.HasKey(p => p.Id);
 
         batch.Property(p => p.Counter);
+        
+        batch.Property(p => p.CreatedTime);
 
         // batch.HasOne(p => p.ParentJob);
         // .WithOne(p => p.Batch)

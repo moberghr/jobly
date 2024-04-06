@@ -21,14 +21,16 @@ public class JoblyHealthManager<TContext> : BackgroundService
     private readonly ILogger<JoblyHealthManager<TContext>> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly JoblyWorkerConfiguration _configuration;
+    private readonly IInterceptorService _interceptorService;
 
     public JoblyHealthManager(
         IServiceScopeFactory serviceScopeFactory,
         ILogger<JoblyHealthManager<TContext>> logger,
-        IOptions<JoblyWorkerConfiguration> configuration)
+        IOptions<JoblyWorkerConfiguration> configuration, IInterceptorService interceptorService)
     {
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
+        _interceptorService = interceptorService;
         _configuration = configuration.Value;
     }
 
@@ -42,7 +44,7 @@ public class JoblyHealthManager<TContext> : BackgroundService
             using var scope = _serviceScopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<TContext>();
             await UpdateHeartbeat(context);
-            await CleanUpServers(context);
+            await CleanUpServers(context, scope, stoppingToken);
             
             await Task.Delay(_configuration.HealthCheckInterval, stoppingToken);
         }
@@ -84,7 +86,7 @@ public class JoblyHealthManager<TContext> : BackgroundService
         await context.SaveChangesAsync();
     }
     
-    private async Task CleanUpServers(TContext context)
+    private async Task CleanUpServers(TContext context, IServiceScope scope, CancellationToken cancellationToken)
     {
         await using var transaction = await context.Database.BeginTransactionAsync();
         var servers = await context.Set<Server>()
@@ -100,7 +102,7 @@ public class JoblyHealthManager<TContext> : BackgroundService
                 var jobs = await context.Set<Job>()
                     .Where(x => x.CurrentState == State.Processing)
                     .Where(x => x.CurrentServerId == server.Id)
-                    .ToListAsync();
+                    .ToListAsync(cancellationToken: cancellationToken);
                 foreach (var job in jobs)
                 {
                     job.CurrentState = State.Failed;
@@ -111,11 +113,14 @@ public class JoblyHealthManager<TContext> : BackgroundService
                         DateTime = DateTime.UtcNow,
                         Message = $"The job {job.Id} failed because of timeout."
                     });
+
+                    var interceptorPipeline = _interceptorService.CreateInterceptorPipeline(context, job, scope);
+                    await _interceptorService.RunJobExecutionFailedInterceptors(interceptorPipeline, cancellationToken);
                 }
             }
         }
-        await context.SaveChangesAsync();
-        await transaction.CommitAsync();
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
     
     private async Task RemoveServer()

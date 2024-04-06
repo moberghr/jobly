@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Jobly.Core;
 
 namespace Jobly.Worker;
@@ -22,4 +23,14 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     /// Worker Id should be unique for each worker. If you need to control the worker id, you can set it here.
     /// </summary>
     public Guid ServerId = Guid.NewGuid();
+    
+    public JoblyInterceptionConfiguration Interceptors { get; set; } = new();
+}
+
+public class JoblyInterceptionConfiguration : Collection<Type>
+{
+    public void Add<T>()
+    {
+        Add(typeof(T));
+    }
 }
