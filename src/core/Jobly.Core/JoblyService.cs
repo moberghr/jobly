@@ -150,18 +150,8 @@ public class JoblyService<TContext> : IJoblyService
 
     public async Task<PagedList<JobModel>> GetJobStatesInProcess(BaseListRequest request)
     {
-        var proccesingJobIds = await _context.Set<JobState>()
-            .Where(x => x.State == State.Processing)
-            .Select(x => x.JobId).ToListAsync();
-
-        var completedJobIds = await _context.Set<JobState>()
-            .Where(x => x.State == State.Completed || x.State == State.Failed)
-            .Select(x => x.JobId).ToListAsync();
-
-        proccesingJobIds.RemoveAll(jobState => completedJobIds.Contains(jobState));
-
         var jobs = await _context.Set<Job>()
-            .Where(x => proccesingJobIds.Contains(x.Id))
+            .Where(x => x.CurrentState == State.Processing)
             .Select(x => new JobModel
             {
                 Id = x.Id,
