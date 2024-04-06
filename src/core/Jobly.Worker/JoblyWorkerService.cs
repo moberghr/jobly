@@ -109,8 +109,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
             await _interceptorService.RunJobExecutedInterceptors(executingContext, cancellationToken);
 
-            await context.SaveChangesAsync(default);
-            await endTransaction.CommitAsync(default);
+            await context.SaveChangesAsync(CancellationToken.None);
+            await endTransaction.CommitAsync(CancellationToken.None);
         }
         catch (Exception e)
         {
@@ -122,8 +122,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
             await _interceptorService.RunJobExecutionFailedInterceptors(executingContext, cancellationToken);
 
-            await context.SaveChangesAsync(default);
-            await endTransaction.CommitAsync(default);
+            await context.SaveChangesAsync(CancellationToken.None);
+            await endTransaction.CommitAsync(CancellationToken.None);
         }
 
         return true;
@@ -159,21 +159,15 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         job.CurrentState = state;
 
-        await CreateJobState(context, job.Id, state,
-            string.IsNullOrEmpty(message) ? $"Job {job.Id} is completed" : message, cancellationToken);
-    }
-
-    private static async Task CreateJobState(TContext context, Guid jobId, State state, string? message,
-        CancellationToken cancellationToken)
-    {
+        // Create job state
         var jobState = new JobState
         {
-            JobId = jobId,
+            JobId = job.Id,
             DateTime = DateTime.UtcNow,
             State = state,
-            Message = message
+            Message = string.IsNullOrEmpty(message) ? $"Job {job.Id} is completed" : message
         };
-
         await context.Set<JobState>().AddAsync(jobState, cancellationToken);
+
     }
 }
