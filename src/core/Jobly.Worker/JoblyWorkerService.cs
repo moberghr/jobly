@@ -74,20 +74,16 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         }
         
         _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
-        
-        UpdateJobStatusToProcessing(job);
-        
-        if (job.RecurringJobId.HasValue)
-        {
-            await CreateNextJob(context, job, cancellationToken);
-        }
-        
-        // Saving the job in processing state so that it is marked as processing in the db.
-        await context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
 
         try
         {
+            UpdateJobStatusToProcessing(job);
+        
+            if (job.RecurringJobId.HasValue)
+            {
+                await CreateNextJob(context, job, cancellationToken);
+            }
+            
             // Processing the message, we don't want to keep a transaction open during this time, it may take a while
             // and we don't want to keep a db lock open for that long. There is also no need to rollback the transaction
             // since we are not doing any db operations here. The ProcessOutboxMessage has its own scope anyway.
@@ -100,6 +96,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
             await transaction.CommitAsync(cancellationToken);
         }
+        
+        await UpdateJobData(context, job, message: null, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
     
     private async Task CreateNextJob(TContext context, Job job, CancellationToken cancellationToken)
