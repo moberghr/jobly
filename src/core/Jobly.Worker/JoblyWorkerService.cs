@@ -95,12 +95,13 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await UpdateJobData(context, job, e.Message, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
+            return;
         }
 
         await UpdateJobData(context, job, message: null, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
-    
+
     private async Task CreateNextJob(TContext context, Job job, CancellationToken cancellationToken)
     {
 
