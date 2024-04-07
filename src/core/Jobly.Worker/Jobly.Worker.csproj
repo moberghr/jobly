@@ -19,4 +19,8 @@
 	<ItemGroup Condition="'$(Configuration)'=='Debug'">
 		<ProjectReference Include="..\Jobly.Core\Jobly.Core.csproj" />
 	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Jobly.Tests" />
+	</ItemGroup>
 </Project>

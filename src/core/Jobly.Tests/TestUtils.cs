@@ -1,5 +1,6 @@
 using Jobly.Core;
 using Jobly.Worker;
+using Jobly.Worker.Interceptors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -32,9 +33,10 @@ public static class TestUtils
         {
             WorkerCount = 1
         });
+        var interceptorService = new InterceptorService(joblyWorkerConfigOptions);
         
         return new JoblyWorkerService<TestContext>(serviceScopeFactory,
             new NullLogger<JoblyWorkerService<TestContext>>(),
-            joblyWorkerConfigOptions);
+            joblyWorkerConfigOptions, interceptorService);
     }
 }
