@@ -4,6 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Jobly.Worker.Interceptors;
 
+/// <summary>
+/// Represents a job interceptor that handles continuation logic for child jobs.
+/// </summary>
 public class ContinuationInterceptor : JobInterceptor
 {
     public override async Task JobExecutedAsync(JobExecutingContext context, CancellationToken cancellationToken)
