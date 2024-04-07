@@ -1,4 +1,5 @@
 ﻿using Jobly.Core;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -7,20 +8,14 @@ namespace Jobly.Worker;
 
 public static class ServiceConfiguration
 {
-    public static IServiceCollection AddJoblyWorker<TContext>(this IServiceCollection services,
-        Action<JoblyWorkerConfiguration>? options = null)
+    public static IServiceCollection AddJoblyWorker<TContext>(
+        this IServiceCollection services,
+        Action<JoblyWorkerConfiguration>? optionsAction = null)
         where TContext : DbContext
     {
-        if (options != null)
-        {
-            services.Configure(options);
-        }
+        optionsAction ??= _ => { };
 
-        services.AddJobly<TContext>();
-
-        services.AddJoblyWorkerServices<TContext>();
-
-        return services;
+        return AddJoblyWorker<TContext>(services, (_, options) => optionsAction(options));
     }
 
     public static IServiceCollection AddJoblyWorker<TContext>(this IServiceCollection services,
@@ -30,12 +25,8 @@ public static class ServiceConfiguration
         services.AddSingleton<IHostedService, JoblyWorker<TContext>>();
         services.Configure<JoblyWorkerConfiguration>(config => { options(services.BuildServiceProvider(), config); });
 
-        services.AddJoblyWorkerServices<TContext>();
-        return services;
-    }
-
-    private static void AddJoblyWorkerServices<TContext>(this IServiceCollection services) where TContext : DbContext
-    {
+        services.AddJobly<TContext>();
+        
         services.AddTransient<IJoblyWorkerService, JoblyWorkerService<TContext>>();
 
         services.AddTransient<IJoblyWorkerService, JoblyWorkerService<TContext>>();
@@ -45,5 +36,8 @@ public static class ServiceConfiguration
         services.AddHostedService<JoblyHealthManager<TContext>>();
 
         services.AddHostedService<JoblyWorkerSetup<TContext>>();
+
+        return services;
     }
+
 }
