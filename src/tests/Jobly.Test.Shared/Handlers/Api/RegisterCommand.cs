@@ -48,10 +48,12 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
         for (var i = 0; i < 20; i++)
         {
             batch.Add(sendEmailRequest);
-            await _publisher.Publish(sendEmailRequest);
+            // await _publisher.Publish(sendEmailRequest);
+            await _context.Publish(sendEmailRequest, cancellationToken);
         }
         
-        await _batchPublisher.StartNew(batch);
+        // await _batchPublisher.StartNew(batch);
+        await _context.StartNew(batch);
 
         Guid parentId = await _publisher.Publish(sendEmailRequest);
 
