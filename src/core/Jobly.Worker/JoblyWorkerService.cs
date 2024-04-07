@@ -72,18 +72,18 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
             return;
         }
-        
+
         _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
 
         try
         {
             UpdateJobStatusToProcessing(job);
-        
+
             if (job.RecurringJobId.HasValue)
             {
                 await CreateNextJob(context, job, cancellationToken);
             }
-            
+
             // Processing the message, we don't want to keep a transaction open during this time, it may take a while
             // and we don't want to keep a db lock open for that long. There is also no need to rollback the transaction
             // since we are not doing any db operations here. The ProcessOutboxMessage has its own scope anyway.
@@ -96,7 +96,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
             await transaction.CommitAsync(cancellationToken);
         }
-        
+
         await UpdateJobData(context, job, message: null, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
