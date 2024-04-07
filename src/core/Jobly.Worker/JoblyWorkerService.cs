@@ -73,16 +73,16 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
             return false;
         }
-        
+
         _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
-        
+
         UpdateJobStatusToProcessing(context, job);
-        
+
         if (job.RecurringJobId.HasValue)
         {
             await CreateNextJob(context, job, cancellationToken);
         }
-        
+
         // Saving the job in processing state so that it is marked as processing in the db.
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -95,11 +95,11 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             _logger.LogInformation("Worker {workerId} processing message {id}", _workerId, job.Id);
             await ProcessOutboxMessage(job, cancellationToken);
             _logger.LogInformation("Worker {workerId} processed message {id}", _workerId, job.Id);
-            
+
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
-            
+
             await UpdateJobData(context, job, message: null, default);
-            
+
             await context.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
         }
@@ -108,13 +108,14 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             _logger.LogError(e, "Error processing message {id}", job.Id);
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
             await UpdateJobData(context, job, e.Message, default);
-            
+
             await context.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
         }
+
         return true;
     }
-    
+
     private async Task CreateNextJob(TContext context, Job job, CancellationToken cancellationToken)
     {
 
