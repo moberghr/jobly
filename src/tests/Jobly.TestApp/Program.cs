@@ -13,11 +13,13 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddServices(builder.Configuration);
-builder.Services.AddJoblyWorker<TestContext>(options =>
+
+builder.Services.AddJoblyWorker<TestContext>(
+    builder.Configuration.GetSection("Jobly"),
+    options =>
 {
-    options.RetryCount = 0;
-    options.DefaultBatchPriority = Priority.Low;
-    options.WorkerCount = 5;
+    // options.RetryCount = 0;
+    options.DefaultBatchPriority = Priority.Normal;
     options.PollingInterval = TimeSpan.FromSeconds(5);
 });
 

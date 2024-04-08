@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.SqlServer.Infrastructure.Internal;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
@@ -20,22 +21,50 @@ public static class ServiceConfiguration
 
     private static readonly SaveChangesConcurrencyTokenInterceptor _saveChangesInterceptor = new();
 
-    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services,
-        Action<JoblyConfiguration>? options = null)
+    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services)
         where TContext : DbContext
     {
-        return CreateJoblyServices<TContext>(services, options);
+        return CreateJoblyServices<TContext>(services, null, null);
+    }
+
+    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services,
+        IConfiguration namedConfigurationSection
+    ) where TContext : DbContext
+    {
+        return CreateJoblyServices<TContext>(services, namedConfigurationSection, null);
+    }
+
+    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services,
+        Action<JoblyConfiguration> options)
+        where TContext : DbContext
+    {
+        return CreateJoblyServices<TContext>(services, null, options);
+    }
+
+    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services,
+        IConfiguration namedConfigurationSection,
+        Action<JoblyConfiguration> options)
+        where TContext : DbContext
+    {
+        return CreateJoblyServices<TContext>(services, namedConfigurationSection, options);
     }
 
     private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services,
+        IConfiguration? namedConfigurationSection,
         Action<JoblyConfiguration>? options)
         where TContext : DbContext
     {
         var assembly = typeof(ServiceConfiguration).Assembly;
-        
+
+        // Add Jobly configuration
+        var optionBuilder = services.AddOptions<JoblyConfiguration>();
+        if (namedConfigurationSection != null)
+        {
+            optionBuilder.Bind(namedConfigurationSection);
+        }
         if (options != null)
         {
-            services.Configure(options);
+            optionBuilder.Configure(options);
         }
 
         var builder = services.AddControllersWithViews();
@@ -49,7 +78,7 @@ public static class ServiceConfiguration
 
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(),
             x.GetRequiredService<IOptions<JoblyConfiguration>>()));
-        
+
         services.AddScoped<IRecurringJobPublisher>(x =>
             new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IJoblyService>(x => new JoblyService<TContext>(x.GetRequiredService<TContext>()));
@@ -196,7 +225,7 @@ public static class ServiceConfiguration
         // batch.HasOne(p => p.ParentJob);
         // .WithOne(p => p.Batch)
         // .HasForeignKey<Batch>(p => p.Id);
-        
+
         // batch.HasMany(p => p.Jobs)
         //     .WithOne(p => p.Batch)
         //     .HasForeignKey(p => p.BatchId); // Job has the foreign key
