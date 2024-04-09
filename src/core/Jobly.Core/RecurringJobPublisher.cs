@@ -51,14 +51,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             throw new InvalidOperationException("Failed to create job for recurring job.");
         }
 
-        // var jobState = JobHelper.CreateJobAndJobState(jobMessage, jobType, 0, nextJobScheduleTime, 0, Priority.Normal, null, State.Enqueued);
-        var jobState = JobBuilder
-            .Create()
-            .WithMessageAndType(jobMessage, jobType)
-            .WithScheduleTime(nextJobScheduleTime)
-            .WithPriority(Priority.Normal) // Not needed
-            .WithState(State.Enqueued)// Not needed
-            .Build();
+        var jobState = JobHelper.CreateJobAndJobState(jobMessage, jobType, 0, nextJobScheduleTime, 0, Priority.Normal, null, State.Enqueued);
 
         return jobState.Job;
     }

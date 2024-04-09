@@ -1,115 +1,121 @@
 using System.Text.Json;
-using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 
 namespace Jobly.Core.Helper;
 
+public class JobParameters
+{
+    internal string Message { get; set; }
+    internal string Type { get; set; }
+    public int Retries { get; set; }
+    public DateTime? ScheduleTime { get; set; }
+    public int? MaxRetries { get; set; }
+    public Priority? Priority { get; set; }
+    public Guid? ParentId { get; set; }
+    public int? RecurringJobId { get; set; }
+    public State? State { get; set; }
+}
+
 public class JobBuilder
 {
-    private JobBuilder() { } // Hide the constructor
-
-    public static JobBuilder Create() // Expose a public static factory method
+    private IPublisher _publisher;
+    
+    internal JobBuilder(IPublisher publisher)
     {
-        return new JobBuilder();
+        _publisher = publisher;
     }
-    public InnerBuilder WithMessage<T>(T message)
+
+    public JobBuilder()
+    {
+    }
+
+    public InnerBuilder WithMessage(object message)
     {
         var _message = JsonSerializer.Serialize(message);
         var type = message.GetType().AssemblyQualifiedName;
         return new InnerBuilder(_message, type);
     }
-    
-    public InnerBuilder WithMessageAndType(string message, string type)
+
+    internal InnerBuilder WithMessageAndType(string message, string type)
     {
         return new InnerBuilder(message, type);
     }
     
     public class InnerBuilder
     {
-        private string _message;
-        private string _type;
-        private int _retries;
-        private DateTime? _scheduleTime;
-        private int? _maxRetries;
-        private Priority? _priority;
-        private Guid? _parentId;
-        private int? _recurringJobId;
-        private State? _state;
+        private JobParameters _job;
+        private IPublisher _publisher;
+        
+        internal InnerBuilder(IPublisher publisher, string message, string type)
+        {
+            _publisher = publisher;
+            _job = new JobParameters
+            {
+                Message = message,
+                Type = type
+            };
+        }
         
         internal InnerBuilder(string message, string type)
         {
-            _message = message;
-            _type = type;
+            _job = new JobParameters
+            {
+                Message = message,
+                Type = type
+            };
+        }
+        
+
+        public InnerBuilder WithRetries(int retries)
+        {
+            _job.Retries = retries;
+            return this;
         }
 
-    public InnerBuilder WithRetries(int retries)
-    {
-        _retries = retries;
-        return this;
-    }
-
-    public InnerBuilder WithScheduleTime(DateTime? scheduleTime)
-    {
-        _scheduleTime = scheduleTime;
-        return this;
-    }
-
-    public InnerBuilder WithMaxRetries(int? maxRetries)
-    {
-        _maxRetries = maxRetries;
-        return this;
-    }
-
-    public InnerBuilder WithPriority(Priority? priority)
-    {
-        _priority = priority;
-        return this;
-    }
-
-    public InnerBuilder WithParentId(Guid? parentId)
-    {
-        _parentId = parentId;
-        return this;
-    }
-
-    public InnerBuilder WithRecurringJobId(int? recurringJobId)
-    {
-        _recurringJobId = recurringJobId;
-        return this;
-    }
-
-    public InnerBuilder WithState(State? state)
-    {
-        _state = state;
-        return this;
-    }
-
-    public JobState Build()
-    {
-        var createdTime = DateTime.UtcNow;
-
-        var job = new Job
+        public InnerBuilder WithScheduleTime(DateTime? scheduleTime)
         {
-            CreateTime = createdTime,
-            Message = _message,
-            Type = _type,
-            ScheduleTime = _scheduleTime ?? createdTime,
-            CurrentState = _state ?? (_parentId == null ? State.Enqueued : State.Awaiting),
-            MaxRetries = _maxRetries ?? _retries,
-            Priority = _priority ?? Priority.Normal,
-            ParentJobId = _parentId,
-            RecurringJobId = _recurringJobId,
-        };
+            _job.ScheduleTime = scheduleTime;
+            return this;
+        }
 
-        var jobState = new JobState
+        public InnerBuilder WithMaxRetries(int? maxRetries)
         {
-            Job = job,
-            State = State.Enqueued,
-            DateTime = createdTime,
-        };
+            _job.MaxRetries = maxRetries;
+            return this;
+        }
 
-        return jobState;
-    }
-    
+        public InnerBuilder WithPriority(Priority? priority)
+        {
+            _job.Priority = priority;
+            return this;
+        }
+
+        public InnerBuilder WithParentId(Guid? parentId)
+        {
+            _job.ParentId = parentId;
+            return this;
+        }
+
+        public InnerBuilder WithRecurringJobId(int? recurringJobId)
+        {
+            _job.RecurringJobId = recurringJobId;
+            return this;
+        }
+
+        public InnerBuilder WithState(State? state)
+        {
+            _job.State = state;
+            return this;
+        }
+
+        internal JobParameters Build()
+        {
+            return _job;
+        }
+        
+        public async Task<Guid> Publish()
+        {
+            return await _publisher.Publish(_job);
+        }
     }
 }
