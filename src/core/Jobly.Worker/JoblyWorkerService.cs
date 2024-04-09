@@ -4,6 +4,7 @@ using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
+using Jobly.Core.Helper;
 using Jobly.Core.Interceptors;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -44,8 +45,6 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         };
         
         job.CurrentState = State.Processing;
-        job.CurrentServerId = _configuration.WorkerId;
-        job.CurrentWorkerId = _workerId;;
         job.JobStates.Add(jobState);
     }
 
@@ -114,35 +113,25 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             return;
         }
 
-        var createTime = DateTime.UtcNow;
-
         var fromUtc = DateTime.SpecifyKind(recurringJob.NextExecution ?? DateTime.UtcNow, DateTimeKind.Utc);
         var nextJobScheduleTime = CronExpression.Parse(recurringJob.Cron).GetNextOccurrence(fromUtc);
 
-        var jobStats = new List<JobState>
-        {
-            new() { State = State.Enqueued, DateTime = createTime}
-        };
-
-        var newJobId = Guid.NewGuid();
-        var newJob = new Job
-        {
-            Id = newJobId,
-            Message = recurringJob.Message,
-            Type = recurringJob.Type,
-            CreateTime = createTime,
-            ScheduleTime = nextJobScheduleTime ?? createTime,
-            Priority = job.Priority,
-            CurrentState = State.Enqueued,
-            RecurringJobId = recurringJob.Id,
-            JobStates = jobStats
-        };
+        var newJobState = JobHelper.CreateJobAndJobState(
+            message: recurringJob.Message, 
+            type: recurringJob.Type,
+            retries: 0,
+            scheduleTime: nextJobScheduleTime,
+            maxRetries: 0, 
+            priority: job.Priority,
+            parentId: null,
+            recurringJobId: recurringJob.Id, 
+            state: State.Enqueued);
 
         recurringJob.LastExecution = recurringJob.NextExecution;
         recurringJob.LastJobId = recurringJob.NextJobId;
 
         recurringJob.NextExecution = nextJobScheduleTime;
-        recurringJob.NextJob = newJob;
+        recurringJob.NextJob = newJobState.Job;
 
     }
 

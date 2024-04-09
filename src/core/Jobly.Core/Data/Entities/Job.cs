@@ -40,7 +40,4 @@ public class Job
     
     public Guid? BatchId { get; set; }
     
-    public Guid? CurrentServerId { get; set; }
-
-    public Guid? CurrentWorkerId { get; set; }
 }

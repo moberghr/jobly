@@ -6,5 +6,5 @@ public class JoblyConfiguration
 {
     public int RetryCount { get; set; }
 
-    public Priority DefaultBatchPriority { get; set; } = Priority.Low;
+    public Priority DefaultBatchPriority { get; set; } = Priority.Normal;
 }

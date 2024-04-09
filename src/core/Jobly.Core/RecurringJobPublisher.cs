@@ -4,6 +4,7 @@ using Cronos;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
+using Jobly.Core.Helper;
 using Jobly.Core.Interceptors;
 using Microsoft.EntityFrameworkCore;
 
@@ -45,27 +46,14 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
     private Job CreateJobForRecurringJob<T>(T message, string cronExpression) where T : class
     {
         var (nextJobScheduleTime, jobMessage, jobType) = GetRecurringJobData(message, cronExpression);
-
-        var jobStats = new List<JobState>
+        if (nextJobScheduleTime == null || string.IsNullOrWhiteSpace(jobMessage) || string.IsNullOrWhiteSpace(jobType))
         {
-            new() { State = State.Enqueued, DateTime = DateTime.UtcNow}
-        };
+            throw new InvalidOperationException("Failed to create job for recurring job.");
+        }
 
-        var createTime = DateTime.UtcNow;
-        var jobId = Guid.NewGuid();
-        var job = new Job
-        {
-            Id = jobId,
-            Message = jobMessage!,
-            Type = jobType!,
-            CreateTime = createTime,
-            ScheduleTime = nextJobScheduleTime ?? createTime,
-            Priority = Priority.Low, // todo: should this be configurable in the recurring job data?
-            CurrentState = State.Enqueued,
-            JobStates = jobStats
-        };
+        var jobState = JobHelper.CreateJobAndJobState(jobMessage, jobType, 0, nextJobScheduleTime, 0, Priority.Normal, null, State.Enqueued);
 
-        return job;
+        return jobState.Job;
     }
 
     private async Task<RecurringJob> AddOrUpdateRecurringJobToDb<T>(T message, string name, string cronExpression, Job job) where T : class

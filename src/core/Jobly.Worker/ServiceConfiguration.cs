@@ -33,8 +33,7 @@ public static class ServiceConfiguration
     /// </summary>
     /// <typeparam name="TContext">The type of the DbContext.</typeparam>
     /// <param name="services">The service collection to add the configuration.</param>
-    /// <param name="namedConfigurationSection">Optional: The named configuration section.</param>
-    /// <param name="optionsAction">Optional: The action to configure the Jobly worker configuration options.</param>
+    /// <param name="optionsAction">The action to configure the Jobly worker configuration options.</param>
     /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddJoblyWorker<TContext>(
         this IServiceCollection services,
@@ -49,6 +48,7 @@ public static class ServiceConfiguration
     /// </summary>
     /// <typeparam name="TContext">The type of the DbContext.</typeparam>
     /// <param name="services">The service collection to add the configuration.</param>
+    /// <param name="namedConfigurationSection">The named configuration section.</param>
     /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddJoblyWorker<TContext>(
         this IServiceCollection services,

@@ -4,18 +4,15 @@ using Jobly.Core.Enums;
 
 namespace Jobly.Core.Helper;
 
-internal static class JobHelper
+public static class JobHelper
 {
     public static JobState CreateJobAndJobState<T>(T message, int retries, string name, DateTime? scheduleTime, int? maxRetries, Priority? priority, Guid? parentId, State? state)
         where T : class
     {
         var createdTime = DateTime.UtcNow;
 
-        var jobId = Guid.NewGuid();
-
         var job = new Job
         {
-            Id = jobId,
             CreateTime = createdTime,
             Message = JsonSerializer.Serialize(message),
             Type = message!.GetType().AssemblyQualifiedName!,
@@ -24,6 +21,59 @@ internal static class JobHelper
             MaxRetries = maxRetries ?? retries,
             Priority = priority ?? Priority.Normal,
             ParentJobId = parentId,
+        };
+
+        var jobState = new JobState
+        {
+            Job = job,
+            State = State.Enqueued,
+            DateTime = createdTime,
+        };
+
+        return jobState;
+    }
+    
+    public static JobState CreateJobAndJobState(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, Priority? priority, Guid? parentId, State? state)
+    {
+        var createdTime = DateTime.UtcNow;
+
+        var job = new Job
+        {
+            CreateTime = createdTime,
+            Message = message,
+            Type = type,
+            ScheduleTime = scheduleTime ?? createdTime,
+            CurrentState = state ?? (parentId == null ? State.Enqueued : State.Awaiting),
+            MaxRetries = maxRetries ?? retries,
+            Priority = priority ?? Priority.Normal,
+            ParentJobId = parentId,
+        };
+
+        var jobState = new JobState
+        {
+            Job = job,
+            State = State.Enqueued,
+            DateTime = createdTime,
+        };
+
+        return jobState;
+    }
+    
+    public static JobState CreateJobAndJobState(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, Priority? priority, Guid? parentId, int recurringJobId, State? state)
+    {
+        var createdTime = DateTime.UtcNow;
+
+        var job = new Job
+        {
+            CreateTime = createdTime,
+            Message = message,
+            Type = type,
+            ScheduleTime = scheduleTime ?? createdTime,
+            CurrentState = state ?? (parentId == null ? State.Enqueued : State.Awaiting),
+            MaxRetries = maxRetries ?? retries,
+            Priority = priority ?? Priority.Normal,
+            ParentJobId = parentId,
+            RecurringJobId = recurringJobId,
         };
 
         var jobState = new JobState
