@@ -52,11 +52,12 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         }
 
         // var jobState = JobHelper.CreateJobAndJobState(jobMessage, jobType, 0, nextJobScheduleTime, 0, Priority.Normal, null, State.Enqueued);
-        var jobState = new JobBuilder()
+        var jobState = JobBuilder
+            .Create()
             .WithMessageAndType(jobMessage, jobType)
             .WithScheduleTime(nextJobScheduleTime)
-            .WithPriority(Priority.Normal)
-            .WithState(State.Enqueued)
+            .WithPriority(Priority.Normal) // Not needed
+            .WithState(State.Enqueued)// Not needed
             .Build();
 
         return jobState.Job;

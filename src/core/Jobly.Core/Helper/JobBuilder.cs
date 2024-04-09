@@ -6,67 +6,79 @@ namespace Jobly.Core.Helper;
 
 public class JobBuilder
 {
-    private string _message;
-    private string _type;
-    private int _retries;
-    private DateTime? _scheduleTime;
-    private int? _maxRetries;
-    private Priority? _priority;
-    private Guid? _parentId;
-    private int? _recurringJobId;
-    private State? _state;
+    private JobBuilder() { } // Hide the constructor
 
-    public JobBuilder WithMessage<T>(T message)
+    public static JobBuilder Create() // Expose a public static factory method
     {
-        _message = JsonSerializer.Serialize(message);
-        _type = message.GetType().AssemblyQualifiedName;
-        return this;
+        return new JobBuilder();
+    }
+    public InnerBuilder WithMessage<T>(T message)
+    {
+        var _message = JsonSerializer.Serialize(message);
+        var type = message.GetType().AssemblyQualifiedName;
+        return new InnerBuilder(_message, type);
     }
     
-    public JobBuilder WithMessageAndType(string message, string type)
+    public InnerBuilder WithMessageAndType(string message, string type)
     {
-        _message = message;
-        _type = type;
-        return this;
+        return new InnerBuilder(message, type);
     }
+    
+    public class InnerBuilder
+    {
+        private string _message;
+        private string _type;
+        private int _retries;
+        private DateTime? _scheduleTime;
+        private int? _maxRetries;
+        private Priority? _priority;
+        private Guid? _parentId;
+        private int? _recurringJobId;
+        private State? _state;
+        
+        internal InnerBuilder(string message, string type)
+        {
+            _message = message;
+            _type = type;
+        }
 
-    public JobBuilder WithRetries(int retries)
+    public InnerBuilder WithRetries(int retries)
     {
         _retries = retries;
         return this;
     }
 
-    public JobBuilder WithScheduleTime(DateTime? scheduleTime)
+    public InnerBuilder WithScheduleTime(DateTime? scheduleTime)
     {
         _scheduleTime = scheduleTime;
         return this;
     }
 
-    public JobBuilder WithMaxRetries(int? maxRetries)
+    public InnerBuilder WithMaxRetries(int? maxRetries)
     {
         _maxRetries = maxRetries;
         return this;
     }
 
-    public JobBuilder WithPriority(Priority? priority)
+    public InnerBuilder WithPriority(Priority? priority)
     {
         _priority = priority;
         return this;
     }
 
-    public JobBuilder WithParentId(Guid? parentId)
+    public InnerBuilder WithParentId(Guid? parentId)
     {
         _parentId = parentId;
         return this;
     }
 
-    public JobBuilder WithRecurringJobId(int? recurringJobId)
+    public InnerBuilder WithRecurringJobId(int? recurringJobId)
     {
         _recurringJobId = recurringJobId;
         return this;
     }
 
-    public JobBuilder WithState(State? state)
+    public InnerBuilder WithState(State? state)
     {
         _state = state;
         return this;
@@ -97,5 +109,7 @@ public class JobBuilder
         };
 
         return jobState;
+    }
+    
     }
 }
