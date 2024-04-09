@@ -25,7 +25,8 @@ public static class ServiceConfiguration
         this IServiceCollection services)
         where TContext : DbContext
     {
-        return AddJoblyWorker<TContext>(services, null, null);
+        services.AddOptions<JoblyWorkerConfiguration>();
+        return AddJoblyWorkerInner<TContext>(services);
     }
 
     /// <summary>
@@ -40,7 +41,11 @@ public static class ServiceConfiguration
         Action<JoblyWorkerConfiguration> optionsAction)
         where TContext : DbContext
     {
-        return AddJoblyWorker<TContext>(services, null, optionsAction);
+        // Setup the configuration
+        services.AddOptions<JoblyWorkerConfiguration>()
+            .Configure(optionsAction);
+        
+        return AddJoblyWorkerInner<TContext>(services);
     }
 
     /// <summary>
@@ -52,39 +57,21 @@ public static class ServiceConfiguration
     /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddJoblyWorker<TContext>(
         this IServiceCollection services,
-        IConfiguration? namedConfigurationSection)
-        where TContext : DbContext
-    {
-        return AddJoblyWorker<TContext>(services, namedConfigurationSection, null);
-    }
-
-    /// <summary>
-    /// Add Jobly worker service configuration to the service collection.
-    /// </summary>
-    /// <typeparam name="TContext">The type of the DbContext.</typeparam>
-    /// <param name="services">The service collection to add the configuration.</param>
-    /// <param name="namedConfigurationSection">The named configuration section to bind.</param>
-    /// <param name="optionsAction">The action to configure the Jobly worker configuration.</param>
-    /// <returns>The updated service collection.</returns>
-    public static IServiceCollection AddJoblyWorker<TContext>(
-        this IServiceCollection services,
-        IConfiguration? namedConfigurationSection,
-        Action<JoblyWorkerConfiguration>? optionsAction)
+        IConfiguration namedConfigurationSection)
         where TContext : DbContext
     {
         // Setup the configuration
-        var optionsBuilder = services.AddOptions<JoblyWorkerConfiguration>();
+        services.AddOptions<JoblyWorkerConfiguration>()
+            .Bind(namedConfigurationSection);
+        
+        return AddJoblyWorkerInner<TContext>(services);
+    }
 
-        if (namedConfigurationSection != null)
-        {
-            optionsBuilder = optionsBuilder.Bind(namedConfigurationSection);
-        }
-
-        if (optionsAction != null)
-        {
-            optionsBuilder.Configure(optionsAction);
-        }
-
+    private static IServiceCollection AddJoblyWorkerInner<TContext>(
+        this IServiceCollection services)
+        where TContext : DbContext
+    {
+        
         services.AddSingleton<IHostedService, JoblyWorker<TContext>>();
 
         services.AddJobly<TContext>();

@@ -24,48 +24,33 @@ public static class ServiceConfiguration
     public static IServiceCollection AddJobly<TContext>(this IServiceCollection services)
         where TContext : DbContext
     {
-        return CreateJoblyServices<TContext>(services, null, null);
-    }
-
-    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services,
-        IConfiguration namedConfigurationSection
-    ) where TContext : DbContext
-    {
-        return CreateJoblyServices<TContext>(services, namedConfigurationSection, null);
+        services.AddOptions<JoblyConfiguration>();
+        return CreateJoblyServices<TContext>(services);
     }
 
     public static IServiceCollection AddJobly<TContext>(this IServiceCollection services,
         Action<JoblyConfiguration> options)
         where TContext : DbContext
     {
-        return CreateJoblyServices<TContext>(services, null, options);
+        services.AddOptions<JoblyConfiguration>()
+            .Configure(options);
+        
+        return CreateJoblyServices<TContext>(services);
     }
 
     public static IServiceCollection AddJobly<TContext>(this IServiceCollection services,
-        IConfiguration namedConfigurationSection,
-        Action<JoblyConfiguration> options)
+        IConfiguration namedConfigurationSection)
         where TContext : DbContext
     {
-        return CreateJoblyServices<TContext>(services, namedConfigurationSection, options);
+        services.AddOptions<JoblyConfiguration>()
+            .Bind(namedConfigurationSection);
+        return CreateJoblyServices<TContext>(services);
     }
 
-    private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services,
-        IConfiguration? namedConfigurationSection,
-        Action<JoblyConfiguration>? options)
+    private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services)
         where TContext : DbContext
     {
         var assembly = typeof(ServiceConfiguration).Assembly;
-
-        // Add Jobly configuration
-        var optionBuilder = services.AddOptions<JoblyConfiguration>();
-        if (namedConfigurationSection != null)
-        {
-            optionBuilder.Bind(namedConfigurationSection);
-        }
-        if (options != null)
-        {
-            optionBuilder.Configure(options);
-        }
 
         var builder = services.AddControllersWithViews();
         builder.AddApplicationPart(assembly)
