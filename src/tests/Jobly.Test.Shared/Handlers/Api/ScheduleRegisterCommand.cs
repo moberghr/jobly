@@ -61,26 +61,6 @@ public class ScheduleRegisterCommand : IRequestHandler<ScheduleRegisterRequest, 
             // Original code, works fine with one parameter
             await _publisher.Publish(sendEmailRequest, request.ScheduleTime);
 
-            // Explicitly setting the builder
-            var jobBuilder = new JobBuilder()
-                .WithMessage(sendEmailRequest)
-                .WithPriority(Priority.High)
-                .WithScheduleTime(request.ScheduleTime);
-            await _publisher.Publish(jobBuilder);
-            
-            // Inline builder
-            await _publisher.PublishBuilder(sendEmailRequest)
-                .WithScheduleTime(request.ScheduleTime)
-                .WithPriority(Priority.High)
-                .Publish();
-            
-            // Action parameters
-            await _publisher.Publish(sendEmailRequest, options =>
-            {
-                options.ScheduleTime = request.ScheduleTime;
-                options.Priority = Priority.High;
-            });
-
             // JobData parameters
             var jobParams = new JobParameters
             {

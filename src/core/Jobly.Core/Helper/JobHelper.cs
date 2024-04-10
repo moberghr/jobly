@@ -33,7 +33,8 @@ public static class JobHelper
         return jobState;
     }
 
-    public static JobState CreateJobAndJobState<T>(T message, int retries, string name, DateTime? scheduleTime, int? maxRetries, Priority? priority, Guid? parentId, State? state)
+    public static JobState CreateJobAndJobState<T>(T message, int retries, DateTime? scheduleTime, int? maxRetries,
+        Priority? priority, Guid? parentId, State? state)
         where T : class
     {
         var serializedMessage = JsonSerializer.Serialize(message);

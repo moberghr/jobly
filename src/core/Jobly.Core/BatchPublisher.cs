@@ -43,7 +43,7 @@ public class BatchPublisher<TContext> : IBatchPublisher
             throw new Exception("List cannot be empty");
         }
 
-        var placeholderJobForBatch = JobHelper.CreateJobAndJobState(batchJobMessages[0], 0, string.Empty, null, null, _joblyConfiguration.DefaultBatchPriority, parentId, State.Awaiting);
+        var placeholderJobForBatch = JobHelper.CreateJobAndJobState(batchJobMessages[0], 0, null, null, _joblyConfiguration.DefaultBatchPriority, parentId, State.Awaiting);
 
         var newBatch = new Batch
         {
@@ -51,7 +51,7 @@ public class BatchPublisher<TContext> : IBatchPublisher
             Counter = batchJobMessages.Count,
         };
 
-        var batchStateJobs = batchJobMessages.Select(x => JobHelper.CreateJobAndJobState(x, 0, string.Empty, null, null, _joblyConfiguration.DefaultBatchPriority, null, batchJobsState))
+        var batchStateJobs = batchJobMessages.Select(x => JobHelper.CreateJobAndJobState(x, 0, null, null, _joblyConfiguration.DefaultBatchPriority, null, batchJobsState))
             .ToList();
 
         var batchJobs = batchStateJobs.Select(x => x.Job).ToList();
