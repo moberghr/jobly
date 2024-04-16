@@ -18,7 +18,7 @@ const JoblySummary: React.FC<IBatch> = ({ id, created, description, amount, fini
                     <td>Progress</td>
                     <td style={{ paddingBottom: "5px" }}>
                         {`${finished}/${amount}`}
-                        <ProgressBar now={(finished / amount) * 100} variant="danger" striped animated />
+                        <ProgressBar now={(finished / amount) * 100} striped animated className={styles.progress} />
                     </td>
                 </tr>
                 <tr>
