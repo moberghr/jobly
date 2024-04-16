@@ -11,7 +11,7 @@ const Navbar = () => {
 
     return (
         <Navigation expand="md" className={styles.navbar}>
-            <Navigation.Brand className={styles["navbar-brand"]}>JOBLY</Navigation.Brand>
+            <Navigation.Brand className={styles["navbar-brand"]}>jobly</Navigation.Brand>
             <Nav className="me-auto">
                 <NavItem link={dashboard} label="Dashboard" quantity={50} isSelected={dashboard === pathname} />
                 <NavItem link={jobs} label="Jobs" quantity={236} isSelected={jobs === pathname} />
