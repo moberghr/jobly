@@ -1,10 +1,11 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 import Paths, { BatchesRouteSubpaths } from "./utils/paths";
 import JobWrapper from "./pages/jobs/JobWrapper";
 import BatchesWrapper from "./pages/batches/BatchesWrapper";
 import { JobRouteSubpaths } from "./utils/paths";
-import { Toaster } from "react-hot-toast";
+import DetailsJob from "./pages/jobs/DetailsJob";
 
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
 const Batches = lazy(() => import("./pages/batches/Batches"));
@@ -12,7 +13,6 @@ const Jobs = lazy(() => import("./pages/jobs/Jobs"));
 const ReccuringJobs = lazy(() => import("./pages/recurringJobs/recurringJobs"));
 const Navbar = lazy(() => import("./containers/navbar/Navbar"));
 const Layout = lazy(() => import("./components/layout/Layout"));
-const DetailsJob = lazy(() => import("./pages/jobs/DetailsJob"));
 
 const App: React.FC = () => {
     const { dashboard, jobs, recurringJobs, batches } = Paths;
