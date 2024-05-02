@@ -1,28 +1,17 @@
 import axios from "axios";
-import { API_URL_Mock } from "../../../utils/constants";
 import toast from "react-hot-toast";
 
-export async function getJobDetails(id: string): Promise<any> {
+import { API_URL_Mock, DEFAULT_ITEMS_PER_PAGE, DEFAULT_PAGE } from "../../../utils/constants";
+import { JobType } from "./jobs.models";
+
+export async function getJobs(type: JobType, page?: number, pageSize?: number): Promise<any> {
     const data = await axios
-        .get(`${API_URL_Mock}/job/${id}`)
+        .get(
+            `${API_URL_Mock}/jobs?page=${page ?? DEFAULT_PAGE}&pageSize=${
+                pageSize ?? DEFAULT_ITEMS_PER_PAGE
+            }&type=${type}`
+        )
         .then(res => res.data)
         .catch(error => toast.error(error));
     return { data } as any;
-}
-
-export async function deleteJob(id: string) {
-    axios
-        .post(
-            `${API_URL_Mock}/delete`,
-            { id: id },
-            {
-                headers: {
-                    "Content-Type": "application/json",
-                    "x-mock-response-code": 200,
-                    "x-mock-response-name": "delete",
-                },
-            }
-        )
-        .then(res => toast.success("Job successfully delete"))
-        .catch(error => toast.error(error));
 }
