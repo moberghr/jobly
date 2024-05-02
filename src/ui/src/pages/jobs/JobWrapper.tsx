@@ -14,21 +14,22 @@ const JobWrapper: React.FC = () => {
 
     useEffect(() => {
         const queryParams = new URLSearchParams(location.search);
-        const page = Number(queryParams.get("page"));
-        const pageSize = Number(queryParams.get("items"));
+        const page = queryParams.get("page") ?? undefined;
+        const pageSize = queryParams.get("items") ?? undefined;
         const jobType = JobType[location.pathname.replace("/jobs/", "") as keyof typeof JobType];
 
         if (!jobType) return;
 
-        const fetchData = async () => {
+        const fetchJobs = async () => {
             try {
                 const response = await getJobs(jobType, page, pageSize);
                 setData(response.data);
             } catch (error) {
+                setData({ data: [], totalCount: 0 });
                 console.error("Error fetching data:", error);
             }
         };
-        fetchData();
+        fetchJobs();
     }, [location.pathname, location.search]);
 
     return (
