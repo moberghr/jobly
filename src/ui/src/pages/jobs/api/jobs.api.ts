@@ -15,3 +15,20 @@ export async function getJobs(type: JobType, page?: string, pageSize?: string): 
         .catch(error => toast.error(error));
     return { data } as any;
 }
+
+export async function deleteJob(id: string) {
+    axios
+        .post(
+            `${API_URL_Mock}/delete`,
+            { id: id },
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-mock-response-code": 200,
+                    "x-mock-response-name": "delete",
+                },
+            }
+        )
+        .then(res => toast.success("Job successfully delete"))
+        .catch(error => toast.error(error));
+}
