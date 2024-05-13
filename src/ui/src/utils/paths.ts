@@ -66,21 +66,9 @@ export const JobRouteSubpaths: Array<ISubpath> = [
 
 export const BatchesRouteSubpaths: Array<ISubpath> = [
     {
-        label: "Enqueued",
-        path: "/enqueued",
+        label: "Started",
+        path: "/started",
         icon: FaLayerGroup,
-        iconColor: "black",
-    },
-    {
-        label: "Scheduled",
-        path: "/scheduled",
-        icon: FaCalendarAlt,
-        iconColor: "black",
-    },
-    {
-        label: "Processing",
-        path: "/processing",
-        icon: GoPulse,
         iconColor: "black",
     },
     {
@@ -90,21 +78,21 @@ export const BatchesRouteSubpaths: Array<ISubpath> = [
         iconColor: "black",
     },
     {
-        label: "Failed",
-        path: "/failed",
+        label: "Completed",
+        path: "/completed",
         icon: FaExclamation,
-        iconColor: "black",
-    },
-    {
-        label: "Deleted",
-        path: "/deleted",
-        icon: FaTrash,
         iconColor: "black",
     },
     {
         label: "Awaiting",
         path: "/awaiting",
         icon: FaClock,
+        iconColor: "black",
+    },
+    {
+        label: "Deleted",
+        path: "/deleted",
+        icon: FaTrash,
         iconColor: "black",
     },
 ];
