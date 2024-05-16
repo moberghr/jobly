@@ -1,16 +1,19 @@
-import React, { useEffect, useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import React, { useEffect } from "react";
+import { Outlet, useLocation, useParams } from "react-router-dom";
 
 import Path, { JobRouteSubpaths } from "../../utils/paths";
 import VerticalNavbar from "../../containers/verticalNavbar/VerticalNavbar";
 import styles from "./jobs.module.scss";
-import { IGetJobsResponse, JobType } from "./api/jobs.models";
+import { JobType } from "./api/jobs.models";
 import { getJobs } from "./api/jobs.api";
+import { useJobsStore } from "../../store/jobs";
 
 const JobWrapper: React.FC = () => {
+    const jobsStore = useJobsStore();
     const { jobs } = Path;
-    const [data, setData] = useState<IGetJobsResponse>({ data: [], totalCount: 0 });
     const location = useLocation();
+    const params = useParams();
+    console.log(params);
 
     useEffect(() => {
         const queryParams = new URLSearchParams(location.search);
@@ -23,9 +26,9 @@ const JobWrapper: React.FC = () => {
         const fetchJobs = async () => {
             try {
                 const response = await getJobs(jobType, page, pageSize);
-                setData(response.data);
+                jobsStore.setData(response.data);
             } catch (error) {
-                setData({ data: [], totalCount: 0 });
+                jobsStore.deleteData();
                 console.error("Error fetching data:", error);
             }
         };
@@ -36,7 +39,7 @@ const JobWrapper: React.FC = () => {
         <>
             <VerticalNavbar currentPath={jobs} subpaths={JobRouteSubpaths} />
             <div className={styles["jobs"]}>
-                <Outlet context={[data]} />
+                <Outlet />
             </div>
         </>
     );

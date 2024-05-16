@@ -1,6 +1,5 @@
 import Button from "react-bootstrap/Button";
 import { useState } from "react";
-import { useOutletContext } from "react-router-dom";
 import { FaRotateRight, FaX } from "react-icons/fa6";
 
 import JoblyAccentText from "../../components/joblyAccentText/joblyAccentText";
@@ -10,7 +9,7 @@ import JoblyTitle from "../../components/joblyTitle/joblyTitle";
 import JoblyDetailsLink from "../../components/joblyDetailsLink/joblyDetailsLink";
 import styles from "./jobs.module.scss";
 import { JoblySpecialComponentType } from "../../utils/types";
-import { IGetJobsResponse } from "./api/jobs.models";
+import { useJobsStore } from "../../store/jobs";
 
 const COLUMN_NAMES = {
     id: "Id",
@@ -19,7 +18,7 @@ const COLUMN_NAMES = {
 };
 
 const FailedJobs = () => {
-    const [data] = useOutletContext<[IGetJobsResponse]>();
+    const { data } = useJobsStore();
     const [selectedRows, setSelectedRows] = useState<(number | string)[]>([]);
 
     const handleRequeueJobs = () => {
