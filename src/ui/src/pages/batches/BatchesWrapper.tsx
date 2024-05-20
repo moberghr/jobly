@@ -29,7 +29,7 @@ const BatchesWrapper = () => {
             }
         };
         fetchBatches();
-    }, [location.pathname, location.search, batchType]);
+    }, [location.search, batchType]);
 
     return (
         <>
