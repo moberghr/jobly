@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import styles from "./styles.module.scss";
 import JoblyTable from "../joblyTable/joblyTable";
 import JoblyDetailsLink from "../joblyDetailsLink/joblyDetailsLink";
+import { JoblySpecialComponentType } from "../../utils/types";
 
 enum Status {
     created = "created",
@@ -90,8 +91,16 @@ const BatchesTable = () => {
                     data={jobs}
                     columnNames={COLUMN_NAMES}
                     specialColumnComponents={{
-                        id: { component: JoblyDetailsLink, props: { type: "primary" } },
-                        job: { component: JoblyDetailsLink, props: { type: "secondary" } },
+                        id: {
+                            component: JoblyDetailsLink,
+                            props: { type: "primary" },
+                            type: JoblySpecialComponentType.Object,
+                        },
+                        job: {
+                            component: JoblyDetailsLink,
+                            props: { type: "secondary" },
+                            type: JoblySpecialComponentType.Object,
+                        },
                     }}
                 />
             </div>

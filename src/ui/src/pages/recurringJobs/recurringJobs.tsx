@@ -4,6 +4,7 @@ import JoblyTable from "../../components/joblyTable/joblyTable";
 import JoblyTitle from "../../components/joblyTitle/joblyTitle";
 import JoblyStatusText from "../../components/joblyStatusText/joblyStatusText";
 import styles from "./recurringJobs.module.scss";
+import { JoblySpecialComponentType } from "../../utils/types";
 
 const DUMMY_DATA = {
     data: [
@@ -55,15 +56,15 @@ const RecurringJobs = () => {
                 </Button>
             </div>
 
-            <div className={styles["table-container"]}>
-                <JoblyTable
-                    data={DUMMY_DATA}
-                    columnNames={COLUMN_NAMES}
-                    specialColumnComponents={{ lastExecution: { component: JoblyStatusText } }}
-                    selectable
-                    onSelectRows={setSelectedRows}
-                />
-            </div>
+            <JoblyTable
+                data={DUMMY_DATA}
+                columnNames={COLUMN_NAMES}
+                specialColumnComponents={{
+                    lastExecution: { component: JoblyStatusText, type: JoblySpecialComponentType.Object },
+                }}
+                selectable
+                onSelectRows={setSelectedRows}
+            />
         </div>
     );
 };

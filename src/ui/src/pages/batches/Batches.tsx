@@ -4,6 +4,8 @@ import JoblyTitle from "../../components/joblyTitle/joblyTitle";
 import JoblyDetailsLink from "../../components/joblyDetailsLink/joblyDetailsLink";
 import { useState } from "react";
 import styles from "./styles.module.scss";
+import { JoblySpecialComponentType } from "../../utils/types";
+import BatchesTable from "../../components/BatchesTable/BatchesTable";
 
 export interface IBatch {
     id: {
@@ -22,6 +24,7 @@ const Batches = () => {
         data: [
             {
                 id: {
+                    type: "primary",
                     value: "msmi431pe",
                     pathId: "msmi431pe",
                     mainRoute: "batches",
@@ -61,13 +64,7 @@ const Batches = () => {
     return (
         <div className={styles.container}>
             <JoblyTitle>{`${status} batches`}</JoblyTitle>
-            <JoblyTable
-                data={MOCK_DATA}
-                columnNames={COLUMNS}
-                specialColumnComponents={{
-                    id: { component: JoblyDetailsLink },
-                }}
-            />
+            <BatchesTable />
         </div>
     );
 };

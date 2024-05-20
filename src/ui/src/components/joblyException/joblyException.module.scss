@@ -1,0 +1,12 @@
+@import "../../style/variables.scss";
+
+.exception {
+    width: 100%;
+    text-align: left;
+    background-color: $grey-light-2;
+    padding: 10px;
+}
+
+.exception__content {
+    margin-left: 10px !important;
+}
