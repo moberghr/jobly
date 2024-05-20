@@ -12,20 +12,18 @@ const JobWrapper: React.FC = () => {
     const jobsStore = useJobsStore();
     const { jobs } = Path;
     const location = useLocation();
-    const params = useParams();
-    console.log(params);
+    const { jobType } = useParams();
 
     useEffect(() => {
         const queryParams = new URLSearchParams(location.search);
         const page = queryParams.get("page") ?? undefined;
         const pageSize = queryParams.get("items") ?? undefined;
-        const jobType = JobType[location.pathname.replace("/jobs/", "") as keyof typeof JobType];
 
-        if (!jobType) return;
+        if (!jobType || !(jobType in JobType)) return;
 
         const fetchJobs = async () => {
             try {
-                const response = await getJobs(jobType, page, pageSize);
+                const response = await getJobs(jobType as JobType, page, pageSize);
                 jobsStore.setData(response.data);
             } catch (error) {
                 jobsStore.deleteData();
