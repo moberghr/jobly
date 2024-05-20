@@ -1,13 +1,9 @@
-import { useLocation } from "react-router";
-import { useOutletContext } from "react-router-dom";
-
-import { IGetBatchesResponse } from "./api/batches.models";
+import { useParams } from "react-router-dom";
 
 const Batches = () => {
-    const { pathname } = useLocation();
-    const [data] = useOutletContext<[IGetBatchesResponse]>();
+    const { batchType } = useParams();
 
-    return <div>Current path: {pathname}</div>;
+    return <div>Batch type is {batchType}</div>;
 };
 
 export default Batches;

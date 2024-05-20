@@ -34,9 +34,7 @@ const App: React.FC = () => {
                             <Route element={<DetailsJob />} path={`/jobs/details/:id`} />
                         </Route>
                         <Route path={batches} element={<Suspense children={<BatchesWrapper />} />}>
-                            {BatchesRouteSubpaths.map(obj => (
-                                <Route key={obj.path} element={<Batches />} path={`${batches}${obj.path}`} />
-                            ))}
+                            <Route element={<Batches />} path={`/batches/:batchType`} />
                         </Route>
                     </Routes>
                 </Layout>
