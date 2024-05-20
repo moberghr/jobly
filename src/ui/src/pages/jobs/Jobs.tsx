@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { JobRouteSubpaths } from "../../utils/paths";
 
-const Page = () => {
+const Jobs = () => {
     const { jobType } = useParams();
 
     let Component = JobRouteSubpaths.find(job => job.path === "/" + jobType)?.component;
@@ -10,4 +10,4 @@ const Page = () => {
     return <Component />;
 };
 
-export default Page;
+export default Jobs;
