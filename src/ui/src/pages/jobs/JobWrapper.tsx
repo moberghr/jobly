@@ -31,7 +31,7 @@ const JobWrapper: React.FC = () => {
             }
         };
         fetchJobs();
-    }, [location.pathname, location.search]);
+    }, [location.search, jobType]);
 
     return (
         <>
