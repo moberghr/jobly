@@ -1,7 +1,17 @@
 import { IconType } from "react-icons";
-import { FaLayerGroup, FaCalendarAlt, FaCheckCircle, FaExclamation, FaTrash, FaClock } from "react-icons/fa";
+import {
+    FaLayerGroup,
+    FaCalendarAlt,
+    FaCheckCircle,
+    FaExclamation,
+    FaTrash,
+    FaClock,
+    FaPlay,
+    FaCircle,
+} from "react-icons/fa";
 import { GoPulse } from "react-icons/go";
 import FailedJobs from "../pages/jobs/FailedJobs";
+import BatchesDetails from "../pages/batches/BatchesDetails";
 
 const Routes = {
     dashboard: "/",
@@ -11,10 +21,10 @@ const Routes = {
 };
 
 export interface ISubpath {
-    label: string;
+    label?: string;
     path: string;
-    icon: IconType;
-    iconColor: string;
+    icon?: IconType;
+    iconColor?: string;
     component?: () => JSX.Element;
 }
 
@@ -66,21 +76,9 @@ export const JobRouteSubpaths: Array<ISubpath> = [
 
 export const BatchesRouteSubpaths: Array<ISubpath> = [
     {
-        label: "Enqueued",
-        path: "/enqueued",
-        icon: FaLayerGroup,
-        iconColor: "black",
-    },
-    {
-        label: "Scheduled",
-        path: "/scheduled",
-        icon: FaCalendarAlt,
-        iconColor: "black",
-    },
-    {
-        label: "Processing",
-        path: "/processing",
-        icon: GoPulse,
+        label: "Started",
+        path: "/started",
+        icon: FaPlay,
         iconColor: "black",
     },
     {
@@ -90,9 +88,15 @@ export const BatchesRouteSubpaths: Array<ISubpath> = [
         iconColor: "black",
     },
     {
-        label: "Failed",
-        path: "/failed",
-        icon: FaExclamation,
+        label: "Completed",
+        path: "/completed",
+        icon: FaCircle,
+        iconColor: "black",
+    },
+    {
+        label: "Awaiting",
+        path: "/awaiting",
+        icon: FaClock,
         iconColor: "black",
     },
     {
@@ -102,10 +106,8 @@ export const BatchesRouteSubpaths: Array<ISubpath> = [
         iconColor: "black",
     },
     {
-        label: "Awaiting",
-        path: "/awaiting",
-        icon: FaClock,
-        iconColor: "black",
+        path: "/details",
+        component: BatchesDetails,
     },
 ];
 
