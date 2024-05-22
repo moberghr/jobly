@@ -78,11 +78,7 @@ export const BatchesRouteSubpaths: Array<ISubpath> = [
     {
         label: "Started",
         path: "/started",
-<<<<<<< HEAD
-        icon: FaLayerGroup,
-=======
         icon: FaPlay,
->>>>>>> b278e5470fbdc87493b1dfb778f0df0e9447f5c6
         iconColor: "black",
     },
     {
@@ -94,16 +90,6 @@ export const BatchesRouteSubpaths: Array<ISubpath> = [
     {
         label: "Completed",
         path: "/completed",
-<<<<<<< HEAD
-        icon: FaExclamation,
-        iconColor: "black",
-    },
-    {
-        label: "Awaiting",
-        path: "/awaiting",
-        icon: FaClock,
-        iconColor: "black",
-=======
         icon: FaCircle,
         iconColor: "black",
     },
@@ -122,13 +108,6 @@ export const BatchesRouteSubpaths: Array<ISubpath> = [
     {
         path: "/details",
         component: BatchesDetails,
->>>>>>> b278e5470fbdc87493b1dfb778f0df0e9447f5c6
-    },
-    {
-        label: "Deleted",
-        path: "/deleted",
-        icon: FaTrash,
-        iconColor: "black",
     },
 ];
 
