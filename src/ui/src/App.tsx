@@ -4,7 +4,6 @@ import { Toaster } from "react-hot-toast";
 import Paths, { BatchesRouteSubpaths } from "./utils/paths";
 import JobWrapper from "./pages/jobs/JobWrapper";
 import BatchesWrapper from "./pages/batches/BatchesWrapper";
-import { JobRouteSubpaths } from "./utils/paths";
 import BatchesDetails from "./pages/batches/BatchesDetails";
 import DetailsJob from "./pages/jobs/DetailsJob";
 
@@ -27,10 +26,7 @@ const App: React.FC = () => {
                     <Route path={dashboard} element={<Suspense children={<Dashboard />} />} />
                     <Route path={recurringJobs} element={<Suspense children={<ReccuringJobs />} />} />
                     <Route path={jobs} element={<Suspense children={<JobWrapper />} />}>
-                        {JobRouteSubpaths.map(obj => {
-                            const Component = obj.component ? obj.component : Jobs;
-                            return <Route key={obj.path} element={<Component />} path={`${jobs}${obj.path}`} />;
-                        })}
+                        <Route element={<Jobs />} path={`/jobs/:jobType`} />
                         <Route element={<DetailsJob />} path={`/jobs/details/:id`} />
                     </Route>
                     <Route path={batches} element={<Suspense children={<BatchesWrapper />} />}>

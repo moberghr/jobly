@@ -1,40 +1,15 @@
 import Button from "react-bootstrap/Button";
 import { useState } from "react";
+import { FaRotateRight, FaX } from "react-icons/fa6";
 
 import JoblyAccentText from "../../components/joblyAccentText/joblyAccentText";
 import JoblyInfo from "../../components/joblyInfo/joblyInfo";
 import JoblyTable from "../../components/joblyTable/joblyTable";
 import JoblyTitle from "../../components/joblyTitle/joblyTitle";
 import JoblyDetailsLink from "../../components/joblyDetailsLink/joblyDetailsLink";
-import { FaRotateRight, FaX } from "react-icons/fa6";
 import styles from "./jobs.module.scss";
 import { JoblySpecialComponentType } from "../../utils/types";
-
-const DUMMY_DATA = {
-    data: [
-        {
-            id: { value: "ff12345", pathId: "ff12345", mainRoute: "jobs" },
-            failed: "a minute ago",
-            job: { value: "IEmailService.SendCampaignEmail", pathId: "ff12345", mainRoute: "jobs" },
-            jobException: {
-                title: "System.Net.Mail.SmtpException",
-                subtitle: "Syntex error, command unrecognized.",
-                exception: "some exception in line 3",
-            },
-        },
-        {
-            id: { value: "ffabcd123", pathId: "ffabcd123", mainRoute: "jobs" },
-            failed: "a minute ago",
-            job: { value: "IEmailService.SendCampaignEmail", pathId: "ffabcd123", mainRoute: "jobs" },
-            jobException: {
-                title: "System.Net.Mail.SmtpException",
-                subtitle: "Syntex error, command unrecognized.",
-                exception: "some exception in line 4",
-            },
-        },
-    ],
-    totalCount: 2,
-};
+import { useJobsStore } from "../../store/jobs";
 
 const COLUMN_NAMES = {
     id: "Id",
@@ -43,6 +18,7 @@ const COLUMN_NAMES = {
 };
 
 const FailedJobs = () => {
+    const { data } = useJobsStore();
     const [selectedRows, setSelectedRows] = useState<(number | string)[]>([]);
 
     const handleRequeueJobs = () => {
@@ -75,7 +51,7 @@ const FailedJobs = () => {
                 </Button>
             </div>
             <JoblyTable
-                data={DUMMY_DATA}
+                data={data}
                 columnNames={COLUMN_NAMES}
                 specialColumnComponents={{
                     id: {
