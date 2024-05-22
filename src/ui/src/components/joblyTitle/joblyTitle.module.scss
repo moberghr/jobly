@@ -1,7 +1,8 @@
 @import "../../style/variables.scss";
 
 .title {
-    font-weight: 400;
+    font-weight: 300;
+    text-transform: capitalize;
 }
 
 .title__line {

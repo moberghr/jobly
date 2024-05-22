@@ -1,6 +1,10 @@
 .recuring-jobs {
     margin: 20px 10vw;
     width: calc(100% - 2 * 10vw);
+
+    .table-container {
+        margin-top: 30px;
+    }
 }
 
 .recuring-jobs__actions {

@@ -4,6 +4,7 @@ import { Toaster } from "react-hot-toast";
 import Paths, { BatchesRouteSubpaths } from "./utils/paths";
 import JobWrapper from "./pages/jobs/JobWrapper";
 import BatchesWrapper from "./pages/batches/BatchesWrapper";
+import BatchesDetails from "./pages/batches/BatchesDetails";
 import DetailsJob from "./pages/jobs/DetailsJob";
 
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
@@ -17,27 +18,26 @@ const App: React.FC = () => {
     const { dashboard, jobs, recurringJobs, batches } = Paths;
 
     return (
-        <>
+        <Router>
             <Toaster />
-            <Router>
-                <Navbar />
-                <Layout>
-                    <Routes>
-                        <Route path={dashboard} element={<Suspense children={<Dashboard />} />} />
-                        <Route path={recurringJobs} element={<Suspense children={<ReccuringJobs />} />} />
-                        <Route path={jobs} element={<Suspense children={<JobWrapper />} />}>
-                            <Route element={<Jobs />} path={`/jobs/:jobType`} />
-                            <Route element={<DetailsJob />} path={`/jobs/details/:id`} />
-                        </Route>
-                        <Route path={batches} element={<Suspense children={<BatchesWrapper />} />}>
-                            {BatchesRouteSubpaths.map(obj => (
-                                <Route key={obj.path} element={<Batches />} path={`${batches}${obj.path}`} />
-                            ))}
-                        </Route>
-                    </Routes>
-                </Layout>
-            </Router>
-        </>
+            <Navbar />
+            <Layout>
+                <Routes>
+                    <Route path={dashboard} element={<Suspense children={<Dashboard />} />} />
+                    <Route path={recurringJobs} element={<Suspense children={<ReccuringJobs />} />} />
+                    <Route path={jobs} element={<Suspense children={<JobWrapper />} />}>
+                        <Route element={<Jobs />} path={`/jobs/:jobType`} />
+                        <Route element={<DetailsJob />} path={`/jobs/details/:id`} />
+                    </Route>
+                    <Route path={batches} element={<Suspense children={<BatchesWrapper />} />}>
+                        {BatchesRouteSubpaths.map(obj => (
+                            <Route key={obj.path} element={<Batches />} path={`${batches}${obj.path}`} />
+                        ))}
+                        <Route element={<Suspense children={<BatchesDetails />} />} path={`/batches/details/:id`} />
+                    </Route>
+                </Routes>
+            </Layout>
+        </Router>
     );
 };
 
