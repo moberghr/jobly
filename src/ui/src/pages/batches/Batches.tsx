@@ -1,10 +1,9 @@
+import { useParams } from "react-router-dom";
 import { useLocation } from "react-router";
-import JoblyTable from "../../components/joblyTable/joblyTable";
-import JoblyTitle from "../../components/joblyTitle/joblyTitle";
-import JoblyDetailsLink from "../../components/joblyDetailsLink/joblyDetailsLink";
 import { useState } from "react";
+
 import styles from "./styles.module.scss";
-import { JoblySpecialComponentType } from "../../utils/types";
+import JoblyTitle from "../../components/joblyTitle/joblyTitle";
 import BatchesTable from "../../components/BatchesTable/BatchesTable";
 
 export interface IBatch {
@@ -20,6 +19,8 @@ export interface IBatch {
 }
 
 const Batches = () => {
+    const { batchType } = useParams();
+
     const MOCK_DATA = {
         data: [
             {
@@ -67,6 +68,7 @@ const Batches = () => {
             <BatchesTable />
         </div>
     );
+    return <div>Batch type is {batchType}</div>;
 };
 
 export default Batches;
