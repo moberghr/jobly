@@ -1,8 +1,16 @@
 @import "../../style/variables.scss";
 
 .jobly-table {
-    margin-top: 30px;
     font-size: 14px;
+
+    td {
+        font-weight: 300;
+
+        a {
+            font-weight: 400;
+            color: #76abae;
+        }
+    }
     & > thead {
         border-bottom-width: 3px;
         font-size: 16px;

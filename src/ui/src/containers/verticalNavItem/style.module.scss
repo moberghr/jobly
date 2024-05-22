@@ -1,7 +1,7 @@
 .container {
     display: flex;
     flex-direction: row;
-    border-bottom: solid 2px whitesmoke;
+    border-bottom: solid 2px #eeeeee;
     align-items: center;
     padding: 20px 0;
     cursor: pointer;
@@ -11,12 +11,13 @@
     }
 
     .label {
+        color: #2c3038;
         margin-right: 8px;
     }
 
     .quantity {
         border-radius: 15px;
-        border: solid 1px grey;
+        border: solid 1px #eeeeee;
         padding: 2px 10px;
     }
 }

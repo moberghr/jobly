@@ -2,15 +2,16 @@ import { Link } from "react-router-dom";
 import styles from "./joblyDetailsLink.module.scss";
 
 interface IJoblyDetailsLink {
+    mainRoute: "jobs" | "batches";
     value: string | number;
     pathId: string;
     type: "primary" | "secondary";
 }
 
-function JoblyDetailsLink({ value, pathId, type }: IJoblyDetailsLink) {
+function JoblyDetailsLink({ value, pathId, type, mainRoute }: IJoblyDetailsLink) {
     return (
         <Link
-            to={"/jobs/details/" + pathId}
+            to={`/${mainRoute}/details/${pathId}`}
             className={`
                 ${styles["details-link"]}
                 ${styles["details-link--" + type]}`}
