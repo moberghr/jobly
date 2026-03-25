@@ -1,4 +1,4 @@
-﻿using MediatR;
+﻿using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Jobly.Core.Handlers;
@@ -12,7 +12,7 @@ public class SendEmailCommand : IRequestHandler<SendEmailRequest, SendEmailRespo
         _context = context;
     }
 
-    public async Task<SendEmailResponse> Handle(SendEmailRequest request, CancellationToken cancellationToken)
+    public async ValueTask<SendEmailResponse> Handle(SendEmailRequest request, CancellationToken cancellationToken)
     {
         var emailLog = await _context.EmailLogs
             .Where(x => x.Id == request.EmailLogId)

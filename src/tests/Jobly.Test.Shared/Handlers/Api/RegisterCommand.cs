@@ -1,5 +1,5 @@
 ﻿using Jobly.Test.Shared.Entities;
-using MediatR;
+using Mediator;
 
 namespace Jobly.Core.Handlers;
 
@@ -16,7 +16,7 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
         _batchPublisher = batchPublisher;
     }
 
-    public async Task<RegisterResponse> Handle(RegisterRequest request, CancellationToken cancellationToken)
+    public async ValueTask<RegisterResponse> Handle(RegisterRequest request, CancellationToken cancellationToken)
     {
         var registration = new Registration
         {

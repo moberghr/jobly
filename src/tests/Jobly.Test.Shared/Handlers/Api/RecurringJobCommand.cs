@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Jobly.Test.Shared.Entities;
-using MediatR;
+using Mediator;
 
 namespace Jobly.Core.Handlers;
 
@@ -33,7 +33,7 @@ public class RecurringJobCommand : IRequestHandler<RecurringJobRequest, Recurrin
         _publisher = publisher;
     }
 
-    public async Task<RecurringJobResponse> Handle(RecurringJobRequest request, CancellationToken cancellationToken)
+    public async ValueTask<RecurringJobResponse> Handle(RecurringJobRequest request, CancellationToken cancellationToken)
     {
         var registration = new Registration
         {

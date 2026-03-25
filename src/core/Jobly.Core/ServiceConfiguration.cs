@@ -151,8 +151,7 @@ public static class ServiceConfiguration
             .HasForeignKey(p => p.JobId);
 
         job.HasIndex(p => new {p.CurrentState, p.Priority, p.ScheduleTime})
-            .IsDescending(false, false, false)
-            .HasFilter("\"current_state\" = 1");
+            .IsDescending(false, false, false);
 
         job.HasIndex(p => p.CurrentState);
     }

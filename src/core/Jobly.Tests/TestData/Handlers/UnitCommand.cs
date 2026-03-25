@@ -1,11 +1,11 @@
-﻿using MediatR;
+﻿using Mediator;
 
 namespace Jobly.Tests.TestData.Handlers;
 public class UnitCommand : IRequestHandler<UnitRequest, Unit>
 {
-    public Task<Unit> Handle(UnitRequest request, CancellationToken cancellationToken)
+    public ValueTask<Unit> Handle(UnitRequest request, CancellationToken cancellationToken)
     {
-        return Task.FromResult(Unit.Value);
+        return new ValueTask<Unit>(Unit.Value);
     }
 }
 

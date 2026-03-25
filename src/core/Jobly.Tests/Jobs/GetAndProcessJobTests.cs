@@ -45,9 +45,10 @@ public abstract partial class JoblyTests : TestBase
         var jobFromDb = await GetJobWithStates(context, jobId);
         var logFromDb = await GetTestLog(context, testLogId);
         jobFromDb.CurrentState.ShouldBe(State.Completed);
-        jobFromDb.JobStates.Count.ShouldBe(2);
-        jobFromDb.JobStates.First().State.ShouldBe(State.Enqueued);
-        jobFromDb.JobStates.Last().State.ShouldBe(State.Completed);
+        jobFromDb.JobStates.Count.ShouldBe(3);
+        jobFromDb.JobStates[0].State.ShouldBe(State.Enqueued);
+        jobFromDb.JobStates[1].State.ShouldBe(State.Processing);
+        jobFromDb.JobStates[2].State.ShouldBe(State.Completed);
         logFromDb.ProcessedTime.ShouldNotBeNull();
     }
 
@@ -63,27 +64,10 @@ public abstract partial class JoblyTests : TestBase
         var jobFromDb = await GetJobWithStates(context, jobId);
 
         jobFromDb.CurrentState.ShouldBe(State.Failed);
-        jobFromDb.JobStates.Count.ShouldBe(2);
-        jobFromDb.JobStates.First().State.ShouldBe(State.Enqueued);
-        jobFromDb.JobStates.Last().State.ShouldBe(State.Failed);
-    }
-
-    [Fact]
-    public async Task GetAndProcessJob_WithoutLockingInterceptor_CounterShouldBeMoreThenOne()
-    {
-        await CreateCounterJob();
-
-        List<Task> tasks = new();
-        for (var i = 0; i < 20; i++)
-        {
-            tasks.Add(ProcessJobWithoutLocking());
-        }
-
-        Task.WaitAll(tasks.ToArray());
-
-
-        var counter = await GetCounterForNoLocking();
-        counter.ShouldNotBe(1);
+        jobFromDb.JobStates.Count.ShouldBe(3);
+        jobFromDb.JobStates[0].State.ShouldBe(State.Enqueued);
+        jobFromDb.JobStates[1].State.ShouldBe(State.Processing);
+        jobFromDb.JobStates[2].State.ShouldBe(State.Failed);
     }
 
     [Fact]

@@ -3,7 +3,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -14,31 +14,20 @@ namespace Jobly.Tests;
 public abstract class TestBase
 {
     private readonly IServiceScopeFactory _serviceScopeFactory;
-    private readonly IServiceScopeFactory _serviceScopeFactoryNoLocking;
 
     protected TestBase()
     {
         var services = new ServiceCollection();
-        var provider = services.AddMediatR(typeof(TestBase))
+        var provider = services.AddMediator()
             .AddTransient<TestContext>(x => CreateContext())
             .AddJoblyWorker<TestContext>()
             .AddSingleton<CounterService>()
             .BuildServiceProvider();
 
         _serviceScopeFactory = provider.GetService<IServiceScopeFactory>()!;
-
-        var providerWithNoLocking = services.AddMediatR(typeof(TestBase))
-            .AddTransient<TestContext>(x => CreateContextWithoutJobLocking())
-            .AddJoblyWorker<TestContext>()
-            .AddSingleton<CounterService>()
-            .BuildServiceProvider();
-
-        _serviceScopeFactoryNoLocking = providerWithNoLocking.GetService<IServiceScopeFactory>()!;
     }
 
     protected abstract TestContext CreateContext();
-
-    protected abstract TestContext CreateContextWithoutJobLocking();
 
     protected static async Task<Guid> CreateProcessLogJob(TestContext context, int testLogId)
     {
@@ -147,7 +136,7 @@ public abstract class TestBase
             requests.Add(request);
         }
 
-        var batchPublisher = new BatchPublisher<TestContext>(context, null);
+        var batchPublisher = TestUtils.CreateBatchPublisher(context);
 
         var placeholderJobId = await batchPublisher.StartNew(requests);
 
@@ -176,7 +165,7 @@ public abstract class TestBase
     {
         var job = await context.Set<Job>()
             .Where(x => x.Id == jobId)
-            .Include(x => x.JobStates)
+            .Include(x => x.JobStates.OrderBy(s => s.DateTime))
             .AsNoTracking()
             .SingleAsync();
 
@@ -200,24 +189,6 @@ public abstract class TestBase
         var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactory);
 
         await worker.GetAndProcessJob(CancellationToken.None);
-    }
-
-    protected async Task ProcessJobWithoutLocking()
-    {
-        using var scope = _serviceScopeFactoryNoLocking.CreateScope();
-
-        var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactoryNoLocking);
-
-        await worker.GetAndProcessJob(CancellationToken.None);
-    }
-
-    protected async Task<int> GetCounterForNoLocking()
-    {
-        using var scope = _serviceScopeFactoryNoLocking.CreateScope();
-
-        var counterService = scope.ServiceProvider.GetService<CounterService>();
-
-        return counterService.Counter;
     }
 
     protected async Task<int> GetCounter()

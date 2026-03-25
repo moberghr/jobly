@@ -1,4 +1,4 @@
-﻿using MediatR;
+﻿using Mediator;
 
 namespace Jobly.Core.Handlers;
 public class ThrowExceptionResponse
@@ -20,7 +20,7 @@ public class ThrowExceptionCommand : IRequestHandler<ThrowExceptionRequest, Thro
         _publisher = publisher;
     }
 
-    public Task<ThrowExceptionResponse> Handle(ThrowExceptionRequest request, CancellationToken cancellationToken)
+    public ValueTask<ThrowExceptionResponse> Handle(ThrowExceptionRequest request, CancellationToken cancellationToken)
     {
         throw new Exception("This is from ThrowExceptionCommand");
     }

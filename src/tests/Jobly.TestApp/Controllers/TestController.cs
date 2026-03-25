@@ -1,5 +1,5 @@
 using Jobly.Core.Handlers;
-using MediatR;
+using Mediator;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jobly.TestApp.Controllers;

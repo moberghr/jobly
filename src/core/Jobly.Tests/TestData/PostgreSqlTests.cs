@@ -1,9 +1,7 @@
-﻿using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Configurations;
-using DotNet.Testcontainers.Containers;
 using Jobly.Core.Interceptors;
 using Jobly.Tests.Jobs;
 using Microsoft.EntityFrameworkCore;
+using Testcontainers.PostgreSql;
 
 namespace Jobly.Tests;
 
@@ -12,34 +10,16 @@ public class PostgreSqlTests : JoblyTests, IAsyncLifetime
     private static readonly PostgresRowLockInterceptor _interceptor = new();
     private static readonly SaveChangesConcurrencyTokenInterceptor _concurrencyTokenInterceptor = new();
 
-    private readonly PostgreSqlTestcontainer _dbContainer = new TestcontainersBuilder<PostgreSqlTestcontainer>()
-        .WithDatabase(
-            new PostgreSqlTestcontainerConfiguration
-            {
-                Database = "Jobly",
-                Username = "postgres",
-                Password = Guid.NewGuid().ToString("D"),
-            })
-        .WithImage("postgres")  // latest
-        .WithCleanUp(true)
+    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder()
+        .WithImage("postgres:latest")
         .Build();
 
     protected override TestContext CreateContext()
     {
         var testContext = new TestContext(new DbContextOptionsBuilder<TestContext>()
-           .UseNpgsql(_dbContainer.ConnectionString)
+           .UseNpgsql(_dbContainer.GetConnectionString())
+           .UseSnakeCaseNamingConvention()
            .AddInterceptors(_interceptor, _concurrencyTokenInterceptor).Options);
-
-        testContext.Database.EnsureCreated();
-
-        return testContext;
-    }
-
-    protected override TestContext CreateContextWithoutJobLocking()
-    {
-        var testContext = new TestContext(new DbContextOptionsBuilder<TestContext>()
-           .UseNpgsql(_dbContainer.ConnectionString)
-           .AddInterceptors(_concurrencyTokenInterceptor).Options);
 
         testContext.Database.EnsureCreated();
 

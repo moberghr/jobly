@@ -1,7 +1,7 @@
 ﻿using Jobly.Core.Enums;
 using Jobly.Core.Helper;
 using Jobly.Test.Shared.Entities;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Jobly.Core.Handlers;
@@ -29,7 +29,7 @@ public class ScheduleRegisterCommand : IRequestHandler<ScheduleRegisterRequest, 
         _publisher = publisher;
     }
 
-    public async Task<ScheduleRegisterResponse> Handle(ScheduleRegisterRequest request, CancellationToken cancellationToken)
+    public async ValueTask<ScheduleRegisterResponse> Handle(ScheduleRegisterRequest request, CancellationToken cancellationToken)
     {
         var registration = new Registration
         {

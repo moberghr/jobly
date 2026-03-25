@@ -6,7 +6,7 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Helper;
 using Jobly.Core.Interceptors;
-using MediatR;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -217,12 +217,37 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
     private static async Task UpdateChildJobs(TContext context, Guid parentJobId, CancellationToken cancellationToken)
     {
-        await context.Set<Job>()
+        var childJobs = await context.Set<Job>()
             .Where(x => x.ParentJobId == parentJobId)
             .Where(x => x.CurrentState == State.Awaiting)
-            // If a job has Batch property in it, then it's a placeholder job, and we don't want to change current status of a placeholder job
-            .Where(x => x.Batch == null)
-            .ExecuteUpdateAsync(x => x.SetProperty(y => y.CurrentState, State.Enqueued), cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        foreach (var childJob in childJobs)
+        {
+            // Check if this child job is a batch placeholder
+            var batch = await context.Set<Batch>()
+                .Where(x => x.Id == childJob.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (batch != null)
+            {
+                // Batch placeholder: don't change its state (stays Awaiting until
+                // UpdateCurrentAndNextBatchFromChildJob sets it Completed when counter hits 0).
+                // Enqueue its batch work-item jobs directly.
+                var batchJobs = await context.Set<Job>()
+                    .Where(x => x.BatchId == batch.Id)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var batchJob in batchJobs)
+                {
+                    batchJob.CurrentState = State.Enqueued;
+                }
+            }
+            else
+            {
+                childJob.CurrentState = State.Enqueued;
+            }
+        }
     }
 
     private static async Task UpdateCurrentAndNextBatchFromChildJob(TContext context, Guid batchId, CancellationToken cancellationToken)

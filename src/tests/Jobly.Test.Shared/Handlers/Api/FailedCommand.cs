@@ -1,4 +1,4 @@
-﻿using MediatR;
+﻿using Mediator;
 
 namespace Jobly.Core.Handlers;
 
@@ -23,7 +23,7 @@ public class FailedCommand : IRequestHandler<FailedJobRequest, FailedJobResponse
         _publisher = publisher;
     }
 
-    public async Task<FailedJobResponse> Handle(FailedJobRequest request, CancellationToken cancellationToken)
+    public async ValueTask<FailedJobResponse> Handle(FailedJobRequest request, CancellationToken cancellationToken)
     {
         if (request.SchedululeTime.HasValue)
         {

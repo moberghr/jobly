@@ -1,4 +1,4 @@
-﻿using MediatR;
+﻿using Mediator;
 
 namespace Jobly.Tests.TestData.Handlers;
 public class CounterCommand : IRequestHandler<CounterRequest, Unit>
@@ -10,7 +10,7 @@ public class CounterCommand : IRequestHandler<CounterRequest, Unit>
 
     private readonly CounterService _counterService;
 
-    public async Task<Unit> Handle(CounterRequest request, CancellationToken cancellationToken)
+    public async ValueTask<Unit> Handle(CounterRequest request, CancellationToken cancellationToken)
     {
         await Task.Delay(500);
 

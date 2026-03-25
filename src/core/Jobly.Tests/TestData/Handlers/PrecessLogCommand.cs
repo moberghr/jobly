@@ -1,4 +1,4 @@
-﻿using MediatR;
+﻿using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Jobly.Tests.TestData.Handlers;
@@ -11,7 +11,7 @@ public class PrecessLogCommand : IRequestHandler<PrecessLogRequest, PrecessLogRe
         _context = context;
     }
 
-    public async Task<PrecessLogResponse> Handle(PrecessLogRequest request, CancellationToken cancellationToken)
+    public async ValueTask<PrecessLogResponse> Handle(PrecessLogRequest request, CancellationToken cancellationToken)
     {
         var testTask = await _context.TestLogs
             .Where(x => x.Id == request.TestTaskId)
