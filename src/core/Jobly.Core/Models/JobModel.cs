@@ -3,7 +3,7 @@
 namespace Jobly.Core.Models;
 public class JobModel
 {
-    public string Id { get; set; }
+    public Guid Id { get; set; }
 
     public string Type { get; set; }
 

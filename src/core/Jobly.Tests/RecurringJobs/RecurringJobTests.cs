@@ -18,7 +18,7 @@ public abstract partial class JoblyTests : TestBase
 
         // get created Job entity
         var nextJobId = recurringJobEntity.NextJobId!;
-        var nextJob = await GetJob(nextJobId);
+        var nextJob = await GetJob(nextJobId.Value);
 
         // check RecurringJob
         recurringJobEntity.ShouldNotBeNull();

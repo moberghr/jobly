@@ -1,7 +1,6 @@
 ﻿using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Interceptors;
-using MediatR;
 using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -10,7 +9,7 @@ using Microsoft.EntityFrameworkCore.SqlServer.Infrastructure.Internal;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.Internal;
 
 namespace Jobly.Core;
@@ -22,19 +21,33 @@ public static class ServiceConfiguration
 
     private static readonly SaveChangesConcurrencyTokenInterceptor _saveChangesInterceptor = new();
 
-    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services, int retryCount)
-        where TContext : DbContext
-    {
-        return CreateJoblyServices<TContext>(services, retryCount);
-    }
-
     public static IServiceCollection AddJobly<TContext>(this IServiceCollection services)
         where TContext : DbContext
     {
-        return AddJobly<TContext>(services, 0);
+        services.AddOptions<JoblyConfiguration>();
+        return CreateJoblyServices<TContext>(services);
     }
 
-    private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services, int retryCount)
+    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services,
+        Action<JoblyConfiguration> options)
+        where TContext : DbContext
+    {
+        services.AddOptions<JoblyConfiguration>()
+            .Configure(options);
+        
+        return CreateJoblyServices<TContext>(services);
+    }
+
+    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services,
+        IConfiguration namedConfigurationSection)
+        where TContext : DbContext
+    {
+        services.AddOptions<JoblyConfiguration>()
+            .Bind(namedConfigurationSection);
+        return CreateJoblyServices<TContext>(services);
+    }
+
+    private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services)
         where TContext : DbContext
     {
         var assembly = typeof(ServiceConfiguration).Assembly;
@@ -48,7 +61,9 @@ public static class ServiceConfiguration
             options.FileProviders.Add(new EmbeddedFileProvider(assembly));
         });
 
-        services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(), retryCount));
+        services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(),
+            x.GetRequiredService<IOptions<JoblyConfiguration>>()));
+
         services.AddScoped<IRecurringJobPublisher>(x =>
             new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IJoblyService>(x => new JoblyService<TContext>(x.GetRequiredService<TContext>()));
@@ -101,6 +116,7 @@ public static class ServiceConfiguration
         AddJobStateEntity(modelBuilder);
         AddRecurringJobEntity(modelBuilder);
         AddBatchEntity(modelBuilder);
+        AddServerEntity(modelBuilder);
     }
 
     private static void AddJobEntity(ModelBuilder modelBuilder)
@@ -116,12 +132,15 @@ public static class ServiceConfiguration
         job.Property(p => p.CreateTime);
         job.Property(p => p.ScheduleTime);
         job.Property(p => p.CurrentState);
+        job.Property(p => p.Priority);
         job.Property(p => p.RetriedTimes);
         job.Property(p => p.MaxRetries);
         job.Property(p => p.ParentJobId);
 
+        // Configure one-to-many relationship with Batch
         job.HasOne(p => p.Batch)
-            .WithOne(p => p.Job);
+            .WithMany(p => p.Jobs)
+            .HasForeignKey(p => p.BatchId); // Job has the foreign key
 
         job.HasMany(x => x.ChildJobs)
             .WithOne(x => x.ParentJob)
@@ -130,9 +149,11 @@ public static class ServiceConfiguration
         job.HasMany(p => p.JobStates)
             .WithOne(p => p.Job);
 
-        job.HasOne(p => p.ParentBatch)
-            .WithMany(p => p.Jobs)
-            .HasForeignKey(p => p.BatchId);
+        job.HasIndex(p => new {p.CurrentState, p.Priority, p.ScheduleTime})
+            .IsDescending(false, false, false)
+            .HasFilter("\"current_state\" = 1");
+
+        job.HasIndex(p => p.CurrentState);
     }
 
     private static void AddJobStateEntity(ModelBuilder modelBuilder)
@@ -184,8 +205,27 @@ public static class ServiceConfiguration
 
         batch.Property(p => p.Counter);
 
-        batch.HasOne(p => p.Job)
-            .WithOne(p => p.Batch)
-            .HasForeignKey<Batch>(p => p.Id);
+        // batch.HasOne(p => p.ParentJob);
+        // .WithOne(p => p.Batch)
+        // .HasForeignKey<Batch>(p => p.Id);
+
+        // batch.HasMany(p => p.Jobs)
+        //     .WithOne(p => p.Batch)
+        //     .HasForeignKey(p => p.BatchId); // Job has the foreign key
+    }
+
+    private static void AddServerEntity(ModelBuilder modelBuilder)
+    {
+        var server = modelBuilder.Entity<Server>();
+        server.ToTable(nameof(Server));
+
+        server.Property(p => p.Id);
+        server.HasKey(p => p.Id);
+
+        server.Property(p => p.StartedTime);
+
+        server.Property(p => p.LastHeartbeatTime);
+
+        server.Property(p => p.ServiceCount);
     }
 }

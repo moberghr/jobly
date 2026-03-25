@@ -15,7 +15,7 @@ public abstract partial class JoblyTests : TestBase
     {
         var context = CreateContext();
 
-        var publisher = new Publisher<TestContext>(context, 0);
+        var publisher = TestUtils.CreatePublisher(context);
         var jobRequest = new UnitRequest();
         var jobId = await publisher.Publish(jobRequest);
 

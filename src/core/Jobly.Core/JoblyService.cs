@@ -27,7 +27,7 @@ public interface IJoblyService
 
     Task<int> CountProcessingJobs();
 
-    Task SetRetry(string jobId);
+    Task SetRetry(Guid jobId);
 }
 
 public class JoblyService<TContext> : IJoblyService
@@ -108,7 +108,7 @@ public class JoblyService<TContext> : IJoblyService
         return jobs;
     }
 
-    public async Task SetRetry(string jobId)
+    public async Task SetRetry(Guid jobId)
     {
         var job = _context.Set<Job>()
             .Where(x => x.Id == jobId)
@@ -140,7 +140,7 @@ public class JoblyService<TContext> : IJoblyService
         return await GetProcessingStates().CountAsync();
     }
 
-    private IQueryable<string> GetProcessingStates()
+    private IQueryable<Guid> GetProcessingStates()
     {
         var query = _context.Set<JobState>()
             .Where(x => x.State == State.Processing)

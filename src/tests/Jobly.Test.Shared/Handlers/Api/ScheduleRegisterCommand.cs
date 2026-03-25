@@ -1,4 +1,6 @@
-﻿using Jobly.Test.Shared.Entities;
+﻿using Jobly.Core.Enums;
+using Jobly.Core.Helper;
+using Jobly.Test.Shared.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -56,7 +58,16 @@ public class ScheduleRegisterCommand : IRequestHandler<ScheduleRegisterRequest, 
 
         for (var i = 0; i < 10; i++)
         {
+            // Original code, works fine with one parameter
             await _publisher.Publish(sendEmailRequest, request.ScheduleTime);
+
+            // JobData parameters
+            var jobParams = new JobParameters
+            {
+                ScheduleTime = request.ScheduleTime,
+                Priority = Priority.High
+            };
+            await _publisher.Publish(sendEmailRequest, jobParams);
         }
 
         await _context.SaveChangesAsync();

@@ -11,10 +11,10 @@ public abstract partial class JoblyTests : TestBase
     public async Task Publish_Continuations_ChildJobCurrentStateShouldSwitchForAwaitToCompleted()
     {
         var context = CreateContext();
-        var publisher = new Publisher<TestContext>(context, 0);
+        var publisher = TestUtils.CreatePublisher(context);
         var jobRequest = new UnitRequest();
-        string jobId = await publisher.Publish(jobRequest);
-        string childJobId = await publisher.Publish(jobRequest, jobId);
+        Guid jobId = await publisher.Publish(jobRequest);
+        Guid childJobId = await publisher.Publish(jobRequest, jobId);
         await context.SaveChangesAsync();
         var childJob = await GetJob(childJobId);
 
@@ -37,11 +37,11 @@ public abstract partial class JoblyTests : TestBase
     public async Task Publish_Continuations_ParentJobFailChildJobShouldBeStateAwait()
     {
         var context = CreateContext();
-        var publisher = new Publisher<TestContext>(context, 0);
+        var publisher = TestUtils.CreatePublisher(context);
         var jobRequest = new UnitRequest();
 
-        string jobId = await CreateFailedRetryJob(context, 0, 0, null);
-        string childJobId = await publisher.Publish(jobRequest, jobId);
+        Guid jobId = await CreateFailedRetryJob(context, 0, 0, null);
+        Guid childJobId = await publisher.Publish(jobRequest, jobId);
         await context.SaveChangesAsync();
 
         for (int i = 0; i < 2; i++)
