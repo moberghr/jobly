@@ -39,5 +39,8 @@ public class Job
     public Batch? Batch { get; set; }
     
     public Guid? BatchId { get; set; }
-    
+
+    public Guid? CurrentServerId { get; set; }
+
+    public Guid? CurrentWorkerId { get; set; }
 }

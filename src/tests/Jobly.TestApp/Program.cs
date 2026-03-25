@@ -21,6 +21,8 @@ builder.Services.AddJoblyWorker<TestContext>(
     options.WorkerCount = 5;
     options.DefaultBatchPriority = Priority.Normal;
     options.PollingInterval = TimeSpan.FromSeconds(5);
+    options.HealthCheckInterval = TimeSpan.FromSeconds(10);
+    options.HealthCheckTimeout = TimeSpan.FromSeconds(30);
 });
 
 var app = builder.Build();

@@ -2,11 +2,13 @@ namespace Jobly.Core.Data.Entities;
 
 public class Server
 {
-    public Guid Id { get; set; }
+    public required Guid Id { get; set; }
 
-    public DateTime StartedTime { get; set; }
+    public string ServerName { get; set; } = $"{Environment.MachineName}.{Guid.NewGuid().ToString()}";
 
-    public DateTime LastHeartbeatTime { get; set; }
+    public required DateTime StartedTime { get; set; }
+
+    public required DateTime LastHeartbeatTime { get; set; }
 
     public int ServiceCount { get; set; }
 }
