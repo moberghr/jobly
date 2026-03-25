@@ -147,7 +147,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         recurringJob.LastJobId = recurringJob.NextJobId;
 
         recurringJob.NextExecution = nextJobScheduleTime;
-        recurringJob.NextJob = newJobState.Job;
+
+        context.Set<JobState>().Add(newJobState);
+        recurringJob.NextJobId = newJobState.Job.Id;
 
     }
 

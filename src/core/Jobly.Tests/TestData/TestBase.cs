@@ -191,6 +191,12 @@ public abstract class TestBase
         await worker.GetAndProcessJob(CancellationToken.None);
     }
 
+    protected async Task<bool> TryProcessJob()
+    {
+        var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactory);
+        return await worker.GetAndProcessJob(CancellationToken.None);
+    }
+
     protected async Task<int> GetCounter()
     {
         using var scope = _serviceScopeFactory.CreateScope();
