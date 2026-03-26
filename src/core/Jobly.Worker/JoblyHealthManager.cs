@@ -35,37 +35,17 @@ public class JoblyHealthManager<TContext> : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await RegisterServer();
-        
         while (!stoppingToken.IsCancellationRequested)
         {
             using var scope = _serviceScopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<TContext>();
             await UpdateHeartbeat(context);
             await CleanUpServers(context);
-            
+
             await Task.Delay(_configuration.HealthCheckInterval, stoppingToken);
         }
-        
-        await RemoveServer();
-    }
 
-    private async Task RegisterServer()
-    {
-        using var scope = _serviceScopeFactory.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TContext>();
-        
-        // Register the server in the database.
-        var now = DateTime.UtcNow;
-        var server = new Server
-        {
-            Id = _configuration.ServerId,
-            StartedTime = now,
-            LastHeartbeatTime = now,
-            ServiceCount = _configuration.WorkerCount
-        };
-        await context.Set<Server>().AddAsync(server);
-        await context.SaveChangesAsync();
+        await RemoveServer();
     }
 
     private async Task UpdateHeartbeat(TContext context)

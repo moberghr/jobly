@@ -70,18 +70,10 @@ public static class ServiceConfiguration
         this IServiceCollection services)
         where TContext : DbContext
     {
-        
-        services.AddSingleton<IHostedService, JoblyWorker<TContext>>();
-
         services.AddJobly<TContext>();
 
-        services.AddTransient<IJoblyWorkerService, JoblyWorkerService<TContext>>();
-
-        services.AddTransient<IJoblyWorkerService, JoblyWorkerService<TContext>>();
-
-        services.AddHostedService<JoblyHealthManager<TContext>>();
-
         services.AddHostedService<JoblyWorkerSetup<TContext>>();
+        services.AddHostedService<JoblyHealthManager<TContext>>();
 
         return services;
     }

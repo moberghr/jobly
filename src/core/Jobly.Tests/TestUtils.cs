@@ -10,6 +10,7 @@ namespace Jobly.Tests;
 public static class TestUtils
 {
     public static readonly Guid TestServerId = Guid.NewGuid();
+    public static readonly Guid TestWorkerId = Guid.NewGuid();
 
     public static async Task RegisterTestServer(TestContext context, int workerCount = 1)
     {
@@ -22,6 +23,16 @@ public static class TestUtils
             ServiceCount = workerCount
         };
         await context.Set<Server>().AddAsync(server);
+
+        var worker = new Jobly.Core.Data.Entities.Worker
+        {
+            Id = TestWorkerId,
+            ServerId = TestServerId,
+            StartedTime = now,
+            LastHeartbeatTime = now
+        };
+        await context.Set<Jobly.Core.Data.Entities.Worker>().AddAsync(worker);
+
         await context.SaveChangesAsync();
     }
 
@@ -56,7 +67,7 @@ public static class TestUtils
             ServerId = TestServerId
         });
 
-        return new JoblyWorkerService<TestContext>(serviceScopeFactory,
+        return new JoblyWorkerService<TestContext>(TestWorkerId, serviceScopeFactory,
             new NullLogger<JoblyWorkerService<TestContext>>(),
             joblyWorkerConfigOptions);
     }

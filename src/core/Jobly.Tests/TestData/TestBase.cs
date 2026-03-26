@@ -14,6 +14,8 @@ namespace Jobly.Tests;
 public abstract class TestBase
 {
     private readonly IServiceScopeFactory _serviceScopeFactory;
+    private readonly SemaphoreSlim _serverRegistrationLock = new(1, 1);
+    private bool _serverRegistered;
 
     protected TestBase()
     {
@@ -28,6 +30,22 @@ public abstract class TestBase
     }
 
     protected abstract TestContext CreateContext();
+
+    protected async Task EnsureServerRegistered()
+    {
+        if (_serverRegistered) return;
+        await _serverRegistrationLock.WaitAsync();
+        try
+        {
+            if (_serverRegistered) return;
+            await TestUtils.RegisterTestServer(CreateContext());
+            _serverRegistered = true;
+        }
+        finally
+        {
+            _serverRegistrationLock.Release();
+        }
+    }
 
     protected static async Task<Guid> CreateProcessLogJob(TestContext context, int testLogId)
     {
@@ -184,7 +202,7 @@ public abstract class TestBase
 
     protected async Task ProcessJob()
     {
-        using var scope = _serviceScopeFactory.CreateScope();
+        await EnsureServerRegistered();
 
         var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactory);
 
@@ -193,6 +211,8 @@ public abstract class TestBase
 
     protected async Task<bool> TryProcessJob()
     {
+        await EnsureServerRegistered();
+
         var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactory);
         return await worker.GetAndProcessJob(CancellationToken.None);
     }
