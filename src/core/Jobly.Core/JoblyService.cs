@@ -1,4 +1,5 @@
-﻿using Jobly.Core.Entities;
+﻿using Jobly.Core.Data.Entities;
+using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Models;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,10 @@ public interface IJoblyService
     Task<int> CountProcessingJobs();
 
     Task SetRetry(Guid jobId);
+
+    Task<List<ServerModel>> GetServers();
+
+    Task<int> GetServerCount();
 }
 
 public class JoblyService<TContext> : IJoblyService
@@ -80,6 +85,8 @@ public class JoblyService<TContext> : IJoblyService
         var failed = await GetJobsCount(State.Failed);
         var processing = await CountProcessingJobs() - completed - failed;
 
+        var servers = await GetServerCount();
+
         var model = new DashboardStatistics
         {
             Total = total,
@@ -88,7 +95,8 @@ public class JoblyService<TContext> : IJoblyService
             Created = created,
             Completed = completed,
             Failed = failed,
-            Processing = processing
+            Processing = processing,
+            Servers = servers
         };
 
         return model;
@@ -238,5 +246,52 @@ public class JoblyService<TContext> : IJoblyService
             .AsQueryable();
 
         return query;
+    }
+
+    public async Task<int> GetServerCount()
+    {
+        return await _context.Set<Server>().CountAsync();
+    }
+
+    public async Task<List<ServerModel>> GetServers()
+    {
+        var servers = await _context.Set<Server>().ToListAsync();
+
+        var workers = await _context.Set<Worker>().ToListAsync();
+
+        var processingJobs = await _context.Set<Job>()
+            .Where(x => x.CurrentState == State.Processing)
+            .Where(x => x.CurrentWorkerId != null)
+            .Select(x => new { x.CurrentWorkerId, x.Id, x.Type })
+            .ToListAsync();
+
+        var jobByWorker = processingJobs.ToDictionary(j => j.CurrentWorkerId!.Value);
+
+        var workersByServer = workers
+            .GroupBy(w => w.ServerId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        return servers.Select(s => new ServerModel
+        {
+            Id = s.Id,
+            ServerName = s.ServerName,
+            StartedTime = s.StartedTime,
+            LastHeartbeatTime = s.LastHeartbeatTime,
+            ServiceCount = s.ServiceCount,
+            Workers = workersByServer.GetValueOrDefault(s.Id, new List<Worker>())
+                .Select(w =>
+                {
+                    jobByWorker.TryGetValue(w.Id, out var activeJob);
+                    return new WorkerModel
+                    {
+                        WorkerId = w.Id,
+                        StartedTime = w.StartedTime,
+                        LastHeartbeatTime = w.LastHeartbeatTime,
+                        CurrentJobId = activeJob?.Id,
+                        CurrentJobType = activeJob?.Type
+                    };
+                })
+                .ToList()
+        }).ToList();
     }
 }

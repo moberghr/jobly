@@ -26,12 +26,45 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<JoblyWorkerService<TContext>> _logger;
     private readonly JoblyWorkerConfiguration _configuration;
+    private bool _registered;
 
     public JoblyWorkerService(IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration)
     {
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
         _configuration = configuration.Value;
+    }
+
+    private async Task EnsureWorkerRegistered(TContext context)
+    {
+        if (_registered) return;
+
+        // Ensure server exists (in production, JoblyHealthManager registers it on startup,
+        // but the worker may start processing before the health manager runs)
+        var serverExists = await context.Set<Server>().AnyAsync(s => s.Id == _configuration.ServerId);
+        if (!serverExists)
+        {
+            var now = DateTime.UtcNow;
+            await context.Set<Server>().AddAsync(new Server
+            {
+                Id = _configuration.ServerId,
+                StartedTime = now,
+                LastHeartbeatTime = now,
+                ServiceCount = 0
+            });
+            await context.SaveChangesAsync();
+        }
+
+        var worker = new Jobly.Core.Data.Entities.Worker
+        {
+            Id = _workerId,
+            ServerId = _configuration.ServerId,
+            StartedTime = DateTime.UtcNow,
+            LastHeartbeatTime = DateTime.UtcNow
+        };
+        await context.Set<Jobly.Core.Data.Entities.Worker>().AddAsync(worker);
+        await context.SaveChangesAsync();
+        _registered = true;
     }
 
     private void UpdateJobStatusToProcessing(TContext context, Job job)
@@ -43,9 +76,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             State = State.Processing,
             Message = $"The job {job.Id} is being processed"
         };
-        
+
         job.CurrentState = State.Processing;
-        job.CurrentServerId = _configuration.ServerId;
         job.CurrentWorkerId = _workerId;
 
         context.Set<JobState>().Add(jobState);
@@ -56,6 +88,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         using var scope = _serviceScopeFactory.CreateScope();
 
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
+
+        await EnsureWorkerRegistered(context);
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
@@ -186,6 +220,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         }
 
         job.CurrentState = state;
+        job.CurrentWorkerId = null;
         
         var isParent = await context.Set<Job>()
             .Where(x => x.ParentJobId == job.Id)

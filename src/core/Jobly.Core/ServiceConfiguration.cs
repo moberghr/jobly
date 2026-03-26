@@ -117,6 +117,7 @@ public static class ServiceConfiguration
         AddRecurringJobEntity(modelBuilder);
         AddBatchEntity(modelBuilder);
         AddServerEntity(modelBuilder);
+        AddWorkerEntity(modelBuilder);
     }
 
     private static void AddJobEntity(ModelBuilder modelBuilder)
@@ -228,5 +229,22 @@ public static class ServiceConfiguration
         server.Property(p => p.LastHeartbeatTime);
 
         server.Property(p => p.ServiceCount);
+    }
+
+    private static void AddWorkerEntity(ModelBuilder modelBuilder)
+    {
+        var worker = modelBuilder.Entity<Worker>();
+        worker.ToTable(nameof(Worker));
+
+        worker.Property(p => p.Id);
+        worker.HasKey(p => p.Id);
+
+        worker.Property(p => p.ServerId);
+        worker.Property(p => p.StartedTime);
+        worker.Property(p => p.LastHeartbeatTime);
+
+        worker.HasOne(p => p.Server)
+            .WithMany()
+            .HasForeignKey(p => p.ServerId);
     }
 }

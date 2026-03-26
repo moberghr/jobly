@@ -60,5 +60,11 @@ public static class JoblyEndpoints
             var model = await joblyService.GetScheduledJobs(request);
             return model;
         });
+
+        apiGroup.MapGet("servers", async ([FromServices] IJoblyService joblyService) =>
+        {
+            var model = await joblyService.GetServers();
+            return model;
+        });
     }
 }

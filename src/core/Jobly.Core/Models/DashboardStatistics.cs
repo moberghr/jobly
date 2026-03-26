@@ -15,4 +15,6 @@ public class DashboardStatistics
     public int Completed { get; set; }
 
     public int Processing { get; set; }
+
+    public int Servers { get; set; }
 }

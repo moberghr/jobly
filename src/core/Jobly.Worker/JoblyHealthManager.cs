@@ -62,7 +62,7 @@ public class JoblyHealthManager<TContext> : BackgroundService
             Id = _configuration.ServerId,
             StartedTime = now,
             LastHeartbeatTime = now,
-            ServiceCount = 0 // Cant set this yet.
+            ServiceCount = _configuration.WorkerCount
         };
         await context.Set<Server>().AddAsync(server);
         await context.SaveChangesAsync();
@@ -96,10 +96,22 @@ public class JoblyHealthManager<TContext> : BackgroundService
             {
                 _logger.LogWarning("Server {ServerId} has not sent a heartbeat in {Timeout}. Removing it from the database.",
                     server.Id, _configuration.HealthCheckTimeout);
+                var workerIds = await context.Set<Jobly.Core.Data.Entities.Worker>()
+                    .Where(w => w.ServerId == server.Id)
+                    .Select(w => w.Id)
+                    .ToListAsync();
+
                 context.Set<Server>().Remove(server);
+
+                // Remove workers for this server
+                var workers = await context.Set<Jobly.Core.Data.Entities.Worker>()
+                    .Where(w => w.ServerId == server.Id)
+                    .ToListAsync();
+                context.Set<Jobly.Core.Data.Entities.Worker>().RemoveRange(workers);
+
                 var jobs = await context.Set<Job>()
                     .Where(x => x.CurrentState == State.Processing)
-                    .Where(x => x.CurrentServerId == server.Id)
+                    .Where(x => x.CurrentWorkerId != null && workerIds.Contains(x.CurrentWorkerId.Value))
                     .ToListAsync();
                 foreach (var job in jobs)
                 {
@@ -133,6 +145,12 @@ public class JoblyHealthManager<TContext> : BackgroundService
             _logger.LogWarning("Server {ServerId} not found in the database. Skipping removal.", _configuration.ServerId);
             return;
         }
+        // Remove workers for this server
+        var workers = await context.Set<Jobly.Core.Data.Entities.Worker>()
+            .Where(w => w.ServerId == server.Id)
+            .ToListAsync();
+        context.Set<Jobly.Core.Data.Entities.Worker>().RemoveRange(workers);
+
         context.Set<Server>().Remove(server);
         await context.SaveChangesAsync();
     }
