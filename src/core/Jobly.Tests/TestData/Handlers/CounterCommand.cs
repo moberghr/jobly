@@ -1,7 +1,7 @@
-﻿using Mediator;
+using Jobly.Core.Handlers;
 
 namespace Jobly.Tests.TestData.Handlers;
-public class CounterCommand : IRequestHandler<CounterRequest, Unit>
+public class CounterCommand : IJobHandler<CounterRequest>
 {
     public CounterCommand(CounterService counterService)
     {
@@ -10,17 +10,15 @@ public class CounterCommand : IRequestHandler<CounterRequest, Unit>
 
     private readonly CounterService _counterService;
 
-    public async ValueTask<Unit> Handle(CounterRequest request, CancellationToken cancellationToken)
+    public async Task HandleAsync(CounterRequest message, CancellationToken ct)
     {
         await Task.Delay(500);
 
         _counterService.Increment();
-
-        return Unit.Value;
     }
 }
 
-public class CounterRequest : IRequest<Unit>
+public class CounterRequest : IJob
 {
 
 }

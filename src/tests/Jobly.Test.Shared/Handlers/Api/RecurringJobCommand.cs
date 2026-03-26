@@ -1,18 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Jobly.Core.Handlers;
 using Jobly.Test.Shared.Entities;
-using Mediator;
 
 namespace Jobly.Core.Handlers;
 
-public class RecurringJobResponse
-{
-}
-
-public class RecurringJobRequest : IRequest<RecurringJobResponse>
+public class RecurringJobRequest : IJob
 {
     public string Email { get; set; }
 
@@ -22,7 +13,7 @@ public class RecurringJobRequest : IRequest<RecurringJobResponse>
 }
 
 
-public class RecurringJobCommand : IRequestHandler<RecurringJobRequest, RecurringJobResponse>
+public class RecurringJobCommand : IJobHandler<RecurringJobRequest>
 {
     private readonly TestContext _context;
     private readonly IRecurringJobPublisher _publisher;
@@ -33,18 +24,18 @@ public class RecurringJobCommand : IRequestHandler<RecurringJobRequest, Recurrin
         _publisher = publisher;
     }
 
-    public async ValueTask<RecurringJobResponse> Handle(RecurringJobRequest request, CancellationToken cancellationToken)
+    public async Task HandleAsync(RecurringJobRequest message, CancellationToken ct)
     {
         var registration = new Registration
         {
-            Email = request.Email
+            Email = message.Email
         };
 
         _context.Registrations.Add(registration);
 
         var emailLog = new EmailLog
         {
-            Email = request.Email,
+            Email = message.Email,
             Body = "Test email",
             Subject = "Test subject"
         };
@@ -52,16 +43,14 @@ public class RecurringJobCommand : IRequestHandler<RecurringJobRequest, Recurrin
         _context.EmailLogs.Add(emailLog);
 
         await _context.SaveChangesAsync();
-        
+
         var sendEmailRequest = new SendEmailRequest
         {
             EmailLogId = emailLog.Id,
         };
 
-        await _publisher.AddOrUpdateRecurringJob(sendEmailRequest, request.Name, request.Cron);
+        await _publisher.AddOrUpdateRecurringJob(sendEmailRequest, message.Name, message.Cron);
 
         await _context.SaveChangesAsync();
-
-        return new();
     }
 }

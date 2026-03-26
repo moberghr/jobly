@@ -1,17 +1,13 @@
-﻿using Mediator;
+using Jobly.Core.Handlers;
 
 namespace Jobly.Core.Handlers;
-public class ThrowExceptionResponse
-{
 
-}
-
-public class ThrowExceptionRequest : IRequest<ThrowExceptionResponse>
+public class ThrowExceptionRequest : IJob
 {
     public DateTime? SchedululeTime { get; set; }
 }
 
-public class ThrowExceptionCommand : IRequestHandler<ThrowExceptionRequest, ThrowExceptionResponse>
+public class ThrowExceptionCommand : IJobHandler<ThrowExceptionRequest>
 {
     private readonly IPublisher _publisher;
 
@@ -20,7 +16,7 @@ public class ThrowExceptionCommand : IRequestHandler<ThrowExceptionRequest, Thro
         _publisher = publisher;
     }
 
-    public ValueTask<ThrowExceptionResponse> Handle(ThrowExceptionRequest request, CancellationToken cancellationToken)
+    public async Task HandleAsync(ThrowExceptionRequest message, CancellationToken ct)
     {
         throw new Exception("This is from ThrowExceptionCommand");
     }

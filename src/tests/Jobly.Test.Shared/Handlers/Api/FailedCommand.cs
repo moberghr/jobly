@@ -1,18 +1,13 @@
-﻿using Mediator;
+using Jobly.Core.Handlers;
 
 namespace Jobly.Core.Handlers;
 
-public class FailedJobResponse
-{
-
-}
-
-public class FailedJobRequest : IRequest<FailedJobResponse>
+public class FailedJobRequest : IJob
 {
     public DateTime? SchedululeTime { get; set; }
 }
 
-public class FailedCommand : IRequestHandler<FailedJobRequest, FailedJobResponse>
+public class FailedCommand : IJobHandler<FailedJobRequest>
 {
     private readonly TestContext _context;
     private readonly IPublisher _publisher;
@@ -23,15 +18,15 @@ public class FailedCommand : IRequestHandler<FailedJobRequest, FailedJobResponse
         _publisher = publisher;
     }
 
-    public async ValueTask<FailedJobResponse> Handle(FailedJobRequest request, CancellationToken cancellationToken)
+    public async Task HandleAsync(FailedJobRequest message, CancellationToken ct)
     {
-        if (request.SchedululeTime.HasValue)
+        if (message.SchedululeTime.HasValue)
         {
-            await _publisher.Publish(new ThrowExceptionRequest(), request.SchedululeTime.Value);
+            await _publisher.Publish(new ThrowExceptionRequest(), message.SchedululeTime.Value);
 
             await _context.SaveChangesAsync();
 
-            return new();
+            return;
         }
 
         for (var i = 0; i < 10; i++)
@@ -40,7 +35,5 @@ public class FailedCommand : IRequestHandler<FailedJobRequest, FailedJobResponse
         }
 
         await _context.SaveChangesAsync();
-
-        return new();
     }
 }

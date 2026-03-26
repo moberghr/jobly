@@ -41,4 +41,6 @@ public class Job
     public Guid? BatchId { get; set; }
 
     public Guid? CurrentWorkerId { get; set; }
+
+    public string? HandlerType { get; set; }
 }

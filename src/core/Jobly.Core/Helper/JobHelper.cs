@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
+using Jobly.Core.Handlers;
 
 namespace Jobly.Core.Helper;
 
@@ -35,7 +36,7 @@ public static class JobHelper
 
     public static JobState CreateJobAndJobState<T>(T message, int retries, DateTime? scheduleTime, int? maxRetries,
         Priority? priority, Guid? parentId, State? state)
-        where T : class
+        where T : class, IJob
     {
         var serializedMessage = JsonSerializer.Serialize(message);
         var type = message!.GetType().AssemblyQualifiedName!;

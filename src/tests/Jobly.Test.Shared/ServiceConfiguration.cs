@@ -1,4 +1,5 @@
 ﻿using Jobly.Core;
+using Jobly.Core.Handlers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,7 +10,7 @@ public static class ServiceConfiguration
 {
     public static void AddServices(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddMediator();
+        services.AddJobHandlers(typeof(ServiceConfiguration).Assembly);
 
         services.AddDbContextPool<TestContext>(options => options
             .UseNpgsql(configuration.GetConnectionString(nameof(TestContext))!)

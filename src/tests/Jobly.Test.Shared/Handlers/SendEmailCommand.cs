@@ -1,9 +1,9 @@
-﻿using Mediator;
+using Jobly.Core.Handlers;
 using Microsoft.EntityFrameworkCore;
 
 namespace Jobly.Core.Handlers;
 
-public class SendEmailCommand : IRequestHandler<SendEmailRequest, SendEmailResponse>
+public class SendEmailCommand : IJobHandler<SendEmailRequest>
 {
     private readonly TestContext _context;
 
@@ -12,25 +12,19 @@ public class SendEmailCommand : IRequestHandler<SendEmailRequest, SendEmailRespo
         _context = context;
     }
 
-    public async ValueTask<SendEmailResponse> Handle(SendEmailRequest request, CancellationToken cancellationToken)
+    public async Task HandleAsync(SendEmailRequest message, CancellationToken ct)
     {
         var emailLog = await _context.EmailLogs
-            .Where(x => x.Id == request.EmailLogId)
+            .Where(x => x.Id == message.EmailLogId)
             .FirstAsync();
 
         emailLog.ProcessedTime = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
-        return new();
     }
 }
 
-public class SendEmailRequest : IRequest<SendEmailResponse>
+public class SendEmailRequest : IJob
 {
     public int EmailLogId { get; set; }
-}
-
-public class SendEmailResponse
-{
-
 }

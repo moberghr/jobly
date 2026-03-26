@@ -4,9 +4,9 @@ using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
+using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
 using Jobly.Core.Interceptors;
-using Mediator;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -88,13 +88,18 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
+        var isMultiHandlerRouting = false;
+
         try
         {
-            // Processing the message, we don't want to keep a transaction open during this time, it may take a while
-            // and we don't want to keep a db lock open for that long. There is also no need to rollback the transaction
-            // since we are not doing any db operations here. The ProcessOutboxMessage has its own scope anyway.
             _logger.LogInformation("Worker {workerId} processing message {id}", _workerId, job.Id);
-            await ProcessOutboxMessage(job, cancellationToken);
+            var hadNoHandler = job.HandlerType == null;
+            await ProcessOutboxMessage(context, job, cancellationToken);
+
+            // Detect multi-handler routing: HandlerType was null before and still null after
+            // (single-handler sets it during ProcessOutboxMessage, multi-handler doesn't)
+            isMultiHandlerRouting = hadNoHandler && job.HandlerType == null;
+
             _logger.LogInformation("Worker {workerId} processed message {id}", _workerId, job.Id);
 
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
@@ -112,6 +117,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
             await context.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
+        }
+
+        // If this was a multi-handler routing job, immediately process one of the child jobs
+        if (isMultiHandlerRouting)
+        {
+            return await GetAndProcessJob(cancellationToken);
         }
 
         return true;
@@ -153,27 +164,72 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
     }
 
-    private async Task ProcessOutboxMessage(Job message, CancellationToken cancellationToken)
+    private async Task ProcessOutboxMessage(TContext context, Job job, CancellationToken cancellationToken)
     {
-        var type = Type.GetType(message.Type);
+        var messageType = Type.GetType(job.Type);
 
-        if (type is null)
+        if (messageType is null)
         {
-            throw new JoblyException($"Unknown type {message.Type}");
+            throw new JoblyException($"Unknown type {job.Type}");
         }
 
-        var request = JsonSerializer.Deserialize(message.Message, type);
+        var message = JsonSerializer.Deserialize(job.Message, messageType);
 
-        if (request is null)
+        if (message is null)
         {
-            throw new JoblyException($"Unable to deserialize message {message.Message} to type {message.Type}");
+            throw new JoblyException($"Unable to deserialize message {job.Message} to type {job.Type}");
         }
 
         using var scope = _serviceScopeFactory.CreateScope();
+        var dispatcher = new JobDispatcher();
 
-        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+        if (job.HandlerType != null)
+        {
+            // Phase 2: Execute — run specific handler through pipeline
+            var handlerType = Type.GetType(job.HandlerType);
+            if (handlerType is null)
+            {
+                throw new JoblyException($"Unknown handler type {job.HandlerType}");
+            }
+            await dispatcher.ExecuteHandler(message, messageType, handlerType, scope.ServiceProvider, cancellationToken);
+            return;
+        }
 
-        await mediator.Send(request, cancellationToken);
+        // Discover handlers for this message type
+        var handlerTypes = dispatcher.DiscoverHandlers(messageType, scope.ServiceProvider);
+
+        if (handlerTypes.Count == 0)
+        {
+            throw new JoblyException($"No handler registered for {messageType.Name}");
+        }
+
+        if (handlerTypes.Count == 1)
+        {
+            // Single handler: execute directly on this job (no fan-out)
+            job.HandlerType = handlerTypes[0].AssemblyQualifiedName;
+            await dispatcher.ExecuteHandler(message, messageType, handlerTypes[0], scope.ServiceProvider, cancellationToken);
+            return;
+        }
+
+        // Multiple handlers: fan out — create a child job per handler
+        foreach (var handlerType in handlerTypes)
+        {
+            var childJobState = JobHelper.CreateJobAndJobState(
+                message: job.Message,
+                type: job.Type,
+                retries: 0,
+                scheduleTime: null,
+                maxRetries: job.MaxRetries,
+                priority: job.Priority,
+                parentId: null,
+                state: State.Enqueued);
+
+            childJobState.Job.HandlerType = handlerType.AssemblyQualifiedName;
+
+            context.Set<JobState>().Add(childJobState);
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task UpdateJobData(TContext context, Job job, string? message, CancellationToken cancellationToken)
@@ -183,6 +239,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         {
             state = State.Enqueued;
             job.RetriedTimes += 1;
+            job.HandlerType = null; // Clear so handler is re-discovered on retry
         }
 
         job.CurrentState = state;

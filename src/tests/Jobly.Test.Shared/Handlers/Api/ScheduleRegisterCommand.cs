@@ -1,24 +1,19 @@
-﻿using Jobly.Core.Enums;
+using Jobly.Core.Enums;
+using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
 using Jobly.Test.Shared.Entities;
-using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Jobly.Core.Handlers;
 
-public class ScheduleRegisterResponse
-{
-
-}
-
-public class ScheduleRegisterRequest : IRequest<ScheduleRegisterResponse>
+public class ScheduleRegisterRequest : IJob
 {
     public string Email { get; set; }
 
     public DateTime ScheduleTime { get; set; }
 }
 
-public class ScheduleRegisterCommand : IRequestHandler<ScheduleRegisterRequest, ScheduleRegisterResponse>
+public class ScheduleRegisterCommand : IJobHandler<ScheduleRegisterRequest>
 {
     private readonly TestContext _context;
     private readonly IPublisher _publisher;
@@ -29,18 +24,18 @@ public class ScheduleRegisterCommand : IRequestHandler<ScheduleRegisterRequest, 
         _publisher = publisher;
     }
 
-    public async ValueTask<ScheduleRegisterResponse> Handle(ScheduleRegisterRequest request, CancellationToken cancellationToken)
+    public async Task HandleAsync(ScheduleRegisterRequest message, CancellationToken ct)
     {
         var registration = new Registration
         {
-            Email = request.Email
+            Email = message.Email
         };
 
         _context.Registrations.Add(registration);
 
         var emailLog = new EmailLog
         {
-            Email = request.Email,
+            Email = message.Email,
             Body = "Test email",
             Subject = "Test subject"
         };
@@ -59,12 +54,12 @@ public class ScheduleRegisterCommand : IRequestHandler<ScheduleRegisterRequest, 
         for (var i = 0; i < 10; i++)
         {
             // Original code, works fine with one parameter
-            await _publisher.Publish(sendEmailRequest, request.ScheduleTime);
+            await _publisher.Publish(sendEmailRequest, message.ScheduleTime);
 
             // JobData parameters
             var jobParams = new JobParameters
             {
-                ScheduleTime = request.ScheduleTime,
+                ScheduleTime = message.ScheduleTime,
                 Priority = Priority.High
             };
             await _publisher.Publish(sendEmailRequest, jobParams);
@@ -73,9 +68,5 @@ public class ScheduleRegisterCommand : IRequestHandler<ScheduleRegisterRequest, 
         await _context.SaveChangesAsync();
 
         await transaction.CommitAsync();
-
-        return new();
-
     }
 }
-

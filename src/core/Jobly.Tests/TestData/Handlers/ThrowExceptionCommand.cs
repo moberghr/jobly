@@ -1,15 +1,15 @@
-﻿using Mediator;
+using Jobly.Core.Handlers;
 
 namespace Jobly.Tests.TestData.Handlers;
-public class ThrowExceptionCommand : IRequestHandler<ThrowExceptionRequest, Unit>
+public class ThrowExceptionCommand : IJobHandler<ThrowExceptionRequest>
 {
-    public ValueTask<Unit> Handle(ThrowExceptionRequest request, CancellationToken cancellationToken)
+    public async Task HandleAsync(ThrowExceptionRequest message, CancellationToken ct)
     {
         throw new NotImplementedException();
     }
 }
 
-public class ThrowExceptionRequest : IRequest<Unit>
+public class ThrowExceptionRequest : IJob
 {
 
 }

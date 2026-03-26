@@ -137,6 +137,7 @@ public static class ServiceConfiguration
         job.Property(p => p.RetriedTimes);
         job.Property(p => p.MaxRetries);
         job.Property(p => p.ParentJobId);
+        job.Property(p => p.HandlerType);
 
         // Configure one-to-many relationship with Batch
         job.HasOne(p => p.Batch)

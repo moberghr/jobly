@@ -1,5 +1,5 @@
+using Jobly.Core;
 using Jobly.Core.Handlers;
-using Mediator;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jobly.TestApp.Controllers;
@@ -7,34 +7,38 @@ namespace Jobly.TestApp.Controllers;
 [ApiController]
 public class TestController : ControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly IPublisher _publisher;
 
-    public TestController(IMediator mediator)
+    public TestController(IPublisher publisher)
     {
-        _mediator = mediator;
+        _publisher = publisher;
     }
 
     [HttpPost("register")]
-    public async Task<RegisterResponse> Register(RegisterRequest request)
+    public async Task<IActionResult> Register(RegisterRequest request)
     {
-        return await _mediator.Send(request);
+        await _publisher.Publish(request);
+        return Ok();
     }
 
     [HttpPost("register-schedule")]
-    public async Task<ScheduleRegisterResponse> ScheduleRegister(ScheduleRegisterRequest request)
+    public async Task<IActionResult> ScheduleRegister(ScheduleRegisterRequest request)
     {
-        return await _mediator.Send(request);
+        await _publisher.Publish(request);
+        return Ok();
     }
 
     [HttpPost("failed-job")]
-    public async Task<FailedJobResponse> FailedJob(FailedJobRequest request)
+    public async Task<IActionResult> FailedJob(FailedJobRequest request)
     {
-        return await _mediator.Send(request);
+        await _publisher.Publish(request);
+        return Ok();
     }
 
     [HttpPost("recurring-job")]
-    public async Task<RecurringJobResponse> RecurringJob(RecurringJobRequest request)
+    public async Task<IActionResult> RecurringJob(RecurringJobRequest request)
     {
-        return await _mediator.Send(request);
+        await _publisher.Publish(request);
+        return Ok();
     }
 }

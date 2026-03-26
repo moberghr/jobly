@@ -1,15 +1,14 @@
-﻿using Mediator;
+using Jobly.Core.Handlers;
 
 namespace Jobly.Tests.TestData.Handlers;
-public class UnitCommand : IRequestHandler<UnitRequest, Unit>
+public class UnitCommand : IJobHandler<UnitRequest>
 {
-    public ValueTask<Unit> Handle(UnitRequest request, CancellationToken cancellationToken)
+    public async Task HandleAsync(UnitRequest message, CancellationToken ct)
     {
-        return new ValueTask<Unit>(Unit.Value);
     }
 }
 
-public class UnitRequest : IRequest<Unit>
+public class UnitRequest : IJob
 {
 
 }

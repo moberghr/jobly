@@ -1,8 +1,8 @@
-﻿using Mediator;
+using Jobly.Core.Handlers;
 using Microsoft.EntityFrameworkCore;
 
 namespace Jobly.Tests.TestData.Handlers;
-public class PrecessLogCommand : IRequestHandler<PrecessLogRequest, PrecessLogResponse>
+public class PrecessLogCommand : IJobHandler<PrecessLogRequest>
 {
     private readonly TestContext _context;
 
@@ -11,26 +11,19 @@ public class PrecessLogCommand : IRequestHandler<PrecessLogRequest, PrecessLogRe
         _context = context;
     }
 
-    public async ValueTask<PrecessLogResponse> Handle(PrecessLogRequest request, CancellationToken cancellationToken)
+    public async Task HandleAsync(PrecessLogRequest message, CancellationToken ct)
     {
         var testTask = await _context.TestLogs
-            .Where(x => x.Id == request.TestTaskId)
-            .FirstAsync(cancellationToken);
+            .Where(x => x.Id == message.TestTaskId)
+            .FirstAsync(ct);
 
         testTask.ProcessedTime = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync(cancellationToken);
-
-        return new();
+        await _context.SaveChangesAsync(ct);
     }
 }
 
-public class PrecessLogRequest : IRequest<PrecessLogResponse>
+public class PrecessLogRequest : IJob
 {
     public int TestTaskId { get; set; }
-}
-
-public class PrecessLogResponse
-{
-
 }

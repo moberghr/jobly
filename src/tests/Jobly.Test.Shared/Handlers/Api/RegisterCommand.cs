@@ -1,9 +1,9 @@
-﻿using Jobly.Test.Shared.Entities;
-using Mediator;
+using Jobly.Core.Handlers;
+using Jobly.Test.Shared.Entities;
 
 namespace Jobly.Core.Handlers;
 
-public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse>
+public class RegisterCommand : IJobHandler<RegisterRequest>
 {
     private readonly TestContext _context;
     private readonly IPublisher _publisher;
@@ -16,18 +16,18 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
         _batchPublisher = batchPublisher;
     }
 
-    public async ValueTask<RegisterResponse> Handle(RegisterRequest request, CancellationToken cancellationToken)
+    public async Task HandleAsync(RegisterRequest message, CancellationToken ct)
     {
         var registration = new Registration
         {
-            Email = request.Email
+            Email = message.Email
         };
 
         _context.Registrations.Add(registration);
 
         var emailLog = new EmailLog
         {
-            Email = request.Email,
+            Email = message.Email,
             Body = "Test email",
             Subject = "Test subject"
         };
@@ -42,7 +42,7 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
         {
             EmailLogId = emailLog.Id
         };
-        
+
         var batch = new List<SendEmailRequest>();
 
         for (var i = 0; i < 20; i++)
@@ -50,7 +50,7 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
             batch.Add(sendEmailRequest);
             await _publisher.Publish(sendEmailRequest);
         }
-        
+
         await _batchPublisher.StartNew(batch);
 
         Guid parentId = await _publisher.Publish(sendEmailRequest);
@@ -63,17 +63,10 @@ public class RegisterCommand : IRequestHandler<RegisterRequest, RegisterResponse
         await _context.SaveChangesAsync();
 
         await transaction.CommitAsync();
-
-        return new();
     }
 }
 
-public class RegisterRequest : IRequest<RegisterResponse>
+public class RegisterRequest : IJob
 {
     public string Email { get; set; }
-}
-
-public class RegisterResponse
-{
-
 }

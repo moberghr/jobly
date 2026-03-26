@@ -3,6 +3,7 @@ using System.Text.Json;
 using Cronos;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
+using Jobly.Core.Handlers;
 using Jobly.Core.Enums;
 using Jobly.Core.Helper;
 using Jobly.Core.Interceptors;
@@ -12,7 +13,7 @@ namespace Jobly.Core;
 
 public interface IRecurringJobPublisher
 {
-    Task AddOrUpdateRecurringJob<T>(T message, string name, string cron) where T : class;
+    Task AddOrUpdateRecurringJob<T>(T message, string name, string cron) where T : class, IJob;
 }
 
 public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
@@ -25,7 +26,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         _context = context;
     }
 
-    public async Task AddOrUpdateRecurringJob<T>(T message, string name, string cronExpression) where T : class
+    public async Task AddOrUpdateRecurringJob<T>(T message, string name, string cronExpression) where T : class, IJob
     {
         ValidateCronExpression(cronExpression);
 
@@ -43,7 +44,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         await transaction.CommitAsync();
     }
 
-    private Job CreateJobForRecurringJob<T>(T message, string cronExpression) where T : class
+    private Job CreateJobForRecurringJob<T>(T message, string cronExpression) where T : class, IJob
     {
         var (nextJobScheduleTime, jobMessage, jobType) = GetRecurringJobData(message, cronExpression);
         if (nextJobScheduleTime == null || string.IsNullOrWhiteSpace(jobMessage) || string.IsNullOrWhiteSpace(jobType))
@@ -56,7 +57,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         return jobState.Job;
     }
 
-    private async Task<RecurringJob> AddOrUpdateRecurringJobToDb<T>(T message, string name, string cronExpression, Job job) where T : class
+    private async Task<RecurringJob> AddOrUpdateRecurringJobToDb<T>(T message, string name, string cronExpression, Job job) where T : class, IJob
     {
         var (nextJobScheduleTime, jobMessage, jobType) = GetRecurringJobData(message, cronExpression);
 
@@ -106,7 +107,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         return recurringJob;
     }
 
-    private (DateTime? nextJobScheduleTime, string? jobMessage, string? jobType) GetRecurringJobData<T>(T message, string cronExpression) where T : class
+    private (DateTime? nextJobScheduleTime, string? jobMessage, string? jobType) GetRecurringJobData<T>(T message, string cronExpression) where T : class, IJob
     {
         var nextJobScheduleTime = CronExpression.Parse(cronExpression).GetNextOccurrence(DateTime.UtcNow);
         var jobMessage = JsonSerializer.Serialize(message);

@@ -3,7 +3,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
-using Mediator;
+using Jobly.Core.Handlers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -20,10 +20,11 @@ public abstract class TestBase
     protected TestBase()
     {
         var services = new ServiceCollection();
-        var provider = services.AddMediator()
+        var provider = services.AddJobHandlers(typeof(TestBase).Assembly)
             .AddTransient<TestContext>(x => CreateContext())
             .AddJoblyWorker<TestContext>()
             .AddSingleton<CounterService>()
+            .AddSingleton<MultiHandlerCounter>()
             .BuildServiceProvider();
 
         _serviceScopeFactory = provider.GetService<IServiceScopeFactory>()!;
@@ -215,6 +216,12 @@ public abstract class TestBase
 
         var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactory);
         return await worker.GetAndProcessJob(CancellationToken.None);
+    }
+
+    protected MultiHandlerCounter GetMultiHandlerCounter()
+    {
+        using var scope = _serviceScopeFactory.CreateScope();
+        return scope.ServiceProvider.GetService<MultiHandlerCounter>()!;
     }
 
     protected async Task<int> GetCounter()

@@ -1,5 +1,6 @@
 ﻿using Jobly.Core.Entities;
 using Jobly.Core.Enums;
+using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -9,9 +10,9 @@ namespace Jobly.Core;
 
 public interface IBatchPublisher
 {
-    Task<Guid> StartNew<T>(List<T> batchJobMessages) where T : class;
+    Task<Guid> StartNew<T>(List<T> batchJobMessages) where T : class, IJob;
 
-    Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId) where T : class;
+    Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId) where T : class, IJob;
 }
 
 public class BatchPublisher<TContext> : IBatchPublisher
@@ -26,17 +27,17 @@ public class BatchPublisher<TContext> : IBatchPublisher
         _joblyConfiguration = configuration.Value;
     }
 
-    public async Task<Guid> StartNew<T>(List<T> batchJobMessages) where T : class
+    public async Task<Guid> StartNew<T>(List<T> batchJobMessages) where T : class, IJob
     {
         return await BaseCreateBatch(batchJobMessages, Enums.State.Enqueued, null);
     }
 
-    public async Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId) where T : class
+    public async Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId) where T : class, IJob
     {
         return await BaseCreateBatch(batchJobMessages, Enums.State.Awaiting, parentId);
     }
 
-    private async Task<Guid> BaseCreateBatch<T>(List<T> batchJobMessages, Enums.State batchJobsState, Guid? parentId) where T : class
+    private async Task<Guid> BaseCreateBatch<T>(List<T> batchJobMessages, Enums.State batchJobsState, Guid? parentId) where T : class, IJob
     {
         if (batchJobMessages.IsNullOrEmpty())
         {
