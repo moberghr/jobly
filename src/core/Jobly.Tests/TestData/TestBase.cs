@@ -201,6 +201,24 @@ public abstract class TestBase
         return log;
     }
 
+    protected async Task<Message> GetMessage(Guid messageId)
+    {
+        var context = CreateContext();
+        return await context.Set<Message>()
+            .Where(x => x.Id == messageId)
+            .AsNoTracking()
+            .SingleAsync();
+    }
+
+    protected async Task<List<Job>> GetJobsForMessage(Guid messageId)
+    {
+        var context = CreateContext();
+        return await context.Set<Job>()
+            .Where(x => x.MessageId == messageId)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
     protected async Task ProcessJob()
     {
         await EnsureServerRegistered();

@@ -4,6 +4,24 @@ namespace Jobly.Tests.TestData.Handlers;
 
 public class MultiRequest : IMessage { }
 
+public class SingleHandlerMessage : IMessage { }
+
+public class SingleMessageHandler : IMessageHandler<SingleHandlerMessage>
+{
+    private readonly MultiHandlerCounter _counter;
+
+    public SingleMessageHandler(MultiHandlerCounter counter)
+    {
+        _counter = counter;
+    }
+
+    public Task HandleAsync(SingleHandlerMessage message, CancellationToken cancellationToken)
+    {
+        _counter.IncrementA();
+        return Task.CompletedTask;
+    }
+}
+
 public class MultiHandlerCounter
 {
     public int CountA;
