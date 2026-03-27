@@ -118,6 +118,7 @@ public static class ServiceConfiguration
         AddBatchEntity(modelBuilder);
         AddServerEntity(modelBuilder);
         AddWorkerEntity(modelBuilder);
+        AddMessageEntity(modelBuilder);
     }
 
     private static void AddJobEntity(ModelBuilder modelBuilder)
@@ -138,6 +139,11 @@ public static class ServiceConfiguration
         job.Property(p => p.MaxRetries);
         job.Property(p => p.ParentJobId);
         job.Property(p => p.HandlerType);
+        job.Property(p => p.MessageId);
+
+        job.HasOne(p => p.MessageEntity)
+            .WithMany()
+            .HasForeignKey(p => p.MessageId);
 
         // Configure one-to-many relationship with Batch
         job.HasOne(p => p.Batch)
@@ -247,5 +253,23 @@ public static class ServiceConfiguration
         worker.HasOne(p => p.Server)
             .WithMany()
             .HasForeignKey(p => p.ServerId);
+    }
+
+    private static void AddMessageEntity(ModelBuilder modelBuilder)
+    {
+        var message = modelBuilder.Entity<Message>();
+        message.ToTable(nameof(Message));
+
+        message.Property(p => p.Id);
+        message.HasKey(p => p.Id);
+
+        message.Property(p => p.Type);
+        message.Property(p => p.Payload);
+        message.Property(p => p.Priority);
+        message.Property(p => p.CreateTime);
+        message.Property(p => p.CurrentState);
+        message.Property(p => p.JobCount);
+
+        message.HasIndex(p => new { p.CurrentState, p.Priority });
     }
 }

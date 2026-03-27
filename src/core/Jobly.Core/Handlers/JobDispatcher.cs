@@ -1,4 +1,3 @@
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jobly.Core.Handlers;
@@ -6,23 +5,33 @@ namespace Jobly.Core.Handlers;
 public class JobDispatcher
 {
     /// <summary>
-    /// Discovers all registered IJobHandler&lt;T&gt; implementation types for a given message type.
+    /// Discovers all registered IMessageHandler&lt;T&gt; implementation types for a message type.
     /// </summary>
-    public List<Type> DiscoverHandlers(Type messageType, IServiceProvider provider)
+    public List<Type> DiscoverMessageHandlers(Type messageType, IServiceProvider provider)
     {
-        var handlerInterfaceType = typeof(IJobHandler<>).MakeGenericType(messageType);
+        var handlerInterfaceType = typeof(IMessageHandler<>).MakeGenericType(messageType);
         var handlers = provider.GetServices(handlerInterfaceType);
         return handlers.Select(h => h!.GetType()).Distinct().ToList();
     }
 
     /// <summary>
+    /// Discovers the single IJobHandler&lt;T&gt; for a job type.
+    /// </summary>
+    public Type? DiscoverJobHandler(Type jobType, IServiceProvider provider)
+    {
+        var handlerInterfaceType = typeof(IJobHandler<>).MakeGenericType(jobType);
+        var handler = provider.GetService(handlerInterfaceType);
+        return handler?.GetType();
+    }
+
+    /// <summary>
     /// Executes a specific handler through the pipeline behavior chain.
+    /// Works for both IMessageHandler and IJobHandler (same reflection pattern).
     /// </summary>
     public async Task ExecuteHandler(object message, Type messageType, Type handlerType,
-        IServiceProvider provider, CancellationToken cancellationToken)
+        Type handlerInterfaceType, IServiceProvider provider, CancellationToken cancellationToken)
     {
-        // Resolve all handlers for this message type and find the one matching the concrete type
-        var handlerInterfaceType = typeof(IJobHandler<>).MakeGenericType(messageType);
+        // Resolve handler via its interface to get the DI-registered instance
         var allHandlers = provider.GetServices(handlerInterfaceType);
         var handler = allHandlers.First(h => h!.GetType() == handlerType);
 
@@ -35,7 +44,7 @@ public class JobDispatcher
             (Task)handleMethod.Invoke(handler, new object[] { message, cancellationToken })!;
 
         // Resolve pipeline behaviors
-        var behaviorInterfaceType = typeof(IJobPipelineBehavior<>).MakeGenericType(messageType);
+        var behaviorInterfaceType = typeof(IPipelineBehavior<>).MakeGenericType(messageType);
         var behaviors = provider.GetServices(behaviorInterfaceType).ToList();
 
         // Build the chain from innermost to outermost
@@ -51,5 +60,25 @@ public class JobDispatcher
         }
 
         await chain();
+    }
+
+    /// <summary>
+    /// Execute a message handler (IMessageHandler&lt;T&gt;).
+    /// </summary>
+    public Task ExecuteMessageHandler(object message, Type messageType, Type handlerType,
+        IServiceProvider provider, CancellationToken ct)
+    {
+        var handlerInterfaceType = typeof(IMessageHandler<>).MakeGenericType(messageType);
+        return ExecuteHandler(message, messageType, handlerType, handlerInterfaceType, provider, ct);
+    }
+
+    /// <summary>
+    /// Execute a job handler (IJobHandler&lt;T&gt;).
+    /// </summary>
+    public Task ExecuteJobHandler(object message, Type messageType, Type handlerType,
+        IServiceProvider provider, CancellationToken ct)
+    {
+        var handlerInterfaceType = typeof(IJobHandler<>).MakeGenericType(messageType);
+        return ExecuteHandler(message, messageType, handlerType, handlerInterfaceType, provider, ct);
     }
 }

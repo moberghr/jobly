@@ -13,8 +13,8 @@ public abstract partial class JoblyTests : TestBase
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
         var jobRequest = new UnitRequest();
-        Guid jobId = await publisher.Publish(jobRequest);
-        Guid childJobId = await publisher.Publish(jobRequest, jobId);
+        Guid jobId = await publisher.Enqueue(jobRequest);
+        Guid childJobId = await publisher.Enqueue(jobRequest, jobId);
         await context.SaveChangesAsync();
         var childJob = await GetJob(childJobId);
 
@@ -41,7 +41,7 @@ public abstract partial class JoblyTests : TestBase
         var jobRequest = new UnitRequest();
 
         Guid jobId = await CreateFailedRetryJob(context, 0, 0, null);
-        Guid childJobId = await publisher.Publish(jobRequest, jobId);
+        Guid childJobId = await publisher.Enqueue(jobRequest, jobId);
         await context.SaveChangesAsync();
 
         for (int i = 0; i < 2; i++)

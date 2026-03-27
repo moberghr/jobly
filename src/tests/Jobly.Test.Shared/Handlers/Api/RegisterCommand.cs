@@ -48,16 +48,16 @@ public class RegisterCommand : IJobHandler<RegisterRequest>
         for (var i = 0; i < 20; i++)
         {
             batch.Add(sendEmailRequest);
-            await _publisher.Publish(sendEmailRequest);
+            await _publisher.Enqueue(sendEmailRequest);
         }
 
         await _batchPublisher.StartNew(batch);
 
-        Guid parentId = await _publisher.Publish(sendEmailRequest);
+        Guid parentId = await _publisher.Enqueue(sendEmailRequest);
 
         for (int i = 0; i < 4; i++)
         {
-            await _publisher.Publish(sendEmailRequest, parentId);
+            await _publisher.Enqueue(sendEmailRequest, parentId);
         }
 
         await _context.SaveChangesAsync();

@@ -12,9 +12,9 @@ public abstract partial class JoblyTests : TestBase
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
-        var lowJobId = await publisher.Publish(new UnitRequest(), Priority.Low);
-        var normalJobId = await publisher.Publish(new UnitRequest(), Priority.Normal);
-        var urgentJobId = await publisher.Publish(new UnitRequest(), Priority.Urgent);
+        var lowJobId = await publisher.Enqueue(new UnitRequest(), Priority.Low);
+        var normalJobId = await publisher.Enqueue(new UnitRequest(), Priority.Normal);
+        var urgentJobId = await publisher.Enqueue(new UnitRequest(), Priority.Urgent);
 
         await context.SaveChangesAsync();
 
@@ -35,7 +35,7 @@ public abstract partial class JoblyTests : TestBase
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
-        var jobId = await publisher.Publish(new UnitRequest(), DateTime.UtcNow.AddHours(1));
+        var jobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddHours(1));
 
         await context.SaveChangesAsync();
 
@@ -53,7 +53,7 @@ public abstract partial class JoblyTests : TestBase
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
-        var jobId = await publisher.Publish(new UnitRequest(), DateTime.UtcNow.AddSeconds(-1));
+        var jobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddSeconds(-1));
 
         await context.SaveChangesAsync();
 
@@ -69,8 +69,8 @@ public abstract partial class JoblyTests : TestBase
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
-        var earlierJobId = await publisher.Publish(new UnitRequest(), DateTime.UtcNow.AddSeconds(-10), Priority.Normal);
-        var laterJobId = await publisher.Publish(new UnitRequest(), DateTime.UtcNow.AddSeconds(-1), Priority.Normal);
+        var earlierJobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddSeconds(-10), Priority.Normal);
+        var laterJobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddSeconds(-1), Priority.Normal);
 
         await context.SaveChangesAsync();
 
@@ -89,8 +89,8 @@ public abstract partial class JoblyTests : TestBase
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
-        var urgentFutureJobId = await publisher.Publish(new UnitRequest(), DateTime.UtcNow.AddHours(1), Priority.Urgent);
-        var lowPastJobId = await publisher.Publish(new UnitRequest(), DateTime.UtcNow.AddSeconds(-1), Priority.Low);
+        var urgentFutureJobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddHours(1), Priority.Urgent);
+        var lowPastJobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddSeconds(-1), Priority.Low);
 
         await context.SaveChangesAsync();
 

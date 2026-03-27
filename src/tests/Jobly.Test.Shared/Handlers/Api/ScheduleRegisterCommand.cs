@@ -54,7 +54,7 @@ public class ScheduleRegisterCommand : IJobHandler<ScheduleRegisterRequest>
         for (var i = 0; i < 10; i++)
         {
             // Original code, works fine with one parameter
-            await _publisher.Publish(sendEmailRequest, message.ScheduleTime);
+            await _publisher.Schedule(sendEmailRequest, message.ScheduleTime);
 
             // JobData parameters
             var jobParams = new JobParameters
@@ -62,7 +62,7 @@ public class ScheduleRegisterCommand : IJobHandler<ScheduleRegisterRequest>
                 ScheduleTime = message.ScheduleTime,
                 Priority = Priority.High
             };
-            await _publisher.Publish(sendEmailRequest, jobParams);
+            await _publisher.Enqueue(sendEmailRequest, jobParams);
         }
 
         await _context.SaveChangesAsync();

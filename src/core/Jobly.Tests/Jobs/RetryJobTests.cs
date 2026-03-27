@@ -96,7 +96,7 @@ public abstract partial class JoblyTests : TestBase
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context, retries);
         var jobRequest = new UnitRequest();
-        Guid jobId = await publisher.Publish(jobRequest);
+        Guid jobId = await publisher.Enqueue(jobRequest);
 
         await context.SaveChangesAsync();
 

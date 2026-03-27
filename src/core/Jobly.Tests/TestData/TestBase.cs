@@ -52,7 +52,7 @@ public abstract class TestBase
     {
         var publisher = TestUtils.CreatePublisher(context);
         var processLogJob = new PrecessLogRequest { TestTaskId = testLogId };
-        var jobId = await publisher.Publish(processLogJob);
+        var jobId = await publisher.Enqueue(processLogJob);
 
         await context.SaveChangesAsync();
 
@@ -65,7 +65,7 @@ public abstract class TestBase
 
         var throwExceptionRequest = new ThrowExceptionRequest();
 
-        var jobId = await publisher.Publish(throwExceptionRequest);
+        var jobId = await publisher.Enqueue(throwExceptionRequest);
 
         await context.SaveChangesAsync();
 
@@ -80,17 +80,17 @@ public abstract class TestBase
         Guid? jobId = null;
         if (maxRetries != null)
         {
-            jobId = await publisher.Publish(throwExceptionRequest, (int)maxRetries);
+            jobId = await publisher.Enqueue(throwExceptionRequest, (int)maxRetries);
         }
 
         if (parentJobId != null)
         {
-            jobId = await publisher.Publish(throwExceptionRequest, parentJobId.Value);
+            jobId = await publisher.Enqueue(throwExceptionRequest, parentJobId.Value);
         }
 
         if (maxRetries == null && parentJobId == null)
         {
-            jobId = await publisher.Publish(throwExceptionRequest);
+            jobId = await publisher.Enqueue(throwExceptionRequest);
         }
 
         await context.SaveChangesAsync();
@@ -119,7 +119,7 @@ public abstract class TestBase
 
         var request = new CounterRequest();
 
-        await publisher.Publish(request);
+        await publisher.Enqueue(request);
 
         await context.SaveChangesAsync();
     }
@@ -139,7 +139,7 @@ public abstract class TestBase
 
         var publisher = TestUtils.CreatePublisher(context);
 
-        var jobId = await publisher.Publish(requests, parentJobId);
+        var jobId = await publisher.Enqueue(requests, parentJobId);
 
         return jobId;
     }

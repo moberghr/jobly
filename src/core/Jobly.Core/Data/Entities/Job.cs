@@ -43,4 +43,8 @@ public class Job
     public Guid? CurrentWorkerId { get; set; }
 
     public string? HandlerType { get; set; }
+
+    public Guid? MessageId { get; set; }
+
+    public Message? MessageEntity { get; set; }
 }

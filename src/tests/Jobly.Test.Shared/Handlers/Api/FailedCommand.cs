@@ -22,7 +22,7 @@ public class FailedCommand : IJobHandler<FailedJobRequest>
     {
         if (message.SchedululeTime.HasValue)
         {
-            await _publisher.Publish(new ThrowExceptionRequest(), message.SchedululeTime.Value);
+            await _publisher.Schedule(new ThrowExceptionRequest(), message.SchedululeTime.Value);
 
             await _context.SaveChangesAsync();
 
@@ -31,7 +31,7 @@ public class FailedCommand : IJobHandler<FailedJobRequest>
 
         for (var i = 0; i < 10; i++)
         {
-            await _publisher.Publish(new ThrowExceptionRequest());
+            await _publisher.Enqueue(new ThrowExceptionRequest());
         }
 
         await _context.SaveChangesAsync();

@@ -1,3 +1,4 @@
+using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Tests.TestData.Handlers;
@@ -9,17 +10,17 @@ namespace Jobly.Tests.Jobs;
 public abstract partial class JoblyTests : TestBase
 {
     [Fact]
-    public async Task GivenMultipleHandlers_WhenJobProcessed_ThenFansOutToSeparateJobs()
+    public async Task GivenMultipleHandlers_WhenMessageRouted_ThenBothHandlersExecute()
     {
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
-        var jobId = await publisher.Publish(new MultiRequest());
+        var messageId = await publisher.Publish(new MultiRequest());
         await context.SaveChangesAsync();
 
-        // First ProcessJob: routes the original job, creates 2 child jobs, then processes one
+        // ProcessJob routes the message and immediately executes one handler job
         await ProcessJob();
-        // Second ProcessJob: processes the other child job
+        // ProcessJob executes the second handler job
         await ProcessJob();
 
         var counter = GetMultiHandlerCounter();
@@ -28,38 +29,45 @@ public abstract partial class JoblyTests : TestBase
     }
 
     [Fact]
-    public async Task GivenMultipleHandlers_WhenJobProcessed_ThenOriginalJobIsCompleted()
+    public async Task GivenMultipleHandlers_WhenMessageRouted_ThenMessageIsCompleted()
     {
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
-        var jobId = await publisher.Publish(new MultiRequest());
+        var messageId = await publisher.Publish(new MultiRequest());
         await context.SaveChangesAsync();
 
-        // Route phase completes the original job
+        // Route + execute first handler
+        await ProcessJob();
+        // Execute second handler
         await ProcessJob();
 
-        var originalJob = await GetJob(jobId);
-        originalJob.CurrentState.ShouldBe(State.Completed);
+        var message = await CreateContext().Set<Message>()
+            .Where(m => m.Id == messageId)
+            .FirstAsync();
+
+        message.CurrentState.ShouldBe(State.Completed);
+        message.JobCount.ShouldBe(0);
     }
 
     [Fact]
-    public async Task GivenMultipleHandlers_WhenJobProcessed_ThenChildJobsHaveHandlerTypeSet()
+    public async Task GivenMultipleHandlers_WhenMessageRouted_ThenChildJobsHaveHandlerTypeSet()
     {
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
-        var jobId = await publisher.Publish(new MultiRequest());
+        var messageId = await publisher.Publish(new MultiRequest());
         await context.SaveChangesAsync();
 
+        // Route the message (creates handler jobs)
         await ProcessJob();
 
-        var childJobs = await CreateContext().Set<Job>()
-            .Where(j => j.HandlerType != null && j.Type == typeof(MultiRequest).AssemblyQualifiedName)
+        var handlerJobs = await CreateContext().Set<Job>()
+            .Where(j => j.MessageId == messageId)
             .ToListAsync();
 
-        childJobs.Count.ShouldBe(2);
-        childJobs.ShouldContain(j => j.HandlerType!.Contains(nameof(MultiHandlerA)));
-        childJobs.ShouldContain(j => j.HandlerType!.Contains(nameof(MultiHandlerB)));
+        handlerJobs.Count.ShouldBe(2);
+        handlerJobs.ShouldContain(j => j.HandlerType!.Contains(nameof(MultiHandlerA)));
+        handlerJobs.ShouldContain(j => j.HandlerType!.Contains(nameof(MultiHandlerB)));
     }
 }

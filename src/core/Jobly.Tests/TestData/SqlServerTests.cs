@@ -5,6 +5,7 @@ using Testcontainers.MsSql;
 
 namespace Jobly.Tests;
 
+[Trait("Category", "SqlServer")]
 public class SqlServerTests : JoblyTests, IAsyncLifetime
 {
     private static readonly SqlServerRowLockInterceptor _interceptor = new();

@@ -6,50 +6,40 @@ namespace Jobly.Core.Handlers;
 public static class JobHandlerServiceExtensions
 {
     /// <summary>
-    /// Scans the assembly for all IJobHandler&lt;T&gt; implementations and registers them in DI.
+    /// Scans the assembly for all IJobHandler&lt;T&gt; and IMessageHandler&lt;T&gt; implementations and registers them in DI.
     /// </summary>
     public static IServiceCollection AddJobHandlers(this IServiceCollection services, Assembly assembly)
     {
-        var handlerTypes = assembly.GetTypes()
-            .Where(t => t is { IsAbstract: false, IsInterface: false })
-            .Where(t => t.GetInterfaces().Any(i =>
-                i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IJobHandler<>)));
-
-        foreach (var handlerType in handlerTypes)
-        {
-            var interfaces = handlerType.GetInterfaces()
-                .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IJobHandler<>));
-
-            foreach (var handlerInterface in interfaces)
-            {
-                services.AddTransient(handlerInterface, handlerType);
-            }
-        }
-
+        RegisterImplementations(services, assembly, typeof(IJobHandler<>));
+        RegisterImplementations(services, assembly, typeof(IMessageHandler<>));
         return services;
     }
 
     /// <summary>
-    /// Scans the assembly for all IJobPipelineBehavior&lt;T&gt; implementations and registers them.
+    /// Scans the assembly for all IPipelineBehavior&lt;T&gt; implementations and registers them.
     /// </summary>
-    public static IServiceCollection AddJobPipelineBehaviors(this IServiceCollection services, Assembly assembly)
+    public static IServiceCollection AddPipelineBehaviors(this IServiceCollection services, Assembly assembly)
     {
-        var behaviorTypes = assembly.GetTypes()
+        RegisterImplementations(services, assembly, typeof(IPipelineBehavior<>));
+        return services;
+    }
+
+    private static void RegisterImplementations(IServiceCollection services, Assembly assembly, Type openGenericInterface)
+    {
+        var implementationTypes = assembly.GetTypes()
             .Where(t => t is { IsAbstract: false, IsInterface: false })
             .Where(t => t.GetInterfaces().Any(i =>
-                i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IJobPipelineBehavior<>)));
+                i.IsGenericType && i.GetGenericTypeDefinition() == openGenericInterface));
 
-        foreach (var behaviorType in behaviorTypes)
+        foreach (var implementationType in implementationTypes)
         {
-            var interfaces = behaviorType.GetInterfaces()
-                .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IJobPipelineBehavior<>));
+            var interfaces = implementationType.GetInterfaces()
+                .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == openGenericInterface);
 
-            foreach (var behaviorInterface in interfaces)
+            foreach (var iface in interfaces)
             {
-                services.AddTransient(behaviorInterface, behaviorType);
+                services.AddTransient(iface, implementationType);
             }
         }
-
-        return services;
     }
 }

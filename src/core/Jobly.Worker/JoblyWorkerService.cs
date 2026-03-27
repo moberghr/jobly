@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Cronos;
 using Jobly.Core;
 using Jobly.Core.Data.Entities;
@@ -35,6 +35,186 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         _configuration = configuration.Value;
     }
 
+    public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
+    {
+        // Prefer executing Jobs (real work) over routing Messages
+        if (await TryExecuteJob(cancellationToken)) return true;
+        if (await TryRouteMessage(cancellationToken)) return true;
+        return false;
+    }
+
+    // ==================== Message Routing ====================
+
+    private async Task<bool> TryRouteMessage(CancellationToken cancellationToken)
+    {
+        using var scope = _serviceScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TContext>();
+
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
+        var message = context.Set<Message>()
+            .Where(x => x.CurrentState == State.Enqueued)
+            .OrderBy(x => x.Priority)
+            .ThenBy(x => x.CreateTime)
+            .FirstOrDefault();
+
+        if (message == null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return false;
+        }
+
+        _logger.LogInformation("Worker {workerId} routing message {id}", _workerId, message.Id);
+
+        var dispatcher = new JobDispatcher();
+        var messageType = Type.GetType(message.Type);
+
+        if (messageType is null)
+        {
+            throw new JoblyException($"Unknown type {message.Type}");
+        }
+
+        var handlerTypes = dispatcher.DiscoverMessageHandlers(messageType, scope.ServiceProvider);
+
+        if (handlerTypes.Count == 0)
+        {
+            message.CurrentState = State.Failed;
+            await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            throw new JoblyException($"No handler registered for {messageType.Name}");
+        }
+
+        // Create a Job for each handler
+        foreach (var handlerType in handlerTypes)
+        {
+            var jobState = JobHelper.CreateJobAndJobState(
+                message: message.Payload,
+                type: message.Type,
+                retries: 0,
+                scheduleTime: null,
+                maxRetries: 0,
+                priority: message.Priority,
+                parentId: null,
+                state: State.Enqueued);
+
+            jobState.Job.HandlerType = handlerType.AssemblyQualifiedName;
+            jobState.Job.MessageId = message.Id;
+
+            context.Set<JobState>().Add(jobState);
+        }
+
+        message.JobCount = handlerTypes.Count;
+        message.CurrentState = State.Processing;
+
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        _logger.LogInformation("Worker {workerId} routed message {id} to {count} jobs", _workerId, message.Id, handlerTypes.Count);
+
+        // Immediately try to execute one of the newly created jobs
+        return await TryExecuteJob(cancellationToken);
+    }
+
+    // ==================== Job Execution ====================
+
+    private async Task<bool> TryExecuteJob(CancellationToken cancellationToken)
+    {
+        using var scope = _serviceScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TContext>();
+
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
+        var job = context.Set<Job>()
+            .Where(x => x.CurrentState == State.Enqueued)
+            .Where(x => x.ScheduleTime < DateTime.UtcNow)
+            .OrderBy(x => x.Priority)
+            .ThenBy(x => x.ScheduleTime)
+            .TagWith(InterceptorConstants.RowLockTableJob)
+            .FirstOrDefault();
+
+        if (job == null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return false;
+        }
+
+        _logger.LogInformation("Worker {workerId} fetched job {id}", _workerId, job.Id);
+
+        UpdateJobStatusToProcessing(context, job);
+
+        if (job.RecurringJobId.HasValue)
+        {
+            await CreateNextJob(context, job, cancellationToken);
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        try
+        {
+            _logger.LogInformation("Worker {workerId} executing job {id}", _workerId, job.Id);
+            await ExecuteJob(job, scope.ServiceProvider, cancellationToken);
+            _logger.LogInformation("Worker {workerId} completed job {id}", _workerId, job.Id);
+
+            await using var endTransaction = await context.Database.BeginTransactionAsync(default);
+            await UpdateJobData(context, job, message: null, default);
+            await context.SaveChangesAsync(default);
+            await endTransaction.CommitAsync(default);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error executing job {id}", job.Id);
+            await using var endTransaction = await context.Database.BeginTransactionAsync(default);
+            await UpdateJobData(context, job, e.Message, default);
+            await context.SaveChangesAsync(default);
+            await endTransaction.CommitAsync(default);
+        }
+
+        return true;
+    }
+
+    private async Task ExecuteJob(Job job, IServiceProvider provider, CancellationToken cancellationToken)
+    {
+        var messageType = Type.GetType(job.Type);
+        if (messageType is null)
+            throw new JoblyException($"Unknown type {job.Type}");
+
+        var payload = JsonSerializer.Deserialize(job.Message, messageType);
+        if (payload is null)
+            throw new JoblyException($"Unable to deserialize message {job.Message} to type {job.Type}");
+
+        var dispatcher = new JobDispatcher();
+
+        if (job.HandlerType != null)
+        {
+            // Message-spawned job: execute specific handler
+            var handlerType = Type.GetType(job.HandlerType);
+            if (handlerType is null)
+                throw new JoblyException($"Unknown handler type {job.HandlerType}");
+
+            // Determine if this is a message handler or job handler based on MessageId
+            if (job.MessageId != null)
+            {
+                await dispatcher.ExecuteMessageHandler(payload, messageType, handlerType, provider, cancellationToken);
+            }
+            else
+            {
+                await dispatcher.ExecuteJobHandler(payload, messageType, handlerType, provider, cancellationToken);
+            }
+            return;
+        }
+
+        // Direct IJob: discover single handler
+        var jobHandlerType = dispatcher.DiscoverJobHandler(messageType, provider);
+        if (jobHandlerType is null)
+            throw new JoblyException($"No handler registered for {messageType.Name}");
+
+        job.HandlerType = jobHandlerType.AssemblyQualifiedName;
+        await dispatcher.ExecuteJobHandler(payload, messageType, jobHandlerType, provider, cancellationToken);
+    }
+
+    // ==================== Shared Logic ====================
+
     private void UpdateJobStatusToProcessing(TContext context, Job job)
     {
         var jobState = new JobState
@@ -51,185 +231,35 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         context.Set<JobState>().Add(jobState);
     }
 
-    public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
-    {
-        using var scope = _serviceScopeFactory.CreateScope();
-
-        var context = scope.ServiceProvider.GetRequiredService<TContext>();
-
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-
-        var job = context.Set<Job>()
-            .Where(x => x.CurrentState == State.Enqueued)
-            .Where(x => x.ScheduleTime < DateTime.UtcNow)
-            .OrderBy(x => x.Priority)
-            .ThenBy(x => x.ScheduleTime)
-            .TagWith(InterceptorConstants.RowLockTableJob)
-            .FirstOrDefault();
-
-        // if we didn't find any messages then we wait, otherwise we query again immediately 
-        if (job == null)
-        {
-            await transaction.CommitAsync(cancellationToken);
-
-            return false;
-        }
-
-        _logger.LogInformation("Worker {workerId} fetched message {id}", _workerId, job.Id);
-
-        UpdateJobStatusToProcessing(context, job);
-
-        if (job.RecurringJobId.HasValue)
-        {
-            await CreateNextJob(context, job, cancellationToken);
-        }
-
-        // Saving the job in processing state so that it is marked as processing in the db.
-        await context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-
-        var isMultiHandlerRouting = false;
-
-        try
-        {
-            _logger.LogInformation("Worker {workerId} processing message {id}", _workerId, job.Id);
-            var hadNoHandler = job.HandlerType == null;
-            await ProcessOutboxMessage(context, job, cancellationToken);
-
-            // Detect multi-handler routing: HandlerType was null before and still null after
-            // (single-handler sets it during ProcessOutboxMessage, multi-handler doesn't)
-            isMultiHandlerRouting = hadNoHandler && job.HandlerType == null;
-
-            _logger.LogInformation("Worker {workerId} processed message {id}", _workerId, job.Id);
-
-            await using var endTransaction = await context.Database.BeginTransactionAsync(default);
-
-            await UpdateJobData(context, job, message: null, default);
-
-            await context.SaveChangesAsync(default);
-            await endTransaction.CommitAsync(default);
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Error processing message {id}", job.Id);
-            await using var endTransaction = await context.Database.BeginTransactionAsync(default);
-            await UpdateJobData(context, job, e.Message, default);
-
-            await context.SaveChangesAsync(default);
-            await endTransaction.CommitAsync(default);
-        }
-
-        // If this was a multi-handler routing job, immediately process one of the child jobs
-        if (isMultiHandlerRouting)
-        {
-            return await GetAndProcessJob(cancellationToken);
-        }
-
-        return true;
-    }
-
     private async Task CreateNextJob(TContext context, Job job, CancellationToken cancellationToken)
     {
-
         var recurringJob = await context.Set<RecurringJob>()
             .Where(x => x.Id == job.RecurringJobId)
             .FirstAsync(cancellationToken);
 
         if (recurringJob.NextJobId != job.Id)
-        {
             return;
-        }
 
         var fromUtc = DateTime.SpecifyKind(recurringJob.NextExecution ?? DateTime.UtcNow, DateTimeKind.Utc);
         var nextJobScheduleTime = CronExpression.Parse(recurringJob.Cron).GetNextOccurrence(fromUtc);
 
         var newJobState = JobHelper.CreateJobAndJobState(
-            message: recurringJob.Message, 
+            message: recurringJob.Message,
             type: recurringJob.Type,
             retries: 0,
             scheduleTime: nextJobScheduleTime,
-            maxRetries: 0, 
+            maxRetries: 0,
             priority: job.Priority,
             parentId: null,
-            recurringJobId: recurringJob.Id, 
+            recurringJobId: recurringJob.Id,
             state: State.Enqueued);
 
         recurringJob.LastExecution = recurringJob.NextExecution;
         recurringJob.LastJobId = recurringJob.NextJobId;
-
         recurringJob.NextExecution = nextJobScheduleTime;
 
         context.Set<JobState>().Add(newJobState);
         recurringJob.NextJobId = newJobState.Job.Id;
-
-    }
-
-    private async Task ProcessOutboxMessage(TContext context, Job job, CancellationToken cancellationToken)
-    {
-        var messageType = Type.GetType(job.Type);
-
-        if (messageType is null)
-        {
-            throw new JoblyException($"Unknown type {job.Type}");
-        }
-
-        var message = JsonSerializer.Deserialize(job.Message, messageType);
-
-        if (message is null)
-        {
-            throw new JoblyException($"Unable to deserialize message {job.Message} to type {job.Type}");
-        }
-
-        using var scope = _serviceScopeFactory.CreateScope();
-        var dispatcher = new JobDispatcher();
-
-        if (job.HandlerType != null)
-        {
-            // Phase 2: Execute — run specific handler through pipeline
-            var handlerType = Type.GetType(job.HandlerType);
-            if (handlerType is null)
-            {
-                throw new JoblyException($"Unknown handler type {job.HandlerType}");
-            }
-            await dispatcher.ExecuteHandler(message, messageType, handlerType, scope.ServiceProvider, cancellationToken);
-            return;
-        }
-
-        // Discover handlers for this message type
-        var handlerTypes = dispatcher.DiscoverHandlers(messageType, scope.ServiceProvider);
-
-        if (handlerTypes.Count == 0)
-        {
-            throw new JoblyException($"No handler registered for {messageType.Name}");
-        }
-
-        if (handlerTypes.Count == 1)
-        {
-            // Single handler: execute directly on this job (no fan-out)
-            job.HandlerType = handlerTypes[0].AssemblyQualifiedName;
-            await dispatcher.ExecuteHandler(message, messageType, handlerTypes[0], scope.ServiceProvider, cancellationToken);
-            return;
-        }
-
-        // Multiple handlers: fan out — create a child job per handler
-        foreach (var handlerType in handlerTypes)
-        {
-            var childJobState = JobHelper.CreateJobAndJobState(
-                message: job.Message,
-                type: job.Type,
-                retries: 0,
-                scheduleTime: null,
-                maxRetries: job.MaxRetries,
-                priority: job.Priority,
-                parentId: null,
-                state: State.Enqueued);
-
-            childJobState.Job.HandlerType = handlerType.AssemblyQualifiedName;
-
-            context.Set<JobState>().Add(childJobState);
-        }
-
-        await context.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task UpdateJobData(TContext context, Job job, string? message, CancellationToken cancellationToken)
@@ -244,7 +274,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         job.CurrentState = state;
         job.CurrentWorkerId = null;
-        
+
+        // Check for child job continuations
         var isParent = await context.Set<Job>()
             .Where(x => x.ParentJobId == job.Id)
             .AnyAsync(cancellationToken);
@@ -254,12 +285,34 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await UpdateChildJobs(context, job.Id, cancellationToken);
         }
 
+        // Check for batch completion
         if (job.BatchId != null)
         {
             await UpdateCurrentAndNextBatchFromChildJob(context, job.BatchId.Value, cancellationToken);
         }
 
+        // Check for message completion (all jobs for a message done)
+        if (job.MessageId != null && job.CurrentState == State.Completed)
+        {
+            await UpdateMessageJobCount(context, job.MessageId.Value, cancellationToken);
+        }
+
         await CreateJobState(context, job.Id, state, string.IsNullOrEmpty(message) ? $"Job {job.Id} is completed" : message, cancellationToken);
+    }
+
+    private static async Task UpdateMessageJobCount(TContext context, Guid messageId, CancellationToken cancellationToken)
+    {
+        var msg = await context.Set<Message>()
+            .Where(x => x.Id == messageId)
+            .FirstAsync(cancellationToken);
+
+        msg.JobCount--;
+
+        if (msg.JobCount <= 0)
+        {
+            msg.JobCount = 0;
+            msg.CurrentState = State.Completed;
+        }
     }
 
     private static async Task CreateJobState(TContext context, Guid jobId, State state, string? message, CancellationToken cancellationToken)
@@ -284,16 +337,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         foreach (var childJob in childJobs)
         {
-            // Check if this child job is a batch placeholder
             var batch = await context.Set<Batch>()
                 .Where(x => x.Id == childJob.Id)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (batch != null)
             {
-                // Batch placeholder: don't change its state (stays Awaiting until
-                // UpdateCurrentAndNextBatchFromChildJob sets it Completed when counter hits 0).
-                // Enqueue its batch work-item jobs directly.
                 var batchJobs = await context.Set<Job>()
                     .Where(x => x.BatchId == batch.Id)
                     .ToListAsync(cancellationToken);
@@ -317,19 +366,13 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             .TagWith(InterceptorConstants.RowLockTableBatch)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Check if this is a batch job
         if (currentBatch == null)
-        {
             return;
-        }
 
         currentBatch.Counter--;
 
-        // If all jobs in a single batch are finished
         if (currentBatch.Counter > 0)
-        {
             return;
-        }
 
         currentBatch.Counter = 0;
 
@@ -343,19 +386,13 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             .Where(x => x.ParentJobId == currentBatchJob.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Check if another parent job exists
-        // If yes, then start another batch jobs process
-        // if no, then no more jobs exists that need to be started (this is the last one)
         if (nextBatchJob == null)
-        {
             return;
-        }
 
         var nextBatch = await context.Set<Batch>()
             .Where(x => x.Id == nextBatchJob.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Check if this is another batch of jobs or...
         if (nextBatch != null)
         {
             var nextBatchJobs = await context.Set<Job>()
@@ -367,17 +404,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
                 batchJob.CurrentState = State.Enqueued;
             }
         }
-        // ...A single job
         else
         {
             nextBatchJob.CurrentState = State.Enqueued;
         }
-    }
-
-    private class JobData
-    {
-        public Job Job { get; init; } = null!;
-
-        public bool IsParent { get; init; }
     }
 }
