@@ -111,6 +111,12 @@ public static class JoblyEndpoints
             await joblyService.DeleteRecurringJob(id);
         });
 
+        apiGroup.MapGet("jobs/{jobId}/logs", async ([FromServices] IJoblyService joblyService, Guid jobId) =>
+        {
+            var job = await joblyService.GetJobById(jobId);
+            return job?.Logs ?? new List<JobLogModel>();
+        });
+
         // ==================== Servers ====================
 
         apiGroup.MapGet("servers", async ([FromServices] IJoblyService joblyService) =>

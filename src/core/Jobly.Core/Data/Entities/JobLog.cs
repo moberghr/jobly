@@ -1,0 +1,16 @@
+namespace Jobly.Core.Data.Entities;
+
+public class JobLog
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public Guid JobId { get; set; }
+
+    public DateTime Timestamp { get; set; }
+
+    public string Level { get; set; } = string.Empty;
+
+    public string Message { get; set; } = string.Empty;
+
+    public string? Exception { get; set; }
+}

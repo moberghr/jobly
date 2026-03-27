@@ -354,6 +354,44 @@ public class JoblyService<TContext> : IJoblyService
             })
             .ToListAsync();
 
+        job.Logs = await _context.Set<JobLog>()
+            .Where(x => x.JobId == jobId)
+            .OrderBy(x => x.Timestamp)
+            .Select(x => new JobLogModel
+            {
+                Id = x.Id,
+                Timestamp = x.Timestamp,
+                Level = x.Level,
+                Message = x.Message,
+                Exception = x.Exception
+            })
+            .ToListAsync();
+
+        // Sibling jobs (from same message)
+        if (job.MessageId != null)
+        {
+            job.SiblingJobs = await _context.Set<Job>()
+                .Where(x => x.MessageId == job.MessageId && x.Id != jobId)
+                .Select(x => new JobModel
+                {
+                    Id = x.Id, Type = x.Type, Message = x.Message,
+                    CreateTime = x.CreateTime, ScheduleTime = x.ScheduleTime,
+                    CurrentState = x.CurrentState
+                })
+                .ToListAsync();
+        }
+
+        // Child jobs (continuations)
+        job.ChildJobs = await _context.Set<Job>()
+            .Where(x => x.ParentJobId == jobId)
+            .Select(x => new JobModel
+            {
+                Id = x.Id, Type = x.Type, Message = x.Message,
+                CreateTime = x.CreateTime, ScheduleTime = x.ScheduleTime,
+                CurrentState = x.CurrentState
+            })
+            .ToListAsync();
+
         return job;
     }
 

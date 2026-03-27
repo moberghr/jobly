@@ -1,9 +1,10 @@
 ﻿using Jobly.Core;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Jobly.Core.Logging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Jobly.Worker;
 
@@ -71,6 +72,8 @@ public static class ServiceConfiguration
         where TContext : DbContext
     {
         services.AddJobly<TContext>();
+
+        services.AddLogging(builder => builder.AddProvider(new JobLoggerProvider()));
 
         services.AddHostedService<JoblyWorkerSetup<TContext>>();
         services.AddHostedService<JoblyHealthManager<TContext>>();

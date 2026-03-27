@@ -6,6 +6,7 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
+using Jobly.Core.Logging;
 using Jobly.Core.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -151,6 +152,10 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
+        // Set up log capture for this job execution
+        var logCollector = new JobLogCollector { JobId = job.Id };
+        JobLogContext.Current = logCollector;
+
         try
         {
             _logger.LogInformation("Worker {workerId} executing job {id}", _workerId, job.Id);
@@ -159,6 +164,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
             await UpdateJobData(context, job, message: null, default);
+            await SaveJobLogs(context, logCollector);
             await context.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
         }
@@ -167,8 +173,13 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             _logger.LogError(e, "Error executing job {id}", job.Id);
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
             await UpdateJobData(context, job, e.Message, default);
+            await SaveJobLogs(context, logCollector);
             await context.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
+        }
+        finally
+        {
+            JobLogContext.Current = null;
         }
 
         return true;
@@ -314,6 +325,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             msg.JobCount = 0;
             msg.CurrentState = State.Completed;
         }
+    }
+
+    private static async Task SaveJobLogs(TContext context, JobLogCollector collector)
+    {
+        if (collector.Entries.Count == 0) return;
+        await context.Set<JobLog>().AddRangeAsync(collector.Entries);
     }
 
     private static async Task CreateJobState(TContext context, Guid jobId, State state, string? message, CancellationToken cancellationToken)

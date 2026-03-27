@@ -119,6 +119,7 @@ public static class ServiceConfiguration
         AddServerEntity(modelBuilder);
         AddWorkerEntity(modelBuilder);
         AddMessageEntity(modelBuilder);
+        AddJobLogEntity(modelBuilder);
     }
 
     private static void AddJobEntity(ModelBuilder modelBuilder)
@@ -271,5 +272,22 @@ public static class ServiceConfiguration
         message.Property(p => p.JobCount);
 
         message.HasIndex(p => new { p.CurrentState, p.Priority });
+    }
+
+    private static void AddJobLogEntity(ModelBuilder modelBuilder)
+    {
+        var jobLog = modelBuilder.Entity<JobLog>();
+        jobLog.ToTable(nameof(JobLog));
+
+        jobLog.Property(p => p.Id);
+        jobLog.HasKey(p => p.Id);
+
+        jobLog.Property(p => p.JobId);
+        jobLog.Property(p => p.Timestamp);
+        jobLog.Property(p => p.Level);
+        jobLog.Property(p => p.Message);
+        jobLog.Property(p => p.Exception);
+
+        jobLog.HasIndex(p => p.JobId);
     }
 }
