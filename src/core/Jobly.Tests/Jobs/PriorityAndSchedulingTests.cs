@@ -102,4 +102,53 @@ public abstract partial class JoblyTests : TestBase
         lowPastJob.CurrentState.ShouldBe(State.Completed);
         criticalFutureJob.CurrentState.ShouldBe(State.Enqueued);
     }
+
+    [Fact]
+    public async Task GivenJobInUnsubscribedQueue_WhenProcessed_ThenJobIsNotPickedUp()
+    {
+        var context = CreateContext();
+        var publisher = TestUtils.CreatePublisher(context);
+
+        // "zzz-unsubscribed" is not in the worker's Queues config
+        var jobId = await publisher.Enqueue(new UnitRequest(), "zzz-unsubscribed");
+        await context.SaveChangesAsync();
+
+        var result = await TryProcessJob();
+        result.ShouldBeFalse();
+
+        var job = await GetJob(jobId);
+        job.CurrentState.ShouldBe(State.Enqueued);
+    }
+
+    [Fact]
+    public async Task GivenJobDefaultQueue_WhenProcessed_ThenJobIsPickedUp()
+    {
+        var context = CreateContext();
+        var publisher = TestUtils.CreatePublisher(context);
+
+        // "default" is in the worker's Queues config
+        var jobId = await publisher.Enqueue(new UnitRequest());
+        await context.SaveChangesAsync();
+
+        await ProcessJob();
+
+        var job = await GetJob(jobId);
+        job.CurrentState.ShouldBe(State.Completed);
+    }
+
+    [Fact]
+    public async Task GivenMessageInQueue_WhenRouted_ThenJobsInheritQueue()
+    {
+        var context = CreateContext();
+        var publisher = TestUtils.CreatePublisher(context);
+
+        var messageId = await publisher.Publish(new SingleHandlerMessage(), "a-critical");
+        await context.SaveChangesAsync();
+
+        await ProcessJob();
+
+        var jobs = await GetJobsForMessage(messageId);
+        jobs.Count.ShouldBe(1);
+        jobs[0].Queue.ShouldBe("a-critical");
+    }
 }
