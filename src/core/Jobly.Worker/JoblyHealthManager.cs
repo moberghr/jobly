@@ -113,16 +113,27 @@ public class JoblyHealthManager<TContext> : BackgroundService
     
     private async Task CleanupExpiredJobs(TContext context)
     {
-        // Get expired job IDs
+        var count = await RunCleanup(context, _configuration.ExpirationBatchSize);
+        if (count > 0)
+        {
+            _logger.LogInformation("Cleaned up {count} expired jobs", count);
+        }
+    }
+
+    /// <summary>
+    /// Deletes expired jobs, their logs/states, and expired messages.
+    /// Returns the number of jobs deleted. Public static so tests can call it directly.
+    /// </summary>
+    public static async Task<int> RunCleanup<TCtx>(TCtx context, int batchSize = 1000) where TCtx : DbContext
+    {
         var expiredJobIds = await context.Set<Job>()
             .Where(x => x.ExpireAt != null && x.ExpireAt < DateTime.UtcNow)
             .Select(x => x.Id)
-            .Take(_configuration.ExpirationBatchSize)
+            .Take(batchSize)
             .ToListAsync();
 
-        if (expiredJobIds.Count == 0) return;
+        if (expiredJobIds.Count == 0) return 0;
 
-        // Delete logs, states, then jobs (respecting FK order)
         await context.Set<JobLog>()
             .Where(x => expiredJobIds.Contains(x.JobId))
             .ExecuteDeleteAsync();
@@ -135,13 +146,12 @@ public class JoblyHealthManager<TContext> : BackgroundService
             .Where(x => expiredJobIds.Contains(x.Id))
             .ExecuteDeleteAsync();
 
-        // Cleanup expired messages
         await context.Set<Message>()
             .Where(x => x.ExpireAt != null && x.ExpireAt < DateTime.UtcNow)
-            .Take(_configuration.ExpirationBatchSize)
+            .Take(batchSize)
             .ExecuteDeleteAsync();
 
-        _logger.LogInformation("Cleaned up {count} expired jobs", expiredJobIds.Count);
+        return expiredJobIds.Count;
     }
 
     private async Task RemoveServer()
