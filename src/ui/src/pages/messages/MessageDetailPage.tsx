@@ -5,18 +5,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { StateBadge } from '@/components/StateBadge';
 import { PriorityBadge } from '@/components/PriorityBadge';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
+import { LoadingState, ErrorState } from '@/components/PageState';
 import type { MessageDetailModel } from '@/types';
 import * as api from '@/api';
 
 export default function MessageDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [message, setMessage] = useState<MessageDetailModel | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (id) api.getMessageById(id).then(setMessage);
+    if (id) api.getMessageById(id).then(setMessage).catch(() => setError('Unable to load message details'));
   }, [id]);
 
-  if (!message) return <div className="text-muted-foreground">Loading...</div>;
+  if (error) return <ErrorState message={error} />;
+  if (!message) return <LoadingState />;
 
   return (
     <div className="max-w-4xl">

@@ -3,21 +3,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/Pagination';
 import { formatRelativeTime } from '@/utils/format';
+import { LoadingState, ErrorState } from '@/components/PageState';
 import type { RecurringJobModel, PagedList } from '@/types';
 import * as api from '@/api';
 
 export default function RecurringPage() {
   const [data, setData] = useState<PagedList<RecurringJobModel> | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
   const fetchData = useCallback(async () => {
-    const result = await api.getRecurringJobs(page, 20);
-    setData(result);
+    try {
+      const result = await api.getRecurringJobs(page, 20);
+      setData(result);
+      setError(null);
+    } catch {
+      setError('Unable to load recurring jobs');
+    }
   }, [page]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  if (!data) return <div className="text-muted-foreground">Loading...</div>;
+  if (error) return <ErrorState message={error} />;
+  if (!data) return <LoadingState />;
 
   return (
     <div>

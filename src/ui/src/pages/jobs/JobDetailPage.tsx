@@ -4,18 +4,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StateBadge } from '@/components/StateBadge';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
+import { LoadingState, ErrorState } from '@/components/PageState';
 import type { JobDetailModel } from '@/types';
 import * as api from '@/api';
 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [job, setJob] = useState<JobDetailModel | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (id) api.getJobById(id).then(setJob);
+    if (id) api.getJobById(id).then(setJob).catch(() => setError('Unable to load job details'));
   }, [id]);
 
-  if (!job) return <div className="text-muted-foreground">Loading...</div>;
+  if (error) return <ErrorState message={error} />;
+  if (!job) return <LoadingState />;
 
   return (
     <div className="max-w-4xl">

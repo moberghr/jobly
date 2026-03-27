@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { StateBadge } from '@/components/StateBadge';
 import { Pagination } from '@/components/Pagination';
 import { shortType, formatRelativeTime, shortId } from '@/utils/format';
+import { LoadingState, ErrorState } from '@/components/PageState';
 import type { JobModel, PagedList } from '@/types';
 import * as api from '@/api';
 
@@ -20,14 +21,20 @@ const stateEndpoints: Record<string, (page: number, pageSize: number) => Promise
 export default function JobListPage() {
   const { state } = useParams<{ state: string }>();
   const [data, setData] = useState<PagedList<JobModel> | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
   const fetchData = useCallback(async () => {
     const fetcher = stateEndpoints[state ?? 'enqueued'];
     if (!fetcher) return;
-    const result = await fetcher(page, pageSize);
-    setData(result);
+    try {
+      const result = await fetcher(page, pageSize);
+      setData(result);
+      setError(null);
+    } catch {
+      setError('Unable to load jobs');
+    }
   }, [state, page]);
 
   useEffect(() => {
@@ -38,7 +45,8 @@ export default function JobListPage() {
     fetchData();
   }, [fetchData]);
 
-  if (!data) return <div className="text-muted-foreground">Loading...</div>;
+  if (error) return <ErrorState message={error} />;
+  if (!data) return <LoadingState />;
 
   const title = (state ?? 'enqueued').charAt(0).toUpperCase() + (state ?? 'enqueued').slice(1);
 

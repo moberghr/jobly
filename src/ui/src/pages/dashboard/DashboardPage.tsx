@@ -1,5 +1,6 @@
 import { useDashboardStore } from '@/stores/dashboard';
 import { MetricCard } from '@/components/MetricCard';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Briefcase,
   CheckCircle,
@@ -9,13 +10,39 @@ import {
   Mail,
   Loader,
   Hourglass,
+  AlertTriangle,
 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { stats } = useDashboardStore();
+  const { stats, error } = useDashboardStore();
+
+  if (error) {
+    return (
+      <div>
+        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <AlertTriangle className="h-10 w-10 text-destructive mx-auto mb-3" />
+            <p className="text-lg font-medium">{error}</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Make sure the Jobly backend is running and accessible.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!stats) {
-    return <div className="text-muted-foreground">Loading...</div>;
+    return (
+      <div>
+        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader className="h-4 w-4 animate-spin" />
+          <span>Connecting to Jobly...</span>
+        </div>
+      </div>
+    );
   }
 
   return (

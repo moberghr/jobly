@@ -5,21 +5,29 @@ import { StateBadge } from '@/components/StateBadge';
 import { PriorityBadge } from '@/components/PriorityBadge';
 import { Pagination } from '@/components/Pagination';
 import { shortType, formatRelativeTime, shortId } from '@/utils/format';
+import { LoadingState, ErrorState } from '@/components/PageState';
 import type { MessageModel, PagedList } from '@/types';
 import * as api from '@/api';
 
 export default function MessagesPage() {
   const [data, setData] = useState<PagedList<MessageModel> | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
   const fetchData = useCallback(async () => {
-    const result = await api.getMessages(page, 20);
-    setData(result);
+    try {
+      const result = await api.getMessages(page, 20);
+      setData(result);
+      setError(null);
+    } catch {
+      setError('Unable to load messages');
+    }
   }, [page]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  if (!data) return <div className="text-muted-foreground">Loading...</div>;
+  if (error) return <ErrorState message={error} />;
+  if (!data) return <LoadingState />;
 
   return (
     <div>

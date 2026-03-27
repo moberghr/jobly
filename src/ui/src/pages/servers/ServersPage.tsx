@@ -3,15 +3,20 @@ import { Link } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatRelativeTime, shortId } from '@/utils/format';
+import { LoadingState, ErrorState } from '@/components/PageState';
 import type { ServerModel } from '@/types';
 import * as api from '@/api';
 
 export default function ServersPage() {
-  const [servers, setServers] = useState<ServerModel[]>([]);
+  const [servers, setServers] = useState<ServerModel[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.getServers().then(setServers);
+    api.getServers().then(setServers).catch(() => setError('Unable to load servers'));
   }, []);
+
+  if (error) return <ErrorState message={error} />;
+  if (!servers) return <LoadingState />;
 
   return (
     <div>

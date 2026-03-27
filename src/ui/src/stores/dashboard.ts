@@ -5,19 +5,20 @@ import { getStatus } from '@/api';
 interface DashboardStore {
   stats: DashboardStatistics | null;
   loading: boolean;
+  error: string | null;
   fetchStats: () => Promise<void>;
 }
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
   stats: null,
   loading: false,
+  error: null,
   fetchStats: async () => {
-    set({ loading: true });
     try {
       const stats = await getStatus();
-      set({ stats, loading: false });
+      set({ stats, loading: false, error: null });
     } catch {
-      set({ loading: false });
+      set({ loading: false, error: 'Unable to connect to Jobly API' });
     }
   },
 }));
