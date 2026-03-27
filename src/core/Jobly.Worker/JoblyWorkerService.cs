@@ -56,6 +56,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             .Where(x => x.CurrentState == State.Enqueued)
             .OrderBy(x => x.Priority)
             .ThenBy(x => x.CreateTime)
+            .TagWith(InterceptorConstants.RowLockTableMessage)
             .FirstOrDefault();
 
         if (message == null)

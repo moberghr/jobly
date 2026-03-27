@@ -228,6 +228,25 @@ public abstract class TestBase
         await worker.GetAndProcessJob(CancellationToken.None);
     }
 
+    protected async Task ProcessAllJobs(int workerCount = 1)
+    {
+        await EnsureServerRegistered();
+
+        var tasks = new List<Task>();
+        for (var i = 0; i < workerCount; i++)
+        {
+            tasks.Add(Task.Run(async () =>
+            {
+                var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactory);
+                while (await worker.GetAndProcessJob(CancellationToken.None))
+                {
+                    // keep processing until no more work
+                }
+            }));
+        }
+        await Task.WhenAll(tasks);
+    }
+
     protected async Task<bool> TryProcessJob()
     {
         await EnsureServerRegistered();
