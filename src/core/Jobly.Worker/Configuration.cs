@@ -24,4 +24,7 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     public Guid ServerId = Guid.NewGuid();
 
     public string[] Queues { get; set; } = new[] { "default" };
+
+    public TimeSpan JobExpirationTimeout { get; set; } = TimeSpan.FromDays(1);
+    public int ExpirationBatchSize { get; set; } = 1000;
 }

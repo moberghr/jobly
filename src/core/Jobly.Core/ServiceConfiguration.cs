@@ -120,6 +120,7 @@ public static class ServiceConfiguration
         AddWorkerEntity(modelBuilder);
         AddMessageEntity(modelBuilder);
         AddJobLogEntity(modelBuilder);
+        AddStatisticEntity(modelBuilder);
     }
 
     private static void AddJobEntity(ModelBuilder modelBuilder)
@@ -141,6 +142,9 @@ public static class ServiceConfiguration
         job.Property(p => p.ParentJobId);
         job.Property(p => p.HandlerType);
         job.Property(p => p.MessageId);
+        job.Property(p => p.ExpireAt);
+
+        job.HasIndex(p => p.ExpireAt);
 
         job.HasOne(p => p.MessageEntity)
             .WithMany()
@@ -270,8 +274,10 @@ public static class ServiceConfiguration
         message.Property(p => p.CreateTime);
         message.Property(p => p.CurrentState);
         message.Property(p => p.JobCount);
+        message.Property(p => p.ExpireAt);
 
         message.HasIndex(p => new { p.CurrentState, p.Queue });
+        message.HasIndex(p => p.ExpireAt);
     }
 
     private static void AddJobLogEntity(ModelBuilder modelBuilder)
@@ -289,5 +295,22 @@ public static class ServiceConfiguration
         jobLog.Property(p => p.Exception);
 
         jobLog.HasIndex(p => p.JobId);
+    }
+
+    private static void AddStatisticEntity(ModelBuilder modelBuilder)
+    {
+        var stat = modelBuilder.Entity<Statistic>();
+        stat.ToTable(nameof(Statistic));
+
+        stat.Property(p => p.Key);
+        stat.HasKey(p => p.Key);
+        stat.Property(p => p.Value);
+
+        stat.HasData(
+            new Statistic { Key = "stats:succeeded", Value = 0 },
+            new Statistic { Key = "stats:failed", Value = 0 },
+            new Statistic { Key = "stats:deleted", Value = 0 },
+            new Statistic { Key = "stats:created", Value = 0 }
+        );
     }
 }

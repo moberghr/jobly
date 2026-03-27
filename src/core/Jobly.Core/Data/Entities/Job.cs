@@ -48,4 +48,6 @@ public class Job
     public Guid? MessageId { get; set; }
 
     public Message? MessageEntity { get; set; }
+
+    public DateTime? ExpireAt { get; set; }
 }

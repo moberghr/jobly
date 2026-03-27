@@ -19,6 +19,10 @@ export interface DashboardStatistics {
   servers: number;
   awaiting: number;
   messages: number;
+  totalSucceeded: number;
+  totalFailed: number;
+  totalDeleted: number;
+  totalCreated: number;
 }
 
 export interface JobModel {

@@ -21,4 +21,9 @@ public class DashboardStatistics
     public int Awaiting { get; set; }
 
     public int Messages { get; set; }
+
+    public long TotalSucceeded { get; set; }
+    public long TotalFailed { get; set; }
+    public long TotalDeleted { get; set; }
+    public long TotalCreated { get; set; }
 }

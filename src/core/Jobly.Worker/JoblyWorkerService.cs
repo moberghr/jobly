@@ -109,6 +109,10 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         message.JobCount = handlerTypes.Count;
         message.CurrentState = State.Processing;
 
+        await context.Set<Statistic>()
+            .Where(x => x.Key == "stats:created")
+            .ExecuteUpdateAsync(x => x.SetProperty(p => p.Value, p => p.Value + handlerTypes.Count));
+
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
@@ -289,6 +293,18 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         job.CurrentState = state;
         job.CurrentWorkerId = null;
 
+        // Set expiration and increment statistics
+        if (state == State.Completed)
+        {
+            job.ExpireAt = DateTime.UtcNow.AddDays(1);
+            await IncrementStatistic(context, "stats:succeeded");
+        }
+        else if (state == State.Failed && job.RetriedTimes >= job.MaxRetries)
+        {
+            // Only count as failed when retries are exhausted (not on re-enqueue)
+            await IncrementStatistic(context, "stats:failed");
+        }
+
         // Check for child job continuations
         var isParent = await context.Set<Job>()
             .Where(x => x.ParentJobId == job.Id)
@@ -326,6 +342,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         {
             msg.JobCount = 0;
             msg.CurrentState = State.Completed;
+            msg.ExpireAt = DateTime.UtcNow.AddDays(1);
         }
     }
 
@@ -428,5 +445,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         {
             nextBatchJob.CurrentState = State.Enqueued;
         }
+    }
+
+    private static async Task IncrementStatistic(TContext context, string key)
+    {
+        await context.Set<Statistic>()
+            .Where(x => x.Key == key)
+            .ExecuteUpdateAsync(x => x.SetProperty(p => p.Value, p => p.Value + 1));
     }
 }

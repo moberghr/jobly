@@ -48,15 +48,25 @@ export default function DashboardPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Live counts */}
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">Current</h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <MetricCard label="Enqueued" value={stats.created} icon={<Briefcase className="h-5 w-5" />} />
         <MetricCard label="Processing" value={stats.processing} icon={<Loader className="h-5 w-5" />} color="text-purple-600" />
-        <MetricCard label="Completed" value={stats.completed} icon={<CheckCircle className="h-5 w-5" />} color="text-green-600" />
-        <MetricCard label="Failed" value={stats.failed} icon={<XCircle className="h-5 w-5" />} color="text-red-600" />
         <MetricCard label="Scheduled" value={stats.scheduled} icon={<Clock className="h-5 w-5" />} />
         <MetricCard label="Awaiting" value={stats.awaiting} icon={<Hourglass className="h-5 w-5" />} />
+        <MetricCard label="Failed" value={stats.failed} icon={<XCircle className="h-5 w-5" />} color="text-red-600" />
         <MetricCard label="Messages" value={stats.messages} icon={<Mail className="h-5 w-5" />} />
         <MetricCard label="Servers" value={stats.servers} icon={<Server className="h-5 w-5" />} />
+      </div>
+
+      {/* Historical totals (survive job deletion) */}
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">Historical</h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <MetricCard label="Total Created" value={stats.totalCreated} icon={<Briefcase className="h-5 w-5" />} />
+        <MetricCard label="Total Succeeded" value={stats.totalSucceeded} icon={<CheckCircle className="h-5 w-5" />} color="text-green-600" />
+        <MetricCard label="Total Failed" value={stats.totalFailed} icon={<XCircle className="h-5 w-5" />} color="text-red-600" />
+        <MetricCard label="Total Deleted" value={stats.totalDeleted} icon={<Briefcase className="h-5 w-5" />} />
       </div>
     </div>
   );

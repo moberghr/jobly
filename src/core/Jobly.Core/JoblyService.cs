@@ -106,6 +106,23 @@ public class JoblyService<TContext> : IJoblyService
         var awaiting = await GetJobsCount(State.Awaiting);
         var messages = await _context.Set<Message>().CountAsync();
 
+        var totalSucceeded = await _context.Set<Statistic>()
+            .Where(x => x.Key == "stats:succeeded")
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync();
+        var totalFailed = await _context.Set<Statistic>()
+            .Where(x => x.Key == "stats:failed")
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync();
+        var totalDeleted = await _context.Set<Statistic>()
+            .Where(x => x.Key == "stats:deleted")
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync();
+        var totalCreated = await _context.Set<Statistic>()
+            .Where(x => x.Key == "stats:created")
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync();
+
         var model = new DashboardStatistics
         {
             Total = total,
@@ -117,7 +134,11 @@ public class JoblyService<TContext> : IJoblyService
             Processing = processing,
             Servers = servers,
             Awaiting = awaiting,
-            Messages = messages
+            Messages = messages,
+            TotalSucceeded = totalSucceeded,
+            TotalFailed = totalFailed,
+            TotalDeleted = totalDeleted,
+            TotalCreated = totalCreated
         };
 
         return model;
@@ -401,6 +422,11 @@ public class JoblyService<TContext> : IJoblyService
         if (job == null) throw new ArgumentException("Job not found.");
 
         job.CurrentState = State.Deleted;
+        job.ExpireAt = DateTime.UtcNow.AddDays(1);
+
+        await _context.Set<Statistic>()
+            .Where(x => x.Key == "stats:deleted")
+            .ExecuteUpdateAsync(x => x.SetProperty(p => p.Value, p => p.Value + 1));
 
         var jobState = new JobState
         {

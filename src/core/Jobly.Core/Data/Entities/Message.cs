@@ -17,4 +17,6 @@ public class Message
     public State CurrentState { get; set; }
 
     public int JobCount { get; set; }
+
+    public DateTime? ExpireAt { get; set; }
 }

@@ -41,6 +41,7 @@ public class JoblyHealthManager<TContext> : BackgroundService
             var context = scope.ServiceProvider.GetRequiredService<TContext>();
             await UpdateHeartbeat(context);
             await CleanUpServers(context);
+            await CleanupExpiredJobs(context);
 
             await Task.Delay(_configuration.HealthCheckInterval, stoppingToken);
         }
@@ -110,6 +111,39 @@ public class JoblyHealthManager<TContext> : BackgroundService
         await transaction.CommitAsync();
     }
     
+    private async Task CleanupExpiredJobs(TContext context)
+    {
+        // Get expired job IDs
+        var expiredJobIds = await context.Set<Job>()
+            .Where(x => x.ExpireAt != null && x.ExpireAt < DateTime.UtcNow)
+            .Select(x => x.Id)
+            .Take(_configuration.ExpirationBatchSize)
+            .ToListAsync();
+
+        if (expiredJobIds.Count == 0) return;
+
+        // Delete logs, states, then jobs (respecting FK order)
+        await context.Set<JobLog>()
+            .Where(x => expiredJobIds.Contains(x.JobId))
+            .ExecuteDeleteAsync();
+
+        await context.Set<JobState>()
+            .Where(x => expiredJobIds.Contains(x.JobId))
+            .ExecuteDeleteAsync();
+
+        await context.Set<Job>()
+            .Where(x => expiredJobIds.Contains(x.Id))
+            .ExecuteDeleteAsync();
+
+        // Cleanup expired messages
+        await context.Set<Message>()
+            .Where(x => x.ExpireAt != null && x.ExpireAt < DateTime.UtcNow)
+            .Take(_configuration.ExpirationBatchSize)
+            .ExecuteDeleteAsync();
+
+        _logger.LogInformation("Cleaned up {count} expired jobs", expiredJobIds.Count);
+    }
+
     private async Task RemoveServer()
     {
         using var scope = _serviceScopeFactory.CreateScope();
