@@ -3,7 +3,6 @@ import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StateBadge } from '@/components/StateBadge';
-import { PriorityBadge } from '@/components/PriorityBadge';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import type { MessageDetailModel } from '@/types';
@@ -26,7 +25,7 @@ export default function MessageDetailPage() {
       <div className="flex items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Message {shortId(message.id)}</h1>
         <StateBadge state={message.currentState} />
-        <PriorityBadge priority={message.priority} />
+        <span className="text-sm text-muted-foreground">Queue: {message.queue}</span>
       </div>
 
       <Card className="mb-6">

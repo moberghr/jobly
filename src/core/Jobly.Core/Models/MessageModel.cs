@@ -10,7 +10,7 @@ public class MessageModel
 
     public string Payload { get; set; } = string.Empty;
 
-    public Priority Priority { get; set; }
+    public string Queue { get; set; } = "default";
 
     public State CurrentState { get; set; }
 

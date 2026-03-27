@@ -93,19 +93,19 @@ public abstract partial class JoblyTests : TestBase
     }
 
     [Fact]
-    public async Task GivenMessageWithPriority_WhenRouted_ThenJobsInheritPriority()
+    public async Task GivenMessageWithQueue_WhenRouted_ThenJobsInheritQueue()
     {
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
-        var messageId = await publisher.Publish(new SingleHandlerMessage(), Priority.Urgent);
+        var messageId = await publisher.Publish(new SingleHandlerMessage(), "a-critical");
         await context.SaveChangesAsync();
 
         await ProcessJob();
 
         var jobs = await GetJobsForMessage(messageId);
         jobs.Count.ShouldBe(1);
-        jobs[0].Priority.ShouldBe(Priority.Urgent);
+        jobs[0].Queue.ShouldBe("a-critical");
     }
 
     // ==================== IJob Direct Execution ====================

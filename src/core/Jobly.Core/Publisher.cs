@@ -13,27 +13,27 @@ public interface IPublisher
 {
     // Queue: create Message (IMessage), immediate routing by worker
     Task<Guid> Publish<T>(T message) where T : class, IMessage;
-    Task<Guid> Publish<T>(T message, Priority priority) where T : class, IMessage;
+    Task<Guid> Publish<T>(T message, string? queue) where T : class, IMessage;
 
     // Orchestration: create Job directly (IJob)
     Task<Guid> Enqueue<T>(T job) where T : class, IJob;
-    Task<Guid> Enqueue<T>(T job, Priority priority) where T : class, IJob;
+    Task<Guid> Enqueue<T>(T job, string? queue) where T : class, IJob;
     Task<Guid> Enqueue<T>(T job, int maxRetries) where T : class, IJob;
-    Task<Guid> Enqueue<T>(T job, int maxRetries, Priority priority) where T : class, IJob;
+    Task<Guid> Enqueue<T>(T job, int maxRetries, string? queue) where T : class, IJob;
     Task<Guid> Enqueue<T>(T job, Guid parentJobId) where T : class, IJob;
-    Task<Guid> Enqueue<T>(T job, Guid parentJobId, Priority priority) where T : class, IJob;
+    Task<Guid> Enqueue<T>(T job, Guid parentJobId, string? queue) where T : class, IJob;
     Task<Guid> Enqueue<T>(T job, int maxRetries, Guid parentJobId) where T : class, IJob;
-    Task<Guid> Enqueue<T>(T job, int maxRetries, Guid parentJobId, Priority priority) where T : class, IJob;
+    Task<Guid> Enqueue<T>(T job, int maxRetries, Guid parentJobId, string? queue) where T : class, IJob;
     Task<Guid> Enqueue<T>(T job, JobParameters jobParameters) where T : class, IJob;
 
     Task<Guid> Schedule<T>(T job, DateTime scheduleTime) where T : class, IJob;
-    Task<Guid> Schedule<T>(T job, DateTime scheduleTime, Priority priority) where T : class, IJob;
+    Task<Guid> Schedule<T>(T job, DateTime scheduleTime, string? queue) where T : class, IJob;
     Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries) where T : class, IJob;
-    Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, Priority priority) where T : class, IJob;
+    Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, string? queue) where T : class, IJob;
     Task<Guid> Schedule<T>(T job, DateTime scheduleTime, Guid parentJobId) where T : class, IJob;
-    Task<Guid> Schedule<T>(T job, DateTime scheduleTime, Guid parentJobId, Priority priority) where T : class, IJob;
+    Task<Guid> Schedule<T>(T job, DateTime scheduleTime, Guid parentJobId, string? queue) where T : class, IJob;
     Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, Guid parentJobId) where T : class, IJob;
-    Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, Guid parentJobId, Priority priority) where T : class, IJob;
+    Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, Guid parentJobId, string? queue) where T : class, IJob;
 }
 
 public class Publisher<TContext> : IPublisher
@@ -52,21 +52,21 @@ public class Publisher<TContext> : IPublisher
 
     public async Task<Guid> Publish<T>(T message) where T : class, IMessage
     {
-        return await CreateMessage(message, Priority.Normal);
+        return await CreateMessage(message);
     }
 
-    public async Task<Guid> Publish<T>(T message, Priority priority) where T : class, IMessage
+    public async Task<Guid> Publish<T>(T message, string? queue) where T : class, IMessage
     {
-        return await CreateMessage(message, priority);
+        return await CreateMessage(message, queue);
     }
 
-    private async Task<Guid> CreateMessage<T>(T message, Priority priority) where T : class, IMessage
+    private async Task<Guid> CreateMessage<T>(T message, string? queue = null) where T : class, IMessage
     {
         var msg = new Message
         {
             Type = message.GetType().AssemblyQualifiedName!,
             Payload = JsonSerializer.Serialize(message),
-            Priority = priority,
+            Queue = queue ?? "default",
             CreateTime = DateTime.UtcNow,
             CurrentState = State.Enqueued,
             JobCount = 0
@@ -82,59 +82,59 @@ public class Publisher<TContext> : IPublisher
     public async Task<Guid> Enqueue<T>(T job) where T : class, IJob
         => await CreateJob(job, null, null, null, null);
 
-    public async Task<Guid> Enqueue<T>(T job, Priority priority) where T : class, IJob
-        => await CreateJob(job, null, null, priority, null);
+    public async Task<Guid> Enqueue<T>(T job, string? queue) where T : class, IJob
+        => await CreateJob(job, null, null, queue, null);
 
     public async Task<Guid> Enqueue<T>(T job, int maxRetries) where T : class, IJob
         => await CreateJob(job, null, maxRetries, null, null);
 
-    public async Task<Guid> Enqueue<T>(T job, int maxRetries, Priority priority) where T : class, IJob
-        => await CreateJob(job, null, maxRetries, priority, null);
+    public async Task<Guid> Enqueue<T>(T job, int maxRetries, string? queue) where T : class, IJob
+        => await CreateJob(job, null, maxRetries, queue, null);
 
     public async Task<Guid> Enqueue<T>(T job, Guid parentJobId) where T : class, IJob
         => await CreateJob(job, null, null, null, parentJobId);
 
-    public async Task<Guid> Enqueue<T>(T job, Guid parentJobId, Priority priority) where T : class, IJob
-        => await CreateJob(job, null, null, priority, parentJobId);
+    public async Task<Guid> Enqueue<T>(T job, Guid parentJobId, string? queue) where T : class, IJob
+        => await CreateJob(job, null, null, queue, parentJobId);
 
     public async Task<Guid> Enqueue<T>(T job, int maxRetries, Guid parentJobId) where T : class, IJob
         => await CreateJob(job, null, maxRetries, null, parentJobId);
 
-    public async Task<Guid> Enqueue<T>(T job, int maxRetries, Guid parentJobId, Priority priority) where T : class, IJob
-        => await CreateJob(job, null, maxRetries, priority, parentJobId);
+    public async Task<Guid> Enqueue<T>(T job, int maxRetries, Guid parentJobId, string? queue) where T : class, IJob
+        => await CreateJob(job, null, maxRetries, queue, parentJobId);
 
     public async Task<Guid> Enqueue<T>(T job, JobParameters jobParameters) where T : class, IJob
-        => await CreateJob(job, jobParameters.ScheduleTime, jobParameters.MaxRetries, jobParameters.Priority, jobParameters.ParentId);
+        => await CreateJob(job, jobParameters.ScheduleTime, jobParameters.MaxRetries, jobParameters.Queue, jobParameters.ParentId);
 
     public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime) where T : class, IJob
         => await CreateJob(job, scheduleTime, null, null, null);
 
-    public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, Priority priority) where T : class, IJob
-        => await CreateJob(job, scheduleTime, null, priority, null);
+    public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, string? queue) where T : class, IJob
+        => await CreateJob(job, scheduleTime, null, queue, null);
 
     public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries) where T : class, IJob
         => await CreateJob(job, scheduleTime, maxRetries, null, null);
 
-    public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, Priority priority) where T : class, IJob
-        => await CreateJob(job, scheduleTime, maxRetries, priority, null);
+    public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, string? queue) where T : class, IJob
+        => await CreateJob(job, scheduleTime, maxRetries, queue, null);
 
     public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, Guid parentJobId) where T : class, IJob
         => await CreateJob(job, scheduleTime, null, null, parentJobId);
 
-    public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, Guid parentJobId, Priority priority) where T : class, IJob
-        => await CreateJob(job, scheduleTime, null, priority, parentJobId);
+    public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, Guid parentJobId, string? queue) where T : class, IJob
+        => await CreateJob(job, scheduleTime, null, queue, parentJobId);
 
     public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, Guid parentJobId) where T : class, IJob
         => await CreateJob(job, scheduleTime, maxRetries, null, parentJobId);
 
-    public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, Guid parentJobId, Priority priority) where T : class, IJob
-        => await CreateJob(job, scheduleTime, maxRetries, priority, parentJobId);
+    public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, Guid parentJobId, string? queue) where T : class, IJob
+        => await CreateJob(job, scheduleTime, maxRetries, queue, parentJobId);
 
     private async Task<Guid> CreateJob<T>(T job, DateTime? scheduleTime, int? maxRetries,
-        Priority? priority, Guid? parentId) where T : class, IJob
+        string? queue, Guid? parentId) where T : class, IJob
     {
         var jobState = JobHelper.CreateJobAndJobState(job, _configuration.RetryCount, scheduleTime,
-            maxRetries, priority, parentId, null);
+            maxRetries, queue, parentId, null);
 
         await _context.Set<JobState>().AddAsync(jobState);
 

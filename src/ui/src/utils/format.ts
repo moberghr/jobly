@@ -1,5 +1,5 @@
 import { formatDistanceToNow, format } from 'date-fns';
-import { State, Priority } from '@/types';
+import { State } from '@/types';
 
 export function formatRelativeTime(dateString: string): string {
   return formatDistanceToNow(new Date(dateString), { addSuffix: true });
@@ -36,27 +36,6 @@ export function stateColor(state: State): string {
     case State.Completed: return 'bg-green-100 text-green-800';
     case State.Failed: return 'bg-red-100 text-red-800';
     case State.Deleted: return 'bg-gray-100 text-gray-800';
-    default: return 'bg-gray-100 text-gray-800';
-  }
-}
-
-const priorityNames: Record<number, string> = {
-  [Priority.Urgent]: 'Urgent',
-  [Priority.High]: 'High',
-  [Priority.Normal]: 'Normal',
-  [Priority.Low]: 'Low',
-};
-
-export function priorityName(priority: Priority): string {
-  return priorityNames[priority] ?? 'Unknown';
-}
-
-export function priorityColor(priority: Priority): string {
-  switch (priority) {
-    case Priority.Urgent: return 'bg-red-100 text-red-800';
-    case Priority.High: return 'bg-orange-100 text-orange-800';
-    case Priority.Normal: return 'bg-gray-100 text-gray-800';
-    case Priority.Low: return 'bg-blue-100 text-blue-800';
     default: return 'bg-gray-100 text-gray-800';
   }
 }

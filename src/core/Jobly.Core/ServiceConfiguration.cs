@@ -135,7 +135,7 @@ public static class ServiceConfiguration
         job.Property(p => p.CreateTime);
         job.Property(p => p.ScheduleTime);
         job.Property(p => p.CurrentState);
-        job.Property(p => p.Priority);
+        job.Property(p => p.Queue);
         job.Property(p => p.RetriedTimes);
         job.Property(p => p.MaxRetries);
         job.Property(p => p.ParentJobId);
@@ -159,7 +159,7 @@ public static class ServiceConfiguration
             .WithOne(p => p.Job)
             .HasForeignKey(p => p.JobId);
 
-        job.HasIndex(p => new {p.CurrentState, p.Priority, p.ScheduleTime})
+        job.HasIndex(p => new {p.CurrentState, p.Queue, p.ScheduleTime})
             .IsDescending(false, false, false);
 
         job.HasIndex(p => p.CurrentState);
@@ -266,12 +266,12 @@ public static class ServiceConfiguration
 
         message.Property(p => p.Type);
         message.Property(p => p.Payload);
-        message.Property(p => p.Priority);
+        message.Property(p => p.Queue);
         message.Property(p => p.CreateTime);
         message.Property(p => p.CurrentState);
         message.Property(p => p.JobCount);
 
-        message.HasIndex(p => new { p.CurrentState, p.Priority });
+        message.HasIndex(p => new { p.CurrentState, p.Queue });
     }
 
     private static void AddJobLogEntity(ModelBuilder modelBuilder)

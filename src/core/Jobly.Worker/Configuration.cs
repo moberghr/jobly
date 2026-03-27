@@ -22,4 +22,6 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     /// Worker Id should be unique for each worker. If you need to control the worker id, you can set it here.
     /// </summary>
     public Guid ServerId = Guid.NewGuid();
+
+    public string[] Queues { get; set; } = new[] { "default" };
 }

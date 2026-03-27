@@ -7,14 +7,14 @@ namespace Jobly.Tests.Jobs;
 public abstract partial class JoblyTests : TestBase
 {
     [Fact]
-    public async Task GivenMultipleJobsWithDifferentPriorities_WhenProcessed_ThenHighestPriorityJobIsProcessedFirst()
+    public async Task GivenMultipleJobsWithDifferentQueues_WhenProcessed_ThenFirstAlphabeticalQueueJobIsProcessedFirst()
     {
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
-        var lowJobId = await publisher.Enqueue(new UnitRequest(), Priority.Low);
-        var normalJobId = await publisher.Enqueue(new UnitRequest(), Priority.Normal);
-        var urgentJobId = await publisher.Enqueue(new UnitRequest(), Priority.Urgent);
+        var lowJobId = await publisher.Enqueue(new UnitRequest(), "c-low");
+        var normalJobId = await publisher.Enqueue(new UnitRequest(), "b-default");
+        var urgentJobId = await publisher.Enqueue(new UnitRequest(), "a-critical");
 
         await context.SaveChangesAsync();
 
@@ -64,13 +64,13 @@ public abstract partial class JoblyTests : TestBase
     }
 
     [Fact]
-    public async Task GivenSamePriorityJobs_WhenProcessed_ThenEarlierScheduledJobIsProcessedFirst()
+    public async Task GivenSameQueueJobs_WhenProcessed_ThenEarlierScheduledJobIsProcessedFirst()
     {
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
-        var earlierJobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddSeconds(-10), Priority.Normal);
-        var laterJobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddSeconds(-1), Priority.Normal);
+        var earlierJobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddSeconds(-10), "b-default");
+        var laterJobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddSeconds(-1), "b-default");
 
         await context.SaveChangesAsync();
 
@@ -84,22 +84,22 @@ public abstract partial class JoblyTests : TestBase
     }
 
     [Fact]
-    public async Task GivenUrgentFutureJobAndLowPastJob_WhenProcessed_ThenOnlyEligibleJobIsProcessed()
+    public async Task GivenCriticalFutureJobAndLowPastJob_WhenProcessed_ThenOnlyEligibleJobIsProcessed()
     {
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
-        var urgentFutureJobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddHours(1), Priority.Urgent);
-        var lowPastJobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddSeconds(-1), Priority.Low);
+        var criticalFutureJobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddHours(1), "a-critical");
+        var lowPastJobId = await publisher.Schedule(new UnitRequest(), DateTime.UtcNow.AddSeconds(-1), "c-low");
 
         await context.SaveChangesAsync();
 
         await ProcessJob();
 
-        var urgentFutureJob = await GetJob(urgentFutureJobId);
+        var criticalFutureJob = await GetJob(criticalFutureJobId);
         var lowPastJob = await GetJob(lowPastJobId);
 
         lowPastJob.CurrentState.ShouldBe(State.Completed);
-        urgentFutureJob.CurrentState.ShouldBe(State.Enqueued);
+        criticalFutureJob.CurrentState.ShouldBe(State.Enqueued);
     }
 }

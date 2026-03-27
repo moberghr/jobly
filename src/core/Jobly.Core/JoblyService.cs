@@ -452,7 +452,7 @@ public class JoblyService<TContext> : IJoblyService
                 Id = x.Id,
                 Type = x.Type,
                 Payload = x.Payload,
-                Priority = x.Priority,
+                Queue = x.Queue,
                 CurrentState = x.CurrentState,
                 JobCount = x.JobCount,
                 CreateTime = x.CreateTime
@@ -469,7 +469,7 @@ public class JoblyService<TContext> : IJoblyService
                 Id = x.Id,
                 Type = x.Type,
                 Payload = x.Payload,
-                Priority = x.Priority,
+                Queue = x.Queue,
                 CurrentState = x.CurrentState,
                 JobCount = x.JobCount,
                 CreateTime = x.CreateTime
@@ -529,7 +529,7 @@ public class JoblyService<TContext> : IJoblyService
                 ScheduleTime = DateTime.UtcNow,
                 CurrentState = State.Enqueued,
                 MaxRetries = 0,
-                Priority = Priority.Normal,
+                Queue = "default",
                 RecurringJobId = recurringJob.Id
             },
             State = State.Enqueued,

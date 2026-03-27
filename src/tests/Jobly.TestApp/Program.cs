@@ -1,5 +1,4 @@
 using Jobly.Core;
-using Jobly.Core.Enums;
 using Jobly.Test.Shared;
 using Jobly.UI.UIMiddleware;
 using Jobly.Worker;
@@ -19,7 +18,7 @@ builder.Services.AddJoblyWorker<TestContext>(
 {
     options.RetryCount = 0;
     options.WorkerCount = 5;
-    options.DefaultBatchPriority = Priority.Normal;
+    options.DefaultQueue = "default";
     options.PollingInterval = TimeSpan.FromSeconds(5);
     options.HealthCheckInterval = TimeSpan.FromSeconds(10);
     options.HealthCheckTimeout = TimeSpan.FromSeconds(30);

@@ -14,7 +14,7 @@ public class JobParameters
 
     public int? MaxRetries { get; set; }
 
-    public Priority? Priority { get; set; }
+    public string? Queue { get; set; }
 
     public Guid? ParentId { get; set; }
 

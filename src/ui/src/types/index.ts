@@ -8,14 +8,6 @@ export const State = {
 } as const;
 export type State = (typeof State)[keyof typeof State];
 
-export const Priority = {
-  Urgent: 1,
-  High: 2,
-  Normal: 3,
-  Low: 4,
-} as const;
-export type Priority = (typeof Priority)[keyof typeof Priority];
-
 export interface DashboardStatistics {
   total: number;
   pending: number;
@@ -72,7 +64,7 @@ export interface MessageModel {
   id: string;
   type: string;
   payload: string;
-  priority: Priority;
+  queue: string;
   currentState: State;
   jobCount: number;
   createTime: string;

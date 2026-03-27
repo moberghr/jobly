@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Entities;
 using Jobly.Core.Enums;
 
 namespace Jobly.Core.Entities;
@@ -24,7 +25,7 @@ public class Job
 
     public int MaxRetries { get; set; }
     
-    public required Priority Priority { get; set; }
+    public string Queue { get; set; } = "default";
 
     public Guid? ParentJobId { get; set; }
 

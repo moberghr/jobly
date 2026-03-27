@@ -3,8 +3,8 @@ using System.Text.Json;
 using Cronos;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
-using Jobly.Core.Handlers;
 using Jobly.Core.Enums;
+using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
 using Jobly.Core.Interceptors;
 using Microsoft.EntityFrameworkCore;
@@ -52,7 +52,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             throw new InvalidOperationException("Failed to create job for recurring job.");
         }
 
-        var jobState = JobHelper.CreateJobAndJobState(jobMessage, jobType, 0, nextJobScheduleTime, 0, Priority.Normal, null, State.Enqueued);
+        var jobState = JobHelper.CreateJobAndJobState(jobMessage, jobType, 0, nextJobScheduleTime, 0, "default", null, State.Enqueued);
 
         return jobState.Job;
     }

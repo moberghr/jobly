@@ -10,7 +10,7 @@ public class Message
 
     public string Payload { get; set; } = string.Empty;
 
-    public required Priority Priority { get; set; }
+    public string Queue { get; set; } = "default";
 
     public DateTime CreateTime { get; set; }
 

@@ -55,7 +55,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         var message = context.Set<Message>()
             .Where(x => x.CurrentState == State.Enqueued)
-            .OrderBy(x => x.Priority)
+            .Where(x => _configuration.Queues.Contains(x.Queue))
+            .OrderBy(x => x.Queue)
             .ThenBy(x => x.CreateTime)
             .TagWith(InterceptorConstants.RowLockTableMessage)
             .FirstOrDefault();
@@ -95,7 +96,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
                 retries: 0,
                 scheduleTime: null,
                 maxRetries: 0,
-                priority: message.Priority,
+                queue: message.Queue,
                 parentId: null,
                 state: State.Enqueued);
 
@@ -129,7 +130,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         var job = context.Set<Job>()
             .Where(x => x.CurrentState == State.Enqueued)
             .Where(x => x.ScheduleTime < DateTime.UtcNow)
-            .OrderBy(x => x.Priority)
+            .Where(x => _configuration.Queues.Contains(x.Queue))
+            .OrderBy(x => x.Queue)
             .ThenBy(x => x.ScheduleTime)
             .TagWith(InterceptorConstants.RowLockTableJob)
             .FirstOrDefault();
@@ -261,7 +263,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             retries: 0,
             scheduleTime: nextJobScheduleTime,
             maxRetries: 0,
-            priority: job.Priority,
+            queue: job.Queue,
             parentId: null,
             recurringJobId: recurringJob.Id,
             state: State.Enqueued);

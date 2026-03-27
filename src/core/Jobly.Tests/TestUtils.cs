@@ -64,7 +64,8 @@ public static class TestUtils
         IOptions<JoblyWorkerConfiguration> joblyWorkerConfigOptions = new OptionsWrapper<JoblyWorkerConfiguration>(new JoblyWorkerConfiguration
         {
             WorkerCount = 1,
-            ServerId = TestServerId
+            ServerId = TestServerId,
+            Queues = new[] { "a-critical", "b-default", "c-low", "default", "high" }
         });
 
         return new JoblyWorkerService<TestContext>(TestWorkerId, serviceScopeFactory,

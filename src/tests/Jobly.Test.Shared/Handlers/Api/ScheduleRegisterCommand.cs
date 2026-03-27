@@ -1,4 +1,3 @@
-using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
 using Jobly.Test.Shared.Entities;
@@ -60,7 +59,7 @@ public class ScheduleRegisterCommand : IJobHandler<ScheduleRegisterRequest>
             var jobParams = new JobParameters
             {
                 ScheduleTime = message.ScheduleTime,
-                Priority = Priority.High
+                Queue = "high"
             };
             await _publisher.Enqueue(sendEmailRequest, jobParams);
         }

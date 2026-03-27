@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StateBadge } from '@/components/StateBadge';
-import { PriorityBadge } from '@/components/PriorityBadge';
 import { Pagination } from '@/components/Pagination';
 import { shortType, formatRelativeTime, shortId } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
@@ -42,7 +41,7 @@ export default function MessagesPage() {
             <TableRow>
               <TableHead className="w-[100px]">ID</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Priority</TableHead>
+              <TableHead>Queue</TableHead>
               <TableHead>State</TableHead>
               <TableHead>Jobs</TableHead>
               <TableHead>Created</TableHead>
@@ -64,7 +63,7 @@ export default function MessagesPage() {
                     </Link>
                   </TableCell>
                   <TableCell>{shortType(msg.type)}</TableCell>
-                  <TableCell><PriorityBadge priority={msg.priority} /></TableCell>
+                  <TableCell>{msg.queue}</TableCell>
                   <TableCell><StateBadge state={msg.currentState} /></TableCell>
                   <TableCell>{msg.jobCount}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
