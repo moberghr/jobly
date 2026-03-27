@@ -17,4 +17,8 @@ public class DashboardStatistics
     public int Processing { get; set; }
 
     public int Servers { get; set; }
+
+    public int Awaiting { get; set; }
+
+    public int Messages { get; set; }
 }

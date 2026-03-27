@@ -33,6 +33,23 @@ public interface IJoblyService
     Task<List<ServerModel>> GetServers();
 
     Task<int> GetServerCount();
+
+    // Job details & actions
+    Task<JobDetailModel?> GetJobById(Guid jobId);
+    Task DeleteJob(Guid jobId);
+    Task RequeueJob(Guid jobId);
+
+    // Awaiting jobs
+    Task<PagedList<JobModel>> GetAwaitingJobs(BaseListRequest request);
+
+    // Messages
+    Task<PagedList<MessageModel>> GetMessages(BaseListRequest request);
+    Task<MessageDetailModel?> GetMessageById(Guid messageId);
+
+    // Recurring jobs
+    Task<PagedList<RecurringJobModel>> GetRecurringJobs(BaseListRequest request);
+    Task TriggerRecurringJob(int id);
+    Task DeleteRecurringJob(int id);
 }
 
 public class JoblyService<TContext> : IJoblyService
@@ -86,6 +103,8 @@ public class JoblyService<TContext> : IJoblyService
         var processing = await CountProcessingJobs() - completed - failed;
 
         var servers = await GetServerCount();
+        var awaiting = await GetJobsCount(State.Awaiting);
+        var messages = await _context.Set<Message>().CountAsync();
 
         var model = new DashboardStatistics
         {
@@ -96,7 +115,9 @@ public class JoblyService<TContext> : IJoblyService
             Completed = completed,
             Failed = failed,
             Processing = processing,
-            Servers = servers
+            Servers = servers,
+            Awaiting = awaiting,
+            Messages = messages
         };
 
         return model;
@@ -293,5 +314,200 @@ public class JoblyService<TContext> : IJoblyService
                 })
                 .ToList()
         }).ToList();
+    }
+
+    // ==================== Job Details & Actions ====================
+
+    public async Task<JobDetailModel?> GetJobById(Guid jobId)
+    {
+        var job = await _context.Set<Job>()
+            .Where(x => x.Id == jobId)
+            .Select(x => new JobDetailModel
+            {
+                Id = x.Id,
+                Type = x.Type,
+                Message = x.Message,
+                CreateTime = x.CreateTime,
+                ScheduleTime = x.ScheduleTime,
+                CurrentState = x.CurrentState,
+                HandlerType = x.HandlerType,
+                MessageId = x.MessageId,
+                ParentJobId = x.ParentJobId,
+                BatchId = x.BatchId,
+                RetriedTimes = x.RetriedTimes,
+                MaxRetries = x.MaxRetries
+            })
+            .FirstOrDefaultAsync();
+
+        if (job == null) return null;
+
+        job.StateHistory = await _context.Set<JobState>()
+            .Where(x => x.JobId == jobId)
+            .OrderBy(x => x.DateTime)
+            .Select(x => new JobStateModel
+            {
+                Id = x.Id,
+                State = x.State,
+                DateTime = x.DateTime,
+                Message = x.Message,
+                JobId = x.JobId
+            })
+            .ToListAsync();
+
+        return job;
+    }
+
+    public async Task DeleteJob(Guid jobId)
+    {
+        var job = await _context.Set<Job>().FindAsync(jobId);
+        if (job == null) throw new ArgumentException("Job not found.");
+
+        job.CurrentState = State.Deleted;
+
+        var jobState = new JobState
+        {
+            JobId = job.Id,
+            DateTime = DateTime.UtcNow,
+            State = State.Deleted,
+            Message = $"Job {job.Id} was deleted"
+        };
+
+        await _context.Set<JobState>().AddAsync(jobState);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task RequeueJob(Guid jobId)
+    {
+        var job = await _context.Set<Job>().FindAsync(jobId);
+        if (job == null) throw new ArgumentException("Job not found.");
+
+        job.CurrentState = State.Enqueued;
+        job.HandlerType = null;
+
+        var jobState = new JobState
+        {
+            JobId = job.Id,
+            DateTime = DateTime.UtcNow,
+            State = State.Enqueued,
+            Message = $"Job {job.Id} was requeued"
+        };
+
+        await _context.Set<JobState>().AddAsync(jobState);
+        await _context.SaveChangesAsync();
+    }
+
+    // ==================== Awaiting Jobs ====================
+
+    public async Task<PagedList<JobModel>> GetAwaitingJobs(BaseListRequest request)
+    {
+        return await GetJobsByState(State.Awaiting).ToPagedListAsync(request);
+    }
+
+    // ==================== Messages ====================
+
+    public async Task<PagedList<MessageModel>> GetMessages(BaseListRequest request)
+    {
+        return await _context.Set<Message>()
+            .OrderByDescending(x => x.CreateTime)
+            .Select(x => new MessageModel
+            {
+                Id = x.Id,
+                Type = x.Type,
+                Payload = x.Payload,
+                Priority = x.Priority,
+                CurrentState = x.CurrentState,
+                JobCount = x.JobCount,
+                CreateTime = x.CreateTime
+            })
+            .ToPagedListAsync(request);
+    }
+
+    public async Task<MessageDetailModel?> GetMessageById(Guid messageId)
+    {
+        var message = await _context.Set<Message>()
+            .Where(x => x.Id == messageId)
+            .Select(x => new MessageDetailModel
+            {
+                Id = x.Id,
+                Type = x.Type,
+                Payload = x.Payload,
+                Priority = x.Priority,
+                CurrentState = x.CurrentState,
+                JobCount = x.JobCount,
+                CreateTime = x.CreateTime
+            })
+            .FirstOrDefaultAsync();
+
+        if (message == null) return null;
+
+        message.Jobs = await _context.Set<Job>()
+            .Where(x => x.MessageId == messageId)
+            .Select(x => new JobModel
+            {
+                Id = x.Id,
+                Type = x.Type,
+                Message = x.Message,
+                CreateTime = x.CreateTime,
+                ScheduleTime = x.ScheduleTime,
+                CurrentState = x.CurrentState
+            })
+            .ToListAsync();
+
+        return message;
+    }
+
+    // ==================== Recurring Jobs ====================
+
+    public async Task<PagedList<RecurringJobModel>> GetRecurringJobs(BaseListRequest request)
+    {
+        return await _context.Set<RecurringJob>()
+            .OrderBy(x => x.NextExecution)
+            .Select(x => new RecurringJobModel
+            {
+                Id = x.Id,
+                Name = x.Name,
+                Cron = x.Cron,
+                Type = x.Type,
+                NextExecution = x.NextExecution,
+                LastExecution = x.LastExecution,
+                CreatedAt = x.CreatedAt
+            })
+            .ToPagedListAsync(request);
+    }
+
+    public async Task TriggerRecurringJob(int id)
+    {
+        var recurringJob = await _context.Set<RecurringJob>().FindAsync(id);
+        if (recurringJob == null) throw new ArgumentException("Recurring job not found.");
+
+        // Create a new job from the recurring job definition
+        var jobState = new JobState
+        {
+            Job = new Job
+            {
+                Type = recurringJob.Type,
+                Message = recurringJob.Message,
+                CreateTime = DateTime.UtcNow,
+                ScheduleTime = DateTime.UtcNow,
+                CurrentState = State.Enqueued,
+                MaxRetries = 0,
+                Priority = Priority.Normal,
+                RecurringJobId = recurringJob.Id
+            },
+            State = State.Enqueued,
+            DateTime = DateTime.UtcNow
+        };
+
+        await _context.Set<JobState>().AddAsync(jobState);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task DeleteRecurringJob(int id)
+    {
+        var recurringJob = await _context.Set<RecurringJob>().FindAsync(id);
+        if (recurringJob == null) throw new ArgumentException("Recurring job not found.");
+
+        _context.Set<RecurringJob>().Remove(recurringJob);
+        await _context.SaveChangesAsync();
     }
 }
