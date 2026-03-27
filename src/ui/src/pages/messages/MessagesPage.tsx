@@ -1,0 +1,75 @@
+import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { StateBadge } from '@/components/StateBadge';
+import { PriorityBadge } from '@/components/PriorityBadge';
+import { Pagination } from '@/components/Pagination';
+import { shortType, formatRelativeTime, shortId } from '@/utils/format';
+import type { MessageModel, PagedList } from '@/types';
+import * as api from '@/api';
+
+export default function MessagesPage() {
+  const [data, setData] = useState<PagedList<MessageModel> | null>(null);
+  const [page, setPage] = useState(0);
+
+  const fetchData = useCallback(async () => {
+    const result = await api.getMessages(page, 20);
+    setData(result);
+  }, [page]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (!data) return <div className="text-muted-foreground">Loading...</div>;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold">Messages</h1>
+        <span className="text-sm text-muted-foreground">{data.totalCount} total</span>
+      </div>
+
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[100px]">ID</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Priority</TableHead>
+              <TableHead>State</TableHead>
+              <TableHead>Jobs</TableHead>
+              <TableHead>Created</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.items.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  No messages found
+                </TableCell>
+              </TableRow>
+            ) : (
+              data.items.map((msg) => (
+                <TableRow key={msg.id}>
+                  <TableCell className="font-mono text-xs">
+                    <Link to={`/messages/${msg.id}`} className="text-primary hover:underline">
+                      {shortId(msg.id)}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{shortType(msg.type)}</TableCell>
+                  <TableCell><PriorityBadge priority={msg.priority} /></TableCell>
+                  <TableCell><StateBadge state={msg.currentState} /></TableCell>
+                  <TableCell>{msg.jobCount}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {formatRelativeTime(msg.createTime)}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <Pagination page={page} pageCount={data.pageCount} onPageChange={setPage} />
+    </div>
+  );
+}

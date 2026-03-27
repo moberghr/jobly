@@ -1,42 +1,29 @@
-import { lazy, Suspense } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { Toaster } from "react-hot-toast";
-import Paths, { BatchesRouteSubpaths } from "./utils/paths";
-import JobWrapper from "./pages/jobs/JobWrapper";
-import BatchesWrapper from "./pages/batches/BatchesWrapper";
-import BatchesDetails from "./pages/batches/BatchesDetails";
-import DetailsJob from "./pages/jobs/DetailsJob";
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import MainLayout from '@/layouts/MainLayout';
+import DashboardPage from '@/pages/dashboard/DashboardPage';
+import JobListPage from '@/pages/jobs/JobListPage';
+import JobDetailPage from '@/pages/jobs/JobDetailPage';
+import MessagesPage from '@/pages/messages/MessagesPage';
+import MessageDetailPage from '@/pages/messages/MessageDetailPage';
+import RecurringPage from '@/pages/recurring/RecurringPage';
+import ServersPage from '@/pages/servers/ServersPage';
 
-const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
-const Batches = lazy(() => import("./pages/batches/Batches"));
-const Jobs = lazy(() => import("./pages/jobs/Jobs"));
-const ReccuringJobs = lazy(() => import("./pages/recurringJobs/recurringJobs"));
-const Navbar = lazy(() => import("./containers/navbar/Navbar"));
-const Layout = lazy(() => import("./components/layout/Layout"));
-
-const App: React.FC = () => {
-    const { dashboard, jobs, recurringJobs, batches } = Paths;
-
-    return (
-        <Router>
-            <Toaster />
-            <Navbar />
-            <Layout>
-                <Routes>
-                    <Route path={dashboard} element={<Suspense children={<Dashboard />} />} />
-                    <Route path={recurringJobs} element={<Suspense children={<ReccuringJobs />} />} />
-                    <Route path={jobs} element={<Suspense children={<JobWrapper />} />}>
-                        <Route element={<Jobs />} path={`/jobs/:jobType`} />
-                        <Route element={<DetailsJob />} path={`/jobs/details/:id`} />
-                    </Route>
-                    <Route path={batches} element={<Suspense children={<BatchesWrapper />} />}>
-                        <Route element={<Batches />} path={`/batches/:batchType`} />
-                        <Route element={<Suspense children={<BatchesDetails />} />} path={`/batches/details/:id`} />
-                    </Route>
-                </Routes>
-            </Layout>
-        </Router>
-    );
-};
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/jobs/:state" element={<JobListPage />} />
+          <Route path="/jobs/:id" element={<JobDetailPage />} />
+          <Route path="/messages" element={<MessagesPage />} />
+          <Route path="/messages/:id" element={<MessageDetailPage />} />
+          <Route path="/recurring" element={<RecurringPage />} />
+          <Route path="/servers" element={<ServersPage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
 
 export default App;
