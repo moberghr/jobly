@@ -24,7 +24,7 @@ export default function BatchDetailPage() {
   const pct = batch.totalJobs > 0 ? Math.round((completed / batch.totalJobs) * 100) : 0;
 
   return (
-    <div className="max-w-4xl">
+    <div>
       <div className="flex items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Batch {shortId(batch.id)}</h1>
         <StateBadge state={batch.placeholderState} />

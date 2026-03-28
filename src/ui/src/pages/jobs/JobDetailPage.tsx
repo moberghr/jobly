@@ -19,7 +19,6 @@ const eventColors: Record<string, { border: string; bg: string; text: string }> 
 };
 
 function getDuration(logs: JobLogModel[], currentIndex: number): string | null {
-  // Duration = time since previous event
   if (currentIndex >= logs.length - 1) return null;
   const current = new Date(logs[currentIndex].timestamp).getTime();
   const previous = new Date(logs[currentIndex + 1].timestamp).getTime();
@@ -41,187 +40,165 @@ export default function JobDetailPage() {
   if (error) return <ErrorState message={error} />;
   if (!job) return <LoadingState />;
 
-  // Split logs into system events and handler logs
-  const systemEvents = job.logs.filter(l => l.eventType !== 'Log').reverse(); // newest first (like Hangfire)
+  const systemEvents = job.logs.filter(l => l.eventType !== 'Log').reverse();
   const handlerLogs = job.logs.filter(l => l.eventType === 'Log');
 
   return (
-    <div className="max-w-4xl">
+    <div>
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Job {shortId(job.id)}</h1>
         <StateBadge state={job.currentState} />
         <div className="flex-1" />
-        <Button variant="outline" size="sm" onClick={() => api.requeueJob(job.id)}>
-          Requeue
-        </Button>
-        <Button variant="destructive" size="sm" onClick={() => api.deleteJob(job.id)}>
-          Delete
-        </Button>
+        <Button variant="outline" size="sm" onClick={() => api.requeueJob(job.id)}>Requeue</Button>
+        <Button variant="destructive" size="sm" onClick={() => api.deleteJob(job.id)}>Delete</Button>
       </div>
 
-      {/* Payload */}
-      {job.message && (
-        <Card className="mb-6">
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Payload</CardTitle></CardHeader>
-          <CardContent>
-            <pre className="text-xs bg-muted p-3 rounded-md overflow-auto">{job.message}</pre>
-          </CardContent>
-        </Card>
-      )}
+      {/* Two-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left column: Details */}
+        <div className="space-y-4">
+          {/* Payload */}
+          {job.message && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Payload</CardTitle></CardHeader>
+              <CardContent>
+                <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">{job.message}</pre>
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Details + Flow */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Details</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div><span className="text-muted-foreground">Type:</span> {shortType(job.type)}</div>
-            <div><span className="text-muted-foreground">Handler:</span> {job.handlerType ? shortType(job.handlerType) : 'N/A'}</div>
-            <div><span className="text-muted-foreground">Created:</span> {formatDateTime(job.createTime)}</div>
-            {job.scheduleTime && <div><span className="text-muted-foreground">Scheduled:</span> {formatDateTime(job.scheduleTime)}</div>}
-            <div><span className="text-muted-foreground">Retries:</span> {job.retriedTimes}/{job.maxRetries}</div>
-            <div><span className="text-muted-foreground">ID:</span> <span className="font-mono text-xs">{job.id}</span></div>
-          </CardContent>
-        </Card>
+          {/* Details */}
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">Details</CardTitle></CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div><span className="text-muted-foreground">Type:</span> {shortType(job.type)}</div>
+              <div><span className="text-muted-foreground">Handler:</span> {job.handlerType ? shortType(job.handlerType) : 'N/A'}</div>
+              <div><span className="text-muted-foreground">Created:</span> {formatDateTime(job.createTime)}</div>
+              {job.scheduleTime && <div><span className="text-muted-foreground">Scheduled:</span> {formatDateTime(job.scheduleTime)}</div>}
+              <div><span className="text-muted-foreground">Retries:</span> {job.retriedTimes}/{job.maxRetries}</div>
+              <div><span className="text-muted-foreground">ID:</span> <span className="font-mono text-xs">{job.id}</span></div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Flow</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {job.messageId && (
-              <div>
-                <span className="text-muted-foreground">Spawned from Message:</span>{' '}
-                <Link to={`/messages/${job.messageId}`} className="text-primary hover:underline font-mono text-xs">
-                  {shortId(job.messageId)}
-                </Link>
-              </div>
-            )}
-            {job.parentJobId && (
-              <div>
-                <span className="text-muted-foreground">Continuation of Job:</span>{' '}
-                <Link to={`/jobs/detail/${job.parentJobId}`} className="text-primary hover:underline font-mono text-xs">
-                  {shortId(job.parentJobId)}
-                </Link>
-              </div>
-            )}
-            {!job.messageId && !job.parentJobId && (
-              <div className="text-muted-foreground">Direct job (no parent)</div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Sibling Jobs */}
-      {job.siblingJobs.length > 0 && (
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Sibling Jobs ({job.siblingJobs.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>State</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {job.siblingJobs.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-mono text-xs">
-                      <Link to={`/jobs/detail/${s.id}`} className="text-primary hover:underline">{shortId(s.id)}</Link>
-                    </TableCell>
-                    <TableCell>{shortType(s.type)}</TableCell>
-                    <TableCell><StateBadge state={s.currentState} /></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Child Jobs */}
-      {job.childJobs.length > 0 && (
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Child Jobs ({job.childJobs.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>State</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {job.childJobs.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-mono text-xs">
-                      <Link to={`/jobs/detail/${c.id}`} className="text-primary hover:underline">{shortId(c.id)}</Link>
-                    </TableCell>
-                    <TableCell>{shortType(c.type)}</TableCell>
-                    <TableCell><StateBadge state={c.currentState} /></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* State History — Hangfire-style state cards, newest first */}
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">History</h2>
-      <div className="space-y-3 mb-6">
-        {systemEvents.map((event, index) => {
-          const colors = eventColors[event.eventType] ?? eventColors.Created;
-          const duration = getDuration(systemEvents, index);
-          return (
-            <div key={event.id} className={`border-l-4 ${colors.border} ${colors.bg} rounded-r-md p-4`}>
-              <div className="flex items-center justify-between">
-                <span className={`font-semibold ${colors.text}`}>{event.eventType}</span>
-                <span className="text-xs text-muted-foreground">
-                  {formatRelativeTime(event.timestamp)}
-                  {duration && <span className="ml-2 opacity-60">({duration})</span>}
-                </span>
-              </div>
-              {event.message && (
-                <p className="text-sm text-muted-foreground mt-1">{event.message}</p>
-              )}
-              {event.exception && (
-                <pre className="text-xs bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-300 p-3 rounded-md overflow-auto mt-2">
-                  {event.exception}
-                </pre>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Handler Logs */}
-      {handlerLogs.length > 0 && (
-        <Card className="mb-4">
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Handler Output ({handlerLogs.length})</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-1 font-mono text-xs">
-              {handlerLogs.map((log) => (
-                <div key={log.id} className={`flex gap-2 ${
-                  log.level === 'Error' ? 'text-red-600' :
-                  log.level === 'Warning' ? 'text-yellow-600' :
-                  'text-muted-foreground'
-                }`}>
-                  <span className="text-muted-foreground shrink-0">{formatDateTime(log.timestamp)}</span>
-                  <span className="shrink-0 w-20">[{log.level}]</span>
-                  <span className="break-all">{log.message}</span>
+          {/* Flow */}
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">Flow</CardTitle></CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {job.messageId && (
+                <div>
+                  <span className="text-muted-foreground">Spawned from Message:</span>{' '}
+                  <Link to={`/messages/${job.messageId}`} className="text-primary hover:underline font-mono text-xs">{shortId(job.messageId)}</Link>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              )}
+              {job.parentJobId && (
+                <div>
+                  <span className="text-muted-foreground">Continuation of Job:</span>{' '}
+                  <Link to={`/jobs/detail/${job.parentJobId}`} className="text-primary hover:underline font-mono text-xs">{shortId(job.parentJobId)}</Link>
+                </div>
+              )}
+              {!job.messageId && !job.parentJobId && (
+                <div className="text-muted-foreground">Direct job (no parent)</div>
+              )}
+            </CardContent>
+          </Card>
 
+          {/* Sibling Jobs */}
+          {job.siblingJobs.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Sibling Jobs ({job.siblingJobs.length})</CardTitle></CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Type</TableHead><TableHead>State</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {job.siblingJobs.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-mono text-xs"><Link to={`/jobs/detail/${s.id}`} className="text-primary hover:underline">{shortId(s.id)}</Link></TableCell>
+                        <TableCell>{shortType(s.type)}</TableCell>
+                        <TableCell><StateBadge state={s.currentState} /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Child Jobs */}
+          {job.childJobs.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Child Jobs ({job.childJobs.length})</CardTitle></CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Type</TableHead><TableHead>State</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {job.childJobs.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-mono text-xs"><Link to={`/jobs/detail/${c.id}`} className="text-primary hover:underline">{shortId(c.id)}</Link></TableCell>
+                        <TableCell>{shortType(c.type)}</TableCell>
+                        <TableCell><StateBadge state={c.currentState} /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Right column: History + Logs */}
+        <div className="space-y-4">
+          {/* State History */}
+          <div>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">History</h2>
+            <div className="space-y-3">
+              {systemEvents.map((event, index) => {
+                const colors = eventColors[event.eventType] ?? eventColors.Created;
+                const duration = getDuration(systemEvents, index);
+                return (
+                  <div key={event.id} className={`border-l-4 ${colors.border} ${colors.bg} rounded-r-md p-4`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`font-semibold ${colors.text}`}>{event.eventType}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatRelativeTime(event.timestamp)}
+                        {duration && <span className="ml-2 opacity-60">({duration})</span>}
+                      </span>
+                    </div>
+                    {event.message && <p className="text-sm text-muted-foreground mt-1">{event.message}</p>}
+                    {event.exception && (
+                      <pre className="text-xs bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-300 p-3 rounded-md overflow-auto mt-2 max-h-60">
+                        {event.exception}
+                      </pre>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Handler Logs */}
+          {handlerLogs.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Handler Output ({handlerLogs.length})</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-1 font-mono text-xs max-h-96 overflow-auto">
+                  {handlerLogs.map((log) => (
+                    <div key={log.id} className={`flex gap-2 ${
+                      log.level === 'Error' ? 'text-red-600' :
+                      log.level === 'Warning' ? 'text-yellow-600' :
+                      'text-muted-foreground'
+                    }`}>
+                      <span className="text-muted-foreground shrink-0">{formatDateTime(log.timestamp)}</span>
+                      <span className="shrink-0 w-20">[{log.level}]</span>
+                      <span className="break-all">{log.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
