@@ -68,13 +68,18 @@ public class JoblyService<TContext> : IJoblyService
         _context = context;
     }
 
+    /// <summary>
+    /// Base query that excludes batch placeholder jobs from results.
+    /// </summary>
+    private IQueryable<Job> Jobs()
+    {
+        var batchIds = _context.Set<Batch>().Select(b => b.Id);
+        return _context.Set<Job>().Where(j => !batchIds.Contains(j.Id));
+    }
+
     public async Task<int> GetTotalJobsCount()
     {
-
-        var counter = await _context.Set<Job>()
-            .CountAsync();
-
-        return counter;
+        return await Jobs().CountAsync();
     }
 
     public async Task<int> GetPendingJobsCount()
@@ -164,14 +169,14 @@ public class JoblyService<TContext> : IJoblyService
 
     public async Task<int> CountProcessingJobs()
     {
-        return await _context.Set<Job>()
+        return await Jobs()
             .Where(x => x.CurrentState == State.Processing)
             .CountAsync();
     }
 
     public async Task<PagedList<JobModel>> GetJobStatesInProcess(BaseListRequest request)
     {
-        var jobs = await _context.Set<Job>()
+        var jobs = await Jobs()
             .Where(x => x.CurrentState == State.Processing)
             .Select(x => new JobModel
             {
@@ -188,7 +193,7 @@ public class JoblyService<TContext> : IJoblyService
 
     private IQueryable<JobModel> GetScheduledJobs()
     {
-        var query = _context.Set<Job>()
+        var query = Jobs()
             .Where(x => x.ScheduleTime > DateTime.UtcNow)
             .Select(x =>
                 new JobModel
@@ -207,7 +212,7 @@ public class JoblyService<TContext> : IJoblyService
 
     private IQueryable<JobModel> GetPendingJobs()
     {
-        var query = _context.Set<Job>()
+        var query = Jobs()
             .Where(x => x.ScheduleTime < DateTime.UtcNow)
             .Select(x =>
                 new JobModel
@@ -226,7 +231,7 @@ public class JoblyService<TContext> : IJoblyService
 
     private IQueryable<JobModel> GetJobsByState(State state)
     {
-        var query = _context.Set<Job>()
+        var query = Jobs()
             .Where(x => x.CurrentState == state)
             .Select(x =>
                 new JobModel

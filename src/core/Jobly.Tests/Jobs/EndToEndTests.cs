@@ -148,8 +148,12 @@ public class EndToEndTests : IAsyncLifetime
         // === Assert: verify final database state ===
         var ctx = _fixture.CreateContext();
 
+        // Helper: exclude batch placeholder jobs (same as dashboard)
+        var batchIds = ctx.Set<Batch>().Select(b => b.Id);
+        var jobs = ctx.Set<Job>().Where(j => !batchIds.Contains(j.Id));
+
         // No jobs stuck in non-terminal states
-        var stuckJobs = await ctx.Set<Job>()
+        var stuckJobs = await jobs
             .Where(j => j.CurrentState == State.Enqueued ||
                         j.CurrentState == State.Processing ||
                         j.CurrentState == State.Awaiting)
@@ -163,12 +167,12 @@ public class EndToEndTests : IAsyncLifetime
         incompleteMessages.ShouldBe(0, "All messages should be completed");
 
         // Completed job count
-        var completedJobs = await ctx.Set<Job>()
+        var completedJobs = await jobs
             .CountAsync(j => j.CurrentState == State.Completed);
         completedJobs.ShouldBeGreaterThan(100, "Should have many completed jobs");
 
         // Failed job count (10 no-retry + 5 with-retry = 15 failed)
-        var failedJobs = await ctx.Set<Job>()
+        var failedJobs = await jobs
             .CountAsync(j => j.CurrentState == State.Failed);
         failedJobs.ShouldBe(15, "Should have exactly 15 failed jobs");
 
@@ -179,36 +183,34 @@ public class EndToEndTests : IAsyncLifetime
         incompleteBatches.ShouldBe(0, "All batch counters should be 0");
 
         // All jobs should have a TraceId
-        var jobsWithoutTrace = await ctx.Set<Job>()
+        var jobsWithoutTrace = await jobs
             .CountAsync(j => j.TraceId == null);
         jobsWithoutTrace.ShouldBe(0, "All jobs should have a TraceId");
 
         // Spawned jobs should have SpawnedByJobId set
-        var spawnedJobs = await ctx.Set<Job>()
+        var spawnedJobs = await jobs
             .Where(j => j.SpawnedByJobId != null)
             .CountAsync();
         spawnedJobs.ShouldBeGreaterThan(0, "Should have spawned jobs with trace links");
 
         // No workers still holding jobs
-        var jobsWithWorker = await ctx.Set<Job>()
+        var jobsWithWorker = await jobs
             .CountAsync(j => j.CurrentWorkerId != null);
         jobsWithWorker.ShouldBe(0, "No terminal jobs should have a CurrentWorkerId");
 
         // LastKeepAlive should be null on all terminal jobs
-        var jobsWithKeepAlive = await ctx.Set<Job>()
+        var jobsWithKeepAlive = await jobs
             .CountAsync(j => j.LastKeepAlive != null);
         jobsWithKeepAlive.ShouldBe(0, "No terminal jobs should have a LastKeepAlive");
 
         // Statistics should be consistent
-        // Note: batch placeholder jobs complete without incrementing stats:succeeded
-        var batchPlaceholderCount = await ctx.Set<Batch>().CountAsync();
+        // completedJobs/failedJobs exclude batch placeholders (hidden from dashboard)
         var statsSucceeded = await ctx.Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded").Select(x => x.Value).FirstOrDefaultAsync();
         var statsFailed = await ctx.Set<Statistic>()
             .Where(x => x.Key == "stats:failed").Select(x => x.Value).FirstOrDefaultAsync();
 
-        statsSucceeded.ShouldBe(completedJobs - batchPlaceholderCount,
-            "stats:succeeded should match completed jobs minus batch placeholders");
+        statsSucceeded.ShouldBe(completedJobs, "stats:succeeded should match completed job count");
         statsFailed.ShouldBe(failedJobs, "stats:failed should match failed job count");
     }
 }
