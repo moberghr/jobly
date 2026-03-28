@@ -1,5 +1,5 @@
 import api from './client';
-import type { DashboardStatistics, JobModel, JobDetailModel, MessageModel, MessageDetailModel, RecurringJobModel, ServerModel, PagedList, BulkResult } from '@/types';
+import type { DashboardStatistics, JobModel, JobDetailModel, MessageModel, MessageDetailModel, RecurringJobModel, ServerModel, PagedList, BulkResult, StatsHistoryPoint } from '@/types';
 
 // Dashboard
 export const getStatus = () => api.get<DashboardStatistics>('/status').then(r => r.data);
@@ -53,3 +53,6 @@ export const bulkRequeueJobs = (jobIds: string[]) =>
 
 // Servers
 export const getServers = () => api.get<ServerModel[]>('/servers').then(r => r.data);
+
+export const getStatsHistory = (hours = 24) =>
+  api.get<StatsHistoryPoint[]>('/stats/history', { params: { hours } }).then(r => r.data);

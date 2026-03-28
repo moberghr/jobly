@@ -49,6 +49,9 @@ public interface IJoblyService
     Task<PagedList<RecurringJobModel>> GetRecurringJobs(BaseListRequest request);
     Task TriggerRecurringJob(int id);
     Task DeleteRecurringJob(int id);
+
+    // Statistics
+    Task<List<StatsHistoryPoint>> GetStatsHistory(int hours = 24);
 }
 
 public class JoblyService<TContext> : IJoblyService
@@ -592,5 +595,44 @@ public class JoblyService<TContext> : IJoblyService
 
         _context.Set<RecurringJob>().Remove(recurringJob);
         await _context.SaveChangesAsync();
+    }
+
+    // ==================== Statistics History ====================
+
+    public async Task<List<StatsHistoryPoint>> GetStatsHistory(int hours = 24)
+    {
+        var since = DateTime.UtcNow.AddHours(-hours);
+
+        var hourlyStats = await _context.Set<Statistic>()
+            .Where(x => x.Key.StartsWith("stats:succeeded:") || x.Key.StartsWith("stats:failed:"))
+            .ToListAsync();
+
+        // Parse keys like "stats:succeeded:2026-03-28-14" into date + metric
+        var points = new Dictionary<string, StatsHistoryPoint>();
+
+        foreach (var stat in hourlyStats)
+        {
+            var parts = stat.Key.Split(':');
+            if (parts.Length != 3) continue;
+
+            var metric = parts[1]; // "succeeded" or "failed"
+            var hourStr = parts[2]; // "2026-03-28-14"
+
+            if (!DateTime.TryParseExact(hourStr, "yyyy-MM-dd-HH",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+                out var hour))
+                continue;
+
+            if (hour < since) continue;
+
+            if (!points.ContainsKey(hourStr))
+                points[hourStr] = new StatsHistoryPoint { Hour = hour };
+
+            if (metric == "succeeded") points[hourStr].Succeeded = stat.Value;
+            else if (metric == "failed") points[hourStr].Failed = stat.Value;
+        }
+
+        return points.Values.OrderBy(p => p.Hour).ToList();
     }
 }

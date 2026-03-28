@@ -119,6 +119,13 @@ public static class JoblyEndpoints
             return job?.Logs ?? new List<JobLogModel>();
         });
 
+        // ==================== Statistics ====================
+
+        apiGroup.MapGet("stats/history", async ([FromServices] IJoblyService joblyService, [FromQuery] int? hours) =>
+        {
+            return await joblyService.GetStatsHistory(hours ?? 24);
+        });
+
         // ==================== Servers ====================
 
         apiGroup.MapGet("servers", async ([FromServices] IJoblyService joblyService) =>

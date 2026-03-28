@@ -308,16 +308,19 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         job.CurrentState = state;
         job.CurrentWorkerId = null;
 
-        // Set expiration and increment statistics
+        // Set expiration and increment statistics (total + hourly)
+        var hourSuffix = DateTime.UtcNow.ToString("yyyy-MM-dd-HH");
         if (state == State.Completed)
         {
             job.ExpireAt = DateTime.UtcNow.AddDays(1);
             await IncrementStatistic(context, "stats:succeeded");
+            await IncrementStatistic(context, $"stats:succeeded:{hourSuffix}");
         }
         else if (state == State.Failed && job.RetriedTimes >= job.MaxRetries)
         {
             // Only count as failed when retries are exhausted (not on re-enqueue)
             await IncrementStatistic(context, "stats:failed");
+            await IncrementStatistic(context, $"stats:failed:{hourSuffix}");
         }
 
         // Check for child job continuations
@@ -474,8 +477,24 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
     private static async Task IncrementStatistic(TContext context, string key)
     {
-        await context.Set<Statistic>()
+        var updated = await context.Set<Statistic>()
             .Where(x => x.Key == key)
             .ExecuteUpdateAsync(x => x.SetProperty(p => p.Value, p => p.Value + 1));
+
+        if (updated == 0)
+        {
+            try
+            {
+                await context.Set<Statistic>().AddAsync(new Statistic { Key = key, Value = 1 });
+                await context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                // Race: another worker inserted first — retry update
+                await context.Set<Statistic>()
+                    .Where(x => x.Key == key)
+                    .ExecuteUpdateAsync(x => x.SetProperty(p => p.Value, p => p.Value + 1));
+            }
+        }
     }
 }

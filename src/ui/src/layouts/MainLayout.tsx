@@ -26,7 +26,7 @@ export default function MainLayout() {
   const location = useLocation();
   const { theme, toggle } = useTheme();
 
-  usePolling(fetchStats, 5000);
+  usePolling(fetchStats, 2000);
 
   const isJobsSection = location.pathname.startsWith('/jobs');
 

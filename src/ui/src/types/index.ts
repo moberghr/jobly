@@ -107,3 +107,9 @@ export interface BulkResult {
   succeeded: number;
   skipped: number;
 }
+
+export interface StatsHistoryPoint {
+  hour: string;
+  succeeded: number;
+  failed: number;
+}

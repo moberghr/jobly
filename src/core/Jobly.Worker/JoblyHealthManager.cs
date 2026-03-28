@@ -148,6 +148,13 @@ public class JoblyHealthManager<TContext> : BackgroundService
             .Take(batchSize)
             .ExecuteDeleteAsync();
 
+        // Cleanup old hourly stats (older than 7 days)
+        var oldHourPrefix = DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-dd");
+        await context.Set<Statistic>()
+            .Where(x => (x.Key.StartsWith("stats:succeeded:") || x.Key.StartsWith("stats:failed:"))
+                        && x.Key.CompareTo($"stats:failed:{oldHourPrefix}") < 0)
+            .ExecuteDeleteAsync();
+
         return expiredJobIds.Count;
     }
 

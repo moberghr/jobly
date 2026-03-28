@@ -1,6 +1,10 @@
+import { useState, useEffect, useRef } from 'react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useDashboardStore } from '@/stores/dashboard';
 import { MetricCard } from '@/components/MetricCard';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { getStatsHistory } from '@/api';
+import type { StatsHistoryPoint } from '@/types';
 import {
   Briefcase,
   CheckCircle,
@@ -15,6 +19,36 @@ import {
 
 export default function DashboardPage() {
   const { stats, error } = useDashboardStore();
+
+  // Realtime graph — polling deltas (2s interval)
+  const [realtimeData, setRealtimeData] = useState<{ time: string; succeeded: number; failed: number }[]>([]);
+  const prevTotals = useRef<{ succeeded: number; failed: number } | null>(null);
+
+  useEffect(() => {
+    if (!stats) return;
+    const current = { succeeded: stats.totalSucceeded, failed: stats.totalFailed };
+
+    if (prevTotals.current) {
+      const delta = {
+        time: new Date().toLocaleTimeString(),
+        succeeded: current.succeeded - prevTotals.current.succeeded,
+        failed: current.failed - prevTotals.current.failed,
+      };
+      setRealtimeData(prev => [...prev.slice(-149), delta]); // keep last 150 points (5 min at 2s)
+    }
+    prevTotals.current = current;
+  }, [stats]);
+
+  // Historical graph — hourly data
+  const [history, setHistory] = useState<StatsHistoryPoint[]>([]);
+
+  useEffect(() => {
+    getStatsHistory(24).then(setHistory).catch(() => {});
+    const id = setInterval(() => {
+      getStatsHistory(24).then(setHistory).catch(() => {});
+    }, 60000); // refresh every minute
+    return () => clearInterval(id);
+  }, []);
 
   if (error) {
     return (
@@ -59,6 +93,48 @@ export default function DashboardPage() {
         <MetricCard label="Messages" value={stats.messages} icon={<Mail className="h-5 w-5" />} />
         <MetricCard label="Servers" value={stats.servers} icon={<Server className="h-5 w-5" />} />
       </div>
+
+      {/* Realtime Graph — last 5 minutes */}
+      <Card className="mb-8">
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Realtime</CardTitle></CardHeader>
+        <CardContent>
+          {realtimeData.length > 1 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={realtimeData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="time" tick={{ fontSize: 10 }} className="text-muted-foreground" />
+                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} className="text-muted-foreground" />
+                <Tooltip />
+                <Area type="monotone" dataKey="succeeded" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} />
+                <Area type="monotone" dataKey="failed" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.3} />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
+              Collecting data...
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Historical Graph — last 24 hours */}
+      {history.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Last 24 Hours</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={history.map(h => ({ ...h, hour: new Date(h.hour).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }))}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="hour" tick={{ fontSize: 10 }} className="text-muted-foreground" />
+                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} className="text-muted-foreground" />
+                <Tooltip />
+                <Area type="monotone" dataKey="succeeded" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} />
+                <Area type="monotone" dataKey="failed" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.3} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Historical totals (survive job deletion) */}
       <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">Historical</h2>
