@@ -4,17 +4,30 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { StateBadge } from '@/components/StateBadge';
-import { shortType, formatDateTime, shortId } from '@/utils/format';
+import { shortType, formatDateTime, shortId, formatRelativeTime } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
-import type { JobDetailModel } from '@/types';
+import type { JobDetailModel, JobLogModel } from '@/types';
 import * as api from '@/api';
 
-const logLevelColors: Record<string, string> = {
-  Information: 'text-muted-foreground',
-  Warning: 'text-yellow-600',
-  Error: 'text-red-600',
-  Critical: 'text-red-800 font-bold',
+const eventColors: Record<string, { border: string; bg: string; text: string }> = {
+  Created:    { border: 'border-l-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/30', text: 'text-blue-700 dark:text-blue-400' },
+  Processing: { border: 'border-l-purple-500', bg: 'bg-purple-50 dark:bg-purple-950/30', text: 'text-purple-700 dark:text-purple-400' },
+  Completed:  { border: 'border-l-green-500', bg: 'bg-green-50 dark:bg-green-950/30', text: 'text-green-700 dark:text-green-400' },
+  Failed:     { border: 'border-l-red-500', bg: 'bg-red-50 dark:bg-red-950/30', text: 'text-red-700 dark:text-red-400' },
+  Requeued:   { border: 'border-l-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-950/30', text: 'text-yellow-700 dark:text-yellow-400' },
+  Deleted:    { border: 'border-l-gray-500', bg: 'bg-gray-50 dark:bg-gray-950/30', text: 'text-gray-700 dark:text-gray-400' },
 };
+
+function getDuration(logs: JobLogModel[], currentIndex: number): string | null {
+  // Duration = time since previous event
+  if (currentIndex >= logs.length - 1) return null;
+  const current = new Date(logs[currentIndex].timestamp).getTime();
+  const previous = new Date(logs[currentIndex + 1].timestamp).getTime();
+  const ms = current - previous;
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${(ms / 60000).toFixed(1)}m`;
+}
 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -28,8 +41,13 @@ export default function JobDetailPage() {
   if (error) return <ErrorState message={error} />;
   if (!job) return <LoadingState />;
 
+  // Split logs into system events and handler logs
+  const systemEvents = job.logs.filter(l => l.eventType !== 'Log').reverse(); // newest first (like Hangfire)
+  const handlerLogs = job.logs.filter(l => l.eventType === 'Log');
+
   return (
     <div className="max-w-4xl">
+      {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Job {shortId(job.id)}</h1>
         <StateBadge state={job.currentState} />
@@ -42,7 +60,7 @@ export default function JobDetailPage() {
         </Button>
       </div>
 
-      {/* Details + Relationships */}
+      {/* Details + Flow */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Details</CardTitle></CardHeader>
@@ -82,7 +100,7 @@ export default function JobDetailPage() {
         </Card>
       </div>
 
-      {/* Sibling Jobs (from same message) */}
+      {/* Sibling Jobs */}
       {job.siblingJobs.length > 0 && (
         <Card className="mb-4">
           <CardHeader className="pb-2">
@@ -113,7 +131,7 @@ export default function JobDetailPage() {
         </Card>
       )}
 
-      {/* Child Jobs (continuations) */}
+      {/* Child Jobs */}
       {job.childJobs.length > 0 && (
         <Card className="mb-4">
           <CardHeader className="pb-2">
@@ -144,33 +162,52 @@ export default function JobDetailPage() {
         </Card>
       )}
 
-      {/* Activity Log */}
-      {job.logs.length > 0 && (
+      {/* State History — Hangfire-style state cards, newest first */}
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">History</h2>
+      <div className="space-y-3 mb-6">
+        {systemEvents.map((event, index) => {
+          const colors = eventColors[event.eventType] ?? eventColors.Created;
+          const duration = getDuration(systemEvents, index);
+          return (
+            <div key={event.id} className={`border-l-4 ${colors.border} ${colors.bg} rounded-r-md p-4`}>
+              <div className="flex items-center justify-between">
+                <span className={`font-semibold ${colors.text}`}>{event.eventType}</span>
+                <span className="text-xs text-muted-foreground">
+                  {formatRelativeTime(event.timestamp)}
+                  {duration && <span className="ml-2 opacity-60">({duration})</span>}
+                </span>
+              </div>
+              {event.message && (
+                <p className="text-sm text-muted-foreground mt-1">{event.message}</p>
+              )}
+              {event.exception && (
+                <pre className="text-xs bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-300 p-3 rounded-md overflow-auto mt-2">
+                  {event.exception}
+                </pre>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Handler Logs */}
+      {handlerLogs.length > 0 && (
         <Card className="mb-4">
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Activity Log ({job.logs.length})</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Handler Output ({handlerLogs.length})</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-1 font-mono text-xs">
-              {job.logs.map((log) => (
+              {handlerLogs.map((log) => (
                 <div key={log.id} className={`flex gap-2 ${
-                  log.eventType !== 'Log'
-                    ? 'text-primary font-medium'
-                    : logLevelColors[log.level] ?? 'text-muted-foreground'
+                  log.level === 'Error' ? 'text-red-600' :
+                  log.level === 'Warning' ? 'text-yellow-600' :
+                  'text-muted-foreground'
                 }`}>
                   <span className="text-muted-foreground shrink-0">{formatDateTime(log.timestamp)}</span>
-                  <span className="shrink-0 w-24">[{log.eventType === 'Log' ? log.level : log.eventType}]</span>
+                  <span className="shrink-0 w-20">[{log.level}]</span>
                   <span className="break-all">{log.message}</span>
                 </div>
               ))}
             </div>
-            {job.logs.some(l => l.exception) && (
-              <div className="mt-4">
-                {job.logs.filter(l => l.exception).map((log) => (
-                  <pre key={log.id} className="text-xs bg-red-50 text-red-800 p-3 rounded-md overflow-auto mt-2">
-                    {log.exception}
-                  </pre>
-                ))}
-              </div>
-            )}
           </CardContent>
         </Card>
       )}
