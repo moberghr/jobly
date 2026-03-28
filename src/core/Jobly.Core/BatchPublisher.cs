@@ -6,7 +6,6 @@ using Jobly.Core.Helper;
 using Jobly.Core.Logging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Jobly.Core;
 
@@ -31,17 +30,17 @@ public class BatchPublisher<TContext> : IBatchPublisher
 
     public async Task<Guid> StartNew<T>(List<T> batchJobMessages, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded) where T : class, IJob
     {
-        return await BaseCreateBatch(batchJobMessages, Enums.State.Enqueued, null, options);
+        return await BaseCreateBatch(batchJobMessages, State.Enqueued, null, options);
     }
 
     public async Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded) where T : class, IJob
     {
-        return await BaseCreateBatch(batchJobMessages, Enums.State.Awaiting, parentId, options);
+        return await BaseCreateBatch(batchJobMessages, State.Awaiting, parentId, options);
     }
 
-    private async Task<Guid> BaseCreateBatch<T>(List<T> batchJobMessages, Enums.State batchJobsState, Guid? parentId, BatchContinuationOptions options) where T : class, IJob
+    private async Task<Guid> BaseCreateBatch<T>(List<T> batchJobMessages, State batchJobsState, Guid? parentId, BatchContinuationOptions options) where T : class, IJob
     {
-        if (batchJobMessages.IsNullOrEmpty())
+        if (batchJobMessages == null || batchJobMessages.Count == 0)
         {
             throw new Exception("List cannot be empty");
         }
@@ -108,9 +107,9 @@ public class BatchPublisher<TContext> : IBatchPublisher
         });
 
         _context.Set<Job>().AddRange(batchJobs);
-        await _context.Set<Job>().AddAsync(placeholderJob);
-        await _context.Set<JobLog>().AddRangeAsync(logs);
-        await _context.Set<Batch>().AddAsync(newBatch);
+        _context.Set<Job>().Add(placeholderJob);
+        _context.Set<JobLog>().AddRange(logs);
+        _context.Set<Batch>().Add(newBatch);
 
         return newBatch.Id;
     }

@@ -56,10 +56,9 @@ public class JoblyHealthManager<TContext> : BackgroundService
             .FindAsync(_configuration.ServerId);
         if (server == null)
         {
-            // This should only happen if this server has stalled and other server has deleted it.
-            // All its jobs may have been failed.
-            // TODO: should we throw an exception here?
-            throw new InvalidOperationException("Server not found in the database.");
+            // Server was removed by another health manager because this server's heartbeat went stale.
+            // This is unrecoverable — the server must restart.
+            throw new InvalidOperationException("Server not found in the database. Another health manager removed this server due to stale heartbeat.");
         }
 
         server.LastHeartbeatTime = DateTime.UtcNow;
@@ -188,7 +187,7 @@ public class JoblyHealthManager<TContext> : BackgroundService
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
         
         var server = await context.Set<Server>()
-            .FindAsync(_configuration.ServerId);;
+            .FindAsync(_configuration.ServerId);
         
         if (server == null)
         {
