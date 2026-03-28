@@ -15,6 +15,7 @@ public class PostgreSqlFixture : IAsyncLifetime
     private Respawner _respawner = null!;
     private string _connectionString = null!;
 
+    public string ConnectionString => _connectionString;
     public PostgresRowLockInterceptor Interceptor { get; } = new();
     public SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();
 
