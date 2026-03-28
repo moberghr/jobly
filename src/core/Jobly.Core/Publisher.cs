@@ -133,11 +133,19 @@ public class Publisher<TContext> : IPublisher
     private async Task<Guid> CreateJob<T>(T job, DateTime? scheduleTime, int? maxRetries,
         string? queue, Guid? parentId) where T : class, IJob
     {
-        var jobState = JobHelper.CreateJobAndJobState(job, _configuration.RetryCount, scheduleTime,
+        var newJob = JobHelper.CreateJob(job, _configuration.RetryCount, scheduleTime,
             maxRetries, queue, parentId, null);
 
-        await _context.Set<JobState>().AddAsync(jobState);
+        await _context.Set<Job>().AddAsync(newJob);
+        await _context.Set<JobLog>().AddAsync(new JobLog
+        {
+            JobId = newJob.Id,
+            EventType = "Created",
+            Level = "Information",
+            Timestamp = DateTime.UtcNow,
+            Message = $"Job created in queue \"{newJob.Queue}\""
+        });
 
-        return jobState.JobId;
+        return newJob.Id;
     }
 }

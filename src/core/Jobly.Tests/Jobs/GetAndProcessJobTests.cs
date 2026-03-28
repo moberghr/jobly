@@ -1,4 +1,5 @@
-﻿using Jobly.Core.Enums;
+﻿using Jobly.Core.Data.Entities;
+using Jobly.Core.Enums;
 using Jobly.Core;
 using Jobly.Tests.TestData.Handlers;
 using System.Text.Json;
@@ -21,14 +22,19 @@ public abstract partial class JoblyTests : TestBase
 
         await context.SaveChangesAsync();
 
-        var jobFromDb = await GetJobWithStates(context, jobId);
+        var jobFromDb = await GetJob(jobId);
 
         jobFromDb.ShouldNotBeNull();
         jobFromDb.CurrentState.ShouldBe(State.Enqueued);
         jobFromDb.Type.ShouldBe(jobRequest.GetType().AssemblyQualifiedName!);
         jobFromDb.Message.ShouldBe(JsonSerializer.Serialize(jobRequest));
-        jobFromDb.JobStates.ShouldHaveSingleItem();
-        jobFromDb.JobStates.Single().State.ShouldBe(State.Enqueued);
+
+        var logs = await CreateContext().Set<JobLog>()
+            .Where(x => x.JobId == jobId)
+            .OrderBy(x => x.Timestamp)
+            .ToListAsync();
+        logs.ShouldHaveSingleItem();
+        logs.ShouldContain(l => l.EventType == "Created");
     }
 
     [Fact]
@@ -42,13 +48,17 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessJob();
 
-        var jobFromDb = await GetJobWithStates(context, jobId);
+        var jobFromDb = await GetJob(jobId);
         var logFromDb = await GetTestLog(context, testLogId);
         jobFromDb.CurrentState.ShouldBe(State.Completed);
-        jobFromDb.JobStates.Count.ShouldBe(3);
-        jobFromDb.JobStates[0].State.ShouldBe(State.Enqueued);
-        jobFromDb.JobStates[1].State.ShouldBe(State.Processing);
-        jobFromDb.JobStates[2].State.ShouldBe(State.Completed);
+
+        var logs = await CreateContext().Set<JobLog>()
+            .Where(x => x.JobId == jobId)
+            .OrderBy(x => x.Timestamp)
+            .ToListAsync();
+        logs.ShouldContain(l => l.EventType == "Created");
+        logs.ShouldContain(l => l.EventType == "Processing");
+        logs.ShouldContain(l => l.EventType == "Completed");
         logFromDb.ProcessedTime.ShouldNotBeNull();
     }
 
@@ -61,13 +71,17 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessJob();
 
-        var jobFromDb = await GetJobWithStates(context, jobId);
+        var jobFromDb = await GetJob(jobId);
 
         jobFromDb.CurrentState.ShouldBe(State.Failed);
-        jobFromDb.JobStates.Count.ShouldBe(3);
-        jobFromDb.JobStates[0].State.ShouldBe(State.Enqueued);
-        jobFromDb.JobStates[1].State.ShouldBe(State.Processing);
-        jobFromDb.JobStates[2].State.ShouldBe(State.Failed);
+
+        var logs = await CreateContext().Set<JobLog>()
+            .Where(x => x.JobId == jobId)
+            .OrderBy(x => x.Timestamp)
+            .ToListAsync();
+        logs.ShouldContain(l => l.EventType == "Created");
+        logs.ShouldContain(l => l.EventType == "Processing");
+        logs.ShouldContain(l => l.EventType == "Failed");
     }
 
     [Fact]

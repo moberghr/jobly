@@ -37,11 +37,11 @@ public abstract partial class ServiceTests : TestBase
         var job = await GetJob(jobId);
         job.CurrentState.ShouldBe(State.Deleted);
 
-        // Only one Deleted JobState entry should exist — not 10
-        var deleteStates = await CreateContext().Set<JobState>()
-            .Where(x => x.JobId == jobId && x.State == State.Deleted)
+        // Only one Deleted JobLog entry should exist — not 10
+        var deleteLogs = await CreateContext().Set<JobLog>()
+            .Where(x => x.JobId == jobId && x.EventType == "Deleted")
             .CountAsync();
-        deleteStates.ShouldBe(1);
+        deleteLogs.ShouldBe(1);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public abstract partial class ServiceTests : TestBase
 
         await ProcessJob(); // Enqueued → Processing → Completed (3 states)
 
-        var statesBefore = await CreateContext().Set<JobState>()
+        var logsBefore = await CreateContext().Set<JobLog>()
             .Where(x => x.JobId == jobId)
             .CountAsync();
 
@@ -119,29 +119,29 @@ public abstract partial class ServiceTests : TestBase
         }
         await Task.WhenAll(tasks);
 
-        // Each successful requeue adds exactly one Enqueued JobState
+        // Each successful requeue adds exactly one Requeued JobLog entry
         // Row lock ensures they run sequentially, so each sees the current state
-        var requeueStates = await CreateContext().Set<JobState>()
-            .Where(x => x.JobId == jobId && x.State == State.Enqueued)
+        var requeueLogs = await CreateContext().Set<JobLog>()
+            .Where(x => x.JobId == jobId && x.EventType == "Requeued")
             .CountAsync();
 
-        // At least the original Enqueued + all requeue Enqueued entries
-        // But the key point: total states = statesBefore + number of successful requeues
-        var statesAfter = await CreateContext().Set<JobState>()
+        // At least the original logs + all requeue log entries
+        // But the key point: total logs = logsBefore + number of successful requeues
+        var logsAfter = await CreateContext().Set<JobLog>()
             .Where(x => x.JobId == jobId)
             .CountAsync();
 
-        statesAfter.ShouldBeGreaterThan(statesBefore);
+        logsAfter.ShouldBeGreaterThan(logsBefore);
 
-        // Every JobState should have a valid state enum
-        var allStates = await CreateContext().Set<JobState>()
+        // Every JobLog should have a valid EventType
+        var allEventTypes = await CreateContext().Set<JobLog>()
             .Where(x => x.JobId == jobId)
-            .Select(x => x.State)
+            .Select(x => x.EventType)
             .ToListAsync();
 
-        foreach (var state in allStates)
+        foreach (var eventType in allEventTypes)
         {
-            Enum.IsDefined(typeof(State), state).ShouldBeTrue();
+            eventType.ShouldNotBeNullOrEmpty();
         }
     }
 

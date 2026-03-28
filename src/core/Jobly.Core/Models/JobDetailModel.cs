@@ -14,8 +14,6 @@ public class JobDetailModel : JobModel
 
     public int MaxRetries { get; set; }
 
-    public List<JobStateModel> StateHistory { get; set; } = new();
-
     public List<JobLogModel> Logs { get; set; } = new();
 
     public List<JobModel> SiblingJobs { get; set; } = new();

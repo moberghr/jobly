@@ -90,7 +90,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         // Create a Job for each handler
         foreach (var handlerType in handlerTypes)
         {
-            var jobState = JobHelper.CreateJobAndJobState(
+            var job = JobHelper.CreateJob(
                 message: message.Payload,
                 type: message.Type,
                 retries: 0,
@@ -100,10 +100,18 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
                 parentId: null,
                 state: State.Enqueued);
 
-            jobState.Job.HandlerType = handlerType.AssemblyQualifiedName;
-            jobState.Job.MessageId = message.Id;
+            job.HandlerType = handlerType.AssemblyQualifiedName;
+            job.MessageId = message.Id;
 
-            context.Set<JobState>().Add(jobState);
+            context.Set<Job>().Add(job);
+            context.Set<JobLog>().Add(new JobLog
+            {
+                JobId = job.Id,
+                EventType = "Created",
+                Timestamp = DateTime.UtcNow,
+                Level = "Information",
+                Message = $"Job {job.Id} created from message {message.Id}"
+            });
         }
 
         message.JobCount = handlerTypes.Count;
@@ -235,18 +243,17 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
     private void UpdateJobStatusToProcessing(TContext context, Job job)
     {
-        var jobState = new JobState
-        {
-            JobId = job.Id,
-            DateTime = DateTime.UtcNow,
-            State = State.Processing,
-            Message = $"The job {job.Id} is being processed"
-        };
-
         job.CurrentState = State.Processing;
         job.CurrentWorkerId = _workerId;
 
-        context.Set<JobState>().Add(jobState);
+        context.Set<JobLog>().Add(new JobLog
+        {
+            JobId = job.Id,
+            EventType = "Processing",
+            Timestamp = DateTime.UtcNow,
+            Level = "Information",
+            Message = $"The job {job.Id} is being processed"
+        });
     }
 
     private async Task CreateNextJob(TContext context, Job job, CancellationToken cancellationToken)
@@ -261,7 +268,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         var fromUtc = DateTime.SpecifyKind(recurringJob.NextExecution ?? DateTime.UtcNow, DateTimeKind.Utc);
         var nextJobScheduleTime = CronExpression.Parse(recurringJob.Cron).GetNextOccurrence(fromUtc);
 
-        var newJobState = JobHelper.CreateJobAndJobState(
+        var newJob = JobHelper.CreateJob(
             message: recurringJob.Message,
             type: recurringJob.Type,
             retries: 0,
@@ -276,8 +283,16 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         recurringJob.LastJobId = recurringJob.NextJobId;
         recurringJob.NextExecution = nextJobScheduleTime;
 
-        context.Set<JobState>().Add(newJobState);
-        recurringJob.NextJobId = newJobState.Job.Id;
+        context.Set<Job>().Add(newJob);
+        context.Set<JobLog>().Add(new JobLog
+        {
+            JobId = newJob.Id,
+            EventType = "Created",
+            Timestamp = DateTime.UtcNow,
+            Level = "Information",
+            Message = $"Job {newJob.Id} created for recurring job {recurringJob.Id}"
+        });
+        recurringJob.NextJobId = newJob.Id;
     }
 
     private static async Task UpdateJobData(TContext context, Job job, string? message, CancellationToken cancellationToken)
@@ -327,7 +342,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await UpdateMessageJobCount(context, job.MessageId.Value, cancellationToken);
         }
 
-        await CreateJobState(context, job.Id, state, string.IsNullOrEmpty(message) ? $"Job {job.Id} is completed" : message, cancellationToken);
+        await CreateJobLog(context, job.Id, state, string.IsNullOrEmpty(message) ? $"Job {job.Id} is completed" : message, cancellationToken);
     }
 
     private static async Task UpdateMessageJobCount(TContext context, Guid messageId, CancellationToken cancellationToken)
@@ -352,17 +367,27 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         await context.Set<JobLog>().AddRangeAsync(collector.Entries);
     }
 
-    private static async Task CreateJobState(TContext context, Guid jobId, State state, string? message, CancellationToken cancellationToken)
+    private static async Task CreateJobLog(TContext context, Guid jobId, State state, string? message, CancellationToken cancellationToken)
     {
-        var jobState = new JobState
+        var eventType = state switch
         {
-            JobId = jobId,
-            DateTime = DateTime.UtcNow,
-            State = state,
-            Message = message
+            State.Completed => "Completed",
+            State.Failed => "Failed",
+            State.Enqueued => "Requeued",
+            State.Processing => "Processing",
+            _ => state.ToString()
         };
 
-        await context.Set<JobState>().AddAsync(jobState, cancellationToken);
+        var level = state == State.Failed ? "Error" : "Information";
+
+        await context.Set<JobLog>().AddAsync(new JobLog
+        {
+            JobId = jobId,
+            EventType = eventType,
+            Timestamp = DateTime.UtcNow,
+            Level = level,
+            Message = message ?? string.Empty
+        }, cancellationToken);
     }
 
     private static async Task UpdateChildJobs(TContext context, Guid parentJobId, CancellationToken cancellationToken)

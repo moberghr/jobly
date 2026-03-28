@@ -113,7 +113,6 @@ public static class ServiceConfiguration
     public static void AddOutboxStateEntity(this ModelBuilder modelBuilder)
     {
         AddJobEntity(modelBuilder);
-        AddJobStateEntity(modelBuilder);
         AddRecurringJobEntity(modelBuilder);
         AddBatchEntity(modelBuilder);
         AddServerEntity(modelBuilder);
@@ -159,31 +158,10 @@ public static class ServiceConfiguration
             .WithOne(x => x.ParentJob)
             .HasForeignKey(x => x.ParentJobId);
 
-        job.HasMany(p => p.JobStates)
-            .WithOne(p => p.Job)
-            .HasForeignKey(p => p.JobId);
-
         job.HasIndex(p => new {p.CurrentState, p.Queue, p.ScheduleTime})
             .IsDescending(false, false, false);
 
         job.HasIndex(p => p.CurrentState);
-    }
-
-    private static void AddJobStateEntity(ModelBuilder modelBuilder)
-    {
-        var jobState = modelBuilder.Entity<JobState>();
-        jobState.ToTable(nameof(JobState));
-
-        jobState.Property(p => p.Id);
-        jobState.HasKey(p => p.Id);
-
-        jobState.Property(p => p.State);
-        jobState.Property(p => p.DateTime);
-        jobState.Property(p => p.Message);
-
-        jobState.HasOne(p => p.Job)
-            .WithMany(p => p.JobStates)
-            .HasForeignKey(p => p.JobId);
     }
 
     private static void AddRecurringJobEntity(ModelBuilder modelBuilder)
@@ -289,6 +267,7 @@ public static class ServiceConfiguration
         jobLog.HasKey(p => p.Id);
 
         jobLog.Property(p => p.JobId);
+        jobLog.Property(p => p.EventType);
         jobLog.Property(p => p.Timestamp);
         jobLog.Property(p => p.Level);
         jobLog.Property(p => p.Message);

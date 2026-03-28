@@ -42,7 +42,6 @@ export interface JobDetailModel extends JobModel {
   batchId: string | null;
   retriedTimes: number;
   maxRetries: number;
-  stateHistory: JobStateModel[];
   logs: JobLogModel[];
   siblingJobs: JobModel[];
   childJobs: JobModel[];
@@ -50,18 +49,11 @@ export interface JobDetailModel extends JobModel {
 
 export interface JobLogModel {
   id: string;
+  eventType: string;
   timestamp: string;
   level: string;
   message: string;
   exception: string | null;
-}
-
-export interface JobStateModel {
-  id: string;
-  state: State;
-  dateTime: string;
-  message: string | null;
-  jobId: string;
 }
 
 export interface MessageModel {

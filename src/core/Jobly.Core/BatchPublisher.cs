@@ -1,3 +1,4 @@
+using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
@@ -44,23 +45,43 @@ public class BatchPublisher<TContext> : IBatchPublisher
             throw new Exception("List cannot be empty");
         }
 
-        var placeholderJobForBatch = JobHelper.CreateJobAndJobState(batchJobMessages[0], 0, null, null, _joblyConfiguration.DefaultQueue, parentId, State.Awaiting);
+        var placeholderJob = JobHelper.CreateJob(batchJobMessages[0], 0, null, null, _joblyConfiguration.DefaultQueue, parentId, State.Awaiting);
 
         var newBatch = new Batch
         {
-            Id = placeholderJobForBatch.Job.Id,
+            Id = placeholderJob.Id,
             Counter = batchJobMessages.Count,
         };
 
-        var batchStateJobs = batchJobMessages.Select(x => JobHelper.CreateJobAndJobState(x, 0, null, null, _joblyConfiguration.DefaultQueue, null, batchJobsState))
+        var batchJobs = batchJobMessages.Select(x => JobHelper.CreateJob(x, 0, null, null, _joblyConfiguration.DefaultQueue, null, batchJobsState))
             .ToList();
-
-        var batchJobs = batchStateJobs.Select(x => x.Job).ToList();
 
         newBatch.Jobs = batchJobs;
 
-        await _context.Set<JobState>().AddRangeAsync(batchStateJobs);
-        await _context.Set<JobState>().AddAsync(placeholderJobForBatch);
+        var logs = new List<JobLog>();
+        foreach (var job in batchJobs)
+        {
+            logs.Add(new JobLog
+            {
+                JobId = job.Id,
+                EventType = "Created",
+                Level = "Information",
+                Timestamp = DateTime.UtcNow,
+                Message = $"Job created in queue \"{job.Queue}\""
+            });
+        }
+        logs.Add(new JobLog
+        {
+            JobId = placeholderJob.Id,
+            EventType = "Created",
+            Level = "Information",
+            Timestamp = DateTime.UtcNow,
+            Message = $"Batch placeholder job created in queue \"{placeholderJob.Queue}\""
+        });
+
+        _context.Set<Job>().AddRange(batchJobs);
+        await _context.Set<Job>().AddAsync(placeholderJob);
+        await _context.Set<JobLog>().AddRangeAsync(logs);
         await _context.Set<Batch>().AddAsync(newBatch);
 
         return newBatch.Id;

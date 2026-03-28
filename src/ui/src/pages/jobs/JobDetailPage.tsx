@@ -144,37 +144,20 @@ export default function JobDetailPage() {
         </Card>
       )}
 
-      {/* State History */}
-      <Card className="mb-4">
-        <CardHeader className="pb-2"><CardTitle className="text-sm">State History</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {job.stateHistory.map((s) => (
-              <div key={s.id} className="flex items-start gap-3">
-                <div className="w-2 h-2 mt-2 rounded-full bg-primary" />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <StateBadge state={s.state} />
-                    <span className="text-xs text-muted-foreground">{formatDateTime(s.dateTime)}</span>
-                  </div>
-                  {s.message && <p className="text-sm text-muted-foreground mt-1">{s.message}</p>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Execution Logs */}
+      {/* Activity Log */}
       {job.logs.length > 0 && (
         <Card className="mb-4">
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Execution Logs ({job.logs.length})</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Activity Log ({job.logs.length})</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-1 font-mono text-xs">
               {job.logs.map((log) => (
-                <div key={log.id} className={`flex gap-2 ${logLevelColors[log.level] ?? 'text-muted-foreground'}`}>
+                <div key={log.id} className={`flex gap-2 ${
+                  log.eventType !== 'Log'
+                    ? 'text-primary font-medium'
+                    : logLevelColors[log.level] ?? 'text-muted-foreground'
+                }`}>
                   <span className="text-muted-foreground shrink-0">{formatDateTime(log.timestamp)}</span>
-                  <span className="shrink-0 w-20">[{log.level}]</span>
+                  <span className="shrink-0 w-24">[{log.eventType === 'Log' ? log.level : log.eventType}]</span>
                   <span className="break-all">{log.message}</span>
                 </div>
               ))}

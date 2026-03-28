@@ -23,8 +23,6 @@ public interface IJoblyService
 
     Task<PagedList<JobModel>> GetScheduledJobs(BaseListRequest request);
 
-    Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request);
-
     Task<PagedList<JobModel>> GetJobStatesInProcess(BaseListRequest request);
 
     Task<int> CountProcessingJobs();
@@ -162,15 +160,9 @@ public class JoblyService<TContext> : IJoblyService
 
     public async Task<int> CountProcessingJobs()
     {
-        return await GetProcessingStates().CountAsync();
-    }
-
-    private IQueryable<Guid> GetProcessingStates()
-    {
-        var query = _context.Set<JobState>()
-            .Where(x => x.State == State.Processing)
-            .Select(x => x.JobId).AsQueryable();
-        return query;
+        return await _context.Set<Job>()
+            .Where(x => x.CurrentState == State.Processing)
+            .CountAsync();
     }
 
     public async Task<PagedList<JobModel>> GetJobStatesInProcess(BaseListRequest request)
@@ -188,24 +180,6 @@ public class JoblyService<TContext> : IJoblyService
             })
             .AsQueryable().ToPagedListAsync(request);
         return jobs;
-    }
-
-    public async Task<PagedList<JobStateModel>> GetJobStates(JobStateRequest request)
-    {
-        var history = await _context.Set<JobState>()
-            .Where(x => x.JobId == request.JobId)
-            .Select(x =>
-                new JobStateModel
-                {
-                    Id = x.Id,
-                    JobId = x.JobId,
-                    DateTime = x.DateTime,
-                    Message = x.Message,
-                    State = x.State,
-                })
-            .ToPagedListAsync(request);
-
-        return history;
     }
 
     private IQueryable<JobModel> GetScheduledJobs()
@@ -337,25 +311,13 @@ public class JoblyService<TContext> : IJoblyService
 
         if (job == null) return null;
 
-        job.StateHistory = await _context.Set<JobState>()
-            .Where(x => x.JobId == jobId)
-            .OrderBy(x => x.DateTime)
-            .Select(x => new JobStateModel
-            {
-                Id = x.Id,
-                State = x.State,
-                DateTime = x.DateTime,
-                Message = x.Message,
-                JobId = x.JobId
-            })
-            .ToListAsync();
-
         job.Logs = await _context.Set<JobLog>()
             .Where(x => x.JobId == jobId)
             .OrderBy(x => x.Timestamp)
             .Select(x => new JobLogModel
             {
                 Id = x.Id,
+                EventType = x.EventType,
                 Timestamp = x.Timestamp,
                 Level = x.Level,
                 Message = x.Message,
@@ -415,15 +377,14 @@ public class JoblyService<TContext> : IJoblyService
             .Where(x => x.Key == "stats:deleted")
             .ExecuteUpdateAsync(x => x.SetProperty(p => p.Value, p => p.Value + 1));
 
-        var jobState = new JobState
+        await _context.Set<JobLog>().AddAsync(new JobLog
         {
             JobId = job.Id,
-            DateTime = DateTime.UtcNow,
-            State = State.Deleted,
+            EventType = "Deleted",
+            Timestamp = DateTime.UtcNow,
+            Level = "Information",
             Message = $"Job {job.Id} was deleted"
-        };
-
-        await _context.Set<JobState>().AddAsync(jobState);
+        });
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
     }
@@ -449,15 +410,14 @@ public class JoblyService<TContext> : IJoblyService
         job.HandlerType = null;
         job.ExpireAt = null;
 
-        var jobState = new JobState
+        await _context.Set<JobLog>().AddAsync(new JobLog
         {
             JobId = job.Id,
-            DateTime = DateTime.UtcNow,
-            State = State.Enqueued,
+            EventType = "Requeued",
+            Timestamp = DateTime.UtcNow,
+            Level = "Information",
             Message = $"Job {job.Id} was requeued"
-        };
-
-        await _context.Set<JobState>().AddAsync(jobState);
+        });
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
     }
@@ -601,24 +561,27 @@ public class JoblyService<TContext> : IJoblyService
         if (recurringJob == null) throw new ArgumentException("Recurring job not found.");
 
         // Create a new job from the recurring job definition
-        var jobState = new JobState
+        var job = new Job
         {
-            Job = new Job
-            {
-                Type = recurringJob.Type,
-                Message = recurringJob.Message,
-                CreateTime = DateTime.UtcNow,
-                ScheduleTime = DateTime.UtcNow,
-                CurrentState = State.Enqueued,
-                MaxRetries = 0,
-                Queue = "default",
-                RecurringJobId = recurringJob.Id
-            },
-            State = State.Enqueued,
-            DateTime = DateTime.UtcNow
+            Type = recurringJob.Type,
+            Message = recurringJob.Message,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            CurrentState = State.Enqueued,
+            MaxRetries = 0,
+            Queue = "default",
+            RecurringJobId = recurringJob.Id
         };
 
-        await _context.Set<JobState>().AddAsync(jobState);
+        await _context.Set<Job>().AddAsync(job);
+        await _context.Set<JobLog>().AddAsync(new JobLog
+        {
+            JobId = job.Id,
+            EventType = "Created",
+            Timestamp = DateTime.UtcNow,
+            Level = "Information",
+            Message = $"Job {job.Id} was created from recurring job {recurringJob.Id}"
+        });
         await _context.SaveChangesAsync();
     }
 

@@ -52,9 +52,9 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             throw new InvalidOperationException("Failed to create job for recurring job.");
         }
 
-        var jobState = JobHelper.CreateJobAndJobState(jobMessage, jobType, 0, nextJobScheduleTime, 0, "default", null, State.Enqueued);
+        var job = JobHelper.CreateJob(jobMessage, jobType, 0, nextJobScheduleTime, 0, "default", null, State.Enqueued);
 
-        return jobState.Job;
+        return job;
     }
 
     private async Task<RecurringJob> AddOrUpdateRecurringJobToDb<T>(T message, string name, string cronExpression, Job job) where T : class, IJob
@@ -76,7 +76,14 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             if (nextJob.CurrentState == State.Enqueued)
             {
                 nextJob.CurrentState = State.Deleted;
-                nextJob.JobStates.Add(new() { DateTime = DateTime.UtcNow, State = State.Deleted });
+                _context.Set<JobLog>().Add(new JobLog
+                {
+                    JobId = nextJob.Id,
+                    EventType = "Deleted",
+                    Timestamp = DateTime.UtcNow,
+                    Level = "Information",
+                    Message = $"Job {nextJob.Id} was deleted (recurring job updated)"
+                });
             }
 
             recurringJob.Cron = cronExpression;

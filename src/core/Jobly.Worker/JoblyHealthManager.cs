@@ -97,11 +97,12 @@ public class JoblyHealthManager<TContext> : BackgroundService
                 foreach (var job in jobs)
                 {
                     job.CurrentState = State.Failed;
-                    context.Set<JobState>().Add(new JobState
+                    context.Set<JobLog>().Add(new JobLog
                     {
                         JobId = job.Id,
-                        State = State.Failed,
-                        DateTime = DateTime.UtcNow,
+                        EventType = "Failed",
+                        Timestamp = DateTime.UtcNow,
+                        Level = "Error",
                         Message = $"The job {job.Id} failed because of timeout."
                     });
                 }
@@ -135,10 +136,6 @@ public class JoblyHealthManager<TContext> : BackgroundService
         if (expiredJobIds.Count == 0) return 0;
 
         await context.Set<JobLog>()
-            .Where(x => expiredJobIds.Contains(x.JobId))
-            .ExecuteDeleteAsync();
-
-        await context.Set<JobState>()
             .Where(x => expiredJobIds.Contains(x.JobId))
             .ExecuteDeleteAsync();
 

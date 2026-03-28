@@ -28,7 +28,7 @@ public abstract partial class ServiceTests : TestBase
 
         job.ShouldNotBeNull();
         job.Id.ShouldBe(jobId);
-        job.StateHistory.Count.ShouldBeGreaterThanOrEqualTo(2); // Enqueued + Processing + Completed
+        job.Logs.Count.ShouldBeGreaterThanOrEqualTo(2); // Enqueued + Processing + Completed
         job.SiblingJobs.ShouldBeEmpty();
         job.ChildJobs.ShouldBeEmpty();
     }

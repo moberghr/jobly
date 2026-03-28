@@ -61,11 +61,6 @@ public static class JoblyEndpoints
             return model is null ? Results.NotFound() : Results.Ok(model);
         });
 
-        apiGroup.MapGet("jobs/{jobId}/states", async ([FromServices] IJoblyService joblyService, [AsParameters] JobStateRequest request) =>
-        {
-            return await joblyService.GetJobStates(request);
-        });
-
         apiGroup.MapPost("jobs/{jobId}/requeue", async ([FromServices] IJoblyService joblyService, Guid jobId) =>
         {
             await joblyService.RequeueJob(jobId);
@@ -156,11 +151,6 @@ public static class JoblyEndpoints
         apiGroup.MapGet("scheduled", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
         {
             return await joblyService.GetScheduledJobs(request);
-        });
-
-        apiGroup.MapGet("details", async ([FromServices] IJoblyService joblyService, [AsParameters] JobStateRequest request) =>
-        {
-            return await joblyService.GetJobStates(request);
         });
 
     }

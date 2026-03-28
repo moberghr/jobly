@@ -6,6 +6,8 @@ public class JobLog
 
     public Guid JobId { get; set; }
 
+    public string EventType { get; set; } = "Log";
+
     public DateTime Timestamp { get; set; }
 
     public string Level { get; set; } = string.Empty;

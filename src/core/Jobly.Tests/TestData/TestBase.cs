@@ -139,15 +139,6 @@ public abstract class TestBase
         return await batchPublisher.ContinueBatchWith(requests, placeholderJobId);
     }
 
-    protected async Task<Job> GetJobWithStates(TestContext context, Guid jobId)
-    {
-        return await context.Set<Job>()
-            .Where(x => x.Id == jobId)
-            .Include(x => x.JobStates.OrderBy(s => s.DateTime))
-            .AsNoTracking()
-            .SingleAsync();
-    }
-
     protected async Task<TestLog> GetTestLog(TestContext context, int testLogId)
     {
         return await context.TestLogs

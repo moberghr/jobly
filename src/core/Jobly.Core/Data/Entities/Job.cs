@@ -31,8 +31,6 @@ public class Job
 
     public RecurringJob? RecurringJob { get; set; }
 
-    public List<JobState> JobStates { get; set; } = new();
-
     public Job? ParentJob { get; set; }
 
     public List<Job> ChildJobs { get; set; } = new();
