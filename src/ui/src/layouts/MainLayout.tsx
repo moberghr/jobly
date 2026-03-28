@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Briefcase,
   Mail,
+  Layers,
   RefreshCw,
   Server,
   Moon,
@@ -17,6 +18,7 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/jobs/enqueued', label: 'Jobs', icon: Briefcase },
   { to: '/messages', label: 'Messages', icon: Mail },
+  { to: '/batches', label: 'Batches', icon: Layers },
   { to: '/recurring', label: 'Recurring', icon: RefreshCw },
   { to: '/servers', label: 'Servers', icon: Server },
 ];
@@ -62,6 +64,9 @@ export default function MainLayout() {
                   )}
                   {item.label === 'Messages' && stats && (
                     <span className="ml-1 text-xs opacity-75">{stats.messages}</span>
+                  )}
+                  {item.label === 'Batches' && stats && (
+                    <span className="ml-1 text-xs opacity-75">{stats.batches}</span>
                   )}
                   {item.label === 'Servers' && stats && (
                     <span className="ml-1 text-xs opacity-75">{stats.servers}</span>

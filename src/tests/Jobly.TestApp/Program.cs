@@ -47,7 +47,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Seed endpoint — creates thousands of jobs for demo
-app.MapPost("/seed", async (IPublisher publisher, TestContext context) =>
+app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher, TestContext context) =>
 {
     var random = new Random();
     var queues = new[] { "a-critical", "b-default", "c-low" };
@@ -92,9 +92,22 @@ app.MapPost("/seed", async (IPublisher publisher, TestContext context) =>
             parentId);
     }
 
+    // Slow job with awaiting children (visible for 30 seconds)
+    var slowJobId = await publisher.Enqueue(new Jobly.Core.Handlers.SlowRequest());
+    for (var i = 0; i < 5; i++)
+    {
+        await publisher.Enqueue(new Jobly.Core.Handlers.RegisterRequest { Email = $"awaiting{i}@test.com" }, slowJobId);
+    }
+
+    // Batch demo: batch of 20 → continuation batch of 10
+    var batchJobs = Enumerable.Range(0, 20).Select(_ => new Jobly.Core.Handlers.RegisterRequest { Email = "batch@test.com" }).ToList();
+    var batchId = await batchPublisher.StartNew(batchJobs);
+    var batch2Jobs = Enumerable.Range(0, 10).Select(_ => new Jobly.Core.Handlers.RegisterRequest { Email = "batch2@test.com" }).ToList();
+    await batchPublisher.ContinueBatchWith(batch2Jobs, batchId);
+
     await context.SaveChangesAsync();
 
-    return Results.Ok(new { messages = 500, jobs = 300, scheduled = 100, failing = 50, continuations = 20 });
+    return Results.Ok(new { messages = 500, jobs = 300, scheduled = 100, failing = 50, continuations = 20, batches = 2 });
 });
 
 app.Run();

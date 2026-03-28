@@ -50,6 +50,10 @@ public interface IJoblyService
     Task TriggerRecurringJob(int id);
     Task DeleteRecurringJob(int id);
 
+    // Batches
+    Task<PagedList<BatchModel>> GetBatches(BaseListRequest request);
+    Task<BatchDetailModel?> GetBatchById(Guid batchId);
+
     // Statistics
     Task<List<StatsHistoryPoint>> GetStatsHistory(int hours = 24);
 }
@@ -107,6 +111,7 @@ public class JoblyService<TContext> : IJoblyService
         var servers = await GetServerCount();
         var awaiting = await GetJobsCount(State.Awaiting);
         var messages = await _context.Set<Message>().CountAsync();
+        var batches = await _context.Set<Batch>().CountAsync();
 
         var totalSucceeded = await _context.Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
@@ -137,6 +142,7 @@ public class JoblyService<TContext> : IJoblyService
             Servers = servers,
             Awaiting = awaiting,
             Messages = messages,
+            Batches = batches,
             TotalSucceeded = totalSucceeded,
             TotalFailed = totalFailed,
             TotalDeleted = totalDeleted,
@@ -595,6 +601,69 @@ public class JoblyService<TContext> : IJoblyService
 
         _context.Set<RecurringJob>().Remove(recurringJob);
         await _context.SaveChangesAsync();
+    }
+
+    // ==================== Batches ====================
+
+    public async Task<PagedList<BatchModel>> GetBatches(BaseListRequest request)
+    {
+        return await _context.Set<Batch>()
+            .Join(_context.Set<Job>(), b => b.Id, j => j.Id, (b, j) => new { Batch = b, PlaceholderJob = j })
+            .OrderByDescending(x => x.PlaceholderJob.CreateTime)
+            .Select(x => new BatchModel
+            {
+                Id = x.Batch.Id,
+                TotalJobs = _context.Set<Job>().Count(j => j.BatchId == x.Batch.Id),
+                RemainingJobs = x.Batch.Counter,
+                PlaceholderState = x.PlaceholderJob.CurrentState,
+                CreateTime = x.PlaceholderJob.CreateTime
+            })
+            .ToPagedListAsync(request);
+    }
+
+    public async Task<BatchDetailModel?> GetBatchById(Guid batchId)
+    {
+        var batch = await _context.Set<Batch>()
+            .Where(b => b.Id == batchId)
+            .FirstOrDefaultAsync();
+
+        if (batch == null) return null;
+
+        var placeholderJob = await _context.Set<Job>()
+            .Where(j => j.Id == batchId)
+            .FirstOrDefaultAsync();
+
+        if (placeholderJob == null) return null;
+
+        var totalJobs = await _context.Set<Job>()
+            .Where(j => j.BatchId == batchId)
+            .CountAsync();
+
+        var jobs = await _context.Set<Job>()
+            .Where(j => j.BatchId == batchId)
+            .Select(j => new JobModel
+            {
+                Id = j.Id, Type = j.Type, Message = j.Message,
+                CreateTime = j.CreateTime, ScheduleTime = j.ScheduleTime,
+                CurrentState = j.CurrentState
+            })
+            .ToListAsync();
+
+        var continuationJob = await _context.Set<Job>()
+            .Where(j => j.ParentJobId == batchId)
+            .Select(j => j.Id)
+            .FirstOrDefaultAsync();
+
+        return new BatchDetailModel
+        {
+            Id = batch.Id,
+            TotalJobs = totalJobs,
+            RemainingJobs = batch.Counter,
+            PlaceholderState = placeholderJob.CurrentState,
+            CreateTime = placeholderJob.CreateTime,
+            Jobs = jobs,
+            ContinuationJobId = continuationJob == Guid.Empty ? null : continuationJob
+        };
     }
 
     // ==================== Statistics History ====================

@@ -119,6 +119,19 @@ public static class JoblyEndpoints
             return job?.Logs ?? new List<JobLogModel>();
         });
 
+        // ==================== Batches ====================
+
+        apiGroup.MapGet("batches", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
+        {
+            return await joblyService.GetBatches(request);
+        });
+
+        apiGroup.MapGet("batches/{batchId}", async ([FromServices] IJoblyService joblyService, Guid batchId) =>
+        {
+            var model = await joblyService.GetBatchById(batchId);
+            return model is null ? Results.NotFound() : Results.Ok(model);
+        });
+
         // ==================== Statistics ====================
 
         apiGroup.MapGet("stats/history", async ([FromServices] IJoblyService joblyService, [FromQuery] int? hours) =>

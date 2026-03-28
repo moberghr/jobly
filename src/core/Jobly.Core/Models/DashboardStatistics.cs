@@ -26,4 +26,6 @@ public class DashboardStatistics
     public long TotalFailed { get; set; }
     public long TotalDeleted { get; set; }
     public long TotalCreated { get; set; }
+
+    public int Batches { get; set; }
 }

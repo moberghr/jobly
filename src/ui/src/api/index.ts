@@ -1,5 +1,5 @@
 import api from './client';
-import type { DashboardStatistics, JobModel, JobDetailModel, MessageModel, MessageDetailModel, RecurringJobModel, ServerModel, PagedList, BulkResult, StatsHistoryPoint } from '@/types';
+import type { DashboardStatistics, JobModel, JobDetailModel, MessageModel, MessageDetailModel, RecurringJobModel, ServerModel, PagedList, BulkResult, StatsHistoryPoint, BatchModel, BatchDetailModel } from '@/types';
 
 // Dashboard
 export const getStatus = () => api.get<DashboardStatistics>('/status').then(r => r.data);
@@ -50,6 +50,13 @@ export const bulkDeleteJobs = (jobIds: string[]) =>
 
 export const bulkRequeueJobs = (jobIds: string[]) =>
   api.post<BulkResult>('/jobs/bulk/requeue', { jobIds }).then(r => r.data);
+
+// Batches
+export const getBatches = (page = 0, pageSize = 20) =>
+  api.get<PagedList<BatchModel>>('/batches', { params: { page, pageSize } }).then(r => r.data);
+
+export const getBatchById = (batchId: string) =>
+  api.get<BatchDetailModel>(`/batches/${batchId}`).then(r => r.data);
 
 // Servers
 export const getServers = () => api.get<ServerModel[]>('/servers').then(r => r.data);

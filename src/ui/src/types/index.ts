@@ -23,6 +23,7 @@ export interface DashboardStatistics {
   totalFailed: number;
   totalDeleted: number;
   totalCreated: number;
+  batches: number;
 }
 
 export interface JobModel {
@@ -101,6 +102,19 @@ export interface PagedList<T> {
   totalCount: number;
   pageCount: number;
   items: T[];
+}
+
+export interface BatchModel {
+  id: string;
+  totalJobs: number;
+  remainingJobs: number;
+  placeholderState: State;
+  createTime: string;
+}
+
+export interface BatchDetailModel extends BatchModel {
+  jobs: JobModel[];
+  continuationJobId: string | null;
 }
 
 export interface BulkResult {
