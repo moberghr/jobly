@@ -29,10 +29,11 @@ export default function DashboardPage() {
     const current = { succeeded: stats.totalSucceeded, failed: stats.totalFailed };
 
     if (prevTotals.current) {
+      const intervalSeconds = 2;
       const delta = {
         time: new Date().toLocaleTimeString(),
-        succeeded: current.succeeded - prevTotals.current.succeeded,
-        failed: current.failed - prevTotals.current.failed,
+        succeeded: (current.succeeded - prevTotals.current.succeeded) / intervalSeconds,
+        failed: (current.failed - prevTotals.current.failed) / intervalSeconds,
       };
       setRealtimeData(prev => [...prev.slice(-149), delta]); // keep last 150 points (5 min at 2s)
     }
@@ -96,7 +97,7 @@ export default function DashboardPage() {
 
       {/* Realtime Graph — last 5 minutes */}
       <Card className="mb-8">
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Realtime</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Realtime (jobs/sec)</CardTitle></CardHeader>
         <CardContent>
           {realtimeData.length > 1 ? (
             <ResponsiveContainer width="100%" height={200}>
