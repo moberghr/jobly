@@ -102,7 +102,7 @@ public class JoblyService<TContext> : IJoblyService
         var created = await GetJobsCount(State.Enqueued);
         var completed = await GetJobsCount(State.Completed);
         var failed = await GetJobsCount(State.Failed);
-        var processing = await CountProcessingJobs() - completed - failed;
+        var processing = await CountProcessingJobs();
 
         var servers = await GetServerCount();
         var awaiting = await GetJobsCount(State.Awaiting);

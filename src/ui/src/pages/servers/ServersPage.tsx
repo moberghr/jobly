@@ -64,7 +64,7 @@ export default function ServersPage() {
                           </TableCell>
                           <TableCell>
                             {w.currentJobId ? (
-                              <Link to={`/jobs/${w.currentJobId}`} className="text-primary hover:underline text-xs font-mono">
+                              <Link to={`/jobs/detail/${w.currentJobId}`} className="text-primary hover:underline text-xs font-mono">
                                 {shortId(w.currentJobId)}
                               </Link>
                             ) : (

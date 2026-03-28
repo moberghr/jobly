@@ -14,8 +14,8 @@ function App() {
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/jobs/detail/:id" element={<JobDetailPage />} />
           <Route path="/jobs/:state" element={<JobListPage />} />
-          <Route path="/jobs/:id" element={<JobDetailPage />} />
           <Route path="/messages" element={<MessagesPage />} />
           <Route path="/messages/:id" element={<MessageDetailPage />} />
           <Route path="/recurring" element={<RecurringPage />} />

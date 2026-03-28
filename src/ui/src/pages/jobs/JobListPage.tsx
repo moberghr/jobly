@@ -4,7 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { StateBadge } from '@/components/StateBadge';
 import { Pagination } from '@/components/Pagination';
-import { shortType, formatRelativeTime, shortId } from '@/utils/format';
+import { shortType, shortId } from '@/utils/format';
+import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import type { JobModel, PagedList } from '@/types';
@@ -127,14 +128,14 @@ export default function JobListPage() {
                     />
                   </TableCell>
                   <TableCell className="font-mono text-xs">
-                    <Link to={`/jobs/${job.id}`} className="text-primary hover:underline">
+                    <Link to={`/jobs/detail/${job.id}`} className="text-primary hover:underline">
                       {shortId(job.id)}
                     </Link>
                   </TableCell>
                   <TableCell>{shortType(job.type)}</TableCell>
                   <TableCell><StateBadge state={job.currentState} /></TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {formatRelativeTime(job.createTime)}
+                    <RelativeTime date={job.createTime} />
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" onClick={() => { api.requeueJob(job.id).then(fetchData); }}>

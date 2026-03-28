@@ -61,7 +61,7 @@ export default function MessageDetailPage() {
               {message.jobs.map((job) => (
                 <TableRow key={job.id}>
                   <TableCell className="font-mono text-xs">
-                    <Link to={`/jobs/${job.id}`} className="text-primary hover:underline">
+                    <Link to={`/jobs/detail/${job.id}`} className="text-primary hover:underline">
                       {shortId(job.id)}
                     </Link>
                   </TableCell>

@@ -39,9 +39,10 @@ export default function MainLayout() {
           <nav className="flex gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
+              const matchPath = item.to === '/jobs/enqueued' ? '/jobs' : item.to;
               const isActive = item.to === '/'
                 ? location.pathname === '/'
-                : location.pathname.startsWith(item.to);
+                : location.pathname.startsWith(matchPath);
               return (
                 <Link
                   key={item.to}

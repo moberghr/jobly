@@ -60,6 +60,16 @@ export default function JobDetailPage() {
         </Button>
       </div>
 
+      {/* Payload */}
+      {job.message && (
+        <Card className="mb-6">
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Payload</CardTitle></CardHeader>
+          <CardContent>
+            <pre className="text-xs bg-muted p-3 rounded-md overflow-auto">{job.message}</pre>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Details + Flow */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <Card>
@@ -88,7 +98,7 @@ export default function JobDetailPage() {
             {job.parentJobId && (
               <div>
                 <span className="text-muted-foreground">Continuation of Job:</span>{' '}
-                <Link to={`/jobs/${job.parentJobId}`} className="text-primary hover:underline font-mono text-xs">
+                <Link to={`/jobs/detail/${job.parentJobId}`} className="text-primary hover:underline font-mono text-xs">
                   {shortId(job.parentJobId)}
                 </Link>
               </div>
@@ -119,7 +129,7 @@ export default function JobDetailPage() {
                 {job.siblingJobs.map((s) => (
                   <TableRow key={s.id}>
                     <TableCell className="font-mono text-xs">
-                      <Link to={`/jobs/${s.id}`} className="text-primary hover:underline">{shortId(s.id)}</Link>
+                      <Link to={`/jobs/detail/${s.id}`} className="text-primary hover:underline">{shortId(s.id)}</Link>
                     </TableCell>
                     <TableCell>{shortType(s.type)}</TableCell>
                     <TableCell><StateBadge state={s.currentState} /></TableCell>
@@ -150,7 +160,7 @@ export default function JobDetailPage() {
                 {job.childJobs.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-mono text-xs">
-                      <Link to={`/jobs/${c.id}`} className="text-primary hover:underline">{shortId(c.id)}</Link>
+                      <Link to={`/jobs/detail/${c.id}`} className="text-primary hover:underline">{shortId(c.id)}</Link>
                     </TableCell>
                     <TableCell>{shortType(c.type)}</TableCell>
                     <TableCell><StateBadge state={c.currentState} /></TableCell>
@@ -212,15 +222,6 @@ export default function JobDetailPage() {
         </Card>
       )}
 
-      {/* Payload */}
-      {job.message && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Payload</CardTitle></CardHeader>
-          <CardContent>
-            <pre className="text-xs bg-muted p-3 rounded-md overflow-auto">{job.message}</pre>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

@@ -6,11 +6,14 @@ export function formatRelativeTime(dateString: string): string {
 }
 
 export function formatDateTime(dateString: string): string {
-  return format(new Date(dateString), 'yyyy-MM-dd HH:mm:ss');
+  return format(new Date(dateString), 'yyyy-MM-dd HH:mm:ss.SSS');
+}
+
+export function formatDateTimeExact(dateString: string): string {
+  return format(new Date(dateString), 'yyyy-MM-dd HH:mm:ss.SSS');
 }
 
 export function shortType(fullType: string): string {
-  // "Namespace.ClassName, Assembly, ..." -> "ClassName"
   const parts = fullType.split(',')[0].split('.');
   return parts[parts.length - 1];
 }
