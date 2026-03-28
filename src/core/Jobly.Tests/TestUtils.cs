@@ -1,5 +1,6 @@
 using Jobly.Core;
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Services;
 using Jobly.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -9,6 +10,7 @@ namespace Jobly.Tests;
 
 public static class TestUtils
 {
+    private static readonly string[] DefaultQueues = ["a-critical", "b-default", "c-low", "default", "high"];
     public static readonly Guid TestServerId = Guid.NewGuid();
     public static readonly Guid TestWorkerId = Guid.NewGuid();
 
@@ -20,7 +22,7 @@ public static class TestUtils
             Id = TestServerId,
             StartedTime = now,
             LastHeartbeatTime = now,
-            ServiceCount = workerCount
+            ServiceCount = workerCount,
         };
         await context.Set<Server>().AddAsync(server);
 
@@ -29,23 +31,48 @@ public static class TestUtils
             Id = TestWorkerId,
             ServerId = TestServerId,
             StartedTime = now,
-            LastHeartbeatTime = now
+            LastHeartbeatTime = now,
         };
         await context.Set<Jobly.Core.Data.Entities.Worker>().AddAsync(worker);
 
         await context.SaveChangesAsync();
     }
 
-    public static JoblyService<TestContext> CreateJoblyService(TestContext context)
+    public static JobQueryService<TestContext> CreateJobQueryService(TestContext context)
     {
-        return new JoblyService<TestContext>(context);
+        return new JobQueryService<TestContext>(context);
+    }
+
+    public static JobCommandService<TestContext> CreateJobCommandService(TestContext context)
+    {
+        return new JobCommandService<TestContext>(context);
+    }
+
+    public static MessageQueryService<TestContext> CreateMessageQueryService(TestContext context)
+    {
+        return new MessageQueryService<TestContext>(context);
+    }
+
+    public static RecurringJobService<TestContext> CreateRecurringJobService(TestContext context)
+    {
+        return new RecurringJobService<TestContext>(context);
+    }
+
+    public static BatchQueryService<TestContext> CreateBatchQueryService(TestContext context)
+    {
+        return new BatchQueryService<TestContext>(context);
+    }
+
+    public static DashboardStatsService<TestContext> CreateDashboardStatsService(TestContext context)
+    {
+        return new DashboardStatsService<TestContext>(context);
     }
 
     public static Publisher<TestContext> CreatePublisher(TestContext context, int retries = 0)
     {
         IOptions<JoblyConfiguration> joblyConfigOptions = new OptionsWrapper<JoblyConfiguration>(new JoblyConfiguration
         {
-            RetryCount = retries
+            RetryCount = retries,
         });
         return new Publisher<TestContext>(context, joblyConfigOptions);
     }
@@ -54,7 +81,7 @@ public static class TestUtils
     {
         IOptions<JoblyConfiguration> joblyConfigOptions = new OptionsWrapper<JoblyConfiguration>(new JoblyConfiguration
         {
-            RetryCount = retries
+            RetryCount = retries,
         });
         return new BatchPublisher<TestContext>(context, joblyConfigOptions);
     }
@@ -65,10 +92,12 @@ public static class TestUtils
         {
             WorkerCount = 1,
             ServerId = TestServerId,
-            Queues = new[] { "a-critical", "b-default", "c-low", "default", "high" }
+            Queues = DefaultQueues,
         });
 
-        return new JoblyWorkerService<TestContext>(TestWorkerId, serviceScopeFactory,
+        return new JoblyWorkerService<TestContext>(
+            TestWorkerId,
+            serviceScopeFactory,
             new NullLogger<JoblyWorkerService<TestContext>>(),
             joblyWorkerConfigOptions);
     }

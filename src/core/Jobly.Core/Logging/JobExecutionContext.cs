@@ -3,6 +3,7 @@ namespace Jobly.Core.Logging;
 public class JobExecutionInfo
 {
     public Guid JobId { get; set; }
+
     public Guid TraceId { get; set; }
 }
 

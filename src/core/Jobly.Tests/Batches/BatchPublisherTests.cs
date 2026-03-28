@@ -1,4 +1,4 @@
-﻿using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Microsoft.EntityFrameworkCore;

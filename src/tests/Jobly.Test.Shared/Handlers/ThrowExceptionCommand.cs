@@ -9,14 +9,7 @@ public class ThrowExceptionRequest : IJob
 
 public class ThrowExceptionCommand : IJobHandler<ThrowExceptionRequest>
 {
-    private readonly IPublisher _publisher;
-
-    public ThrowExceptionCommand(IPublisher publisher)
-    {
-        _publisher = publisher;
-    }
-
-    public async Task HandleAsync(ThrowExceptionRequest message, CancellationToken ct)
+    public Task HandleAsync(ThrowExceptionRequest message, CancellationToken ct)
     {
         throw new Exception("This is from ThrowExceptionCommand");
     }

@@ -1,11 +1,11 @@
-﻿using Jobly.Core.Data.Entities;
-using Jobly.Core.Enums;
-using Jobly.Core;
-using Jobly.Tests.TestData.Handlers;
 using System.Text.Json;
-using Shouldly;
-using Microsoft.EntityFrameworkCore;
+using Jobly.Core;
+using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
+using Jobly.Core.Enums;
+using Jobly.Tests.TestData.Handlers;
+using Microsoft.EntityFrameworkCore;
+using Shouldly;
 
 namespace Jobly.Tests.Jobs;
 
@@ -89,13 +89,13 @@ public abstract partial class JoblyTests : TestBase
     {
         await CreateCounterJob();
 
-        List<Task> tasks = new();
+        List<Task> tasks = [];
         for (var i = 0; i < 20; i++)
         {
             tasks.Add(ProcessJob());
         }
 
-        Task.WaitAll(tasks.ToArray());
+        await Task.WhenAll([.. tasks]);
 
         var counter = await GetCounter();
         counter.ShouldBe(1);
@@ -179,7 +179,7 @@ public abstract partial class JoblyTests : TestBase
 
         var firstPlaceholderJobId = await CreateBatch(context, 2);
 
-        var secondPlaceholderJobId = await ContinueBatchWith(context, 2, firstPlaceholderJobId);
+        _ = await ContinueBatchWith(context, 2, firstPlaceholderJobId);
 
         await context.SaveChangesAsync();
 
@@ -202,7 +202,7 @@ public abstract partial class JoblyTests : TestBase
 
         var firstPlaceholderJobId = await CreateBatch(context, 2);
 
-        var secondPlaceholderJobId = await ContinueBatchWith(context, 2, firstPlaceholderJobId);
+        _ = await ContinueBatchWith(context, 2, firstPlaceholderJobId);
 
         await context.SaveChangesAsync();
 
@@ -305,7 +305,7 @@ public abstract partial class JoblyTests : TestBase
 
         var singleJobId = await CreateJobWithParentId(context, firstPlaceholderJobId);
 
-        var secondPlaceholderJobId = await ContinueBatchWith(context, 2, singleJobId);
+        _ = await ContinueBatchWith(context, 2, singleJobId);
 
         await context.SaveChangesAsync();
 
@@ -345,7 +345,7 @@ public abstract partial class JoblyTests : TestBase
 
         var singleJobId = await CreateJobWithParentId(context, firstPlaceholderJobId);
 
-        var secondPlaceholderJobId = await ContinueBatchWith(context, 2, singleJobId);
+        _ = await ContinueBatchWith(context, 2, singleJobId);
 
         await context.SaveChangesAsync();
 
@@ -436,4 +436,3 @@ public abstract partial class JoblyTests : TestBase
         }
     }
 }
-

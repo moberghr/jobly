@@ -5,13 +5,12 @@ namespace Jobly.Core.Handlers;
 
 public class RecurringJobRequest : IJob
 {
-    public string Email { get; set; }
+    public string? Email { get; set; }
 
-    public string Name { get; set; }
+    public string? Name { get; set; }
 
-    public string Cron { get; set; }
+    public string? Cron { get; set; }
 }
-
 
 public class RecurringJobCommand : IJobHandler<RecurringJobRequest>
 {
@@ -28,7 +27,7 @@ public class RecurringJobCommand : IJobHandler<RecurringJobRequest>
     {
         var registration = new Registration
         {
-            Email = message.Email
+            Email = message.Email,
         };
 
         _context.Registrations.Add(registration);
@@ -37,12 +36,12 @@ public class RecurringJobCommand : IJobHandler<RecurringJobRequest>
         {
             Email = message.Email,
             Body = "Test email",
-            Subject = "Test subject"
+            Subject = "Test subject",
         };
 
         _context.EmailLogs.Add(emailLog);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(ct);
 
         var sendEmailRequest = new SendEmailRequest
         {
@@ -51,6 +50,6 @@ public class RecurringJobCommand : IJobHandler<RecurringJobRequest>
 
         await _publisher.AddOrUpdateRecurringJob(sendEmailRequest, message.Name, message.Cron);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(ct);
     }
 }

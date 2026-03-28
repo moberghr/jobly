@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Jobly.TestApp.Controllers;
 
 [ApiController]
+[Route("api/[controller]")]
 public class TestController : ControllerBase
 {
     private readonly IPublisher _publisher;

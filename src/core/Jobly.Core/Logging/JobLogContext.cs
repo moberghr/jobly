@@ -5,7 +5,8 @@ namespace Jobly.Core.Logging;
 public class JobLogCollector
 {
     public Guid JobId { get; set; }
-    public List<JobLog> Entries { get; } = new();
+
+    public List<JobLog> Entries { get; } = [];
 
     public void Add(string level, string message, string? exception = null)
     {
@@ -15,7 +16,7 @@ public class JobLogCollector
             Timestamp = DateTime.UtcNow,
             Level = level,
             Message = message,
-            Exception = exception
+            Exception = exception,
         });
     }
 }

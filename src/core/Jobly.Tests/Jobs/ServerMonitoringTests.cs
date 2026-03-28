@@ -12,7 +12,7 @@ public abstract partial class JoblyTests : TestBase
 
         await TestUtils.RegisterTestServer(context, workerCount: 5);
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateDashboardStatsService(CreateContext());
         var servers = await service.GetServers();
 
         servers.Count.ShouldBe(1);
@@ -27,7 +27,7 @@ public abstract partial class JoblyTests : TestBase
     {
         await EnsureServerRegistered();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateDashboardStatsService(CreateContext());
         var stats = await service.GetJoblyStatus();
 
         stats.Servers.ShouldBe(1);
@@ -59,7 +59,7 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessJob();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateDashboardStatsService(CreateContext());
         var servers = await service.GetServers();
 
         servers.Count.ShouldBe(1);
@@ -78,7 +78,7 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessJob();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateDashboardStatsService(CreateContext());
         var servers = await service.GetServers();
 
         servers[0].Workers.Count.ShouldBeGreaterThan(0);

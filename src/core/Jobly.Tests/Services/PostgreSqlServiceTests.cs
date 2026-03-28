@@ -7,7 +7,8 @@ public class PostgreSqlServiceTests : ServiceTests, IAsyncLifetime
 {
     private readonly PostgreSqlFixture _fixture;
 
-    public PostgreSqlServiceTests(PostgreSqlFixture fixture) : base(fixture.CreateContext)
+    public PostgreSqlServiceTests(PostgreSqlFixture fixture)
+        : base(fixture.CreateContext)
     {
         _fixture = fixture;
     }

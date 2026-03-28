@@ -8,7 +8,8 @@ public class SqlServerServiceTests : ServiceTests, IAsyncLifetime
 {
     private readonly SqlServerFixture _fixture;
 
-    public SqlServerServiceTests(SqlServerFixture fixture) : base(fixture.CreateContext)
+    public SqlServerServiceTests(SqlServerFixture fixture)
+        : base(fixture.CreateContext)
     {
         _fixture = fixture;
     }

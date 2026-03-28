@@ -21,5 +21,5 @@ public class MessageModel
 
 public class MessageDetailModel : MessageModel
 {
-    public List<JobModel> Jobs { get; set; } = new();
+    public List<JobModel> Jobs { get; set; } = [];
 }

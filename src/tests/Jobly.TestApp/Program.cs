@@ -29,7 +29,7 @@ builder.Services.AddJoblyWorker<TestContext>(options =>
     options.WorkerCount = 10;
     options.ServerName = "jobly-demo-server";
     options.DefaultQueue = "default";
-    options.Queues = new[] { "a-critical", "b-default", "c-low", "default" };
+    options.Queues = ["a-critical", "b-default", "c-low", "default"];
     options.PollingInterval = TimeSpan.FromMilliseconds(500);
     options.HealthCheckInterval = TimeSpan.FromSeconds(10);
     options.HealthCheckTimeout = TimeSpan.FromSeconds(30);
@@ -52,10 +52,12 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Seed endpoint — creates a realistic demo workload
+var seedQueues = new[] { "a-critical", "b-default", "c-low" };
+
 app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher, IRecurringJobPublisher recurringPublisher, TestContext context) =>
 {
     var random = new Random();
-    var queues = new[] { "a-critical", "b-default", "c-low" };
+    var queues = seedQueues;
 
     // === Jobs across queues (fast, will complete quickly) ===
     for (var i = 0; i < 300; i++)
@@ -121,7 +123,6 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     await batchPublisher.ContinueBatchWith(batch2Jobs, batchId);
 
     // === Batch with OnAnyFinishedState (continuation fires even if some fail) ===
-    var mixedBatchJobs = new List<IJob>();
     // Can't mix types in BatchPublisher, so use SendEmailRequest for success batch
     var failBatchJobs = Enumerable.Range(0, 5)
         .Select(_ => new ThrowExceptionRequest()).ToList();
@@ -156,15 +157,15 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
         messages = 10,
         orderFlows = 5,
         batches = 2,
-        recurringJobs = 2
+        recurringJobs = 2,
     });
 });
 
-app.Run();
+await app.RunAsync();
 
 async Task Migrate()
 {
-    using var scope = app!.Services.CreateScope();
+    await using var scope = app!.Services.CreateAsyncScope();
     var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
     await ctx.Database.EnsureDeletedAsync();
     await ctx.Database.EnsureCreatedAsync();

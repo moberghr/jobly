@@ -9,8 +9,6 @@ namespace Jobly.Tests.Jobs;
 
 public abstract partial class JoblyTests : TestBase
 {
-    // ==================== Lifecycle Event Logs ====================
-
     [Fact]
     public async Task GivenJob_WhenCreated_ThenCreatedLogExists()
     {
@@ -49,9 +47,9 @@ public abstract partial class JoblyTests : TestBase
         logs.ShouldContain(l => l.EventType == "Completed");
 
         // Correct order
-        var created = logs.First(l => l.EventType == "Created");
-        var processing = logs.First(l => l.EventType == "Processing");
-        var completed = logs.First(l => l.EventType == "Completed");
+        var created = logs.First(l => string.Equals(l.EventType, "Created", StringComparison.Ordinal));
+        var processing = logs.First(l => string.Equals(l.EventType, "Processing", StringComparison.Ordinal));
+        var completed = logs.First(l => string.Equals(l.EventType, "Completed", StringComparison.Ordinal));
         processing.Timestamp.ShouldBeGreaterThanOrEqualTo(created.Timestamp);
         completed.Timestamp.ShouldBeGreaterThanOrEqualTo(processing.Timestamp);
     }
@@ -86,7 +84,7 @@ public abstract partial class JoblyTests : TestBase
         var jobId = await publisher.Enqueue(new UnitRequest());
         await context.SaveChangesAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.DeleteJob(jobId);
 
         var logs = await CreateContext().Set<JobLog>()
@@ -107,7 +105,7 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessJob(); // completes
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.RequeueJob(jobId);
 
         var logs = await CreateContext().Set<JobLog>()
@@ -128,10 +126,11 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessJob(); // Created → Processing → Completed
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
-        await service.RequeueJob(jobId); // + Requeued
+        var commandService = TestUtils.CreateJobCommandService(CreateContext());
+        await commandService.RequeueJob(jobId); // + Requeued
 
-        var jobDetail = await service.GetJobById(jobId);
+        var queryService = TestUtils.CreateJobQueryService(CreateContext());
+        var jobDetail = await queryService.GetJobById(jobId);
         jobDetail.ShouldNotBeNull();
 
         jobDetail.Logs.ShouldContain(l => l.EventType == "Created");
@@ -145,8 +144,6 @@ public abstract partial class JoblyTests : TestBase
             log.EventType.ShouldNotBeNullOrEmpty();
         }
     }
-
-    // ==================== Handler ILogger Capture ====================
 
     [Fact]
     public async Task GivenHandlerWithLogging_WhenJobExecuted_ThenLogsAreCaptured()
@@ -185,13 +182,13 @@ public abstract partial class JoblyTests : TestBase
             .ToListAsync();
 
         // System events have specific EventTypes
-        var systemLogs = allLogs.Where(l => l.EventType != "Log").ToList();
+        var systemLogs = allLogs.Where(l => !string.Equals(l.EventType, "Log", StringComparison.Ordinal)).ToList();
         systemLogs.ShouldContain(l => l.EventType == "Created");
         systemLogs.ShouldContain(l => l.EventType == "Processing");
         systemLogs.ShouldContain(l => l.EventType == "Completed");
 
         // Handler logs have EventType = "Log"
-        var handlerLogs = allLogs.Where(l => l.EventType == "Log").ToList();
+        var handlerLogs = allLogs.Where(l => string.Equals(l.EventType, "Log", StringComparison.Ordinal)).ToList();
         handlerLogs.Count.ShouldBeGreaterThanOrEqualTo(2);
     }
 
@@ -224,7 +221,7 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessJob();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobQueryService(CreateContext());
         var jobDetail = await service.GetJobById(jobId);
 
         jobDetail.ShouldNotBeNull();
@@ -240,8 +237,6 @@ public abstract partial class JoblyTests : TestBase
             log.EventType.ShouldNotBeNullOrEmpty();
         }
     }
-
-    // ==================== Log Isolation ====================
 
     [Fact]
     public async Task GivenTwoJobs_ThenLogsDoNotLeak()

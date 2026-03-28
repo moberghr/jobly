@@ -1,5 +1,5 @@
-﻿using Jobly.Core.Enums;
 using Jobly.Core;
+using Jobly.Core.Enums;
 using Jobly.Tests.TestData.Handlers;
 using Shouldly;
 
@@ -13,8 +13,8 @@ public abstract partial class JoblyTests : TestBase
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
         var jobRequest = new UnitRequest();
-        Guid jobId = await publisher.Enqueue(jobRequest);
-        Guid childJobId = await publisher.Enqueue(jobRequest, jobId);
+        var jobId = await publisher.Enqueue(jobRequest);
+        var childJobId = await publisher.Enqueue(jobRequest, jobId);
         await context.SaveChangesAsync();
         var childJob = await GetJob(childJobId);
 
@@ -22,7 +22,7 @@ public abstract partial class JoblyTests : TestBase
         childJob.CurrentState.ShouldBe(State.Awaiting);
         childJob.ParentJobId.ShouldBe(jobId);
 
-        for (int i = 0; i < 3; i++)
+        for (var i = 0; i < 3; i++)
         {
             await ProcessJob();
         }
@@ -40,11 +40,11 @@ public abstract partial class JoblyTests : TestBase
         var publisher = TestUtils.CreatePublisher(context);
         var jobRequest = new UnitRequest();
 
-        Guid jobId = await CreateFailedRetryJob(context, 0, 0, null);
-        Guid childJobId = await publisher.Enqueue(jobRequest, jobId);
+        var jobId = await CreateFailedRetryJob(context, 0, 0, null);
+        var childJobId = await publisher.Enqueue(jobRequest, jobId);
         await context.SaveChangesAsync();
 
-        for (int i = 0; i < 2; i++)
+        for (var i = 0; i < 2; i++)
         {
             await ProcessJob();
         }
@@ -55,4 +55,3 @@ public abstract partial class JoblyTests : TestBase
         childJob.CurrentState.ShouldBe(State.Awaiting);
     }
 }
-

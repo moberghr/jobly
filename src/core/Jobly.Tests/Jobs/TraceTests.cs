@@ -9,8 +9,6 @@ namespace Jobly.Tests.Jobs;
 
 public abstract partial class JoblyTests : TestBase
 {
-    // ==================== Root Job TraceId ====================
-
     [Fact]
     public async Task GivenRootJob_WhenEnqueued_ThenTraceIdEqualsJobId()
     {
@@ -22,8 +20,6 @@ public abstract partial class JoblyTests : TestBase
         var job = await GetJob(jobId);
         job.TraceId.ShouldBe(jobId);
     }
-
-    // ==================== Spawned Job Inherits Trace ====================
 
     [Fact]
     public async Task GivenJobThatSpawnsChild_WhenProcessed_ThenChildInheritsTraceId()
@@ -69,13 +65,12 @@ public abstract partial class JoblyTests : TestBase
         childJob.CurrentState.ShouldBe(State.Completed);
     }
 
-    // ==================== Multi-Level Trace ====================
-
     [Fact]
     public async Task GivenThreeLevelChain_WhenFullyProcessed_ThenAllShareSameTraceId()
     {
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
+
         // Level 1: SpawnGrandchildJobRequest → spawns SpawnChildJobRequest → spawns UnitRequest
         var rootJobId = await publisher.Enqueue(new SpawnGrandchildJobRequest());
         await context.SaveChangesAsync();
@@ -100,8 +95,6 @@ public abstract partial class JoblyTests : TestBase
         leafJob.TraceId.ShouldBe(rootJobId); // Same trace all the way down
         leafJob.SpawnedByJobId.ShouldBe(midJob.Id);
     }
-
-    // ==================== Message-Routed Jobs ====================
 
     [Fact]
     public async Task GivenMessageWithMultipleHandlers_WhenRouted_ThenAllJobsShareTraceId()
@@ -144,8 +137,6 @@ public abstract partial class JoblyTests : TestBase
         jobs1[0].TraceId.ShouldNotBe(jobs2[0].TraceId);
     }
 
-    // ==================== GetJobById Includes TraceJobs ====================
-
     [Fact]
     public async Task GivenJobWithSpawnedChild_WhenGetJobById_ThenTraceJobsIncludesChild()
     {
@@ -157,7 +148,7 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessAllJobs();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobQueryService(CreateContext());
         var detail = await service.GetJobById(parentJobId);
 
         detail.ShouldNotBeNull();

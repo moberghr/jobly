@@ -24,7 +24,7 @@ public class FailedCommand : IJobHandler<FailedJobRequest>
         {
             await _publisher.Schedule(new ThrowExceptionRequest(), message.SchedululeTime.Value);
 
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(ct);
 
             return;
         }
@@ -34,6 +34,6 @@ public class FailedCommand : IJobHandler<FailedJobRequest>
             await _publisher.Enqueue(new ThrowExceptionRequest());
         }
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(ct);
     }
 }

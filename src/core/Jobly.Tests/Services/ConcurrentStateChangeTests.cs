@@ -26,12 +26,15 @@ public abstract partial class ServiceTests : TestBase
             {
                 try
                 {
-                    var service = TestUtils.CreateJoblyService(CreateContext());
+                    var service = TestUtils.CreateJobCommandService(CreateContext());
                     await service.DeleteJob(jobId);
                 }
-                catch { }
+                catch
+                {
+                }
             }));
         }
+
         await Task.WhenAll(tasks);
 
         var job = await GetJob(jobId);
@@ -67,17 +70,20 @@ public abstract partial class ServiceTests : TestBase
             {
                 try
                 {
-                    var service = TestUtils.CreateJoblyService(CreateContext());
+                    var service = TestUtils.CreateJobCommandService(CreateContext());
                     await service.RequeueJob(jobId);
                 }
-                catch { }
+                catch
+                {
+                }
             }));
         }
+
         await Task.WhenAll(tasks);
 
         // stats:succeeded should be decremented exactly once
-        // First requeue: Completed → Enqueued (stats:succeeded -1)
-        // Subsequent requeues: Enqueued → Enqueued (no stat change for Enqueued)
+        // First requeue: Completed -> Enqueued (stats:succeeded -1)
+        // Subsequent requeues: Enqueued -> Enqueued (no stat change for Enqueued)
         var succeededAfter = await CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
             .Select(x => x.Value)
@@ -98,7 +104,7 @@ public abstract partial class ServiceTests : TestBase
         var jobId = await publisher.Enqueue(new UnitRequest());
         await context.SaveChangesAsync();
 
-        await ProcessJob(); // Enqueued → Processing → Completed (3 states)
+        await ProcessJob(); // Enqueued -> Processing -> Completed (3 states)
 
         var logsBefore = await CreateContext().Set<JobLog>()
             .Where(x => x.JobId == jobId)
@@ -111,20 +117,19 @@ public abstract partial class ServiceTests : TestBase
             {
                 try
                 {
-                    var service = TestUtils.CreateJoblyService(CreateContext());
+                    var service = TestUtils.CreateJobCommandService(CreateContext());
                     await service.RequeueJob(jobId);
                 }
-                catch { }
+                catch
+                {
+                }
             }));
         }
+
         await Task.WhenAll(tasks);
 
         // Each successful requeue adds exactly one Requeued JobLog entry
         // Row lock ensures they run sequentially, so each sees the current state
-        var requeueLogs = await CreateContext().Set<JobLog>()
-            .Where(x => x.JobId == jobId && x.EventType == "Requeued")
-            .CountAsync();
-
         // At least the original logs + all requeue log entries
         // But the key point: total logs = logsBefore + number of successful requeues
         var logsAfter = await CreateContext().Set<JobLog>()
@@ -164,11 +169,23 @@ public abstract partial class ServiceTests : TestBase
         // Concurrent delete + requeue on the same job
         var deleteTask = Task.Run(async () =>
         {
-            try { await TestUtils.CreateJoblyService(CreateContext()).DeleteJob(jobId); } catch { }
+            try
+            {
+                await TestUtils.CreateJobCommandService(CreateContext()).DeleteJob(jobId);
+            }
+            catch
+            {
+            }
         });
         var requeueTask = Task.Run(async () =>
         {
-            try { await TestUtils.CreateJoblyService(CreateContext()).RequeueJob(jobId); } catch { }
+            try
+            {
+                await TestUtils.CreateJobCommandService(CreateContext()).RequeueJob(jobId);
+            }
+            catch
+            {
+            }
         });
         await Task.WhenAll(deleteTask, requeueTask);
 
@@ -196,6 +213,7 @@ public abstract partial class ServiceTests : TestBase
         {
             jobIds.Add(await publisher.Enqueue(new UnitRequest()));
         }
+
         await context.SaveChangesAsync();
 
         var deletedBefore = await CreateContext().Set<Statistic>()
@@ -204,11 +222,11 @@ public abstract partial class ServiceTests : TestBase
             .FirstOrDefaultAsync();
 
         // Delete all 10 jobs concurrently
-        var tasks = jobIds.Select(id => Task.Run(async () =>
+        var tasks = jobIds.ConvertAll(id => Task.Run(async () =>
         {
-            var service = TestUtils.CreateJoblyService(CreateContext());
+            var service = TestUtils.CreateJobCommandService(CreateContext());
             await service.DeleteJob(id);
-        })).ToList();
+        }));
         await Task.WhenAll(tasks);
 
         var deletedAfter = await CreateContext().Set<Statistic>()
@@ -239,17 +257,29 @@ public abstract partial class ServiceTests : TestBase
         // Requeue and process concurrently — one modifies via service, other via worker
         var requeueTask = Task.Run(async () =>
         {
-            try { await TestUtils.CreateJoblyService(CreateContext()).RequeueJob(jobId); } catch { }
+            try
+            {
+                await TestUtils.CreateJobCommandService(CreateContext()).RequeueJob(jobId);
+            }
+            catch
+            {
+            }
         });
         var processTask = Task.Run(async () =>
         {
-            try { await ProcessJob(); } catch { }
+            try
+            {
+                await ProcessJob();
+            }
+            catch
+            {
+            }
         });
         await Task.WhenAll(requeueTask, processTask);
 
         // Job should be in a valid state
         var job = await GetJob(jobId);
         job.ShouldNotBeNull();
-        Enum.IsDefined(typeof(State), job.CurrentState).ShouldBeTrue();
+        Enum.IsDefined<State>(job.CurrentState).ShouldBeTrue();
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Cronos;
 using Jobly.Core.Data.Entities;
@@ -13,7 +13,13 @@ namespace Jobly.Core;
 
 public interface IRecurringJobPublisher
 {
-    Task AddOrUpdateRecurringJob<T>(T message, string name, string cron) where T : class, IJob;
+    Task AddOrUpdateRecurringJob<T>(T message, string name, string cron)
+        where T : class, IJob;
+}
+
+file static class RecurringJobPublisherConstants
+{
+    public static readonly char[] SplitChars = [' ', '\t'];
 }
 
 public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
@@ -26,7 +32,8 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         _context = context;
     }
 
-    public async Task AddOrUpdateRecurringJob<T>(T message, string name, string cronExpression) where T : class, IJob
+    public async Task AddOrUpdateRecurringJob<T>(T message, string name, string cronExpression)
+        where T : class, IJob
     {
         ValidateCronExpression(cronExpression);
 
@@ -44,7 +51,8 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         await transaction.CommitAsync();
     }
 
-    private Job CreateJobForRecurringJob<T>(T message, string cronExpression) where T : class, IJob
+    private static Job CreateJobForRecurringJob<T>(T message, string cronExpression)
+        where T : class, IJob
     {
         var (nextJobScheduleTime, jobMessage, jobType) = GetRecurringJobData(message, cronExpression);
         if (nextJobScheduleTime == null || string.IsNullOrWhiteSpace(jobMessage) || string.IsNullOrWhiteSpace(jobType))
@@ -57,7 +65,8 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         return job;
     }
 
-    private async Task<RecurringJob> AddOrUpdateRecurringJobToDb<T>(T message, string name, string cronExpression, Job job) where T : class, IJob
+    private async Task<RecurringJob> AddOrUpdateRecurringJobToDb<T>(T message, string name, string cronExpression, Job job)
+        where T : class, IJob
     {
         var (nextJobScheduleTime, jobMessage, jobType) = GetRecurringJobData(message, cronExpression);
 
@@ -82,7 +91,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
                     EventType = "Deleted",
                     Timestamp = DateTime.UtcNow,
                     Level = "Information",
-                    Message = $"Job {nextJob.Id} was deleted (recurring job updated)"
+                    Message = $"Job {nextJob.Id} was deleted (recurring job updated)",
                 });
             }
 
@@ -114,7 +123,8 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         return recurringJob;
     }
 
-    private (DateTime? nextJobScheduleTime, string? jobMessage, string? jobType) GetRecurringJobData<T>(T message, string cronExpression) where T : class, IJob
+    private static (DateTime? nextJobScheduleTime, string? jobMessage, string? jobType) GetRecurringJobData<T>(T message, string cronExpression)
+        where T : class, IJob
     {
         var nextJobScheduleTime = CronExpression.Parse(cronExpression).GetNextOccurrence(DateTime.UtcNow);
         var jobMessage = JsonSerializer.Serialize(message);
@@ -138,11 +148,11 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         }
     }
 
-    private static CronExpression ParseCronExpression([NotNull] string cronExpression)
+    private static void ParseCronExpression([NotNull] string cronExpression)
     {
-        if (cronExpression == null) throw new ArgumentNullException(nameof(cronExpression));
+        ArgumentNullException.ThrowIfNull(cronExpression);
 
-        var parts = cronExpression.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        var parts = cronExpression.Split(RecurringJobPublisherConstants.SplitChars, StringSplitOptions.RemoveEmptyEntries);
         var format = CronFormat.Standard;
 
         if (parts.Length == 6)
@@ -155,6 +165,6 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
                 $"Wrong number of parts in the `{cronExpression}` cron expression, you can only use 5 or 6 (with seconds) part-based expressions.");
         }
 
-        return CronExpression.Parse(cronExpression, format);
+        CronExpression.Parse(cronExpression, format);
     }
 }

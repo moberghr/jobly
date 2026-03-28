@@ -1,4 +1,4 @@
-﻿using Jobly.Test.Shared.Entities;
+using Jobly.Test.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Jobly.Core;

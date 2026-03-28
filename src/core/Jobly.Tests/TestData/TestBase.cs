@@ -1,9 +1,9 @@
 using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
+using Jobly.Core.Handlers;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
-using Jobly.Core.Handlers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -41,11 +41,19 @@ public abstract class TestBase
 
     protected async Task EnsureServerRegistered()
     {
-        if (_serverRegistered) return;
+        if (_serverRegistered)
+        {
+            return;
+        }
+
         await _serverRegistrationLock.WaitAsync();
         try
         {
-            if (_serverRegistered) return;
+            if (_serverRegistered)
+            {
+                return;
+            }
+
             await TestUtils.RegisterTestServer(CreateContext());
             _serverRegistered = true;
         }
@@ -64,7 +72,7 @@ public abstract class TestBase
         return jobId;
     }
 
-    protected async Task<Guid> CreateFailedJob(TestContext context)
+    protected static async Task<Guid> CreateFailedJob(TestContext context)
     {
         var publisher = TestUtils.CreatePublisher(context);
         var throwExceptionRequest = new ThrowExceptionRequest();
@@ -73,17 +81,26 @@ public abstract class TestBase
         return jobId;
     }
 
-    protected async Task<Guid> CreateFailedRetryJob(TestContext context, int retries, int? maxRetries, Guid? parentJobId)
+    protected static async Task<Guid> CreateFailedRetryJob(TestContext context, int retries, int? maxRetries, Guid? parentJobId)
     {
         var publisher = TestUtils.CreatePublisher(context, retries);
         var throwExceptionRequest = new ThrowExceptionRequest();
         Guid? jobId = null;
         if (maxRetries != null)
+        {
             jobId = await publisher.Enqueue(throwExceptionRequest, (int)maxRetries);
+        }
+
         if (parentJobId != null)
+        {
             jobId = await publisher.Enqueue(throwExceptionRequest, parentJobId.Value);
+        }
+
         if (maxRetries == null && parentJobId == null)
+        {
             jobId = await publisher.Enqueue(throwExceptionRequest);
+        }
+
         await context.SaveChangesAsync();
         return jobId!.Value;
     }
@@ -107,7 +124,7 @@ public abstract class TestBase
         await context.SaveChangesAsync();
     }
 
-    protected async Task<int> CreateLogInDb(TestContext context)
+    protected static async Task<int> CreateLogInDb(TestContext context)
     {
         var logInDb = new TestLog();
         await context.TestLogs.AddAsync(logInDb);
@@ -115,41 +132,50 @@ public abstract class TestBase
         return logInDb.Id;
     }
 
-    protected async Task<Guid> CreateJobWithParentId(TestContext context, Guid parentJobId)
+    protected static async Task<Guid> CreateJobWithParentId(TestContext context, Guid parentJobId)
     {
         var publisher = TestUtils.CreatePublisher(context);
         var jobId = await publisher.Enqueue(new UnitRequest(), parentJobId);
         return jobId;
     }
 
-    protected async Task<Guid> CreateBatch(TestContext context, int numberOfJobs)
+    protected static async Task<Guid> CreateBatch(TestContext context, int numberOfJobs)
     {
         var requests = new List<UnitRequest>();
         for (var i = 0; i < numberOfJobs; i++)
+        {
             requests.Add(new UnitRequest());
+        }
+
         var batchPublisher = TestUtils.CreateBatchPublisher(context);
         return await batchPublisher.StartNew(requests);
     }
 
-    protected async Task<Guid> CreateBatchWithOptions(TestContext context, int numberOfJobs, BatchContinuationOptions options)
+    protected static async Task<Guid> CreateBatchWithOptions(TestContext context, int numberOfJobs, BatchContinuationOptions options)
     {
         var requests = new List<UnitRequest>();
         for (var i = 0; i < numberOfJobs; i++)
+        {
             requests.Add(new UnitRequest());
+        }
+
         var batchPublisher = TestUtils.CreateBatchPublisher(context);
         return await batchPublisher.StartNew(requests, options);
     }
 
-    protected async Task<Guid> ContinueBatchWith(TestContext context, int numberOfJobs, Guid placeholderJobId)
+    protected static async Task<Guid> ContinueBatchWith(TestContext context, int numberOfJobs, Guid placeholderJobId)
     {
         var requests = new List<UnitRequest>();
         for (var i = 0; i < numberOfJobs; i++)
+        {
             requests.Add(new UnitRequest());
+        }
+
         var batchPublisher = TestUtils.CreateBatchPublisher(context);
         return await batchPublisher.ContinueBatchWith(requests, placeholderJobId);
     }
 
-    protected async Task<TestLog> GetTestLog(TestContext context, int testLogId)
+    protected static async Task<TestLog> GetTestLog(TestContext context, int testLogId)
     {
         return await context.TestLogs
             .Where(x => x.Id == testLogId)
@@ -189,9 +215,12 @@ public abstract class TestBase
             tasks.Add(Task.Run(async () =>
             {
                 var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactory);
-                while (await worker.GetAndProcessJob(CancellationToken.None)) { }
+                while (await worker.GetAndProcessJob(CancellationToken.None))
+                {
+                }
             }));
         }
+
         await Task.WhenAll(tasks);
     }
 
@@ -224,14 +253,14 @@ public abstract class TestBase
         return name;
     }
 
-    protected async Task<RecurringJob> GetRecurringJob(string name)
+    protected async Task<RecurringJob?> GetRecurringJob(string name)
     {
         return await CreateContext().Set<RecurringJob>()
             .Where(x => x.Name == name)
             .SingleOrDefaultAsync();
     }
 
-    protected async Task<Job> GetJob(Guid id)
+    protected async Task<Job?> GetJob(Guid id)
     {
         return await CreateContext().Set<Job>()
             .Where(x => x.Id == id)

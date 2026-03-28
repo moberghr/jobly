@@ -11,8 +11,6 @@ namespace Jobly.Tests.Jobs;
 
 public abstract partial class JoblyTests : TestBase
 {
-    // ==================== ExpireAt Tests ====================
-
     [Fact]
     public async Task GivenCompletedJob_WhenProcessed_ThenExpireAtIsSet()
     {
@@ -53,7 +51,7 @@ public abstract partial class JoblyTests : TestBase
         var jobId = await publisher.Enqueue(new UnitRequest());
         await context.SaveChangesAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.DeleteJob(jobId);
 
         var job = await GetJob(jobId);
@@ -105,8 +103,6 @@ public abstract partial class JoblyTests : TestBase
         job.RetriedTimes.ShouldBe(1);
     }
 
-    // ==================== Statistics Tests ====================
-
     [Fact]
     public async Task GivenCompletedJob_WhenProcessed_ThenSucceededStatIncremented()
     {
@@ -141,7 +137,7 @@ public abstract partial class JoblyTests : TestBase
             .Select(x => x.Value)
             .FirstOrDefaultAsync();
 
-        var jobId = await CreateFailedJob(context);
+        _ = await CreateFailedJob(context);
 
         await ProcessJob();
 
@@ -167,7 +163,7 @@ public abstract partial class JoblyTests : TestBase
             .Select(x => x.Value)
             .FirstOrDefaultAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.DeleteJob(jobId);
 
         var statAfter = await CreateContext().Set<Statistic>()
@@ -189,7 +185,7 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessJob();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateDashboardStatsService(CreateContext());
         var stats = await service.GetJoblyStatus();
 
         stats.TotalSucceeded.ShouldBeGreaterThanOrEqualTo(1);
@@ -208,7 +204,7 @@ public abstract partial class JoblyTests : TestBase
             .Select(x => x.Value)
             .FirstOrDefaultAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.RequeueJob(jobId); // requeue failed job → stats:failed -1
 
         var failedAfter = await CreateContext().Set<Statistic>()
@@ -235,7 +231,7 @@ public abstract partial class JoblyTests : TestBase
             .Select(x => x.Value)
             .FirstOrDefaultAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.RequeueJob(jobId); // requeue → stats:succeeded -1
 
         var succeededAfter = await CreateContext().Set<Statistic>()
@@ -266,7 +262,7 @@ public abstract partial class JoblyTests : TestBase
             .Select(x => x.Value)
             .FirstOrDefaultAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.DeleteJob(jobId); // delete → stats:succeeded -1, stats:deleted +1
 
         var succeededAfter = await CreateContext().Set<Statistic>()
@@ -281,8 +277,6 @@ public abstract partial class JoblyTests : TestBase
         succeededAfter.ShouldBe(succeededBefore - 1);
         deletedAfter.ShouldBe(deletedBefore + 1);
     }
-
-    // ==================== Cleanup Tests ====================
 
     [Fact]
     public async Task GivenExpiredJob_WhenCleanupRuns_ThenJobIsDeletedFromDb()

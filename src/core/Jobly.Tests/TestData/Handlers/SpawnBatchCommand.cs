@@ -8,7 +8,7 @@ namespace Jobly.Tests.TestData.Handlers;
 /// Handler that creates a batch of 3 UnitRequests with a continuation UnitRequest.
 /// Tests: batch creation inside handler, trace propagation to batch jobs + continuation.
 /// </summary>
-public class SpawnBatchRequest : IJob { }
+public class SpawnBatchRequest : IJob;
 
 public class SpawnBatchHandler : IJobHandler<SpawnBatchRequest>
 {

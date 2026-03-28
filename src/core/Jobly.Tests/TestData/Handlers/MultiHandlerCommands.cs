@@ -2,9 +2,9 @@ using Jobly.Core.Handlers;
 
 namespace Jobly.Tests.TestData.Handlers;
 
-public class MultiRequest : IMessage { }
+public class MultiRequest : IMessage;
 
-public class SingleHandlerMessage : IMessage { }
+public class SingleHandlerMessage : IMessage;
 
 public class SingleMessageHandler : IMessageHandler<SingleHandlerMessage>
 {
@@ -28,6 +28,7 @@ public class MultiHandlerCounter
     public int CountB;
 
     public void IncrementA() => Interlocked.Increment(ref CountA);
+
     public void IncrementB() => Interlocked.Increment(ref CountB);
 }
 

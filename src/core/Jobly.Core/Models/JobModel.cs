@@ -1,13 +1,14 @@
-﻿using Jobly.Core.Enums;
+using Jobly.Core.Enums;
 
 namespace Jobly.Core.Models;
+
 public class JobModel
 {
     public Guid Id { get; set; }
 
-    public string Type { get; set; }
+    public string? Type { get; set; }
 
-    public string Message { get; set; }
+    public string? Message { get; set; }
 
     public DateTime CreateTime { get; set; }
 

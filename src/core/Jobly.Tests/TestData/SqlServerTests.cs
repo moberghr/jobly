@@ -9,7 +9,8 @@ public class SqlServerTests : JoblyTests, IAsyncLifetime
 {
     private readonly SqlServerFixture _fixture;
 
-    public SqlServerTests(SqlServerFixture fixture) : base(fixture.CreateContext)
+    public SqlServerTests(SqlServerFixture fixture)
+        : base(fixture.CreateContext)
     {
         _fixture = fixture;
     }

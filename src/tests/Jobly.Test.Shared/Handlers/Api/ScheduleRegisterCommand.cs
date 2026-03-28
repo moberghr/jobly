@@ -7,7 +7,7 @@ namespace Jobly.Core.Handlers;
 
 public class ScheduleRegisterRequest : IJob
 {
-    public string Email { get; set; }
+    public string? Email { get; set; }
 
     public DateTime ScheduleTime { get; set; }
 }
@@ -27,7 +27,7 @@ public class ScheduleRegisterCommand : IJobHandler<ScheduleRegisterRequest>
     {
         var registration = new Registration
         {
-            Email = message.Email
+            Email = message.Email,
         };
 
         _context.Registrations.Add(registration);
@@ -36,14 +36,14 @@ public class ScheduleRegisterCommand : IJobHandler<ScheduleRegisterRequest>
         {
             Email = message.Email,
             Body = "Test email",
-            Subject = "Test subject"
+            Subject = "Test subject",
         };
 
         _context.EmailLogs.Add(emailLog);
 
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(ct);
 
         var sendEmailRequest = new SendEmailRequest
         {
@@ -59,13 +59,13 @@ public class ScheduleRegisterCommand : IJobHandler<ScheduleRegisterRequest>
             var jobParams = new JobParameters
             {
                 ScheduleTime = message.ScheduleTime,
-                Queue = "high"
+                Queue = "high",
             };
             await _publisher.Enqueue(sendEmailRequest, jobParams);
         }
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(ct);
 
-        await transaction.CommitAsync();
+        await transaction.CommitAsync(ct);
     }
 }

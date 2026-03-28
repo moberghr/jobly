@@ -1,6 +1,7 @@
 using Jobly.Core;
 using Jobly.Core.Enums;
 using Jobly.Core.Models;
+using Jobly.Core.Services;
 using Jobly.UI.UIMiddleware;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -14,164 +15,74 @@ public static class JoblyEndpoints
     {
         var apiGroup = app.MapGroup($"{options.RoutePrefix}/api");
 
-        // ==================== Dashboard ====================
+        apiGroup.MapGet("status", async ([FromServices] IDashboardStatsService statsService) => await statsService.GetJoblyStatus());
 
-        apiGroup.MapGet("status", async ([FromServices] IJoblyService joblyService) =>
+        apiGroup.MapGet("jobs/enqueued", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobsList(request, State.Enqueued));
+
+        apiGroup.MapGet("jobs/completed", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobsList(request, State.Completed));
+
+        apiGroup.MapGet("jobs/failed", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobsList(request, State.Failed));
+
+        apiGroup.MapGet("jobs/processing", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobStatesInProcess(request));
+
+        apiGroup.MapGet("jobs/scheduled", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetScheduledJobs(request));
+
+        apiGroup.MapGet("jobs/awaiting", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetAwaitingJobs(request));
+
+        apiGroup.MapGet("jobs/{jobId}", async ([FromServices] IJobQueryService jobQueryService, Guid jobId) =>
         {
-            return await joblyService.GetJoblyStatus();
-        });
-
-        // ==================== Jobs by State ====================
-
-        apiGroup.MapGet("jobs/enqueued", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
-        {
-            return await joblyService.GetJobsList(request, State.Enqueued);
-        });
-
-        apiGroup.MapGet("jobs/completed", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
-        {
-            return await joblyService.GetJobsList(request, State.Completed);
-        });
-
-        apiGroup.MapGet("jobs/failed", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
-        {
-            return await joblyService.GetJobsList(request, State.Failed);
-        });
-
-        apiGroup.MapGet("jobs/processing", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
-        {
-            return await joblyService.GetJobStatesInProcess(request);
-        });
-
-        apiGroup.MapGet("jobs/scheduled", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
-        {
-            return await joblyService.GetScheduledJobs(request);
-        });
-
-        apiGroup.MapGet("jobs/awaiting", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
-        {
-            return await joblyService.GetAwaitingJobs(request);
-        });
-
-        // ==================== Job Details & Actions ====================
-
-        apiGroup.MapGet("jobs/{jobId}", async ([FromServices] IJoblyService joblyService, Guid jobId) =>
-        {
-            var model = await joblyService.GetJobById(jobId);
+            var model = await jobQueryService.GetJobById(jobId);
             return model is null ? Results.NotFound() : Results.Ok(model);
         });
 
-        apiGroup.MapPost("jobs/{jobId}/requeue", async ([FromServices] IJoblyService joblyService, Guid jobId) =>
+        apiGroup.MapPost("jobs/{jobId}/requeue", async ([FromServices] IJobCommandService jobCommandService, Guid jobId) => await jobCommandService.RequeueJob(jobId));
+
+        apiGroup.MapPost("jobs/{jobId}/delete", async ([FromServices] IJobCommandService jobCommandService, Guid jobId) => await jobCommandService.DeleteJob(jobId));
+
+        apiGroup.MapPost("jobs/bulk/delete", async ([FromServices] IJobCommandService jobCommandService, [FromBody] BulkJobRequest request) => await jobCommandService.BulkDeleteJobs(request.JobIds));
+
+        apiGroup.MapPost("jobs/bulk/requeue", async ([FromServices] IJobCommandService jobCommandService, [FromBody] BulkJobRequest request) => await jobCommandService.BulkRequeueJobs(request.JobIds));
+
+        apiGroup.MapGet("messages", async ([FromServices] IMessageQueryService messageQueryService, [AsParameters] BaseListRequest request) => await messageQueryService.GetMessages(request));
+
+        apiGroup.MapGet("messages/{messageId}", async ([FromServices] IMessageQueryService messageQueryService, Guid messageId) =>
         {
-            await joblyService.RequeueJob(jobId);
-        });
-
-        apiGroup.MapPost("jobs/{jobId}/delete", async ([FromServices] IJoblyService joblyService, Guid jobId) =>
-        {
-            await joblyService.DeleteJob(jobId);
-        });
-
-        // ==================== Bulk Actions ====================
-
-        apiGroup.MapPost("jobs/bulk/delete", async ([FromServices] IJoblyService joblyService, [FromBody] BulkJobRequest request) =>
-        {
-            return await joblyService.BulkDeleteJobs(request.JobIds);
-        });
-
-        apiGroup.MapPost("jobs/bulk/requeue", async ([FromServices] IJoblyService joblyService, [FromBody] BulkJobRequest request) =>
-        {
-            return await joblyService.BulkRequeueJobs(request.JobIds);
-        });
-
-        // ==================== Messages ====================
-
-        apiGroup.MapGet("messages", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
-        {
-            return await joblyService.GetMessages(request);
-        });
-
-        apiGroup.MapGet("messages/{messageId}", async ([FromServices] IJoblyService joblyService, Guid messageId) =>
-        {
-            var model = await joblyService.GetMessageById(messageId);
+            var model = await messageQueryService.GetMessageById(messageId);
             return model is null ? Results.NotFound() : Results.Ok(model);
         });
 
-        // ==================== Recurring Jobs ====================
+        apiGroup.MapGet("recurring", async ([FromServices] IRecurringJobService recurringJobService, [AsParameters] BaseListRequest request) => await recurringJobService.GetRecurringJobs(request));
 
-        apiGroup.MapGet("recurring", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
+        apiGroup.MapPost("recurring/{id}/trigger", async ([FromServices] IRecurringJobService recurringJobService, int id) => await recurringJobService.TriggerRecurringJob(id));
+
+        apiGroup.MapDelete("recurring/{id}", async ([FromServices] IRecurringJobService recurringJobService, int id) => await recurringJobService.DeleteRecurringJob(id));
+
+        apiGroup.MapGet("jobs/{jobId}/logs", async ([FromServices] IJobQueryService jobQueryService, Guid jobId) =>
         {
-            return await joblyService.GetRecurringJobs(request);
+            var job = await jobQueryService.GetJobById(jobId);
+            return job?.Logs ?? [];
         });
 
-        apiGroup.MapPost("recurring/{id}/trigger", async ([FromServices] IJoblyService joblyService, int id) =>
-        {
-            await joblyService.TriggerRecurringJob(id);
-        });
+        apiGroup.MapGet("batches", async ([FromServices] IBatchQueryService batchQueryService, [AsParameters] BaseListRequest request) => await batchQueryService.GetBatches(request));
 
-        apiGroup.MapDelete("recurring/{id}", async ([FromServices] IJoblyService joblyService, int id) =>
+        apiGroup.MapGet("batches/{batchId}", async ([FromServices] IBatchQueryService batchQueryService, Guid batchId) =>
         {
-            await joblyService.DeleteRecurringJob(id);
-        });
-
-        apiGroup.MapGet("jobs/{jobId}/logs", async ([FromServices] IJoblyService joblyService, Guid jobId) =>
-        {
-            var job = await joblyService.GetJobById(jobId);
-            return job?.Logs ?? new List<JobLogModel>();
-        });
-
-        // ==================== Batches ====================
-
-        apiGroup.MapGet("batches", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
-        {
-            return await joblyService.GetBatches(request);
-        });
-
-        apiGroup.MapGet("batches/{batchId}", async ([FromServices] IJoblyService joblyService, Guid batchId) =>
-        {
-            var model = await joblyService.GetBatchById(batchId);
+            var model = await batchQueryService.GetBatchById(batchId);
             return model is null ? Results.NotFound() : Results.Ok(model);
         });
 
-        // ==================== Statistics ====================
+        apiGroup.MapGet("stats/history", async ([FromServices] IDashboardStatsService statsService, [FromQuery] int? hours) => await statsService.GetStatsHistory(hours ?? 24));
 
-        apiGroup.MapGet("stats/history", async ([FromServices] IJoblyService joblyService, [FromQuery] int? hours) =>
-        {
-            return await joblyService.GetStatsHistory(hours ?? 24);
-        });
+        apiGroup.MapGet("servers", async ([FromServices] IDashboardStatsService statsService) => await statsService.GetServers());
 
-        // ==================== Servers ====================
+        apiGroup.MapGet("created", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobsList(request, State.Enqueued));
 
-        apiGroup.MapGet("servers", async ([FromServices] IJoblyService joblyService) =>
-        {
-            return await joblyService.GetServers();
-        });
+        apiGroup.MapGet("completed", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobsList(request, State.Completed));
 
-        // ==================== Legacy endpoints (backwards compat) ====================
+        apiGroup.MapGet("failed", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobsList(request, State.Failed));
 
-        apiGroup.MapGet("created", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
-        {
-            return await joblyService.GetJobsList(request, State.Enqueued);
-        });
+        apiGroup.MapGet("processing", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobStatesInProcess(request));
 
-        apiGroup.MapGet("completed", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
-        {
-            return await joblyService.GetJobsList(request, State.Completed);
-        });
-
-        apiGroup.MapGet("failed", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
-        {
-            return await joblyService.GetJobsList(request, State.Failed);
-        });
-
-        apiGroup.MapGet("processing", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
-        {
-            return await joblyService.GetJobStatesInProcess(request);
-        });
-
-        apiGroup.MapGet("scheduled", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>
-        {
-            return await joblyService.GetScheduledJobs(request);
-        });
-
+        apiGroup.MapGet("scheduled", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetScheduledJobs(request));
     }
 }

@@ -1,8 +1,9 @@
-﻿using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 
 namespace Jobly.Tests.Jobs;
+
 public abstract partial class JoblyTests : TestBase
 {
     private readonly string _cronExpression = "* * * * *";

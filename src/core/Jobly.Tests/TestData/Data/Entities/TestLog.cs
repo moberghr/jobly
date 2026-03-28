@@ -1,4 +1,5 @@
-﻿namespace Jobly.Tests;
+namespace Jobly.Tests;
+
 public class TestLog
 {
     public int Id { get; set; }

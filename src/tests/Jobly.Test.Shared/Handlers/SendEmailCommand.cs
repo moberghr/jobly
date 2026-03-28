@@ -16,11 +16,11 @@ public class SendEmailCommand : IJobHandler<SendEmailRequest>
     {
         var emailLog = await _context.EmailLogs
             .Where(x => x.Id == message.EmailLogId)
-            .FirstAsync();
+            .FirstAsync(cancellationToken: ct);
 
         emailLog.ProcessedTime = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(ct);
     }
 }
 

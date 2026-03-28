@@ -1,4 +1,4 @@
-﻿using Jobly.Core;
+using Jobly.Core;
 using Microsoft.EntityFrameworkCore;
 
 namespace Jobly.Tests;

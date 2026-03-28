@@ -14,12 +14,12 @@ public abstract partial class JoblyTests : TestBase
     {
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
-
-        var messageId = await publisher.Publish(new MultiRequest());
+        _ = await publisher.Publish(new MultiRequest());
         await context.SaveChangesAsync();
 
         // ProcessJob routes the message and immediately executes one handler job
         await ProcessJob();
+
         // ProcessJob executes the second handler job
         await ProcessJob();
 
@@ -39,6 +39,7 @@ public abstract partial class JoblyTests : TestBase
 
         // Route + execute first handler
         await ProcessJob();
+
         // Execute second handler
         await ProcessJob();
 

@@ -12,7 +12,7 @@ public class ServerModel
 
     public int ServiceCount { get; set; }
 
-    public List<WorkerModel> Workers { get; set; } = new();
+    public List<WorkerModel> Workers { get; set; } = [];
 }
 
 public class WorkerModel

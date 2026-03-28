@@ -2,7 +2,7 @@ using Jobly.Core.Handlers;
 
 namespace Jobly.Core.Handlers;
 
-public class SlowRequest : IJob { }
+public class SlowRequest : IJob;
 
 public class SlowCommand : IJobHandler<SlowRequest>
 {

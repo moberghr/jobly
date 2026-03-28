@@ -4,9 +4,9 @@ namespace Jobly.Core.Helper;
 
 public class JobParameters
 {
-    internal string Message { get; set; }
+    internal string? Message { get; set; }
 
-    internal string Type { get; set; }
+    internal string? Type { get; set; }
 
     public int Retries { get; set; }
 

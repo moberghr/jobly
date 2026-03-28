@@ -27,15 +27,16 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     /// <summary>
     /// Worker Id should be unique for each worker. If you need to control the worker id, you can set it here.
     /// </summary>
-    public Guid ServerId = Guid.NewGuid();
+    public Guid ServerId { get; set; } = Guid.NewGuid();
 
     /// <summary>
     /// Display name for this server in the dashboard. Defaults to MachineName.
     /// </summary>
     public string? ServerName { get; set; }
 
-    public string[] Queues { get; set; } = new[] { "default" };
+    public string[] Queues { get; set; } = ["default"];
 
     public TimeSpan JobExpirationTimeout { get; set; } = TimeSpan.FromDays(1);
+
     public int ExpirationBatchSize { get; set; } = 1000;
 }

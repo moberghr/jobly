@@ -1,4 +1,5 @@
-﻿namespace Jobly.Core.Enums;
+namespace Jobly.Core.Enums;
+
 public enum State
 {
     Enqueued = 1,

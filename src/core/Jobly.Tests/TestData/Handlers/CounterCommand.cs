@@ -1,6 +1,7 @@
 using Jobly.Core.Handlers;
 
 namespace Jobly.Tests.TestData.Handlers;
+
 public class CounterCommand : IJobHandler<CounterRequest>
 {
     public CounterCommand(CounterService counterService)
@@ -12,23 +13,22 @@ public class CounterCommand : IJobHandler<CounterRequest>
 
     public async Task HandleAsync(CounterRequest message, CancellationToken ct)
     {
-        await Task.Delay(500);
+        await Task.Delay(500, ct);
 
         _counterService.Increment();
     }
 }
 
-public class CounterRequest : IJob
-{
-
-}
+public class CounterRequest : IJob;
 
 public class CounterService
 {
-    public int Counter = 0;
+    private int _counter;
+
+    public int Counter => _counter;
 
     public void Increment()
     {
-        Interlocked.Increment(ref Counter);
+        Interlocked.Increment(ref _counter);
     }
 }

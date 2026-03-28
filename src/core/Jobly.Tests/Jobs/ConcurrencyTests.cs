@@ -15,6 +15,7 @@ public abstract partial class JoblyTests : TestBase
         {
             await publisher.Enqueue(new CounterRequest());
         }
+
         await context.SaveChangesAsync();
 
         await ProcessAllJobs(workerCount: 5);

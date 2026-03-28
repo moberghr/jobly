@@ -1,4 +1,4 @@
-﻿namespace Jobly.Core.Entities;
+namespace Jobly.Core.Entities;
 
 public enum BatchContinuationOptions
 {
@@ -22,5 +22,5 @@ public class Batch
 
     public BatchContinuationOptions ContinuationOptions { get; set; } = BatchContinuationOptions.OnlyOnSucceeded;
 
-    public List<Job> Jobs { get; set; } = new();
+    public List<Job> Jobs { get; set; } = [];
 }

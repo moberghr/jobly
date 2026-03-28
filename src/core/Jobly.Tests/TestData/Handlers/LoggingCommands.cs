@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Jobly.Tests.TestData.Handlers;
 
-public class LoggingRequest : IJob { }
+public class LoggingRequest : IJob;
 
 public class LoggingCommand : IJobHandler<LoggingRequest>
 {
@@ -22,7 +22,7 @@ public class LoggingCommand : IJobHandler<LoggingRequest>
     }
 }
 
-public class ErrorLoggingRequest : IJob { }
+public class ErrorLoggingRequest : IJob;
 
 public class ErrorLoggingCommand : IJobHandler<ErrorLoggingRequest>
 {

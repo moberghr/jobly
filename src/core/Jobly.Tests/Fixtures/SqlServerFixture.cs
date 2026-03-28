@@ -16,32 +16,30 @@ public class SqlServerFixture : IAsyncLifetime
     private string _connectionString = null!;
 
     public SqlServerRowLockInterceptor Interceptor { get; } = new();
+
     public SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();
 
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
         _connectionString = _container.GetConnectionString() + ";Encrypt=False;";
-
-        using var context = CreateContext();
+        await using var context = CreateContext();
         await context.Database.EnsureCreatedAsync();
-
-        using var conn = new SqlConnection(_connectionString);
+        await using var conn = new SqlConnection(_connectionString);
         await conn.OpenAsync();
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
-            TablesToIgnore = new[] { new Respawn.Graph.Table("Statistic") },
-            DbAdapter = DbAdapter.SqlServer
+            TablesToIgnore = [new Respawn.Graph.Table("Statistic")],
+            DbAdapter = DbAdapter.SqlServer,
         });
     }
 
     public async Task ResetAsync()
     {
-        using var conn = new SqlConnection(_connectionString);
+        await using var conn = new SqlConnection(_connectionString);
         await conn.OpenAsync();
         await _respawner.ResetAsync(conn);
-
-        using var context = CreateContext();
+        await using var context = CreateContext();
         await context.Database.ExecuteSqlRawAsync("UPDATE [Statistic] SET [Value] = 0");
     }
 
@@ -60,4 +58,4 @@ public class SqlServerFixture : IAsyncLifetime
 }
 
 [CollectionDefinition("SqlServer")]
-public class SqlServerCollection : ICollectionFixture<SqlServerFixture> { }
+public class SqlServerCollection : ICollectionFixture<SqlServerFixture>;

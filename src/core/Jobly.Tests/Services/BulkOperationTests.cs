@@ -25,8 +25,8 @@ public abstract partial class ServiceTests : TestBase
             .Select(x => x.Value)
             .FirstOrDefaultAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
-        var result = await service.BulkDeleteJobs(new[] { id1, id2, id3 });
+        var service = TestUtils.CreateJobCommandService(CreateContext());
+        var result = await service.BulkDeleteJobs([id1, id2, id3]);
 
         result.Succeeded.ShouldBe(3);
         result.Skipped.ShouldBe(0);
@@ -59,8 +59,8 @@ public abstract partial class ServiceTests : TestBase
             .Select(x => x.Value)
             .FirstOrDefaultAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
-        var result = await service.BulkRequeueJobs(new[] { id1, id2, id3 });
+        var service = TestUtils.CreateJobCommandService(CreateContext());
+        var result = await service.BulkRequeueJobs([id1, id2, id3]);
 
         result.Succeeded.ShouldBe(3);
         result.Skipped.ShouldBe(0);
@@ -89,15 +89,15 @@ public abstract partial class ServiceTests : TestBase
         await context.SaveChangesAsync();
 
         // Pre-delete id2
-        var preService = TestUtils.CreateJoblyService(CreateContext());
+        var preService = TestUtils.CreateJobCommandService(CreateContext());
         await preService.DeleteJob(id2);
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
-        var result = await service.BulkDeleteJobs(new[] { id1, id2, id3 });
+        var service = TestUtils.CreateJobCommandService(CreateContext());
+        var result = await service.BulkDeleteJobs([id1, id2, id3]);
 
         // id2 was already Deleted — deleting a Deleted job still works (it's idempotent)
-        // But stats should be correct: Deleted state → Deleted = no stat change for id2
-        result.Succeeded.ShouldBe(3); // All 3 "succeed" since Deleted→Deleted is valid
+        // But stats should be correct: Deleted state -> Deleted = no stat change for id2
+        result.Succeeded.ShouldBe(3); // All 3 "succeed" since Deleted->Deleted is valid
     }
 
     [Fact]
@@ -111,8 +111,8 @@ public abstract partial class ServiceTests : TestBase
 
         var fakeId = Guid.NewGuid();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
-        var result = await service.BulkDeleteJobs(new[] { id1, fakeId });
+        var service = TestUtils.CreateJobCommandService(CreateContext());
+        var result = await service.BulkDeleteJobs([id1, fakeId]);
 
         result.Succeeded.ShouldBe(1);
         result.Skipped.ShouldBe(1);

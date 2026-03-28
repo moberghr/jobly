@@ -6,8 +6,8 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
-using Jobly.Core.Logging;
 using Jobly.Core.Interceptors;
+using Jobly.Core.Logging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -39,12 +39,18 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
     {
         // Prefer executing Jobs (real work) over routing Messages
-        if (await TryExecuteJob(cancellationToken)) return true;
-        if (await TryRouteMessage(cancellationToken)) return true;
+        if (await TryExecuteJob(cancellationToken))
+        {
+            return true;
+        }
+
+        if (await TryRouteMessage(cancellationToken))
+        {
+            return true;
+        }
+
         return false;
     }
-
-    // ==================== Message Routing ====================
 
     private async Task<bool> TryRouteMessage(CancellationToken cancellationToken)
     {
@@ -53,13 +59,13 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var message = context.Set<Message>()
+        var message = await context.Set<Message>()
             .Where(x => x.CurrentState == State.Enqueued)
             .Where(x => _configuration.Queues.Contains(x.Queue))
             .OrderBy(x => x.Queue)
             .ThenBy(x => x.CreateTime)
             .TagWith(InterceptorConstants.RowLockTableMessage)
-            .FirstOrDefault();
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (message == null)
         {
@@ -69,15 +75,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         _logger.LogInformation("Worker {workerId} routing message {id}", _workerId, message.Id);
 
-        var dispatcher = new JobDispatcher();
-        var messageType = Type.GetType(message.Type);
-
-        if (messageType is null)
-        {
-            throw new JoblyException($"Unknown type {message.Type}");
-        }
-
-        var handlerTypes = dispatcher.DiscoverMessageHandlers(messageType, scope.ServiceProvider);
+        var messageType = Type.GetType(message.Type) ?? throw new JoblyException($"Unknown type {message.Type}");
+        var handlerTypes = JobDispatcher.DiscoverMessageHandlers(messageType, scope.ServiceProvider);
 
         if (handlerTypes.Count == 0)
         {
@@ -112,7 +111,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
                 EventType = "Created",
                 Timestamp = DateTime.UtcNow,
                 Level = "Information",
-                Message = $"Job {job.Id} created from message {message.Id}"
+                Message = $"Job {job.Id} created from message {message.Id}",
             });
         }
 
@@ -128,8 +127,6 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         return await TryExecuteJob(cancellationToken);
     }
 
-    // ==================== Job Execution ====================
-
     private async Task<bool> TryExecuteJob(CancellationToken cancellationToken)
     {
         using var scope = _serviceScopeFactory.CreateScope();
@@ -137,14 +134,14 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
-        var job = context.Set<Job>()
+        var job = await context.Set<Job>()
             .Where(x => x.CurrentState == State.Enqueued)
             .Where(x => x.ScheduleTime < DateTime.UtcNow)
             .Where(x => _configuration.Queues.Contains(x.Queue))
             .OrderBy(x => x.Queue)
             .ThenBy(x => x.ScheduleTime)
             .TagWith(InterceptorConstants.RowLockTableJob)
-            .FirstOrDefault();
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (job == null)
         {
@@ -170,7 +167,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         JobExecutionContext.Current = new JobExecutionInfo
         {
             JobId = job.Id,
-            TraceId = job.TraceId ?? job.Id
+            TraceId = job.TraceId ?? job.Id,
         };
 
         // Start keep-alive background loop
@@ -182,8 +179,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             _logger.LogInformation("Worker {workerId} executing job {id}", _workerId, job.Id);
             await ExecuteJob(job, scope.ServiceProvider, cancellationToken);
             _logger.LogInformation("Worker {workerId} completed job {id}", _workerId, job.Id);
-
-            keepAliveCts.Cancel();
+            await keepAliveCts.CancelAsync();
             await keepAliveTask;
 
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
@@ -195,8 +191,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         catch (Exception e)
         {
             _logger.LogError(e, "Error executing job {id}", job.Id);
-
-            keepAliveCts.Cancel();
+            await keepAliveCts.CancelAsync();
             await keepAliveTask;
 
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
@@ -214,47 +209,33 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         return true;
     }
 
-    private async Task ExecuteJob(Job job, IServiceProvider provider, CancellationToken cancellationToken)
+    private static async Task ExecuteJob(Job job, IServiceProvider provider, CancellationToken cancellationToken)
     {
-        var messageType = Type.GetType(job.Type);
-        if (messageType is null)
-            throw new JoblyException($"Unknown type {job.Type}");
-
-        var payload = JsonSerializer.Deserialize(job.Message, messageType);
-        if (payload is null)
-            throw new JoblyException($"Unable to deserialize message {job.Message} to type {job.Type}");
-
-        var dispatcher = new JobDispatcher();
-
+        var messageType = Type.GetType(job.Type) ?? throw new JoblyException($"Unknown type {job.Type}");
+        var payload = JsonSerializer.Deserialize(job.Message, messageType) ?? throw new JoblyException($"Unable to deserialize message {job.Message} to type {job.Type}");
         if (job.HandlerType != null)
         {
             // Message-spawned job: execute specific handler
-            var handlerType = Type.GetType(job.HandlerType);
-            if (handlerType is null)
-                throw new JoblyException($"Unknown handler type {job.HandlerType}");
+            var handlerType = Type.GetType(job.HandlerType) ?? throw new JoblyException($"Unknown handler type {job.HandlerType}");
 
             // Determine if this is a message handler or job handler based on MessageId
             if (job.MessageId != null)
             {
-                await dispatcher.ExecuteMessageHandler(payload, messageType, handlerType, provider, cancellationToken);
+                await JobDispatcher.ExecuteMessageHandler(payload, messageType, handlerType, provider, cancellationToken);
             }
             else
             {
-                await dispatcher.ExecuteJobHandler(payload, messageType, handlerType, provider, cancellationToken);
+                await JobDispatcher.ExecuteJobHandler(payload, messageType, handlerType, provider, cancellationToken);
             }
+
             return;
         }
 
         // Direct IJob: discover single handler
-        var jobHandlerType = dispatcher.DiscoverJobHandler(messageType, provider);
-        if (jobHandlerType is null)
-            throw new JoblyException($"No handler registered for {messageType.Name}");
-
+        var jobHandlerType = JobDispatcher.DiscoverJobHandler(messageType, provider) ?? throw new JoblyException($"No handler registered for {messageType.Name}");
         job.HandlerType = jobHandlerType.AssemblyQualifiedName;
-        await dispatcher.ExecuteJobHandler(payload, messageType, jobHandlerType, provider, cancellationToken);
+        await JobDispatcher.ExecuteJobHandler(payload, messageType, jobHandlerType, provider, cancellationToken);
     }
-
-    // ==================== Shared Logic ====================
 
     private void UpdateJobStatusToProcessing(TContext context, Job job)
     {
@@ -268,7 +249,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             EventType = "Processing",
             Timestamp = DateTime.UtcNow,
             Level = "Information",
-            Message = $"The job {job.Id} is being processed"
+            Message = $"The job {job.Id} is being processed",
         });
     }
 
@@ -305,14 +286,16 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         }
     }
 
-    private async Task CreateNextJob(TContext context, Job job, CancellationToken cancellationToken)
+    private static async Task CreateNextJob(TContext context, Job job, CancellationToken cancellationToken)
     {
         var recurringJob = await context.Set<RecurringJob>()
             .Where(x => x.Id == job.RecurringJobId)
             .FirstAsync(cancellationToken);
 
         if (recurringJob.NextJobId != job.Id)
+        {
             return;
+        }
 
         var fromUtc = DateTime.SpecifyKind(recurringJob.NextExecution ?? DateTime.UtcNow, DateTimeKind.Utc);
         var nextJobScheduleTime = CronExpression.Parse(recurringJob.Cron).GetNextOccurrence(fromUtc);
@@ -339,7 +322,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             EventType = "Created",
             Timestamp = DateTime.UtcNow,
             Level = "Information",
-            Message = $"Job {newJob.Id} created for recurring job {recurringJob.Id}"
+            Message = $"Job {newJob.Id} created for recurring job {recurringJob.Id}",
         });
         recurringJob.NextJobId = newJob.Id;
     }
@@ -417,7 +400,11 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
     private static async Task SaveJobLogs(TContext context, JobLogCollector collector)
     {
-        if (collector.Entries.Count == 0) return;
+        if (collector.Entries.Count == 0)
+        {
+            return;
+        }
+
         await context.Set<JobLog>().AddRangeAsync(collector.Entries);
     }
 
@@ -429,20 +416,22 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             State.Failed => "Failed",
             State.Enqueued => "Requeued",
             State.Processing => "Processing",
-            _ => state.ToString()
+            _ => state.ToString(),
         };
 
         var level = state == State.Failed ? "Error" : "Information";
 
-        await context.Set<JobLog>().AddAsync(new JobLog
-        {
-            JobId = jobId,
-            EventType = eventType,
-            Timestamp = DateTime.UtcNow,
-            Level = level,
-            Message = message ?? string.Empty,
-            Exception = exception
-        }, cancellationToken);
+        await context.Set<JobLog>().AddAsync(
+            new JobLog
+            {
+                JobId = jobId,
+                EventType = eventType,
+                Timestamp = DateTime.UtcNow,
+                Level = level,
+                Message = message ?? string.Empty,
+                Exception = exception,
+            },
+            cancellationToken);
     }
 
     private static async Task UpdateChildJobs(TContext context, Guid parentJobId, CancellationToken cancellationToken)
@@ -484,12 +473,16 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             .FirstOrDefaultAsync(cancellationToken);
 
         if (currentBatch == null)
+        {
             return;
+        }
 
         currentBatch.Counter--;
 
         if (currentBatch.Counter > 0)
+        {
             return;
+        }
 
         currentBatch.Counter = 0;
 
@@ -519,7 +512,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             .FirstOrDefaultAsync(cancellationToken);
 
         if (nextBatchJob == null)
+        {
             return;
+        }
 
         var nextBatch = await context.Set<Batch>()
             .Where(x => x.Id == nextBatchJob.Id)

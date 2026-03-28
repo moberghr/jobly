@@ -10,8 +10,6 @@ namespace Jobly.Tests.Jobs;
 
 public abstract partial class JoblyTests : TestBase
 {
-    // ==================== Core Requeue Behavior ====================
-
     [Fact]
     public async Task GivenStaleProcessingJob_WhenRequeueStaleJobsRuns_ThenJobIsRequeued()
     {
@@ -161,8 +159,6 @@ public abstract partial class JoblyTests : TestBase
         requeued.ShouldBe(0);
     }
 
-    // ==================== Full Lifecycle ====================
-
     [Fact]
     public async Task GivenCrashedJob_WhenRequeuedAndProcessed_ThenJobCompletes()
     {
@@ -230,8 +226,6 @@ public abstract partial class JoblyTests : TestBase
         job.RetriedTimes.ShouldBe(1); // Doesn't increment past max
         job.CurrentState.ShouldBe(State.Failed);
     }
-
-    // ==================== Server Cleanup ====================
 
     [Fact]
     public async Task GivenDeadServer_WhenCleanUpServersRuns_ThenServerAndWorkersAreRemoved()
@@ -322,8 +316,6 @@ public abstract partial class JoblyTests : TestBase
         (await CreateContext().Set<Server>().CountAsync()).ShouldBe(0);
     }
 
-    // ==================== Keep-Alive During Execution ====================
-
     [Fact]
     public async Task GivenJob_WhenProcessed_ThenLastKeepAliveIsClearedAfterCompletion()
     {
@@ -351,8 +343,6 @@ public abstract partial class JoblyTests : TestBase
         job.CurrentState.ShouldBe(State.Failed);
         job.LastKeepAlive.ShouldBeNull();
     }
-
-    // ==================== Concurrency ====================
 
     [Fact]
     public async Task GivenStaleJob_WhenMultipleRequeueStaleJobsRunConcurrently_ThenOnlyOnceRequeued()
@@ -385,8 +375,6 @@ public abstract partial class JoblyTests : TestBase
             .ToListAsync();
         logs.Count.ShouldBe(1);
     }
-
-    // ==================== Edge Cases ====================
 
     [Fact]
     public async Task GivenBatchJobCrash_WhenRequeued_ThenBatchCounterUnaffectedAndBatchCompletes()

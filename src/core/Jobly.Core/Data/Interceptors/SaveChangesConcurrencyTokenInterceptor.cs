@@ -1,9 +1,10 @@
-﻿using Jobly.Core.Interfaces;
+using Jobly.Core.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Jobly.Core.Interceptors;
+
 public class SaveChangesConcurrencyTokenInterceptor : SaveChangesInterceptor
 {
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
@@ -19,7 +20,7 @@ public class SaveChangesConcurrencyTokenInterceptor : SaveChangesInterceptor
                 x.State == EntityState.Modified
                 || x.State == EntityState.Added);
 
-        if(concurrencyTokenEntities is not null)
+        if (concurrencyTokenEntities is not null)
         {
             foreach (var entity in concurrencyTokenEntities)
             {

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Enums;
@@ -9,9 +9,9 @@ public class Job
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    public string Type { get; set; }
+    public string? Type { get; set; }
 
-    public string Message { get; set; }
+    public string? Message { get; set; }
 
     public DateTime CreateTime { get; set; }
 
@@ -24,7 +24,7 @@ public class Job
     public int RetriedTimes { get; set; }
 
     public int MaxRetries { get; set; }
-    
+
     public string Queue { get; set; } = "default";
 
     public Guid? ParentJobId { get; set; }
@@ -33,10 +33,10 @@ public class Job
 
     public Job? ParentJob { get; set; }
 
-    public List<Job> ChildJobs { get; set; } = new();
+    public List<Job> ChildJobs { get; set; } = [];
 
     public Batch? Batch { get; set; }
-    
+
     public Guid? BatchId { get; set; }
 
     public Guid? CurrentWorkerId { get; set; }

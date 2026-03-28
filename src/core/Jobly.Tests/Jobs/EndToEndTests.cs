@@ -20,6 +20,7 @@ namespace Jobly.Tests.Jobs;
 [Collection("PostgreSql")]
 public class EndToEndTests : IAsyncLifetime
 {
+    private static readonly string[] DefaultQueues = ["default"];
     private readonly PostgreSqlFixture _fixture;
 
     public EndToEndTests(PostgreSqlFixture fixture)
@@ -37,7 +38,6 @@ public class EndToEndTests : IAsyncLifetime
     [Fact]
     public async Task GivenComplexWorkload_WhenProcessedByRealWorkers_ThenAllJobsReachTerminalState()
     {
-        // === Arrange: build host with real worker infrastructure ===
         var host = Host.CreateDefaultBuilder()
             .ConfigureServices(services =>
             {
@@ -50,7 +50,7 @@ public class EndToEndTests : IAsyncLifetime
                 {
                     options.WorkerCount = 5;
                     options.ServerName = "e2e-test-server";
-                    options.Queues = new[] { "default" };
+                    options.Queues = DefaultQueues;
                     options.PollingInterval = TimeSpan.FromMilliseconds(100);
                     options.HealthCheckInterval = TimeSpan.FromSeconds(5);
                 });
@@ -59,8 +59,7 @@ public class EndToEndTests : IAsyncLifetime
 
         await host.StartAsync();
 
-        // === Act: seed a complex workload ===
-        using (var scope = host.Services.CreateScope())
+        await using (var scope = host.Services.CreateAsyncScope())
         {
             var publisher = scope.ServiceProvider.GetRequiredService<IPublisher>();
             var batchPublisher = scope.ServiceProvider.GetRequiredService<IBatchPublisher>();
@@ -68,31 +67,45 @@ public class EndToEndTests : IAsyncLifetime
 
             // 1. Simple jobs (50)
             for (var i = 0; i < 50; i++)
+            {
                 await publisher.Enqueue(new UnitRequest());
+            }
 
             // 2. Jobs that spawn children (10 → 10 children = 20 total)
             for (var i = 0; i < 10; i++)
+            {
                 await publisher.Enqueue(new SpawnChildJobRequest());
+            }
 
             // 3. Three-level trace chain (5 → 5 mid → 5 leaf = 15 total)
             for (var i = 0; i < 5; i++)
+            {
                 await publisher.Enqueue(new SpawnGrandchildJobRequest());
+            }
 
             // 4. Jobs that spawn batches with continuations (3 parents + 3 batches of 3 + 3 continuations + placeholders)
             for (var i = 0; i < 3; i++)
+            {
                 await publisher.Enqueue(new SpawnBatchRequest());
+            }
 
             // 5. Messages with multiple handlers (5 messages → 10 jobs)
             for (var i = 0; i < 5; i++)
+            {
                 await publisher.Publish(new MultiRequest());
+            }
 
             // 6. Failing jobs (10, no retries)
             for (var i = 0; i < 10; i++)
+            {
                 await publisher.Enqueue(new ThrowExceptionRequest());
+            }
 
             // 7. Failing jobs with retries (5, maxRetries=2 → will retry twice then fail)
             for (var i = 0; i < 5; i++)
+            {
                 await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 2);
+            }
 
             // 8. Batch of 10 jobs → continuation of 3 (directly, not via handler)
             var batchJobs = Enumerable.Range(0, 10).Select(_ => new UnitRequest()).ToList();
@@ -110,7 +123,6 @@ public class EndToEndTests : IAsyncLifetime
             await context.SaveChangesAsync();
         }
 
-        // === Wait: poll until all jobs reach terminal states ===
         var maxWait = TimeSpan.FromSeconds(60);
         var start = DateTime.UtcNow;
         var allDone = false;
@@ -119,7 +131,7 @@ public class EndToEndTests : IAsyncLifetime
         {
             await Task.Delay(500);
 
-            using var checkScope = host.Services.CreateScope();
+            await using var checkScope = host.Services.CreateAsyncScope();
             var checkContext = checkScope.ServiceProvider.GetRequiredService<TestContext>();
 
             var activeJobs = await checkContext.Set<Job>()
@@ -145,7 +157,6 @@ public class EndToEndTests : IAsyncLifetime
 
         allDone.ShouldBeTrue("Timed out waiting for all jobs to complete");
 
-        // === Assert: verify final database state ===
         var ctx = _fixture.CreateContext();
 
         // Helper: exclude batch placeholder jobs (same as dashboard)

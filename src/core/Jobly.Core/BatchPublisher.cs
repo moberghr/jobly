@@ -11,9 +11,11 @@ namespace Jobly.Core;
 
 public interface IBatchPublisher
 {
-    Task<Guid> StartNew<T>(List<T> batchJobMessages, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded) where T : class, IJob;
+    Task<Guid> StartNew<T>(List<T> batchJobMessages, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded)
+        where T : class, IJob;
 
-    Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded) where T : class, IJob;
+    Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded)
+        where T : class, IJob;
 }
 
 public class BatchPublisher<TContext> : IBatchPublisher
@@ -28,21 +30,24 @@ public class BatchPublisher<TContext> : IBatchPublisher
         _joblyConfiguration = configuration.Value;
     }
 
-    public async Task<Guid> StartNew<T>(List<T> batchJobMessages, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded) where T : class, IJob
+    public async Task<Guid> StartNew<T>(List<T> batchJobMessages, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded)
+        where T : class, IJob
     {
         return await BaseCreateBatch(batchJobMessages, State.Enqueued, null, options);
     }
 
-    public async Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded) where T : class, IJob
+    public async Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded)
+        where T : class, IJob
     {
         return await BaseCreateBatch(batchJobMessages, State.Awaiting, parentId, options);
     }
 
-    private async Task<Guid> BaseCreateBatch<T>(List<T> batchJobMessages, State batchJobsState, Guid? parentId, BatchContinuationOptions options) where T : class, IJob
+    private async Task<Guid> BaseCreateBatch<T>(List<T> batchJobMessages, State batchJobsState, Guid? parentId, BatchContinuationOptions options)
+        where T : class, IJob
     {
         if (batchJobMessages == null || batchJobMessages.Count == 0)
         {
-            throw new Exception("List cannot be empty");
+            throw new ArgumentException("List cannot be empty", nameof(batchJobMessages));
         }
 
         var placeholderJob = JobHelper.CreateJob(batchJobMessages[0], 0, null, null, _joblyConfiguration.DefaultQueue, parentId, State.Awaiting);
@@ -54,8 +59,8 @@ public class BatchPublisher<TContext> : IBatchPublisher
             ContinuationOptions = options,
         };
 
-        var batchJobs = batchJobMessages.Select(x => JobHelper.CreateJob(x, 0, null, null, _joblyConfiguration.DefaultQueue, null, batchJobsState))
-            .ToList();
+        var batchJobs = batchJobMessages.ConvertAll(x => JobHelper.CreateJob(x, 0, null, null, _joblyConfiguration.DefaultQueue, null, batchJobsState))
+;
 
         // Propagate trace from execution context
         var executionContext = JobExecutionContext.Current;
@@ -94,16 +99,17 @@ public class BatchPublisher<TContext> : IBatchPublisher
                 EventType = "Created",
                 Level = "Information",
                 Timestamp = DateTime.UtcNow,
-                Message = $"Job created in queue \"{job.Queue}\""
+                Message = $"Job created in queue \"{job.Queue}\"",
             });
         }
+
         logs.Add(new JobLog
         {
             JobId = placeholderJob.Id,
             EventType = "Created",
             Level = "Information",
             Timestamp = DateTime.UtcNow,
-            Message = $"Batch placeholder job created in queue \"{placeholderJob.Queue}\""
+            Message = $"Batch placeholder job created in queue \"{placeholderJob.Queue}\"",
         });
 
         _context.Set<Job>().AddRange(batchJobs);

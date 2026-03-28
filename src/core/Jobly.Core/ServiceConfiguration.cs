@@ -1,6 +1,7 @@
-﻿using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Interceptors;
+using Jobly.Core.Services;
 using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -28,17 +29,19 @@ public static class ServiceConfiguration
         return CreateJoblyServices<TContext>(services);
     }
 
-    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services,
+    public static IServiceCollection AddJobly<TContext>(
+        this IServiceCollection services,
         Action<JoblyConfiguration> options)
         where TContext : DbContext
     {
         services.AddOptions<JoblyConfiguration>()
             .Configure(options);
-        
+
         return CreateJoblyServices<TContext>(services);
     }
 
-    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services,
+    public static IServiceCollection AddJobly<TContext>(
+        this IServiceCollection services,
         IConfiguration namedConfigurationSection)
         where TContext : DbContext
     {
@@ -56,17 +59,20 @@ public static class ServiceConfiguration
         builder.AddApplicationPart(assembly)
             .AddRazorRuntimeCompilation();
 
-        services.Configure<MvcRazorRuntimeCompilationOptions>(options =>
-        {
-            options.FileProviders.Add(new EmbeddedFileProvider(assembly));
-        });
+        services.Configure<MvcRazorRuntimeCompilationOptions>(options => options.FileProviders.Add(new EmbeddedFileProvider(assembly)));
 
-        services.AddScoped<IPublisher>(x => new Publisher<TContext>(x.GetRequiredService<TContext>(),
+        services.AddScoped<IPublisher>(x => new Publisher<TContext>(
+            x.GetRequiredService<TContext>(),
             x.GetRequiredService<IOptions<JoblyConfiguration>>()));
 
         services.AddScoped<IRecurringJobPublisher>(x =>
             new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
-        services.AddScoped<IJoblyService>(x => new JoblyService<TContext>(x.GetRequiredService<TContext>()));
+        services.AddScoped<IJobQueryService>(x => new JobQueryService<TContext>(x.GetRequiredService<TContext>()));
+        services.AddScoped<IJobCommandService>(x => new JobCommandService<TContext>(x.GetRequiredService<TContext>()));
+        services.AddScoped<IMessageQueryService>(x => new MessageQueryService<TContext>(x.GetRequiredService<TContext>()));
+        services.AddScoped<IRecurringJobService>(x => new RecurringJobService<TContext>(x.GetRequiredService<TContext>()));
+        services.AddScoped<IBatchQueryService>(x => new BatchQueryService<TContext>(x.GetRequiredService<TContext>()));
+        services.AddScoped<IDashboardStatsService>(x => new DashboardStatsService<TContext>(x.GetRequiredService<TContext>()));
         services.AddTransient<IBatchPublisher, BatchPublisher<TContext>>();
 
         return services;
@@ -91,16 +97,10 @@ public static class ServiceConfiguration
             }
         }
 
-        var builderExtension = optionsBuilder.Options.FindExtension<CoreOptionsExtension>();
-
-        if (builderExtension == null)
-        {
-            throw new ArgumentException("No CoreOptionsExtension found");
-        }
-
+        var builderExtension = optionsBuilder.Options.FindExtension<CoreOptionsExtension>() ?? throw new ArgumentException("No CoreOptionsExtension found", nameof(optionsBuilder));
         if (builderExtension.Interceptors == null)
         {
-            throw new ArgumentException("Interceptors don't contains the configuration for this database type");
+            throw new ArgumentException("Interceptors don't contains the configuration for this database type", nameof(optionsBuilder));
         }
 
         optionsBuilder.AddInterceptors(_saveChangesInterceptor);
@@ -162,7 +162,7 @@ public static class ServiceConfiguration
             .WithOne(x => x.ParentJob)
             .HasForeignKey(x => x.ParentJobId);
 
-        job.HasIndex(p => new {p.CurrentState, p.Queue, p.ScheduleTime})
+        job.HasIndex(p => new { p.CurrentState, p.Queue, p.ScheduleTime })
             .IsDescending(false, false, false);
 
         job.HasIndex(p => p.CurrentState);
@@ -285,7 +285,6 @@ public static class ServiceConfiguration
         stat.HasData(
             new Statistic { Key = "stats:succeeded", Value = 0 },
             new Statistic { Key = "stats:failed", Value = 0 },
-            new Statistic { Key = "stats:deleted", Value = 0 }
-        );
+            new Statistic { Key = "stats:deleted", Value = 0 });
     }
 }

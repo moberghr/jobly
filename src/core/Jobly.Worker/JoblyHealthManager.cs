@@ -13,7 +13,7 @@ namespace Jobly.Worker;
 
 /// <summary>
 /// Jobly health manager will be responsible for managing the health of the Jobly worker.
-/// 
+///
 /// </summary>
 public class JoblyHealthManager<TContext> : BackgroundService
     where TContext : DbContext
@@ -31,7 +31,6 @@ public class JoblyHealthManager<TContext> : BackgroundService
         _logger = logger;
         _configuration = configuration.Value;
     }
-
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -53,24 +52,18 @@ public class JoblyHealthManager<TContext> : BackgroundService
     private async Task UpdateHeartbeat(TContext context)
     {
         var server = await context.Set<Server>()
-            .FindAsync(_configuration.ServerId);
-        if (server == null)
-        {
-            // Server was removed by another health manager because this server's heartbeat went stale.
-            // This is unrecoverable — the server must restart.
-            throw new InvalidOperationException("Server not found in the database. Another health manager removed this server due to stale heartbeat.");
-        }
-
+            .FindAsync(_configuration.ServerId) ?? throw new InvalidOperationException("Server not found in the database. Another health manager removed this server due to stale heartbeat.");
         server.LastHeartbeatTime = DateTime.UtcNow;
         await context.SaveChangesAsync();
     }
-    
+
     /// <summary>
     /// Removes servers that have not sent a heartbeat within the timeout.
     /// Also removes their worker records. Job recovery is handled separately by RequeueStaleJobs.
     /// Public static so tests can call it directly.
     /// </summary>
-    public static async Task<int> CleanUpServers<TCtx>(TCtx context, TimeSpan healthCheckTimeout) where TCtx : DbContext
+    public static async Task<int> CleanUpServers<TCtx>(TCtx context, TimeSpan healthCheckTimeout)
+        where TCtx : DbContext
     {
         var removedCount = 0;
         await using var transaction = await context.Database.BeginTransactionAsync();
@@ -91,6 +84,7 @@ public class JoblyHealthManager<TContext> : BackgroundService
                 removedCount++;
             }
         }
+
         await context.SaveChangesAsync();
         await transaction.CommitAsync();
         return removedCount;
@@ -102,7 +96,8 @@ public class JoblyHealthManager<TContext> : BackgroundService
     /// Does NOT increment RetriedTimes (crash requeue is not a real failure).
     /// Public static so tests can call it directly.
     /// </summary>
-    public static async Task<int> RequeueStaleJobs<TCtx>(TCtx context, TimeSpan invisibilityTimeout) where TCtx : DbContext
+    public static async Task<int> RequeueStaleJobs<TCtx>(TCtx context, TimeSpan invisibilityTimeout)
+        where TCtx : DbContext
     {
         var cutoff = DateTime.UtcNow - invisibilityTimeout;
 
@@ -125,7 +120,7 @@ public class JoblyHealthManager<TContext> : BackgroundService
                 EventType = "Requeued",
                 Timestamp = DateTime.UtcNow,
                 Level = "Warning",
-                Message = "Requeued by crash recovery — worker stopped responding"
+                Message = "Requeued by crash recovery — worker stopped responding",
             });
         }
 
@@ -134,13 +129,13 @@ public class JoblyHealthManager<TContext> : BackgroundService
 
         return staleJobs.Count;
     }
-    
+
     private async Task CleanupExpiredJobs(TContext context)
     {
         var count = await RunCleanup(context, _configuration.ExpirationBatchSize);
         if (count > 0)
         {
-            _logger.LogInformation("Cleaned up {count} expired jobs", count);
+            _logger.LogInformation("Cleaned up {Count} expired jobs", count);
         }
     }
 
@@ -148,7 +143,8 @@ public class JoblyHealthManager<TContext> : BackgroundService
     /// Deletes expired jobs, their logs/states, and expired messages.
     /// Returns the number of jobs deleted. Public static so tests can call it directly.
     /// </summary>
-    public static async Task<int> RunCleanup<TCtx>(TCtx context, int batchSize = 1000) where TCtx : DbContext
+    public static async Task<int> RunCleanup<TCtx>(TCtx context, int batchSize = 1000)
+        where TCtx : DbContext
     {
         var expiredJobIds = await context.Set<Job>()
             .Where(x => x.ExpireAt != null && x.ExpireAt < DateTime.UtcNow)
@@ -156,7 +152,10 @@ public class JoblyHealthManager<TContext> : BackgroundService
             .Take(batchSize)
             .ToListAsync();
 
-        if (expiredJobIds.Count == 0) return 0;
+        if (expiredJobIds.Count == 0)
+        {
+            return 0;
+        }
 
         await context.Set<JobLog>()
             .Where(x => expiredJobIds.Contains(x.JobId))
@@ -185,10 +184,10 @@ public class JoblyHealthManager<TContext> : BackgroundService
     {
         using var scope = _serviceScopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
-        
+
         var server = await context.Set<Server>()
             .FindAsync(_configuration.ServerId);
-        
+
         if (server == null)
         {
             // This should only happen if this server has stalled and other server has deleted it.
@@ -196,6 +195,7 @@ public class JoblyHealthManager<TContext> : BackgroundService
             _logger.LogWarning("Server {ServerId} not found in the database. Skipping removal.", _configuration.ServerId);
             return;
         }
+
         // Remove workers for this server
         var workers = await context.Set<Jobly.Core.Data.Entities.Worker>()
             .Where(w => w.ServerId == server.Id)

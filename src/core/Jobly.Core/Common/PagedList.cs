@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace Jobly.Core;
 
@@ -7,7 +7,7 @@ public static class PagedListExtensions
     public static async Task<PagedList<T>> ToPagedListAsync<T>(this IQueryable<T> query, BaseListRequest request)
         where T : class
     {
-        var totalCount = query.Count();
+        var totalCount = await query.CountAsync();
 
         var pageCount = (int)Math.Ceiling(totalCount / (double)request.PageSize);
 

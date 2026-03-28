@@ -2,6 +2,7 @@ using Jobly.Core.Handlers;
 using Microsoft.EntityFrameworkCore;
 
 namespace Jobly.Tests.TestData.Handlers;
+
 public class PrecessLogCommand : IJobHandler<PrecessLogRequest>
 {
     private readonly TestContext _context;

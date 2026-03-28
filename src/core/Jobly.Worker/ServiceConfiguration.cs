@@ -1,4 +1,4 @@
-﻿using Jobly.Core;
+using Jobly.Core;
 using Jobly.Core.Logging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -44,7 +44,7 @@ public static class ServiceConfiguration
         // Setup the configuration
         services.AddOptions<JoblyWorkerConfiguration>()
             .Configure(optionsAction);
-        
+
         return AddJoblyWorkerInner<TContext>(services);
     }
 
@@ -63,7 +63,7 @@ public static class ServiceConfiguration
         // Setup the configuration
         services.AddOptions<JoblyWorkerConfiguration>()
             .Bind(namedConfigurationSection);
-        
+
         return AddJoblyWorkerInner<TContext>(services);
     }
 

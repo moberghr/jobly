@@ -3,7 +3,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Jobly.Core.Handlers;
 
-public class TimingPipelineBehavior<T> : IPipelineBehavior<T> where T : class
+public class TimingPipelineBehavior<T> : IPipelineBehavior<T>
+    where T : class
 {
     private readonly ILogger<TimingPipelineBehavior<T>> _logger;
 

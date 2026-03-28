@@ -9,8 +9,6 @@ namespace Jobly.Tests.Jobs;
 
 public abstract partial class JoblyTests : TestBase
 {
-    // ==================== Batch Counter Bug Fix ====================
-
     [Fact]
     public async Task GivenBatchWithRetryingJob_WhenJobFailsAndRetries_ThenBatchCounterOnlyDecrementsOnTerminalState()
     {
@@ -46,8 +44,6 @@ public abstract partial class JoblyTests : TestBase
             .FirstAsync();
         batchAfterRetry.Counter.ShouldBe(2); // Not decremented — job is retrying, not finished
     }
-
-    // ==================== BatchContinuationOptions.OnlyOnSucceeded (default) ====================
 
     [Fact]
     public async Task GivenBatchWithDefaultOptions_WhenAllJobsSucceed_ThenContinuationFires()
@@ -102,8 +98,6 @@ public abstract partial class JoblyTests : TestBase
             .ToListAsync();
         continuationJobs.ShouldAllBe(j => j.CurrentState == State.Awaiting);
     }
-
-    // ==================== BatchContinuationOptions.OnAnyFinishedState ====================
 
     [Fact]
     public async Task GivenBatchWithOnAnyFinished_WhenSomeJobsFail_ThenContinuationStillFires()

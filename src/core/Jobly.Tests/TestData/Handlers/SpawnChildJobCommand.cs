@@ -3,7 +3,7 @@ using Jobly.Core.Handlers;
 
 namespace Jobly.Tests.TestData.Handlers;
 
-public class SpawnChildJobRequest : IJob { }
+public class SpawnChildJobRequest : IJob;
 
 public class SpawnChildJobHandler : IJobHandler<SpawnChildJobRequest>
 {
@@ -24,7 +24,7 @@ public class SpawnChildJobHandler : IJobHandler<SpawnChildJobRequest>
 /// <summary>
 /// Handler that spawns another SpawnChildJobRequest, creating a 3-level trace chain.
 /// </summary>
-public class SpawnGrandchildJobRequest : IJob { }
+public class SpawnGrandchildJobRequest : IJob;
 
 public class SpawnGrandchildJobHandler : IJobHandler<SpawnGrandchildJobRequest>
 {

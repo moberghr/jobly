@@ -32,7 +32,7 @@ public abstract partial class JoblyTests : TestBase
     public async Task GivenFailedJob_ThenHourlyFailedStatIncremented()
     {
         var context = CreateContext();
-        var jobId = await CreateFailedJob(context);
+        _ = await CreateFailedJob(context);
 
         await ProcessJob();
 
@@ -78,7 +78,7 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessJob();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateDashboardStatsService(CreateContext());
         var history = await service.GetStatsHistory(24);
 
         history.Count.ShouldBeGreaterThanOrEqualTo(1);

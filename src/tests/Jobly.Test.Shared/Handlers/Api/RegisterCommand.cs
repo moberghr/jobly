@@ -20,7 +20,7 @@ public class RegisterCommand : IJobHandler<RegisterRequest>
     {
         var registration = new Registration
         {
-            Email = message.Email
+            Email = message.Email,
         };
 
         _context.Registrations.Add(registration);
@@ -29,18 +29,18 @@ public class RegisterCommand : IJobHandler<RegisterRequest>
         {
             Email = message.Email,
             Body = "Test email",
-            Subject = "Test subject"
+            Subject = "Test subject",
         };
 
         _context.EmailLogs.Add(emailLog);
 
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(ct);
 
         var sendEmailRequest = new SendEmailRequest
         {
-            EmailLogId = emailLog.Id
+            EmailLogId = emailLog.Id,
         };
 
         var batch = new List<SendEmailRequest>();
@@ -53,20 +53,20 @@ public class RegisterCommand : IJobHandler<RegisterRequest>
 
         await _batchPublisher.StartNew(batch);
 
-        Guid parentId = await _publisher.Enqueue(sendEmailRequest);
+        var parentId = await _publisher.Enqueue(sendEmailRequest);
 
-        for (int i = 0; i < 4; i++)
+        for (var i = 0; i < 4; i++)
         {
             await _publisher.Enqueue(sendEmailRequest, parentId);
         }
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(ct);
 
-        await transaction.CommitAsync();
+        await transaction.CommitAsync(ct);
     }
 }
 
 public class RegisterRequest : IJob
 {
-    public string Email { get; set; }
+    public string? Email { get; set; }
 }

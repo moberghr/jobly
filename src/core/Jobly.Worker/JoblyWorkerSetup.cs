@@ -10,12 +10,13 @@ namespace Jobly.Worker;
 /// <summary>
 /// Registers the server and workers in the database, then starts the worker background services.
 /// </summary>
-public class JoblyWorkerSetup<TContext> : IHostedService where TContext : DbContext
+public class JoblyWorkerSetup<TContext> : IHostedService
+    where TContext : DbContext
 {
     private readonly JoblyWorkerConfiguration _configuration;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IServiceProvider _serviceProvider;
-    private readonly List<JoblyWorker<TContext>> _workers = new();
+    private readonly List<JoblyWorker<TContext>> _workers = [];
 
     public JoblyWorkerSetup(
         IOptions<JoblyWorkerConfiguration> configuration,
@@ -47,19 +48,21 @@ public class JoblyWorkerSetup<TContext> : IHostedService where TContext : DbCont
                 ServerName = _configuration.ServerName ?? $"{Environment.MachineName}.{_configuration.ServerId}",
                 StartedTime = now,
                 LastHeartbeatTime = now,
-                ServiceCount = _configuration.WorkerCount
+                ServiceCount = _configuration.WorkerCount,
             };
             await context.Set<Server>().AddAsync(server, cancellationToken);
 
             foreach (var workerId in workerIds)
             {
-                await context.Set<Jobly.Core.Data.Entities.Worker>().AddAsync(new Jobly.Core.Data.Entities.Worker
-                {
-                    Id = workerId,
-                    ServerId = _configuration.ServerId,
-                    StartedTime = now,
-                    LastHeartbeatTime = now
-                }, cancellationToken);
+                await context.Set<Jobly.Core.Data.Entities.Worker>().AddAsync(
+                    new Jobly.Core.Data.Entities.Worker
+                    {
+                        Id = workerId,
+                        ServerId = _configuration.ServerId,
+                        StartedTime = now,
+                        LastHeartbeatTime = now,
+                    },
+                    cancellationToken);
             }
 
             await context.SaveChangesAsync(cancellationToken);
@@ -74,7 +77,8 @@ public class JoblyWorkerSetup<TContext> : IHostedService where TContext : DbCont
                 _serviceProvider.GetRequiredService<ILogger<JoblyWorkerService<TContext>>>(),
                 _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>());
 
-            var worker = new JoblyWorker<TContext>(workerService,
+            var worker = new JoblyWorker<TContext>(
+                workerService,
                 _serviceProvider.GetRequiredService<ILogger<JoblyWorker<TContext>>>(),
                 _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>());
 

@@ -29,6 +29,7 @@ public class JoblyWorker<TContext> : BackgroundService
                 await Task.Delay(_configuration.PollingInterval, stoppingToken);
             }
         }
+
         _logger.LogInformation("Jobly worker is stopping.");
     }
 }

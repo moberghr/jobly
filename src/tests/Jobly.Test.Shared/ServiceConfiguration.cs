@@ -1,4 +1,4 @@
-﻿using Jobly.Core;
+using Jobly.Core;
 using Jobly.Core.Handlers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -14,7 +14,8 @@ public static class ServiceConfiguration
 
         services.AddDbContextPool<TestContext>(options => options
             .UseNpgsql(configuration.GetConnectionString(nameof(TestContext))!)
-            //.UseSqlServer(configuration.GetConnectionString(nameof(TestContext))!)
+
+            // .UseSqlServer(configuration.GetConnectionString(nameof(TestContext))!)
             .UseSnakeCaseNamingConvention()
             .AddJoblyInterceptors());
     }

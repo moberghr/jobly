@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Jobly.Core.Handlers;
 
-public class OrderNotification : IMessage { }
+public class OrderNotification : IMessage;
 
 public class OrderEmailHandler : IMessageHandler<OrderNotification>
 {

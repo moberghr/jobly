@@ -9,8 +9,6 @@ namespace Jobly.Core.Handlers;
 /// Job (ProcessOrderRequest) → spawns a batch of ShipItemRequest → continuation PublishInvoiceRequest
 /// PublishInvoiceRequest → publishes InvoiceNotification message → 2 handlers
 /// </summary>
-
-// === Top-level job that kicks off the complex flow ===
 public class ProcessOrderRequest : IJob
 {
     public string OrderId { get; set; } = "ORD-001";
@@ -41,7 +39,7 @@ public class ProcessOrderHandler : IJobHandler<ProcessOrderRequest>
         // Continuation after batch completes: publish invoice
         var invoiceJobs = new List<PublishInvoiceRequest>
         {
-            new() { OrderId = message.OrderId }
+            new() { OrderId = message.OrderId },
         };
         await _batchPublisher.ContinueBatchWith(invoiceJobs, batchId);
 
@@ -49,10 +47,10 @@ public class ProcessOrderHandler : IJobHandler<ProcessOrderRequest>
     }
 }
 
-// === Batch job: ship individual item ===
 public class ShipItemRequest : IJob
 {
-    public string OrderId { get; set; } = "";
+    public string OrderId { get; set; } = string.Empty;
+
     public int ItemIndex { get; set; }
 }
 
@@ -72,10 +70,9 @@ public class ShipItemHandler : IJobHandler<ShipItemRequest>
     }
 }
 
-// === Continuation job: publish invoice notification (message) ===
 public class PublishInvoiceRequest : IJob
 {
-    public string OrderId { get; set; } = "";
+    public string OrderId { get; set; } = string.Empty;
 }
 
 public class PublishInvoiceHandler : IJobHandler<PublishInvoiceRequest>
@@ -99,10 +96,9 @@ public class PublishInvoiceHandler : IJobHandler<PublishInvoiceRequest>
     }
 }
 
-// === Message: invoice notification → multiple handlers ===
 public class InvoiceNotification : IMessage
 {
-    public string OrderId { get; set; } = "";
+    public string OrderId { get; set; } = string.Empty;
 }
 
 public class InvoiceEmailHandler : IMessageHandler<InvoiceNotification>

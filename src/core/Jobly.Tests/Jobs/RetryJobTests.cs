@@ -1,5 +1,5 @@
-﻿using Jobly.Core.Enums;
 using Jobly.Core;
+using Jobly.Core.Enums;
 using Jobly.Tests.TestData.Handlers;
 using Shouldly;
 
@@ -10,11 +10,11 @@ public abstract partial class JoblyTests : TestBase
     [Fact]
     public async Task Publish_RetryJobWithStateFailed_RetriedTimesShouldBeEqualToMaxRetries()
     {
-        int retries = 5;
+        const int retries = 5;
         var context = CreateContext();
-        Guid jobId = await CreateFailedRetryJob(context, retries, null, null);
+        var jobId = await CreateFailedRetryJob(context, retries, null, null);
 
-        for (int i = 0; i <= 10; i++)
+        for (var i = 0; i <= 10; i++)
         {
             await ProcessJob();
         }
@@ -30,11 +30,11 @@ public abstract partial class JoblyTests : TestBase
     [Fact]
     public async Task Publish_WithoutRetryJob_WithStateFailed()
     {
-        int retries = 0;
+        const int retries = 0;
         var context = CreateContext();
-        Guid jobId = await CreateFailedRetryJob(context, retries, null, null);
+        var jobId = await CreateFailedRetryJob(context, retries, null, null);
 
-        for (int i = 0; i <= 10; i++)
+        for (var i = 0; i <= 10; i++)
         {
             await ProcessJob();
         }
@@ -50,12 +50,12 @@ public abstract partial class JoblyTests : TestBase
     [Fact]
     public async Task Publish_RetryJob_UsePublisherMaxRetriesParameter()
     {
-        int retries = 0;
+        const int retries = 0;
         var context = CreateContext();
-        int maxRetries = 2;
-        Guid jobId = await CreateFailedRetryJob(context, retries, maxRetries, null);
+        const int maxRetries = 2;
+        var jobId = await CreateFailedRetryJob(context, retries, maxRetries, null);
 
-        for (int i = 0; i <= 10; i++)
+        for (var i = 0; i <= 10; i++)
         {
             await ProcessJob();
         }
@@ -71,12 +71,12 @@ public abstract partial class JoblyTests : TestBase
     [Fact]
     public async Task Publish_RetryJob_UsePublisherMaxRetriesAndGlobalRetryParameter()
     {
-        int retries = 5;
+        const int retries = 5;
         var context = CreateContext();
-        int maxRetries = 1;
-        Guid jobId = await CreateFailedRetryJob(context, retries, maxRetries, null);
+        const int maxRetries = 1;
+        var jobId = await CreateFailedRetryJob(context, retries, maxRetries, null);
 
-        for (int i = 0; i <= 10; i++)
+        for (var i = 0; i <= 10; i++)
         {
             await ProcessJob();
         }
@@ -92,15 +92,15 @@ public abstract partial class JoblyTests : TestBase
     [Fact]
     public async Task Publish_WithoutRetryJob_WithStateComplited()
     {
-        int retries = 0;
+        const int retries = 0;
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context, retries);
         var jobRequest = new UnitRequest();
-        Guid jobId = await publisher.Enqueue(jobRequest);
+        var jobId = await publisher.Enqueue(jobRequest);
 
         await context.SaveChangesAsync();
 
-        for (int i = 0; i <= 10; i++)
+        for (var i = 0; i <= 10; i++)
         {
             await ProcessJob();
         }
@@ -116,12 +116,12 @@ public abstract partial class JoblyTests : TestBase
     [Fact]
     public async Task Publish_RetryJobWithStateComplated_RetriedTimesShouldNotBeEqualToMaxRetries()
     {
-        int retries = 5;
-        int successIteration = 3;
+        const int retries = 5;
+        const int successIteration = 3;
         var context = CreateContext();
-        Guid jobId = await CreateFailedRetryJob(context, retries, null, null);
+        var jobId = await CreateFailedRetryJob(context, retries, null, null);
 
-        for (int i = 0; i <= 10; i++)
+        for (var i = 0; i <= 10; i++)
         {
             if (i == successIteration)
             {

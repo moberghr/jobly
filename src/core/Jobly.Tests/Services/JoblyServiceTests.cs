@@ -10,7 +10,10 @@ namespace Jobly.Tests.Services;
 
 public abstract partial class ServiceTests : TestBase
 {
-    protected ServiceTests(Func<TestContext> createContext) : base(createContext) { }
+    protected ServiceTests(Func<TestContext> createContext)
+        : base(createContext)
+    {
+    }
 
     [Fact]
     public async Task GetJobById_ReturnsJobWithStateHistoryAndRelationships()
@@ -23,7 +26,7 @@ public abstract partial class ServiceTests : TestBase
 
         await ProcessJob();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobQueryService(CreateContext());
         var job = await service.GetJobById(jobId);
 
         job.ShouldNotBeNull();
@@ -36,7 +39,7 @@ public abstract partial class ServiceTests : TestBase
     [Fact]
     public async Task GetJobById_NonExistent_ReturnsNull()
     {
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobQueryService(CreateContext());
         var job = await service.GetJobById(Guid.NewGuid());
         job.ShouldBeNull();
     }
@@ -50,7 +53,7 @@ public abstract partial class ServiceTests : TestBase
         var jobId = await publisher.Enqueue(new UnitRequest());
         await context.SaveChangesAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.DeleteJob(jobId);
 
         var job = await GetJob(jobId);
@@ -68,7 +71,7 @@ public abstract partial class ServiceTests : TestBase
 
         await ProcessJob(); // completes the job
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.RequeueJob(jobId);
 
         var job = await GetJob(jobId);
@@ -85,7 +88,7 @@ public abstract partial class ServiceTests : TestBase
         await publisher.Publish(new SingleHandlerMessage());
         await context.SaveChangesAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateMessageQueryService(CreateContext());
         var result = await service.GetMessages(new BaseListRequest { Page = 0, PageSize = 10 });
 
         result.TotalCount.ShouldBe(2);
@@ -104,7 +107,7 @@ public abstract partial class ServiceTests : TestBase
         // Route the message to create jobs
         await ProcessJob();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateMessageQueryService(CreateContext());
         var message = await service.GetMessageById(messageId);
 
         message.ShouldNotBeNull();
@@ -122,7 +125,7 @@ public abstract partial class ServiceTests : TestBase
         var childId = await publisher.Enqueue(new UnitRequest(), parentId);
         await context.SaveChangesAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobQueryService(CreateContext());
         var result = await service.GetAwaitingJobs(new BaseListRequest { Page = 0, PageSize = 10 });
 
         result.Items.ShouldContain(j => j.Id == childId);
@@ -139,7 +142,7 @@ public abstract partial class ServiceTests : TestBase
         await publisher.Enqueue(new UnitRequest());
         await context.SaveChangesAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateDashboardStatsService(CreateContext());
         var stats = await service.GetJoblyStatus();
 
         stats.Created.ShouldBeGreaterThanOrEqualTo(2);
@@ -155,14 +158,14 @@ public abstract partial class ServiceTests : TestBase
         var messageId = await publisher.Publish(new MultiRequest());
         await context.SaveChangesAsync();
 
-        // Route message → creates 2 handler jobs
+        // Route message -> creates 2 handler jobs
         await ProcessJob();
 
         var jobs = await CreateContext().Set<Job>()
             .Where(j => j.MessageId == messageId)
             .ToListAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobQueryService(CreateContext());
         var jobDetail = await service.GetJobById(jobs[0].Id);
 
         jobDetail.ShouldNotBeNull();
@@ -180,7 +183,7 @@ public abstract partial class ServiceTests : TestBase
         var childId = await publisher.Enqueue(new UnitRequest(), parentId);
         await context.SaveChangesAsync();
 
-        var service = TestUtils.CreateJoblyService(CreateContext());
+        var service = TestUtils.CreateJobQueryService(CreateContext());
         var jobDetail = await service.GetJobById(parentId);
 
         jobDetail.ShouldNotBeNull();

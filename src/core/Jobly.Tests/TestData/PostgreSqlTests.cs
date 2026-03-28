@@ -8,7 +8,8 @@ public class PostgreSqlTests : JoblyTests, IAsyncLifetime
 {
     private readonly PostgreSqlFixture _fixture;
 
-    public PostgreSqlTests(PostgreSqlFixture fixture) : base(fixture.CreateContext)
+    public PostgreSqlTests(PostgreSqlFixture fixture)
+        : base(fixture.CreateContext)
     {
         _fixture = fixture;
     }

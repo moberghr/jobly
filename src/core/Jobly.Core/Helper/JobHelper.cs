@@ -27,8 +27,14 @@ public static class JobHelper
         return job;
     }
 
-    public static Job CreateJob<T>(T message, int retries, DateTime? scheduleTime, int? maxRetries,
-        string? queue, Guid? parentId, State? state)
+    public static Job CreateJob<T>(
+        T message,
+        int retries,
+        DateTime? scheduleTime,
+        int? maxRetries,
+        string? queue,
+        Guid? parentId,
+        State? state)
         where T : class, IJob
     {
         var serializedMessage = JsonSerializer.Serialize(message);

@@ -9,8 +9,6 @@ namespace Jobly.Tests.Jobs;
 
 public abstract partial class JoblyTests : TestBase
 {
-    // ==================== IMessage Routing ====================
-
     [Fact]
     public async Task GivenMessage_WhenPublished_ThenMessageCreatedWithEnqueuedState()
     {
@@ -108,8 +106,6 @@ public abstract partial class JoblyTests : TestBase
         jobs[0].Queue.ShouldBe("a-critical");
     }
 
-    // ==================== IJob Direct Execution ====================
-
     [Fact]
     public async Task GivenJob_WhenEnqueued_ThenJobCreatedDirectlyWithNoMessageId()
     {
@@ -189,8 +185,6 @@ public abstract partial class JoblyTests : TestBase
         job.HandlerType.ShouldContain(nameof(UnitCommand));
     }
 
-    // ==================== Worker Prioritization ====================
-
     [Fact]
     public async Task GivenJobAndMessage_WhenWorkerPolls_ThenJobIsProcessedFirst()
     {
@@ -199,6 +193,7 @@ public abstract partial class JoblyTests : TestBase
 
         // Publish a message first
         var messageId = await publisher.Publish(new SingleHandlerMessage());
+
         // Then enqueue a job
         var jobId = await publisher.Enqueue(new UnitRequest());
         await context.SaveChangesAsync();
@@ -212,8 +207,6 @@ public abstract partial class JoblyTests : TestBase
         var message = await GetMessage(messageId);
         message.CurrentState.ShouldBe(State.Enqueued); // not yet routed
     }
-
-    // ==================== Message-spawned Job Independence ====================
 
     [Fact]
     public async Task GivenMultipleHandlers_WhenOneJobFails_ThenOtherJobStillCompletes()
