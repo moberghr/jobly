@@ -10,6 +10,8 @@ namespace Jobly.Tests.Services;
 
 public abstract partial class ServiceTests : TestBase
 {
+    protected ServiceTests(Func<TestContext> createContext) : base(createContext) { }
+
     [Fact]
     public async Task GetJobById_ReturnsJobWithStateHistoryAndRelationships()
     {

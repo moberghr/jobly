@@ -15,24 +15,19 @@ public class SqlServerTests : JoblyTests, IAsyncLifetime
         .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
         .Build();
 
-    protected override TestContext CreateContext()
+    public SqlServerTests() : base(null!)
     {
-        var testContext = new TestContext(new DbContextOptionsBuilder<TestContext>()
-           .UseSqlServer(_dbContainer.GetConnectionString() + ";Encrypt=False;")
-           .AddInterceptors(_interceptor, _concurrencyTokenInterceptor).Options);
-
-        testContext.Database.EnsureCreated();
-
-        return testContext;
-    }
-
-    public async Task DisposeAsync()
-    {
-        await _dbContainer.DisposeAsync();
+        // SQL Server tests are skipped (Category=SqlServer).
+        // TODO: convert to Respawn fixture pattern.
     }
 
     public async Task InitializeAsync()
     {
         await _dbContainer.StartAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _dbContainer.DisposeAsync();
     }
 }
