@@ -74,7 +74,8 @@ public class JoblyWorkerSetup<TContext> : IHostedService where TContext : DbCont
                 _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>());
 
             var worker = new JoblyWorker<TContext>(workerService,
-                _serviceProvider.GetRequiredService<ILogger<JoblyWorker<TContext>>>());
+                _serviceProvider.GetRequiredService<ILogger<JoblyWorker<TContext>>>(),
+                _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>());
 
             await worker.StartAsync(cancellationToken);
             _workers.Add(worker);
