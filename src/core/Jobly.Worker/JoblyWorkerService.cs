@@ -177,7 +177,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             _logger.LogInformation("Worker {workerId} completed job {id}", _workerId, job.Id);
 
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
-            await UpdateJobData(context, job, message: null, default);
+            await UpdateJobData(context, job, null, default);
             await SaveJobLogs(context, logCollector);
             await context.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
@@ -186,7 +186,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         {
             _logger.LogError(e, "Error executing job {id}", job.Id);
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
-            await UpdateJobData(context, job, e.Message, default);
+            await UpdateJobData(context, job, e, default);
             await SaveJobLogs(context, logCollector);
             await context.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
@@ -295,10 +295,11 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         recurringJob.NextJobId = newJob.Id;
     }
 
-    private static async Task UpdateJobData(TContext context, Job job, string? message, CancellationToken cancellationToken)
+    private static async Task UpdateJobData(TContext context, Job job, Exception? error, CancellationToken cancellationToken)
     {
-        var state = !string.IsNullOrEmpty(message) ? State.Failed : State.Completed;
-        if (job.RetriedTimes < job.MaxRetries && !string.IsNullOrEmpty(message))
+        var failed = error != null;
+        var state = failed ? State.Failed : State.Completed;
+        if (job.RetriedTimes < job.MaxRetries && failed)
         {
             state = State.Enqueued;
             job.RetriedTimes += 1;
@@ -318,7 +319,6 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         }
         else if (state == State.Failed && job.RetriedTimes >= job.MaxRetries)
         {
-            // Only count as failed when retries are exhausted (not on re-enqueue)
             await IncrementStatistic(context, "stats:failed");
             await IncrementStatistic(context, $"stats:failed:{hourSuffix}");
         }
@@ -333,19 +333,20 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await UpdateChildJobs(context, job.Id, cancellationToken);
         }
 
-        // Check for batch completion
         if (job.BatchId != null)
         {
             await UpdateCurrentAndNextBatchFromChildJob(context, job.BatchId.Value, cancellationToken);
         }
 
-        // Check for message completion (all jobs for a message done)
         if (job.MessageId != null && job.CurrentState == State.Completed)
         {
             await UpdateMessageJobCount(context, job.MessageId.Value, cancellationToken);
         }
 
-        await CreateJobLog(context, job.Id, state, string.IsNullOrEmpty(message) ? $"Job {job.Id} is completed" : message, cancellationToken);
+        var logMessage = error != null ? error.Message : $"Job {job.Id} completed";
+        var logException = error?.ToString(); // Full stack trace
+
+        await CreateJobLog(context, job.Id, state, logMessage, cancellationToken, logException);
     }
 
     private static async Task UpdateMessageJobCount(TContext context, Guid messageId, CancellationToken cancellationToken)
@@ -370,7 +371,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         await context.Set<JobLog>().AddRangeAsync(collector.Entries);
     }
 
-    private static async Task CreateJobLog(TContext context, Guid jobId, State state, string? message, CancellationToken cancellationToken)
+    private static async Task CreateJobLog(TContext context, Guid jobId, State state, string? message, CancellationToken cancellationToken, string? exception = null)
     {
         var eventType = state switch
         {
@@ -389,7 +390,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             EventType = eventType,
             Timestamp = DateTime.UtcNow,
             Level = level,
-            Message = message ?? string.Empty
+            Message = message ?? string.Empty,
+            Exception = exception
         }, cancellationToken);
     }
 
