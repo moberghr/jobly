@@ -110,3 +110,8 @@ export interface PagedList<T> {
   pageCount: number;
   items: T[];
 }
+
+export interface BulkResult {
+  succeeded: number;
+  skipped: number;
+}

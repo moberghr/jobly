@@ -37,6 +37,8 @@ public interface IJoblyService
     Task<JobDetailModel?> GetJobById(Guid jobId);
     Task DeleteJob(Guid jobId);
     Task RequeueJob(Guid jobId);
+    Task<BulkResultModel> BulkDeleteJobs(Guid[] jobIds);
+    Task<BulkResultModel> BulkRequeueJobs(Guid[] jobIds);
 
     // Awaiting jobs
     Task<PagedList<JobModel>> GetAwaitingJobs(BaseListRequest request);
@@ -458,6 +460,42 @@ public class JoblyService<TContext> : IJoblyService
         await _context.Set<JobState>().AddAsync(jobState);
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
+    }
+
+    public async Task<BulkResultModel> BulkDeleteJobs(Guid[] jobIds)
+    {
+        var result = new BulkResultModel();
+        foreach (var jobId in jobIds)
+        {
+            try
+            {
+                await DeleteJob(jobId);
+                result.Succeeded++;
+            }
+            catch
+            {
+                result.Skipped++;
+            }
+        }
+        return result;
+    }
+
+    public async Task<BulkResultModel> BulkRequeueJobs(Guid[] jobIds)
+    {
+        var result = new BulkResultModel();
+        foreach (var jobId in jobIds)
+        {
+            try
+            {
+                await RequeueJob(jobId);
+                result.Succeeded++;
+            }
+            catch
+            {
+                result.Skipped++;
+            }
+        }
+        return result;
     }
 
     private async Task DecrementStatForState(State state)

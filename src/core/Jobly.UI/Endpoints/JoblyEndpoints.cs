@@ -76,6 +76,18 @@ public static class JoblyEndpoints
             await joblyService.DeleteJob(jobId);
         });
 
+        // ==================== Bulk Actions ====================
+
+        apiGroup.MapPost("jobs/bulk/delete", async ([FromServices] IJoblyService joblyService, [FromBody] BulkJobRequest request) =>
+        {
+            return await joblyService.BulkDeleteJobs(request.JobIds);
+        });
+
+        apiGroup.MapPost("jobs/bulk/requeue", async ([FromServices] IJoblyService joblyService, [FromBody] BulkJobRequest request) =>
+        {
+            return await joblyService.BulkRequeueJobs(request.JobIds);
+        });
+
         // ==================== Messages ====================
 
         apiGroup.MapGet("messages", async ([FromServices] IJoblyService joblyService, [AsParameters] BaseListRequest request) =>

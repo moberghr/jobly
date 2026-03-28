@@ -5,6 +5,7 @@ import { StateBadge } from '@/components/StateBadge';
 import { Pagination } from '@/components/Pagination';
 import { shortType, formatRelativeTime, shortId } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
+import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import type { MessageModel, PagedList } from '@/types';
 import * as api from '@/api';
 
@@ -12,16 +13,17 @@ export default function MessagesPage() {
   const [data, setData] = useState<PagedList<MessageModel> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = usePersistedPageSize();
 
   const fetchData = useCallback(async () => {
     try {
-      const result = await api.getMessages(page, 20);
+      const result = await api.getMessages(page, pageSize);
       setData(result);
       setError(null);
     } catch {
       setError('Unable to load messages');
     }
-  }, [page]);
+  }, [page, pageSize]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -76,7 +78,7 @@ export default function MessagesPage() {
         </Table>
       </div>
 
-      <Pagination page={page} pageCount={data.pageCount} onPageChange={setPage} />
+      <Pagination page={page} pageCount={data.pageCount} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/Pagination';
 import { formatRelativeTime } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
+import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import type { RecurringJobModel, PagedList } from '@/types';
 import * as api from '@/api';
 
@@ -11,16 +12,17 @@ export default function RecurringPage() {
   const [data, setData] = useState<PagedList<RecurringJobModel> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = usePersistedPageSize();
 
   const fetchData = useCallback(async () => {
     try {
-      const result = await api.getRecurringJobs(page, 20);
+      const result = await api.getRecurringJobs(page, pageSize);
       setData(result);
       setError(null);
     } catch {
       setError('Unable to load recurring jobs');
     }
-  }, [page]);
+  }, [page, pageSize]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -77,7 +79,7 @@ export default function RecurringPage() {
         </Table>
       </div>
 
-      <Pagination page={page} pageCount={data.pageCount} onPageChange={setPage} />
+      <Pagination page={page} pageCount={data.pageCount} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} />
     </div>
   );
 }

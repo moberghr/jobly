@@ -5,10 +5,12 @@ interface PaginationProps {
   page: number;
   pageCount: number;
   onPageChange: (page: number) => void;
+  pageSize?: number;
+  onPageSizeChange?: (size: number) => void;
 }
 
-export function Pagination({ page, pageCount, onPageChange }: PaginationProps) {
-  if (pageCount <= 1) return null;
+export function Pagination({ page, pageCount, onPageChange, pageSize, onPageSizeChange }: PaginationProps) {
+  if (pageCount <= 1 && !onPageSizeChange) return null;
 
   return (
     <div className="flex items-center gap-2 justify-center mt-4">
@@ -31,6 +33,17 @@ export function Pagination({ page, pageCount, onPageChange }: PaginationProps) {
       >
         <ChevronRight className="h-4 w-4" />
       </Button>
+      {onPageSizeChange && (
+        <select
+          value={pageSize}
+          onChange={e => onPageSizeChange(Number(e.target.value))}
+          className="ml-4 px-2 py-1 text-sm border rounded-md bg-background"
+        >
+          {[10, 20, 50, 100].map(size => (
+            <option key={size} value={size}>{size} per page</option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }

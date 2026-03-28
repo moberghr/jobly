@@ -7,7 +7,10 @@ import {
   Mail,
   RefreshCw,
   Server,
+  Moon,
+  Sun,
 } from 'lucide-react';
+import { useTheme } from '@/hooks/useTheme';
 import type { DashboardStatistics } from '@/types';
 
 const navItems = [
@@ -21,6 +24,7 @@ const navItems = [
 export default function MainLayout() {
   const { stats, fetchStats } = useDashboardStore();
   const location = useLocation();
+  const { theme, toggle } = useTheme();
 
   usePolling(fetchStats, 5000);
 
@@ -65,6 +69,10 @@ export default function MainLayout() {
               );
             })}
           </nav>
+          <div className="flex-1" />
+          <button onClick={toggle} className="p-2 rounded-md hover:bg-accent text-muted-foreground">
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
         </div>
       </header>
 

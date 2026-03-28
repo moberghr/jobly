@@ -1,5 +1,5 @@
 import api from './client';
-import type { DashboardStatistics, JobModel, JobDetailModel, MessageModel, MessageDetailModel, RecurringJobModel, ServerModel, PagedList } from '@/types';
+import type { DashboardStatistics, JobModel, JobDetailModel, MessageModel, MessageDetailModel, RecurringJobModel, ServerModel, PagedList, BulkResult } from '@/types';
 
 // Dashboard
 export const getStatus = () => api.get<DashboardStatistics>('/status').then(r => r.data);
@@ -43,6 +43,13 @@ export const getRecurringJobs = (page = 0, pageSize = 20) =>
 
 export const triggerRecurringJob = (id: number) => api.post(`/recurring/${id}/trigger`);
 export const deleteRecurringJob = (id: number) => api.delete(`/recurring/${id}`);
+
+// Bulk actions
+export const bulkDeleteJobs = (jobIds: string[]) =>
+  api.post<BulkResult>('/jobs/bulk/delete', { jobIds }).then(r => r.data);
+
+export const bulkRequeueJobs = (jobIds: string[]) =>
+  api.post<BulkResult>('/jobs/bulk/requeue', { jobIds }).then(r => r.data);
 
 // Servers
 export const getServers = () => api.get<ServerModel[]>('/servers').then(r => r.data);
