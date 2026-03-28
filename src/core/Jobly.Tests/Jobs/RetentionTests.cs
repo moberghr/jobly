@@ -179,30 +179,6 @@ public abstract partial class JoblyTests : TestBase
     }
 
     [Fact]
-    public async Task GivenMessageRouted_ThenCreatedStatIncrementedByHandlerCount()
-    {
-        var context = CreateContext();
-        var publisher = TestUtils.CreatePublisher(context);
-
-        var statBefore = await CreateContext().Set<Statistic>()
-            .Where(x => x.Key == "stats:created")
-            .Select(x => x.Value)
-            .FirstOrDefaultAsync();
-
-        await publisher.Publish(new MultiRequest()); // 2 handlers
-        await context.SaveChangesAsync();
-
-        await ProcessJob(); // routes message, creates 2 jobs, executes 1
-
-        var statAfter = await CreateContext().Set<Statistic>()
-            .Where(x => x.Key == "stats:created")
-            .Select(x => x.Value)
-            .FirstOrDefaultAsync();
-
-        statAfter.ShouldBe(statBefore + 2); // 2 handler jobs created
-    }
-
-    [Fact]
     public async Task GivenDashboardStats_ThenHistoricalTotalsIncluded()
     {
         var context = CreateContext();

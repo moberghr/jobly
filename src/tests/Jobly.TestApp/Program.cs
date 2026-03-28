@@ -1,4 +1,5 @@
 using Jobly.Core;
+using Jobly.Core.Entities;
 using Jobly.Core.Handlers;
 using Jobly.Test.Shared;
 using Jobly.UI.UIMiddleware;
@@ -13,6 +14,9 @@ builder.Services.AddServices(builder.Configuration);
 builder.Services.AddJobHandlers(typeof(Program).Assembly);
 builder.Services.AddJobHandlers(typeof(Jobly.Test.Shared.ServiceConfiguration).Assembly);
 
+// Register open generic pipeline behavior
+builder.Services.AddTransient(typeof(IPipelineBehavior<>), typeof(TimingPipelineBehavior<>));
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -23,6 +27,7 @@ builder.Services.AddJoblyWorker<TestContext>(options =>
 {
     options.RetryCount = 3;
     options.WorkerCount = 10;
+    options.ServerName = "jobly-demo-server";
     options.DefaultQueue = "default";
     options.Queues = new[] { "a-critical", "b-default", "c-low", "default" };
     options.PollingInterval = TimeSpan.FromMilliseconds(500);
@@ -46,68 +51,113 @@ app.UseJoblyUI();
 app.UseAuthorization();
 app.MapControllers();
 
-// Seed endpoint — creates thousands of jobs for demo
-app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher, TestContext context) =>
+// Seed endpoint — creates a realistic demo workload
+app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher, IRecurringJobPublisher recurringPublisher, TestContext context) =>
 {
     var random = new Random();
     var queues = new[] { "a-critical", "b-default", "c-low" };
 
-    // 500 jobs across queues
-    for (var i = 0; i < 500; i++)
-    {
-        var queue = queues[random.Next(queues.Length)];
-        await publisher.Enqueue(new Jobly.Core.Handlers.SendEmailRequest { EmailLogId = 1 }, queue);
-    }
-
-    // 300 more jobs
+    // === Jobs across queues (fast, will complete quickly) ===
     for (var i = 0; i < 300; i++)
     {
         var queue = queues[random.Next(queues.Length)];
-        await publisher.Enqueue(new Jobly.Core.Handlers.RegisterRequest { Email = $"user{i}@test.com" }, queue);
+        await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, queue);
     }
 
-    // 100 scheduled jobs (some in the future, some in the past)
-    for (var i = 0; i < 100; i++)
+    // === Register jobs (each spawns child jobs inside handler — creates traces) ===
+    for (var i = 0; i < 50; i++)
     {
-        var offset = random.Next(-60, 120); // -60s to +120s
+        var queue = queues[random.Next(queues.Length)];
+        await publisher.Enqueue(new RegisterRequest { Email = $"user{i}@test.com" }, queue);
+    }
+
+    // === Scheduled jobs (some past, some future) ===
+    for (var i = 0; i < 50; i++)
+    {
+        var offset = random.Next(-60, 120);
         await publisher.Schedule(
-            new Jobly.Core.Handlers.RegisterRequest { Email = $"scheduled{i}@test.com" },
+            new RegisterRequest { Email = $"scheduled{i}@test.com" },
             DateTime.UtcNow.AddSeconds(offset));
     }
 
-    // 50 jobs that will fail
-    for (var i = 0; i < 50; i++)
+    // === Failing jobs (no retries — go straight to Failed) ===
+    for (var i = 0; i < 30; i++)
     {
-        await publisher.Enqueue(new Jobly.Core.Handlers.ThrowExceptionRequest(),
-            queues[random.Next(queues.Length)]);
+        await publisher.Enqueue(new ThrowExceptionRequest(), queues[random.Next(queues.Length)]);
     }
 
-    // 20 continuations (parent → child chains)
-    for (var i = 0; i < 20; i++)
+    // === Failing jobs with retries (shows retry lifecycle) ===
+    for (var i = 0; i < 10; i++)
     {
-        var parentId = await publisher.Enqueue(
-            new Jobly.Core.Handlers.RegisterRequest { Email = $"parent{i}@test.com" });
-        await publisher.Enqueue(
-            new Jobly.Core.Handlers.RegisterRequest { Email = $"child{i}@test.com" },
-            parentId);
+        await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 3, queue: queues[random.Next(queues.Length)]);
     }
 
-    // Slow job with awaiting children (visible for 30 seconds)
-    var slowJobId = await publisher.Enqueue(new Jobly.Core.Handlers.SlowRequest());
+    // === Continuations (parent → child chains) ===
+    for (var i = 0; i < 10; i++)
+    {
+        var parentId = await publisher.Enqueue(new RegisterRequest { Email = $"parent{i}@test.com" });
+        await publisher.Enqueue(new RegisterRequest { Email = $"child{i}@test.com" }, parentId);
+    }
+
+    // === Slow job with awaiting children (visible for 30s) ===
+    var slowJobId = await publisher.Enqueue(new SlowRequest());
     for (var i = 0; i < 5; i++)
     {
-        await publisher.Enqueue(new Jobly.Core.Handlers.RegisterRequest { Email = $"awaiting{i}@test.com" }, slowJobId);
+        await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, slowJobId);
     }
 
-    // Batch demo: batch of 20 → continuation batch of 10
-    var batchJobs = Enumerable.Range(0, 20).Select(_ => new Jobly.Core.Handlers.RegisterRequest { Email = "batch@test.com" }).ToList();
+    // === Messages (pub/sub — each routes to multiple handlers) ===
+    for (var i = 0; i < 10; i++)
+    {
+        await publisher.Publish(new OrderNotification());
+    }
+
+    // === Batch: 15 jobs → continuation batch of 8 (OnlyOnSucceeded, default) ===
+    var batchJobs = Enumerable.Range(0, 15)
+        .Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
     var batchId = await batchPublisher.StartNew(batchJobs);
-    var batch2Jobs = Enumerable.Range(0, 10).Select(_ => new Jobly.Core.Handlers.RegisterRequest { Email = "batch2@test.com" }).ToList();
+    var batch2Jobs = Enumerable.Range(0, 8)
+        .Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
     await batchPublisher.ContinueBatchWith(batch2Jobs, batchId);
+
+    // === Batch with OnAnyFinishedState (continuation fires even if some fail) ===
+    var mixedBatchJobs = new List<IJob>();
+    // Can't mix types in BatchPublisher, so use SendEmailRequest for success batch
+    var failBatchJobs = Enumerable.Range(0, 5)
+        .Select(_ => new ThrowExceptionRequest()).ToList();
+    var failBatchId = await batchPublisher.StartNew(failBatchJobs, BatchContinuationOptions.OnAnyFinishedState);
+    var afterFailBatchJobs = Enumerable.Range(0, 3)
+        .Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
+    await batchPublisher.ContinueBatchWith(afterFailBatchJobs, failBatchId);
+
+    // === Complex flow: ProcessOrder → batch of ShipItem → PublishInvoice → InvoiceNotification message ===
+    for (var i = 0; i < 5; i++)
+    {
+        await publisher.Enqueue(new ProcessOrderRequest { OrderId = $"ORD-{1000 + i}" });
+    }
+
+    // === Recurring jobs ===
+    await recurringPublisher.AddOrUpdateRecurringJob(
+        new SendEmailRequest { EmailLogId = 1 }, "send-daily-report", "0 9 * * *");
+    await recurringPublisher.AddOrUpdateRecurringJob(
+        new SendEmailRequest { EmailLogId = 1 }, "cleanup-hourly", "0 * * * *");
 
     await context.SaveChangesAsync();
 
-    return Results.Ok(new { messages = 500, jobs = 300, scheduled = 100, failing = 50, continuations = 20, batches = 2 });
+    return Results.Ok(new
+    {
+        jobs = 300,
+        registerJobs = 50,
+        scheduled = 50,
+        failing = 30,
+        failingWithRetries = 10,
+        continuations = 10,
+        slowWithAwaiting = 6,
+        messages = 10,
+        orderFlows = 5,
+        batches = 2,
+        recurringJobs = 2
+    });
 });
 
 app.Run();

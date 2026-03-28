@@ -4,6 +4,7 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
+using Jobly.Core.Logging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -135,6 +136,18 @@ public class Publisher<TContext> : IPublisher
     {
         var newJob = JobHelper.CreateJob(job, _configuration.RetryCount, scheduleTime,
             maxRetries, queue, parentId, null);
+
+        // Automatic trace propagation: if called from within a job handler, inherit trace
+        var executionContext = JobExecutionContext.Current;
+        if (executionContext != null)
+        {
+            newJob.TraceId = executionContext.TraceId;
+            newJob.SpawnedByJobId = executionContext.JobId;
+        }
+        else
+        {
+            newJob.TraceId = newJob.Id; // Root of a new trace
+        }
 
         await _context.Set<Job>().AddAsync(newJob);
         await _context.Set<JobLog>().AddAsync(new JobLog

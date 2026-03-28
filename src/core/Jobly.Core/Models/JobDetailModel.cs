@@ -19,4 +19,10 @@ public class JobDetailModel : JobModel
     public List<JobModel> SiblingJobs { get; set; } = new();
 
     public List<JobModel> ChildJobs { get; set; } = new();
+
+    public Guid? TraceId { get; set; }
+
+    public Guid? SpawnedByJobId { get; set; }
+
+    public List<JobModel> TraceJobs { get; set; } = new();
 }

@@ -19,9 +19,20 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     public TimeSpan HealthCheckTimeout { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
+    /// How long a job can go without a keep-alive refresh before being considered stale and requeued.
+    /// Workers refresh keep-alive every InvisibilityTimeout / 5 during execution.
+    /// </summary>
+    public TimeSpan InvisibilityTimeout { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
     /// Worker Id should be unique for each worker. If you need to control the worker id, you can set it here.
     /// </summary>
     public Guid ServerId = Guid.NewGuid();
+
+    /// <summary>
+    /// Display name for this server in the dashboard. Defaults to MachineName.
+    /// </summary>
+    public string? ServerName { get; set; }
 
     public string[] Queues { get; set; } = new[] { "default" };
 

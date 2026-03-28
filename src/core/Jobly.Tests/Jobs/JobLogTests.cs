@@ -264,8 +264,12 @@ public abstract partial class JoblyTests : TestBase
             .Where(l => l.JobId == jobId2 && l.EventType == "Log")
             .ToListAsync();
 
-        // LoggingRequest handler writes logs, UnitRequest does not
+        // LoggingRequest handler writes handler-specific logs
         logs1.Count.ShouldBeGreaterThan(0);
-        logs2.Count.ShouldBe(0);
+        logs1.ShouldContain(l => l.Message.Contains("Processing logging request"));
+
+        // UnitRequest should NOT contain LoggingRequest's handler logs (no leak between jobs)
+        logs2.ShouldNotContain(l => l.Message.Contains("Processing logging request"));
+        logs2.ShouldNotContain(l => l.Message.Contains("This is a warning"));
     }
 }

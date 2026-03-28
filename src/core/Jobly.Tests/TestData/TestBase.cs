@@ -22,7 +22,8 @@ public abstract class TestBase
 
         var services = new ServiceCollection();
         var provider = services.AddJobHandlers(typeof(TestBase).Assembly)
-            .AddTransient<TestContext>(x => CreateContext())
+            .AddPipelineBehaviors(typeof(TestBase).Assembly)
+            .AddScoped<TestContext>(x => CreateContext())
             .AddJoblyWorker<TestContext>()
             .AddSingleton<CounterService>()
             .AddSingleton<MultiHandlerCounter>()
@@ -128,6 +129,15 @@ public abstract class TestBase
             requests.Add(new UnitRequest());
         var batchPublisher = TestUtils.CreateBatchPublisher(context);
         return await batchPublisher.StartNew(requests);
+    }
+
+    protected async Task<Guid> CreateBatchWithOptions(TestContext context, int numberOfJobs, BatchContinuationOptions options)
+    {
+        var requests = new List<UnitRequest>();
+        for (var i = 0; i < numberOfJobs; i++)
+            requests.Add(new UnitRequest());
+        var batchPublisher = TestUtils.CreateBatchPublisher(context);
+        return await batchPublisher.StartNew(requests, options);
     }
 
     protected async Task<Guid> ContinueBatchWith(TestContext context, int numberOfJobs, Guid placeholderJobId)

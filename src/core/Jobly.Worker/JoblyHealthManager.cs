@@ -40,7 +40,8 @@ public class JoblyHealthManager<TContext> : BackgroundService
             using var scope = _serviceScopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<TContext>();
             await UpdateHeartbeat(context);
-            await CleanUpServers(context);
+            await CleanUpServers(context, _configuration.HealthCheckTimeout);
+            await RequeueStaleJobs(context, _configuration.InvisibilityTimeout);
             await CleanupExpiredJobs(context);
 
             await Task.Delay(_configuration.HealthCheckInterval, stoppingToken);
@@ -65,51 +66,74 @@ public class JoblyHealthManager<TContext> : BackgroundService
         await context.SaveChangesAsync();
     }
     
-    private async Task CleanUpServers(TContext context)
+    /// <summary>
+    /// Removes servers that have not sent a heartbeat within the timeout.
+    /// Also removes their worker records. Job recovery is handled separately by RequeueStaleJobs.
+    /// Public static so tests can call it directly.
+    /// </summary>
+    public static async Task<int> CleanUpServers<TCtx>(TCtx context, TimeSpan healthCheckTimeout) where TCtx : DbContext
     {
+        var removedCount = 0;
         await using var transaction = await context.Database.BeginTransactionAsync();
         var servers = await context.Set<Server>()
             .TagWith(InterceptorConstants.RowLockTableBatch)
             .ToListAsync();
         foreach (var server in servers)
         {
-            if (DateTime.UtcNow - server.LastHeartbeatTime > _configuration.HealthCheckTimeout)
+            if (DateTime.UtcNow - server.LastHeartbeatTime > healthCheckTimeout)
             {
-                _logger.LogWarning("Server {ServerId} has not sent a heartbeat in {Timeout}. Removing it from the database.",
-                    server.Id, _configuration.HealthCheckTimeout);
-                var workerIds = await context.Set<Jobly.Core.Data.Entities.Worker>()
-                    .Where(w => w.ServerId == server.Id)
-                    .Select(w => w.Id)
-                    .ToListAsync();
-
                 context.Set<Server>().Remove(server);
 
-                // Remove workers for this server
                 var workers = await context.Set<Jobly.Core.Data.Entities.Worker>()
                     .Where(w => w.ServerId == server.Id)
                     .ToListAsync();
                 context.Set<Jobly.Core.Data.Entities.Worker>().RemoveRange(workers);
 
-                var jobs = await context.Set<Job>()
-                    .Where(x => x.CurrentState == State.Processing)
-                    .Where(x => x.CurrentWorkerId != null && workerIds.Contains(x.CurrentWorkerId.Value))
-                    .ToListAsync();
-                foreach (var job in jobs)
-                {
-                    job.CurrentState = State.Failed;
-                    context.Set<JobLog>().Add(new JobLog
-                    {
-                        JobId = job.Id,
-                        EventType = "Failed",
-                        Timestamp = DateTime.UtcNow,
-                        Level = "Error",
-                        Message = $"The job {job.Id} failed because of timeout."
-                    });
-                }
+                removedCount++;
             }
         }
         await context.SaveChangesAsync();
         await transaction.CommitAsync();
+        return removedCount;
+    }
+
+    /// <summary>
+    /// Finds jobs stuck in Processing with stale LastKeepAlive and requeues them.
+    /// Uses transaction + row lock to prevent concurrent health managers from double-requeuing.
+    /// Does NOT increment RetriedTimes (crash requeue is not a real failure).
+    /// Public static so tests can call it directly.
+    /// </summary>
+    public static async Task<int> RequeueStaleJobs<TCtx>(TCtx context, TimeSpan invisibilityTimeout) where TCtx : DbContext
+    {
+        var cutoff = DateTime.UtcNow - invisibilityTimeout;
+
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        var staleJobs = await context.Set<Job>()
+            .Where(x => x.CurrentState == State.Processing)
+            .Where(x => x.LastKeepAlive != null && x.LastKeepAlive < cutoff)
+            .TagWith(InterceptorConstants.RowLockTableJob)
+            .ToListAsync();
+
+        foreach (var job in staleJobs)
+        {
+            job.CurrentState = State.Enqueued;
+            job.CurrentWorkerId = null;
+            job.LastKeepAlive = null;
+
+            context.Set<JobLog>().Add(new JobLog
+            {
+                JobId = job.Id,
+                EventType = "Requeued",
+                Timestamp = DateTime.UtcNow,
+                Level = "Warning",
+                Message = "Requeued by crash recovery — worker stopped responding"
+            });
+        }
+
+        await context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return staleJobs.Count;
     }
     
     private async Task CleanupExpiredJobs(TContext context)

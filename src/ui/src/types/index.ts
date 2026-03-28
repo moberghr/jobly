@@ -46,6 +46,9 @@ export interface JobDetailModel extends JobModel {
   logs: JobLogModel[];
   siblingJobs: JobModel[];
   childJobs: JobModel[];
+  traceId: string | null;
+  spawnedByJobId: string | null;
+  traceJobs: JobModel[];
 }
 
 export interface JobLogModel {

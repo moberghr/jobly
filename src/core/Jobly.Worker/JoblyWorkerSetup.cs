@@ -44,6 +44,7 @@ public class JoblyWorkerSetup<TContext> : IHostedService where TContext : DbCont
             var server = new Server
             {
                 Id = _configuration.ServerId,
+                ServerName = _configuration.ServerName ?? $"{Environment.MachineName}.{_configuration.ServerId}",
                 StartedTime = now,
                 LastHeartbeatTime = now,
                 ServiceCount = _configuration.WorkerCount

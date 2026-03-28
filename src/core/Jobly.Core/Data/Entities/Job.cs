@@ -48,4 +48,10 @@ public class Job
     public Message? MessageEntity { get; set; }
 
     public DateTime? ExpireAt { get; set; }
+
+    public DateTime? LastKeepAlive { get; set; }
+
+    public Guid? TraceId { get; set; }
+
+    public Guid? SpawnedByJobId { get; set; }
 }

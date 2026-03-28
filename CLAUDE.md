@@ -87,11 +87,12 @@ Queue order is alphabetical. Row locking (`FOR UPDATE SKIP LOCKED`) prevents dup
 
 ### Testing
 
-120 integration tests using xUnit, Shouldly, Testcontainers + Respawn (~10s). Covers: lifecycle logs, concurrency (row locking), queue ordering, scheduling, retries, continuations, batches, recurring jobs, server monitoring, log capture, retention, statistics, bulk operations, time-series stats.
+296 integration tests using xUnit, Shouldly, Testcontainers + Respawn (~24s). Covers: lifecycle logs, concurrency (row locking), queue ordering, scheduling, retries, continuations, batches, recurring jobs, server monitoring, log capture, retention, statistics, bulk operations, time-series stats, crash recovery (keep-alive + stale job requeue), job tracing (TraceId/SpawnedByJobId), pipeline behavior logging, batch continuation options. Tests run on both PostgreSQL and SQL Server.
 
 ### Key Design Decisions
 
 - Raw SQL acceptable for internal ops (stats, cleanup). EF integration matters for publishing (outbox pattern).
+- **DbContext must be registered as Scoped** (not Transient). The outbox pattern requires the publisher and application code to share the same DbContext instance within a scope, so jobs/messages are committed atomically with business data. The worker also relies on scoped context so that jobs spawned by handlers during execution are saved in the same transaction.
 - If something can go wrong, assume it will. All state changes use transaction + row lock.
 - Tests must call actual production code, never duplicate logic.
 - Failed jobs never auto-deleted.

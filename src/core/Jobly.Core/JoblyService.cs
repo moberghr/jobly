@@ -125,11 +125,6 @@ public class JoblyService<TContext> : IJoblyService
             .Where(x => x.Key == "stats:deleted")
             .Select(x => x.Value)
             .FirstOrDefaultAsync();
-        var totalCreated = await _context.Set<Statistic>()
-            .Where(x => x.Key == "stats:created")
-            .Select(x => x.Value)
-            .FirstOrDefaultAsync();
-
         var model = new DashboardStatistics
         {
             Total = total,
@@ -146,7 +141,7 @@ public class JoblyService<TContext> : IJoblyService
             TotalSucceeded = totalSucceeded,
             TotalFailed = totalFailed,
             TotalDeleted = totalDeleted,
-            TotalCreated = totalCreated
+            TotalCreated = 0
         };
 
         return model;
@@ -314,7 +309,9 @@ public class JoblyService<TContext> : IJoblyService
                 ParentJobId = x.ParentJobId,
                 BatchId = x.BatchId,
                 RetriedTimes = x.RetriedTimes,
-                MaxRetries = x.MaxRetries
+                MaxRetries = x.MaxRetries,
+                TraceId = x.TraceId,
+                SpawnedByJobId = x.SpawnedByJobId
             })
             .FirstOrDefaultAsync();
 
@@ -359,6 +356,21 @@ public class JoblyService<TContext> : IJoblyService
             })
             .ToListAsync();
 
+        // Trace: all jobs sharing the same TraceId
+        if (job.TraceId != null)
+        {
+            job.TraceJobs = await _context.Set<Job>()
+                .Where(x => x.TraceId == job.TraceId && x.Id != jobId)
+                .OrderBy(x => x.CreateTime)
+                .Select(x => new JobModel
+                {
+                    Id = x.Id, Type = x.Type, Message = x.Message,
+                    CreateTime = x.CreateTime, ScheduleTime = x.ScheduleTime,
+                    CurrentState = x.CurrentState
+                })
+                .ToListAsync();
+        }
+
         return job;
     }
 
@@ -375,6 +387,12 @@ public class JoblyService<TContext> : IJoblyService
         {
             await transaction.RollbackAsync();
             throw new ArgumentException("Job not found.");
+        }
+
+        if (job.CurrentState == State.Deleted)
+        {
+            await transaction.RollbackAsync();
+            return;
         }
 
         await DecrementStatForState(job.CurrentState);
@@ -411,6 +429,12 @@ public class JoblyService<TContext> : IJoblyService
         {
             await transaction.RollbackAsync();
             throw new ArgumentException("Job not found.");
+        }
+
+        if (job.CurrentState == State.Enqueued)
+        {
+            await transaction.RollbackAsync();
+            return;
         }
 
         await DecrementStatForState(job.CurrentState);

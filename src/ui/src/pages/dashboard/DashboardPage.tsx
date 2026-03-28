@@ -139,7 +139,6 @@ export default function DashboardPage() {
       {/* Historical totals (survive job deletion) */}
       <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">Historical</h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MetricCard label="Total Created" value={stats.totalCreated} icon={<Briefcase className="h-5 w-5" />} />
         <MetricCard label="Total Succeeded" value={stats.totalSucceeded} icon={<CheckCircle className="h-5 w-5" />} color="text-green-600" />
         <MetricCard label="Total Failed" value={stats.totalFailed} icon={<XCircle className="h-5 w-5" />} color="text-red-600" />
         <MetricCard label="Total Deleted" value={stats.totalDeleted} icon={<Briefcase className="h-5 w-5" />} />

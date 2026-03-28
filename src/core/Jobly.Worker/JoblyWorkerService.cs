@@ -87,7 +87,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             throw new JoblyException($"No handler registered for {messageType.Name}");
         }
 
-        // Create a Job for each handler
+        // Create a Job for each handler — all share a TraceId
+        var messageTraceId = Guid.NewGuid();
         foreach (var handlerType in handlerTypes)
         {
             var job = JobHelper.CreateJob(
@@ -102,6 +103,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
             job.HandlerType = handlerType.AssemblyQualifiedName;
             job.MessageId = message.Id;
+            job.TraceId = messageTraceId;
 
             context.Set<Job>().Add(job);
             context.Set<JobLog>().Add(new JobLog
@@ -116,10 +118,6 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         message.JobCount = handlerTypes.Count;
         message.CurrentState = State.Processing;
-
-        await context.Set<Statistic>()
-            .Where(x => x.Key == "stats:created")
-            .ExecuteUpdateAsync(x => x.SetProperty(p => p.Value, p => p.Value + handlerTypes.Count));
 
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -166,15 +164,27 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         await context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        // Set up log capture for this job execution
+        // Set up log capture and execution context for this job
         var logCollector = new JobLogCollector { JobId = job.Id };
         JobLogContext.Current = logCollector;
+        JobExecutionContext.Current = new JobExecutionInfo
+        {
+            JobId = job.Id,
+            TraceId = job.TraceId ?? job.Id
+        };
+
+        // Start keep-alive background loop
+        using var keepAliveCts = new CancellationTokenSource();
+        var keepAliveTask = RunKeepAlive(job.Id, keepAliveCts.Token);
 
         try
         {
             _logger.LogInformation("Worker {workerId} executing job {id}", _workerId, job.Id);
             await ExecuteJob(job, scope.ServiceProvider, cancellationToken);
             _logger.LogInformation("Worker {workerId} completed job {id}", _workerId, job.Id);
+
+            keepAliveCts.Cancel();
+            await keepAliveTask;
 
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
             await UpdateJobData(context, job, null, default);
@@ -185,6 +195,10 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         catch (Exception e)
         {
             _logger.LogError(e, "Error executing job {id}", job.Id);
+
+            keepAliveCts.Cancel();
+            await keepAliveTask;
+
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
             await UpdateJobData(context, job, e, default);
             await SaveJobLogs(context, logCollector);
@@ -194,6 +208,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         finally
         {
             JobLogContext.Current = null;
+            JobExecutionContext.Current = null;
         }
 
         return true;
@@ -245,6 +260,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     {
         job.CurrentState = State.Processing;
         job.CurrentWorkerId = _workerId;
+        job.LastKeepAlive = DateTime.UtcNow;
 
         context.Set<JobLog>().Add(new JobLog
         {
@@ -254,6 +270,39 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             Level = "Information",
             Message = $"The job {job.Id} is being processed"
         });
+    }
+
+    private async Task RunKeepAlive(Guid jobId, CancellationToken ct)
+    {
+        var interval = _configuration.InvisibilityTimeout / 5;
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(interval, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            try
+            {
+                using var scope = _serviceScopeFactory.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<TContext>();
+                await context.Set<Job>()
+                    .Where(x => x.Id == jobId)
+                    .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastKeepAlive, DateTime.UtcNow), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e, "Failed to refresh keep-alive for job {jobId}", jobId);
+            }
+        }
     }
 
     private async Task CreateNextJob(TContext context, Job job, CancellationToken cancellationToken)
@@ -308,6 +357,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         job.CurrentState = state;
         job.CurrentWorkerId = null;
+        job.LastKeepAlive = null;
 
         // Set expiration and increment statistics (total + hourly)
         var hourSuffix = DateTime.UtcNow.ToString("yyyy-MM-dd-HH");
@@ -333,7 +383,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await UpdateChildJobs(context, job.Id, cancellationToken);
         }
 
-        if (job.BatchId != null)
+        if (job.BatchId != null && (state == State.Completed || state == State.Failed))
         {
             await UpdateCurrentAndNextBatchFromChildJob(context, job.BatchId.Value, cancellationToken);
         }
@@ -443,9 +493,24 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         currentBatch.Counter = 0;
 
+        // All jobs finished — check if continuation should fire
         var currentBatchJob = await context.Set<Job>()
             .Where(x => x.Id == currentBatch.Id)
             .FirstAsync(cancellationToken);
+
+        if (currentBatch.ContinuationOptions == BatchContinuationOptions.OnlyOnSucceeded)
+        {
+            // Check if any batch jobs failed
+            var hasFailedJobs = await context.Set<Job>()
+                .Where(x => x.BatchId == batchId && x.CurrentState == State.Failed)
+                .AnyAsync(cancellationToken);
+
+            if (hasFailedJobs)
+            {
+                currentBatchJob.CurrentState = State.Failed;
+                return;
+            }
+        }
 
         currentBatchJob.CurrentState = State.Completed;
 

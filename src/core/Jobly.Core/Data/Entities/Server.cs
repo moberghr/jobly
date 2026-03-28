@@ -4,7 +4,7 @@ public class Server
 {
     public required Guid Id { get; set; }
 
-    public string ServerName { get; set; } = $"{Environment.MachineName}.{Guid.NewGuid().ToString()}";
+    public string ServerName { get; set; } = Environment.MachineName;
 
     public required DateTime StartedTime { get; set; }
 

@@ -97,7 +97,19 @@ export default function JobDetailPage() {
                   <Link to={`/jobs/detail/${job.parentJobId}`} className="text-primary hover:underline font-mono text-xs">{shortId(job.parentJobId)}</Link>
                 </div>
               )}
-              {!job.messageId && !job.parentJobId && (
+              {job.spawnedByJobId && (
+                <div>
+                  <span className="text-muted-foreground">Spawned by Job:</span>{' '}
+                  <Link to={`/jobs/detail/${job.spawnedByJobId}`} className="text-primary hover:underline font-mono text-xs">{shortId(job.spawnedByJobId)}</Link>
+                </div>
+              )}
+              {job.traceId && (
+                <div>
+                  <span className="text-muted-foreground">Trace:</span>{' '}
+                  <span className="font-mono text-xs">{shortId(job.traceId)}</span>
+                </div>
+              )}
+              {!job.messageId && !job.parentJobId && !job.spawnedByJobId && (
                 <div className="text-muted-foreground">Direct job (no parent)</div>
               )}
             </CardContent>
@@ -137,6 +149,27 @@ export default function JobDetailPage() {
                         <TableCell className="font-mono text-xs"><Link to={`/jobs/detail/${c.id}`} className="text-primary hover:underline">{shortId(c.id)}</Link></TableCell>
                         <TableCell>{shortType(c.type)}</TableCell>
                         <TableCell><StateBadge state={c.currentState} /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Trace Jobs */}
+          {job.traceJobs.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Trace ({job.traceJobs.length + 1} jobs)</CardTitle></CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Type</TableHead><TableHead>State</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {job.traceJobs.map((t) => (
+                      <TableRow key={t.id}>
+                        <TableCell className="font-mono text-xs"><Link to={`/jobs/detail/${t.id}`} className="text-primary hover:underline">{shortId(t.id)}</Link></TableCell>
+                        <TableCell>{shortType(t.type)}</TableCell>
+                        <TableCell><StateBadge state={t.currentState} /></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

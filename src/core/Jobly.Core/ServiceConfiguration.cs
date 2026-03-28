@@ -142,8 +142,12 @@ public static class ServiceConfiguration
         job.Property(p => p.HandlerType);
         job.Property(p => p.MessageId);
         job.Property(p => p.ExpireAt);
+        job.Property(p => p.LastKeepAlive);
+        job.Property(p => p.TraceId);
+        job.Property(p => p.SpawnedByJobId);
 
         job.HasIndex(p => p.ExpireAt);
+        job.HasIndex(p => p.TraceId);
 
         job.HasOne(p => p.MessageEntity)
             .WithMany()
@@ -196,6 +200,7 @@ public static class ServiceConfiguration
         batch.HasKey(p => p.Id);
 
         batch.Property(p => p.Counter);
+        batch.Property(p => p.ContinuationOptions);
 
         // batch.HasOne(p => p.ParentJob);
         // .WithOne(p => p.Batch)
@@ -288,8 +293,7 @@ public static class ServiceConfiguration
         stat.HasData(
             new Statistic { Key = "stats:succeeded", Value = 0 },
             new Statistic { Key = "stats:failed", Value = 0 },
-            new Statistic { Key = "stats:deleted", Value = 0 },
-            new Statistic { Key = "stats:created", Value = 0 }
+            new Statistic { Key = "stats:deleted", Value = 0 }
         );
     }
 }
