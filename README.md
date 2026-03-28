@@ -9,32 +9,29 @@ A distributed job processing and message queue library for .NET 10. Supports pub
 - **Named Queues** — Assign jobs to queues. Workers subscribe to specific queues. Alphabetical order = priority.
 - **Pipeline Behaviors** — Middleware chain wraps all handler executions (logging, validation, error handling).
 - **Execution Logs** — ILogger output automatically captured during handler execution, viewable in dashboard.
+- **Unified Activity Log** — Single audit trail per job: lifecycle events (Created, Processing, Completed, Failed) + handler logs.
 - **Multi-Database** — PostgreSQL and SQL Server with row-level locking for concurrent worker safety.
 - **Server Monitoring** — Worker registration, heartbeat tracking, orphaned job recovery.
 - **Job Retention** — Auto-expiration for completed jobs. Failed jobs persist forever. Statistics survive deletion.
+- **Time-Series Stats** — Hourly succeeded/failed counts for historical graphs.
 - **Recurring Jobs** — Cron-based scheduled job execution.
-- **Dashboard** — React-based web UI with dark mode, bulk actions, per-page selector, and live stats.
+- **Dashboard** — React-based web UI with realtime graph (jobs/sec), historical graph (24h), dark mode, bulk actions, per-page selector, Hangfire-style job detail with colored state cards.
 
 ## Integration Guide
 
 ### 1. Set Up Your DbContext
-
-Jobly stores jobs in your existing database. Add Jobly's entity configuration to your DbContext:
 
 ```csharp
 public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    // Your existing entities
     public DbSet<Order> Orders { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
-        // Add Jobly tables to your database
-        modelBuilder.AddOutboxStateEntity();
+        modelBuilder.AddOutboxStateEntity(); // Add Jobly tables
     }
 }
 ```
@@ -44,12 +41,10 @@ public class AppDbContext : DbContext
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-// Your DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default"))
-           .AddJoblyInterceptors());  // Required: adds row locking interceptors
+           .AddJoblyInterceptors());
 
-// Register Jobly worker
 builder.Services.AddJoblyWorker<AppDbContext>(options =>
 {
     options.WorkerCount = 5;
@@ -58,20 +53,14 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     options.JobExpirationTimeout = TimeSpan.FromDays(7);
 });
 
-// Register handlers from your assembly
 builder.Services.AddJobHandlers(typeof(Program).Assembly);
 
 var app = builder.Build();
-
-// Enable Jobly dashboard (optional)
-app.UseJoblyUI();
-
+app.UseJoblyUI(); // Dashboard
 app.Run();
 ```
 
 ### 3. Define Messages (Pub/Sub)
-
-Use `IMessage` when one event should trigger multiple independent handlers:
 
 ```csharp
 public class OrderCreated : IMessage
@@ -80,22 +69,16 @@ public class OrderCreated : IMessage
     public string CustomerEmail { get; set; }
 }
 
-// Each handler becomes an independent job — retryable, trackable
 public class SendConfirmationEmail : IMessageHandler<OrderCreated>
 {
-    private readonly IEmailService _email;
     private readonly ILogger<SendConfirmationEmail> _logger;
 
-    public SendConfirmationEmail(IEmailService email, ILogger<SendConfirmationEmail> logger)
-    {
-        _email = email;
-        _logger = logger;
-    }
+    public SendConfirmationEmail(ILogger<SendConfirmationEmail> logger) => _logger = logger;
 
     public async Task HandleAsync(OrderCreated message, CancellationToken ct)
     {
-        _logger.LogInformation("Sending confirmation for order {OrderId}", message.OrderId);
-        await _email.SendAsync(message.CustomerEmail, "Order confirmed", $"Order #{message.OrderId}");
+        _logger.LogInformation("Sending email for order {OrderId}", message.OrderId);
+        // All ILogger calls are captured and viewable in the dashboard
     }
 }
 
@@ -103,74 +86,44 @@ public class UpdateInventory : IMessageHandler<OrderCreated>
 {
     public async Task HandleAsync(OrderCreated message, CancellationToken ct)
     {
-        // Update stock levels — runs independently from email
-    }
-}
-
-public class NotifyWarehouse : IMessageHandler<OrderCreated>
-{
-    public async Task HandleAsync(OrderCreated message, CancellationToken ct)
-    {
-        // Send warehouse notification — if this fails, email still succeeds
+        // Runs independently — if email fails, this still succeeds
     }
 }
 ```
 
-**Publishing** — use the outbox pattern (jobs are created in the same transaction as your business data):
+**Publish with outbox pattern:**
 
 ```csharp
-public class OrderController : ControllerBase
+[HttpPost]
+public async Task<IActionResult> CreateOrder(CreateOrderRequest request)
 {
-    private readonly AppDbContext _context;
-    private readonly IPublisher _publisher;
+    var order = new Order { /* ... */ };
+    _context.Orders.Add(order);
 
-    [HttpPost]
-    public async Task<IActionResult> CreateOrder(CreateOrderRequest request)
-    {
-        var order = new Order { /* ... */ };
-        _context.Orders.Add(order);
+    // Same transaction — if SaveChanges fails, no message is sent
+    await _publisher.Publish(new OrderCreated { OrderId = order.Id });
 
-        // Published in the same transaction — if SaveChanges fails, no message is sent
-        await _publisher.Publish(new OrderCreated
-        {
-            OrderId = order.Id,
-            CustomerEmail = request.Email
-        });
-
-        await _context.SaveChangesAsync();
-        return Ok(order.Id);
-    }
+    await _context.SaveChangesAsync();
+    return Ok(order.Id);
 }
 ```
 
 ### 4. Define Jobs (Orchestration)
 
-Use `IJob` when you need scheduling, retries, continuations, or a single handler:
-
 ```csharp
-public class GenerateMonthlyReport : IJob
+public class GenerateReport : IJob
 {
-    public int Year { get; set; }
     public int Month { get; set; }
 }
 
-public class GenerateMonthlyReportHandler : IJobHandler<GenerateMonthlyReport>
+public class GenerateReportHandler : IJobHandler<GenerateReport>
 {
-    private readonly IReportService _reports;
-    private readonly ILogger<GenerateMonthlyReportHandler> _logger;
+    private readonly ILogger<GenerateReportHandler> _logger;
 
-    public GenerateMonthlyReportHandler(IReportService reports, ILogger<GenerateMonthlyReportHandler> logger)
+    public async Task HandleAsync(GenerateReport message, CancellationToken ct)
     {
-        _reports = reports;
-        _logger = logger;
-    }
-
-    public async Task HandleAsync(GenerateMonthlyReport message, CancellationToken ct)
-    {
-        _logger.LogInformation("Generating report for {Year}-{Month}", message.Year, message.Month);
-        await _reports.GenerateAsync(message.Year, message.Month, ct);
-        _logger.LogInformation("Report generated successfully");
-        // All ILogger calls are automatically captured and viewable in the dashboard
+        _logger.LogInformation("Generating report for month {Month}", message.Month);
+        // Handler logs appear in the job's Activity Log on the dashboard
     }
 }
 ```
@@ -178,142 +131,92 @@ public class GenerateMonthlyReportHandler : IJobHandler<GenerateMonthlyReport>
 **Publishing options:**
 
 ```csharp
-// Immediate execution
-await publisher.Enqueue(new GenerateMonthlyReport { Year = 2026, Month = 3 });
-
-// Scheduled for later
-await publisher.Schedule(
-    new GenerateMonthlyReport { Year = 2026, Month = 3 },
-    new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc));
-
-// With retries
-await publisher.Enqueue(new GenerateMonthlyReport { Year = 2026, Month = 3 }, maxRetries: 3);
-
-// In a specific queue
-await publisher.Enqueue(new GenerateMonthlyReport { Year = 2026, Month = 3 }, queue: "reports");
-
-// Continuation (run after parent completes)
-var prepareId = await publisher.Enqueue(new PrepareReportData { Month = 3 });
-await publisher.Enqueue(new GenerateMonthlyReport { Year = 2026, Month = 3 }, parentJobId: prepareId);
+await publisher.Enqueue(new GenerateReport { Month = 3 });
+await publisher.Schedule(new GenerateReport { Month = 3 }, tomorrow);
+await publisher.Enqueue(new GenerateReport { Month = 3 }, maxRetries: 3);
+await publisher.Enqueue(new GenerateReport { Month = 3 }, queue: "reports");
+await publisher.Enqueue(new FollowUp(), parentJobId: prepareId); // continuation
 ```
 
 ### 5. Pipeline Behaviors
-
-Add cross-cutting concerns that wrap ALL handler executions:
 
 ```csharp
 public class LoggingBehavior<T> : IPipelineBehavior<T> where T : class
 {
     private readonly ILogger<LoggingBehavior<T>> _logger;
 
-    public LoggingBehavior(ILogger<LoggingBehavior<T>> logger) => _logger = logger;
-
     public async Task HandleAsync(T message, JobHandlerDelegate next, CancellationToken ct)
     {
-        var typeName = typeof(T).Name;
-        _logger.LogInformation("Handling {MessageType}", typeName);
         var sw = Stopwatch.StartNew();
-
-        try
-        {
-            await next();
-            _logger.LogInformation("Handled {MessageType} in {Elapsed}ms", typeName, sw.ElapsedMilliseconds);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed handling {MessageType} after {Elapsed}ms", typeName, sw.ElapsedMilliseconds);
-            throw;
-        }
+        _logger.LogInformation("Handling {Type}", typeof(T).Name);
+        try { await next(); }
+        finally { _logger.LogInformation("Handled {Type} in {Ms}ms", typeof(T).Name, sw.ElapsedMilliseconds); }
     }
 }
 
-// Register pipeline behaviors
 builder.Services.AddPipelineBehaviors(typeof(Program).Assembly);
 ```
 
 ### 6. Named Queues
 
-Workers process queues in alphabetical order (like Hangfire). Name queues to control priority:
-
 ```csharp
-// Worker configuration
 options.Queues = new[] { "a-critical", "b-default", "c-low" };
-// Worker checks "a-critical" first, then "b-default", then "c-low"
+// Alphabetical order = priority. "a-critical" processed first.
 
-// Publishing to specific queues
 await publisher.Enqueue(new UrgentTask(), queue: "a-critical");
-await publisher.Enqueue(new RegularTask());  // defaults to "default"
 await publisher.Publish(new LowPriorityEvent(), queue: "c-low");
 ```
 
 ### 7. Recurring Jobs
 
 ```csharp
-var recurringPublisher = serviceProvider.GetRequiredService<IRecurringJobPublisher>();
-
-// Run every hour
 await recurringPublisher.AddOrUpdateRecurringJob(
-    new CleanupExpiredSessions(),
-    name: "session-cleanup",
-    cron: "0 * * * *");
-
-// Run every day at midnight
-await recurringPublisher.AddOrUpdateRecurringJob(
-    new GenerateDailySummary(),
-    name: "daily-summary",
-    cron: "0 0 * * *");
+    new CleanupSessions(), name: "session-cleanup", cron: "0 * * * *");
 ```
 
 ## How It Works
 
-### Message Flow (IMessage)
+### Message Flow
 ```
-Publish(OrderCreated) → Message row (State=Enqueued)
+Publish(OrderCreated) → Message (Enqueued)
   ↓ Worker routes
-  → Job 1 (SendConfirmationEmail)  → Executes independently
-  → Job 2 (UpdateInventory)        → Executes independently
-  → Job 3 (NotifyWarehouse)        → Executes independently
-  ↓ All jobs complete
-  → Message State = Completed → ExpireAt set → eventually cleaned up
-  → Statistics persisted (stats:succeeded +3)
+  → Job 1 (SendEmail)     → Completed → stats:succeeded +1
+  → Job 2 (UpdateInventory) → Completed → stats:succeeded +1
+  → Message Completed → ExpireAt set
 ```
 
-### Job Flow (IJob)
+### Job Flow
 ```
-Enqueue(GenerateReport) → Job row (State=Enqueued, Queue="reports")
-  ↓ Worker picks up (queue match + schedule time)
-  → Pipeline behaviors execute
-  → Handler runs (ILogger output captured)
-  → Job State = Completed → ExpireAt set
-  → stats:succeeded +1
+Enqueue(GenerateReport) → Job (Enqueued, queue="reports")
+  ↓ Worker picks up (queue match + schedule)
+  → Pipeline → Handler → ILogger captured → Completed
+  → stats:succeeded +1, stats:succeeded:{hour} +1
+  → ExpireAt set → eventually cleaned up
 ```
 
 ### Concurrency Safety
-
-All operations use database-level protection:
-- **Job pickup**: Row locking (`FOR UPDATE SKIP LOCKED`) prevents duplicate processing
-- **State changes**: Transaction + row lock ensures stat changes and state changes are atomic
-- **Bulk operations**: Each job in its own transaction — failures skip, don't propagate
-- **Message routing**: Row lock on Message prevents duplicate fan-out
+- **Job pickup**: `FOR UPDATE SKIP LOCKED` — one worker per job
+- **State changes**: Transaction + row lock — stats and state atomic
+- **Bulk operations**: Per-job transactions — failures skip, don't propagate
+- **Message routing**: Row lock prevents duplicate fan-out
 
 ### Job Retention
-
-- Completed/Deleted jobs auto-expire after configurable TTL (default: 1 day)
-- Failed jobs never auto-expire — they require manual intervention
-- Persistent statistics survive job deletion (total succeeded/failed/deleted/created)
-- `JoblyHealthManager` runs cleanup in batches during its health check loop
+- Completed/Deleted: auto-expire (configurable TTL)
+- Failed: never expire (manual intervention required)
+- Statistics survive deletion (persistent counters)
+- Hourly stats cleaned up after 7 days
 
 ## Dashboard
 
-The dashboard provides real-time monitoring:
-
-- **Dashboard** — Live + historical metric cards (enqueued, processing, completed, failed, scheduled, servers, messages)
-- **Jobs** — List by state with sidebar nav, bulk actions (requeue/delete), per-page selector
-- **Job Detail** — State history timeline, execution logs, flow visualization (message → jobs, sibling/child relationships)
-- **Messages** — Queue message list with spawned jobs
-- **Recurring Jobs** — Cron schedules with trigger/remove actions
-- **Servers** — Server health with worker tables
-- **Dark Mode** — Toggle with system preference detection
+- **Realtime graph** — jobs/second, polling every 2s, rolling 5 minutes
+- **Historical graph** — succeeded/failed per hour, last 24 hours
+- **Metric cards** — current (enqueued, processing, failed, etc.) + historical totals
+- **Job list** — by state, bulk actions (requeue/delete), per-page selector
+- **Job detail** — Hangfire-style colored state cards with duration, handler output, flow visualization
+- **Messages** — list + detail with spawned jobs
+- **Recurring jobs** — cron schedules, trigger/remove
+- **Servers** — health, workers, current jobs
+- **Dark mode** — system preference + toggle
 
 ## Project Structure
 
@@ -321,41 +224,22 @@ The dashboard provides real-time monitoring:
 src/
 ├── core/
 │   ├── Jobly.Core/          # Entities, handlers, publisher, services, logging
-│   │   ├── Handlers/        # IJob, IMessage, IJobHandler, IMessageHandler, IPipelineBehavior, JobDispatcher
-│   │   ├── Data/Entities/   # Job, Message, JobState, JobLog, Batch, RecurringJob, Server, Worker, Statistic
-│   │   ├── Logging/         # JobLogContext, JobLoggerProvider (ILogger capture)
-│   │   └── Models/          # DTOs for API responses
-│   ├── Jobly.Worker/        # Background worker service, health manager, worker setup
+│   ├── Jobly.Worker/        # Worker service, health manager, worker setup
 │   ├── Jobly.UI/            # Dashboard API endpoints
-│   └── Jobly.Tests/         # 108 integration tests (Respawn + Testcontainers)
+│   └── Jobly.Tests/         # 120 integration tests (Respawn + Testcontainers)
 ├── tests/
-│   ├── Jobly.Test.Shared/   # Shared test handlers and configuration
+│   ├── Jobly.Test.Shared/   # Shared test handlers
 │   ├── Jobly.TestApp/       # Test web application
 │   └── Jobly.TestWorker/    # Test worker service
-└── ui/                      # Vite + React + Tailwind + shadcn/ui dashboard
+└── ui/                      # Vite + React + Tailwind + shadcn/ui + Recharts
 ```
 
 ## Development
 
 ```bash
-# Build
 cd src && dotnet build Jobly.sln
-
-# Test (PostgreSQL only — ~9 seconds with Respawn)
-dotnet test Jobly.sln --filter "Category!=SqlServer"
-
-# Test (all databases)
-dotnet test Jobly.sln
-
-# Frontend dev
-cd src/ui && npm run dev
-
-# Frontend build
-npm run build
+dotnet test Jobly.sln --filter "Category!=SqlServer"  # ~10 seconds
+cd src/ui && npm run dev                               # Dashboard on :5173
 ```
 
-Requires Docker for integration tests (Testcontainers spins up PostgreSQL).
-
-## License
-
-See repository for license information.
+Requires Docker for tests (Testcontainers + Respawn).

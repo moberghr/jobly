@@ -1,33 +1,24 @@
-using Jobly.Core.Interceptors;
+using Jobly.Tests.Fixtures;
 using Jobly.Tests.Jobs;
-using Microsoft.EntityFrameworkCore;
-using Testcontainers.MsSql;
 
 namespace Jobly.Tests;
 
+[Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class SqlServerTests : JoblyTests, IAsyncLifetime
 {
-    private static readonly SqlServerRowLockInterceptor _interceptor = new();
-    private static readonly SaveChangesConcurrencyTokenInterceptor _concurrencyTokenInterceptor = new();
+    private readonly SqlServerFixture _fixture;
 
-    private readonly MsSqlContainer _dbContainer = new MsSqlBuilder()
-        .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
-        .Build();
-
-    public SqlServerTests() : base(null!)
+    public SqlServerTests(SqlServerFixture fixture) : base(fixture.CreateContext)
     {
-        // SQL Server tests are skipped (Category=SqlServer).
-        // TODO: convert to Respawn fixture pattern.
+        _fixture = fixture;
     }
 
     public async Task InitializeAsync()
     {
-        await _dbContainer.StartAsync();
+        await _fixture.ResetAsync();
+        ResetServerRegistration();
     }
 
-    public async Task DisposeAsync()
-    {
-        await _dbContainer.DisposeAsync();
-    }
+    public Task DisposeAsync() => Task.CompletedTask;
 }
