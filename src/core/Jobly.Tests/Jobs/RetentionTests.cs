@@ -233,7 +233,7 @@ public abstract partial class JoblyTests : TestBase
             .FirstOrDefaultAsync();
 
         var service = TestUtils.CreateJoblyService(CreateContext());
-        await service.SetRetry(jobId); // requeue failed job → stats:failed -1
+        await service.RequeueJob(jobId); // requeue failed job → stats:failed -1
 
         var failedAfter = await CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:failed")

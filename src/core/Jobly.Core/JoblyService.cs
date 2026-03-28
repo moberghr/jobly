@@ -1,6 +1,7 @@
 ﻿using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
+using Jobly.Core.Interceptors;
 using Jobly.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,8 +28,6 @@ public interface IJoblyService
     Task<PagedList<JobModel>> GetJobStatesInProcess(BaseListRequest request);
 
     Task<int> CountProcessingJobs();
-
-    Task SetRetry(Guid jobId);
 
     Task<List<ServerModel>> GetServers();
 
@@ -158,35 +157,6 @@ public class JoblyService<TContext> : IJoblyService
         return jobs;
     }
 
-    public async Task SetRetry(Guid jobId)
-    {
-        var job = _context.Set<Job>()
-            .Where(x => x.Id == jobId)
-            .Where(x => x.CurrentState == State.Failed)
-            .FirstOrDefault();
-
-        if (job == null)
-        {
-            throw new ArgumentException("Invalid job id.");
-        }
-
-        await DecrementStatForState(job.CurrentState);
-
-        job.CurrentState = State.Enqueued;
-        job.ExpireAt = null;
-
-        var jobState = new JobState
-        {
-            Job = job,
-            DateTime = DateTime.UtcNow,
-            State = State.Enqueued
-        };
-
-        _context.Set<Job>().Update(job);
-        await _context.Set<JobState>().AddAsync(jobState);
-
-        await _context.SaveChangesAsync();
-    }
 
     public async Task<int> CountProcessingJobs()
     {
@@ -421,8 +391,18 @@ public class JoblyService<TContext> : IJoblyService
 
     public async Task DeleteJob(Guid jobId)
     {
-        var job = await _context.Set<Job>().FindAsync(jobId);
-        if (job == null) throw new ArgumentException("Job not found.");
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var job = await _context.Set<Job>()
+            .Where(x => x.Id == jobId)
+            .TagWith(InterceptorConstants.RowLockTableJob)
+            .FirstOrDefaultAsync();
+
+        if (job == null)
+        {
+            await transaction.RollbackAsync();
+            throw new ArgumentException("Job not found.");
+        }
 
         await DecrementStatForState(job.CurrentState);
 
@@ -443,12 +423,23 @@ public class JoblyService<TContext> : IJoblyService
 
         await _context.Set<JobState>().AddAsync(jobState);
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
     }
 
     public async Task RequeueJob(Guid jobId)
     {
-        var job = await _context.Set<Job>().FindAsync(jobId);
-        if (job == null) throw new ArgumentException("Job not found.");
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var job = await _context.Set<Job>()
+            .Where(x => x.Id == jobId)
+            .TagWith(InterceptorConstants.RowLockTableJob)
+            .FirstOrDefaultAsync();
+
+        if (job == null)
+        {
+            await transaction.RollbackAsync();
+            throw new ArgumentException("Job not found.");
+        }
 
         await DecrementStatForState(job.CurrentState);
 
@@ -466,6 +457,7 @@ public class JoblyService<TContext> : IJoblyService
 
         await _context.Set<JobState>().AddAsync(jobState);
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
     }
 
     private async Task DecrementStatForState(State state)

@@ -37,9 +37,6 @@ export default function JobDetailPage() {
         <Button variant="outline" size="sm" onClick={() => api.requeueJob(job.id)}>
           Requeue
         </Button>
-        <Button variant="outline" size="sm" onClick={() => api.retryJob(job.id)}>
-          Retry
-        </Button>
         <Button variant="destructive" size="sm" onClick={() => api.deleteJob(job.id)}>
           Delete
         </Button>

@@ -27,7 +27,6 @@ export const getAwaitingJobs = (page = 0, pageSize = 20) =>
 export const getJobById = (jobId: string) =>
   api.get<JobDetailModel>(`/jobs/${jobId}`).then(r => r.data);
 
-export const retryJob = (jobId: string) => api.post(`/jobs/${jobId}/retry`);
 export const requeueJob = (jobId: string) => api.post(`/jobs/${jobId}/requeue`);
 export const deleteJob = (jobId: string) => api.post(`/jobs/${jobId}/delete`);
 

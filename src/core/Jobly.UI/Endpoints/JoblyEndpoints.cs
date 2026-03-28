@@ -66,11 +66,6 @@ public static class JoblyEndpoints
             return await joblyService.GetJobStates(request);
         });
 
-        apiGroup.MapPost("jobs/{jobId}/retry", async ([FromServices] IJoblyService joblyService, Guid jobId) =>
-        {
-            await joblyService.SetRetry(jobId);
-        });
-
         apiGroup.MapPost("jobs/{jobId}/requeue", async ([FromServices] IJoblyService joblyService, Guid jobId) =>
         {
             await joblyService.RequeueJob(jobId);
@@ -156,9 +151,5 @@ public static class JoblyEndpoints
             return await joblyService.GetJobStates(request);
         });
 
-        apiGroup.MapPost("retry/{jobId}", async ([FromServices] IJoblyService joblyService, Guid jobId) =>
-        {
-            await joblyService.SetRetry(jobId);
-        });
     }
 }
