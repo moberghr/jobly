@@ -29,13 +29,12 @@ export default function DashboardPage() {
     const current = { succeeded: stats.totalSucceeded, failed: stats.totalFailed };
 
     if (prevTotals.current) {
-      const intervalSeconds = 2;
       const delta = {
         time: new Date().toLocaleTimeString(),
-        succeeded: (current.succeeded - prevTotals.current.succeeded) / intervalSeconds,
-        failed: (current.failed - prevTotals.current.failed) / intervalSeconds,
+        succeeded: current.succeeded - prevTotals.current.succeeded,
+        failed: current.failed - prevTotals.current.failed,
       };
-      setRealtimeData(prev => [...prev.slice(-149), delta]); // keep last 150 points (5 min at 2s)
+      setRealtimeData(prev => [...prev.slice(-299), delta]); // keep last 300 points (5 min at 1s)
     }
     prevTotals.current = current;
   }, [stats]);
@@ -106,8 +105,8 @@ export default function DashboardPage() {
                 <XAxis dataKey="time" tick={{ fontSize: 10 }} className="text-muted-foreground" />
                 <YAxis tick={{ fontSize: 10 }} allowDecimals={false} className="text-muted-foreground" />
                 <Tooltip />
-                <Area type="monotone" dataKey="succeeded" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} />
-                <Area type="monotone" dataKey="failed" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.3} />
+                <Area type="monotone" dataKey="succeeded" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} isAnimationActive={false} />
+                <Area type="monotone" dataKey="failed" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.3} isAnimationActive={false} />
               </AreaChart>
             </ResponsiveContainer>
           ) : (

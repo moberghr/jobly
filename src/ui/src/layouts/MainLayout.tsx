@@ -26,7 +26,7 @@ export default function MainLayout() {
   const location = useLocation();
   const { theme, toggle } = useTheme();
 
-  usePolling(fetchStats, 2000);
+  usePolling(fetchStats, 1000);
 
   const isJobsSection = location.pathname.startsWith('/jobs');
 
@@ -86,6 +86,15 @@ export default function MainLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t bg-card px-6 py-3 text-xs text-muted-foreground flex items-center justify-between">
+        <span>Jobly Dashboard</span>
+        <div className="flex items-center gap-4">
+          {stats && <span>Servers: {stats.servers} · Workers active</span>}
+          <span>UTC: {new Date().toISOString().replace('T', ' ').substring(0, 19)}</span>
+        </div>
+      </footer>
     </div>
   );
 }
