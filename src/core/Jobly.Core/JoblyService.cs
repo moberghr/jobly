@@ -170,7 +170,10 @@ public class JoblyService<TContext> : IJoblyService
             throw new ArgumentException("Invalid job id.");
         }
 
+        await DecrementStatForState(job.CurrentState);
+
         job.CurrentState = State.Enqueued;
+        job.ExpireAt = null;
 
         var jobState = new JobState
         {
@@ -421,6 +424,8 @@ public class JoblyService<TContext> : IJoblyService
         var job = await _context.Set<Job>().FindAsync(jobId);
         if (job == null) throw new ArgumentException("Job not found.");
 
+        await DecrementStatForState(job.CurrentState);
+
         job.CurrentState = State.Deleted;
         job.ExpireAt = DateTime.UtcNow.AddDays(1);
 
@@ -445,8 +450,11 @@ public class JoblyService<TContext> : IJoblyService
         var job = await _context.Set<Job>().FindAsync(jobId);
         if (job == null) throw new ArgumentException("Job not found.");
 
+        await DecrementStatForState(job.CurrentState);
+
         job.CurrentState = State.Enqueued;
         job.HandlerType = null;
+        job.ExpireAt = null;
 
         var jobState = new JobState
         {
@@ -458,6 +466,24 @@ public class JoblyService<TContext> : IJoblyService
 
         await _context.Set<JobState>().AddAsync(jobState);
         await _context.SaveChangesAsync();
+    }
+
+    private async Task DecrementStatForState(State state)
+    {
+        var key = state switch
+        {
+            State.Completed => "stats:succeeded",
+            State.Failed => "stats:failed",
+            State.Deleted => "stats:deleted",
+            _ => null
+        };
+
+        if (key != null)
+        {
+            await _context.Set<Statistic>()
+                .Where(x => x.Key == key)
+                .ExecuteUpdateAsync(x => x.SetProperty(p => p.Value, p => p.Value - 1));
+        }
     }
 
     // ==================== Awaiting Jobs ====================

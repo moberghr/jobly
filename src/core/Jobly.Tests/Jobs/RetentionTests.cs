@@ -219,6 +219,93 @@ public abstract partial class JoblyTests : TestBase
         stats.TotalSucceeded.ShouldBeGreaterThanOrEqualTo(1);
     }
 
+    [Fact]
+    public async Task GivenFailedJobRequeued_ThenFailedStatDecremented()
+    {
+        var context = CreateContext();
+        var jobId = await CreateFailedJob(context);
+
+        await ProcessJob(); // fails, stats:failed +1
+
+        var failedBefore = await CreateContext().Set<Statistic>()
+            .Where(x => x.Key == "stats:failed")
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync();
+
+        var service = TestUtils.CreateJoblyService(CreateContext());
+        await service.SetRetry(jobId); // requeue failed job → stats:failed -1
+
+        var failedAfter = await CreateContext().Set<Statistic>()
+            .Where(x => x.Key == "stats:failed")
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync();
+
+        failedAfter.ShouldBe(failedBefore - 1);
+    }
+
+    [Fact]
+    public async Task GivenCompletedJobRequeued_ThenSucceededStatDecremented()
+    {
+        var context = CreateContext();
+        var publisher = TestUtils.CreatePublisher(context);
+
+        var jobId = await publisher.Enqueue(new UnitRequest());
+        await context.SaveChangesAsync();
+
+        await ProcessJob(); // completes, stats:succeeded +1
+
+        var succeededBefore = await CreateContext().Set<Statistic>()
+            .Where(x => x.Key == "stats:succeeded")
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync();
+
+        var service = TestUtils.CreateJoblyService(CreateContext());
+        await service.RequeueJob(jobId); // requeue → stats:succeeded -1
+
+        var succeededAfter = await CreateContext().Set<Statistic>()
+            .Where(x => x.Key == "stats:succeeded")
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync();
+
+        succeededAfter.ShouldBe(succeededBefore - 1);
+    }
+
+    [Fact]
+    public async Task GivenCompletedJobDeleted_ThenSucceededDecrementedAndDeletedIncremented()
+    {
+        var context = CreateContext();
+        var publisher = TestUtils.CreatePublisher(context);
+
+        var jobId = await publisher.Enqueue(new UnitRequest());
+        await context.SaveChangesAsync();
+
+        await ProcessJob(); // completes, stats:succeeded +1
+
+        var succeededBefore = await CreateContext().Set<Statistic>()
+            .Where(x => x.Key == "stats:succeeded")
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync();
+        var deletedBefore = await CreateContext().Set<Statistic>()
+            .Where(x => x.Key == "stats:deleted")
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync();
+
+        var service = TestUtils.CreateJoblyService(CreateContext());
+        await service.DeleteJob(jobId); // delete → stats:succeeded -1, stats:deleted +1
+
+        var succeededAfter = await CreateContext().Set<Statistic>()
+            .Where(x => x.Key == "stats:succeeded")
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync();
+        var deletedAfter = await CreateContext().Set<Statistic>()
+            .Where(x => x.Key == "stats:deleted")
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync();
+
+        succeededAfter.ShouldBe(succeededBefore - 1);
+        deletedAfter.ShouldBe(deletedBefore + 1);
+    }
+
     // ==================== Cleanup Tests ====================
 
     [Fact]
