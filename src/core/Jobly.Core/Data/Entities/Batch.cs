@@ -18,7 +18,7 @@ public class Batch
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    public int Counter { get; set; }
+    public int JobCount { get; set; }
 
     public BatchContinuationOptions ContinuationOptions { get; set; } = BatchContinuationOptions.OnlyOnSucceeded;
 

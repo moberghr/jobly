@@ -63,6 +63,13 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
 
     public int ExpirationBatchSize { get; set; } = 1000;
 
+    /// <summary>
+    /// When true, uses a single dispatcher per worker group that batch-fetches jobs
+    /// and distributes them to workers, reducing per-job DB overhead.
+    /// When false (default), each worker independently fetches its own jobs.
+    /// </summary>
+    public bool UseDispatcher { get; set; }
+
     internal List<WorkerGroupConfiguration> ExplicitWorkerGroups { get; } = [];
 
     /// <summary>

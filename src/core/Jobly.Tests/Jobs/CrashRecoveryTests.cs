@@ -405,7 +405,7 @@ public abstract partial class JoblyTests : TestBase
         var batchBefore = await CreateContext().Set<Batch>()
             .Where(x => x.Id == batchId)
             .FirstAsync();
-        var counterBefore = batchBefore.Counter;
+        var counterBefore = batchBefore.JobCount;
 
         await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
 
@@ -413,7 +413,7 @@ public abstract partial class JoblyTests : TestBase
         var batchAfter = await CreateContext().Set<Batch>()
             .Where(x => x.Id == batchId)
             .FirstAsync();
-        batchAfter.Counter.ShouldBe(counterBefore);
+        batchAfter.JobCount.ShouldBe(counterBefore);
 
         // Process all jobs (including the requeued one) — batch should complete
         await ProcessAllJobs();
@@ -421,7 +421,7 @@ public abstract partial class JoblyTests : TestBase
         var batchFinal = await CreateContext().Set<Batch>()
             .Where(x => x.Id == batchId)
             .FirstAsync();
-        batchFinal.Counter.ShouldBe(0);
+        batchFinal.JobCount.ShouldBe(0);
     }
 
     [Fact]

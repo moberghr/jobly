@@ -28,7 +28,7 @@ public abstract partial class JoblyTests : TestBase
         var batchBefore = await CreateContext().Set<Batch>()
             .Where(x => x.Id == batchId)
             .FirstAsync();
-        batchBefore.Counter.ShouldBe(2);
+        batchBefore.JobCount.ShouldBe(2);
 
         // Process one job — it fails but retries (goes back to Enqueued)
         await ProcessJob();
@@ -42,7 +42,7 @@ public abstract partial class JoblyTests : TestBase
         var batchAfterRetry = await CreateContext().Set<Batch>()
             .Where(x => x.Id == batchId)
             .FirstAsync();
-        batchAfterRetry.Counter.ShouldBe(2); // Not decremented — job is retrying, not finished
+        batchAfterRetry.JobCount.ShouldBe(2); // Not decremented — job is retrying, not finished
     }
 
     [Fact]

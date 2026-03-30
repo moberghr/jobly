@@ -199,6 +199,7 @@ public static class ServiceConfiguration
         recurringJob.HasIndex(p => p.Name).IsUnique();
 
         recurringJob.Property(p => p.Cron);
+        recurringJob.Property(p => p.Queue);
         recurringJob.Property(p => p.CreatedAt);
         recurringJob.Property(p => p.NextExecution);
         recurringJob.Property(p => p.LastExecution);
@@ -218,7 +219,7 @@ public static class ServiceConfiguration
         batch.Property(p => p.Id);
         batch.HasKey(p => p.Id);
 
-        batch.Property(p => p.Counter);
+        batch.Property(p => p.JobCount);
         batch.Property(p => p.ContinuationOptions);
     }
 

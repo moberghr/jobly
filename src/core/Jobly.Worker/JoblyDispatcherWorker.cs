@@ -1,170 +1,82 @@
 using System.Text.Json;
+using System.Threading.Channels;
 using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
-using Jobly.Core.Helper;
 using Jobly.Core.Interceptors;
 using Jobly.Core.Logging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Jobly.Worker;
 
-public interface IJoblyWorkerService
-{
-    Task<bool> GetAndProcessJob(CancellationToken cancellationToken);
-}
-
-public class JoblyWorkerService<TContext> : IJoblyWorkerService
+/// <summary>
+/// Worker that receives pre-fetched jobs from a dispatcher channel.
+/// Handles execution and completion — dispatcher only handles fetching.
+/// </summary>
+public class JoblyDispatcherWorker<TContext> : BackgroundService
     where TContext : DbContext
 {
     private readonly Guid _workerId;
-    private readonly IServiceScopeFactory _serviceScopeFactory;
-    private readonly ILogger<JoblyWorkerService<TContext>> _logger;
+    private readonly ChannelReader<Job> _jobReader;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<JoblyDispatcherWorker<TContext>> _logger;
     private readonly JoblyWorkerConfiguration _configuration;
-    private readonly WorkerGroupConfiguration _groupConfiguration;
 
-    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration)
+    public JoblyDispatcherWorker(
+        Guid workerId,
+        ChannelReader<Job> jobReader,
+        IServiceScopeFactory scopeFactory,
+        ILogger<JoblyDispatcherWorker<TContext>> logger,
+        IOptions<JoblyWorkerConfiguration> configuration)
     {
         _workerId = workerId;
-        _serviceScopeFactory = serviceScopeFactory;
+        _jobReader = jobReader;
+        _scopeFactory = scopeFactory;
         _logger = logger;
         _configuration = configuration.Value;
-        _groupConfiguration = groupConfiguration;
     }
 
-    public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Prefer executing Jobs (real work) over routing Messages
-        if (await TryExecuteJob(cancellationToken))
+        await foreach (var job in _jobReader.ReadAllAsync(stoppingToken))
         {
-            return true;
-        }
-
-        if (await TryRouteMessage(cancellationToken))
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    private async Task<bool> TryRouteMessage(CancellationToken cancellationToken)
-    {
-        using var scope = _serviceScopeFactory.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TContext>();
-
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-
-        var message = await context.Set<Message>()
-            .Where(x => x.CurrentState == State.Enqueued)
-            .Where(x => _groupConfiguration.Queues.Contains(x.Queue))
-            .OrderBy(x => x.Queue)
-            .ThenBy(x => x.CreateTime)
-            .TagWith(InterceptorConstants.RowLockTableMessage)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (message == null)
-        {
-            await transaction.CommitAsync(cancellationToken);
-            return false;
-        }
-
-        _logger.LogInformation("Worker {workerId} routing message {id}", _workerId, message.Id);
-
-        var messageType = Type.GetType(message.Type) ?? throw new JoblyException($"Unknown type {message.Type}");
-        var handlerTypes = JobDispatcher.DiscoverMessageHandlers(messageType, scope.ServiceProvider);
-
-        if (handlerTypes.Count == 0)
-        {
-            message.CurrentState = State.Failed;
-            await context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            throw new JoblyException($"No handler registered for {messageType.Name}");
-        }
-
-        // Create a Job for each handler — all share a TraceId
-        var messageTraceId = Guid.NewGuid();
-        foreach (var handlerType in handlerTypes)
-        {
-            var job = JobHelper.CreateJob(
-                message: message.Payload,
-                type: message.Type,
-                retries: 0,
-                scheduleTime: null,
-                maxRetries: 0,
-                queue: message.Queue,
-                parentId: null,
-                state: State.Enqueued);
-
-            job.HandlerType = handlerType.AssemblyQualifiedName;
-            job.MessageId = message.Id;
-            job.TraceId = messageTraceId;
-
-            context.Set<Job>().Add(job);
-            context.Set<JobLog>().Add(new JobLog
+            try
             {
-                JobId = job.Id,
-                EventType = "Created",
-                Timestamp = DateTime.UtcNow,
-                Level = "Information",
-                Message = $"Job {job.Id} created from message {message.Id}",
-            });
+                await ProcessJob(job, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Dispatcher worker failed on job {id}", job.Id);
+            }
         }
-
-        message.JobCount = handlerTypes.Count;
-        message.CurrentState = State.Processing;
-
-        await context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-
-        _logger.LogInformation("Worker {workerId} routed message {id} to {count} jobs", _workerId, message.Id, handlerTypes.Count);
-
-        // Immediately try to execute one of the newly created jobs
-        return await TryExecuteJob(cancellationToken);
     }
 
-    private async Task<bool> TryExecuteJob(CancellationToken cancellationToken)
+    private async Task ProcessJob(Job job, CancellationToken cancellationToken)
     {
         PerfTrace.Begin();
 
-        using var scope = _serviceScopeFactory.CreateScope();
+        using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
-        PerfTrace.Mark(PerfTrace.BeginTransaction1);
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-
-        PerfTrace.Mark(PerfTrace.FetchJob);
-        var job = await context.Set<Job>()
-            .Where(x => x.CurrentState == State.Enqueued)
-            .Where(x => x.ScheduleTime < DateTime.UtcNow)
-            .Where(x => _groupConfiguration.Queues.Contains(x.Queue))
-            .OrderBy(x => x.Queue)
-            .ThenBy(x => x.ScheduleTime)
-            .TagWith(InterceptorConstants.RowLockTableJob)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (job == null)
-        {
-            await transaction.CommitAsync(cancellationToken);
-            return false;
-        }
-
-        _logger.LogInformation("Worker {workerId} fetched job {id}", _workerId, job.Id);
-
-        UpdateJobStatusToProcessing(context, job);
-
-        PerfTrace.Mark(PerfTrace.SaveProcessing);
+        // Reload the job in this context (dispatcher's context is a different scope)
+        var trackedJob = await context.Set<Job>().FindAsync([job.Id], cancellationToken)
+            ?? throw new InvalidOperationException($"Job {job.Id} not found");
+        trackedJob.CurrentWorkerId = _workerId;
+        trackedJob.HandlerType = job.HandlerType;
         await context.SaveChangesAsync(cancellationToken);
+        job = trackedJob;
 
-        PerfTrace.Mark(PerfTrace.CommitTransaction1);
-        await transaction.CommitAsync(cancellationToken);
-
-        // Set up log capture and execution context for this job
+        // Set up log capture and execution context
         var logCollector = new JobLogCollector { JobId = job.Id };
         JobLogContext.Current = logCollector;
         JobExecutionContext.Current = new JobExecutionInfo
@@ -173,7 +85,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             TraceId = job.TraceId ?? job.Id,
         };
 
-        // Start keep-alive background loop
+        // Start keep-alive
         using var keepAliveCts = new CancellationTokenSource();
         var keepAliveTask = RunKeepAlive(job.Id, keepAliveCts.Token);
 
@@ -220,8 +132,6 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         PerfTrace.Mark(PerfTrace.Done);
         PerfTrace.End();
-
-        return true;
     }
 
     private static async Task ExecuteJob(Job job, IServiceProvider provider, CancellationToken cancellationToken)
@@ -230,10 +140,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         var payload = JsonSerializer.Deserialize(job.Message, messageType) ?? throw new JoblyException($"Unable to deserialize message {job.Message} to type {job.Type}");
         if (job.HandlerType != null)
         {
-            // Message-spawned job: execute specific handler
             var handlerType = Type.GetType(job.HandlerType) ?? throw new JoblyException($"Unknown handler type {job.HandlerType}");
-
-            // Determine if this is a message handler or job handler based on MessageId
             if (job.MessageId != null)
             {
                 await JobDispatcher.ExecuteMessageHandler(payload, messageType, handlerType, provider, cancellationToken);
@@ -246,26 +153,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             return;
         }
 
-        // Direct IJob: discover single handler
         var jobHandlerType = JobDispatcher.DiscoverJobHandler(messageType, provider) ?? throw new JoblyException($"No handler registered for {messageType.Name}");
         job.HandlerType = jobHandlerType.AssemblyQualifiedName;
         await JobDispatcher.ExecuteJobHandler(payload, messageType, jobHandlerType, provider, cancellationToken);
-    }
-
-    private void UpdateJobStatusToProcessing(TContext context, Job job)
-    {
-        job.CurrentState = State.Processing;
-        job.CurrentWorkerId = _workerId;
-        job.LastKeepAlive = DateTime.UtcNow;
-
-        context.Set<JobLog>().Add(new JobLog
-        {
-            JobId = job.Id,
-            EventType = "Processing",
-            Timestamp = DateTime.UtcNow,
-            Level = "Information",
-            Message = $"The job {job.Id} is being processed",
-        });
     }
 
     private async Task RunKeepAlive(Guid jobId, CancellationToken ct)
@@ -273,27 +163,18 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         var interval = _configuration.InvisibilityTimeout / 5;
         while (!ct.IsCancellationRequested)
         {
-            try
-            {
-                await Task.Delay(interval, ct);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
+            try { await Task.Delay(interval, ct); }
+            catch (OperationCanceledException) { return; }
 
             try
             {
-                using var scope = _serviceScopeFactory.CreateScope();
+                using var scope = _scopeFactory.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<TContext>();
                 await context.Set<Job>()
                     .Where(x => x.Id == jobId)
                     .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastKeepAlive, DateTime.UtcNow), ct);
             }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
+            catch (OperationCanceledException) { return; }
             catch (Exception e)
             {
                 _logger.LogWarning(e, "Failed to refresh keep-alive for job {jobId}", jobId);
@@ -309,14 +190,13 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         {
             state = State.Enqueued;
             job.RetriedTimes += 1;
-            job.HandlerType = null; // Clear so handler is re-discovered on retry
+            job.HandlerType = null;
         }
 
         job.CurrentState = state;
         job.CurrentWorkerId = null;
         job.LastKeepAlive = null;
 
-        // Set expiration and increment statistics (total + hourly)
         PerfTrace.Mark(PerfTrace.IncrementStats);
         var hourSuffix = DateTime.UtcNow.ToString("yyyy-MM-dd-HH");
         if (state == State.Completed)
@@ -329,7 +209,6 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             AddCounters(context, "stats:failed", $"stats:failed:{hourSuffix}");
         }
 
-        // Check for child job continuations — skip DB query if job can't have children
         PerfTrace.Mark(PerfTrace.CheckChildren);
         if (job.CurrentState == State.Completed)
         {
@@ -355,7 +234,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         }
 
         var logMessage = error != null ? error.Message : $"Job {job.Id} completed";
-        var logException = error?.ToString(); // Full stack trace
+        var logException = error?.ToString();
 
         await CreateJobLog(context, job.Id, state, logMessage, cancellationToken, logException);
     }
@@ -464,14 +343,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         currentBatch.JobCount = 0;
 
-        // All jobs finished — check if continuation should fire
         var currentBatchJob = await context.Set<Job>()
             .Where(x => x.Id == currentBatch.Id)
             .FirstAsync(cancellationToken);
 
         if (currentBatch.ContinuationOptions == BatchContinuationOptions.OnlyOnSucceeded)
         {
-            // Check if any batch jobs failed
             var hasFailedJobs = await context.Set<Job>()
                 .Where(x => x.BatchId == batchId && x.CurrentState == State.Failed)
                 .AnyAsync(cancellationToken);

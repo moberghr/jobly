@@ -33,7 +33,7 @@ public class BatchQueryService<TContext> : IBatchQueryService
             {
                 Id = x.Batch.Id,
                 TotalJobs = _context.Set<Job>().Count(j => j.BatchId == x.Batch.Id),
-                RemainingJobs = x.Batch.Counter,
+                RemainingJobs = x.Batch.JobCount,
                 PlaceholderState = x.PlaceholderJob.CurrentState,
                 CreateTime = x.PlaceholderJob.CreateTime,
             })
@@ -73,7 +73,7 @@ public class BatchQueryService<TContext> : IBatchQueryService
         {
             Id = batch.Id,
             TotalJobs = totalJobs,
-            RemainingJobs = batch.Counter,
+            RemainingJobs = batch.JobCount,
             PlaceholderState = placeholderJob.CurrentState,
             CreateTime = placeholderJob.CreateTime,
             ContinuationJobId = continuationJob == Guid.Empty ? null : continuationJob,

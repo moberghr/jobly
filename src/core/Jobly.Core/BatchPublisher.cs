@@ -55,7 +55,7 @@ public class BatchPublisher<TContext> : IBatchPublisher
         var newBatch = new Batch
         {
             Id = placeholderJob.Id,
-            Counter = batchJobMessages.Count,
+            JobCount = batchJobMessages.Count,
             ContinuationOptions = options,
         };
 

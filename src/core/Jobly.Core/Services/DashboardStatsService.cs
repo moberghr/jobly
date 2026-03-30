@@ -50,7 +50,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             .Where(x => x.CurrentState != State.Completed)
             .CountAsync();
         var batches = await _context.Set<Batch>()
-            .Where(x => x.Counter > 0)
+            .Where(x => x.JobCount > 0)
             .CountAsync();
 
         var totalSucceeded = await GetCombinedStatValue("stats:succeeded");

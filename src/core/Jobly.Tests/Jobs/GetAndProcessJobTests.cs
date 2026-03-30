@@ -142,8 +142,8 @@ public abstract partial class JoblyTests : TestBase
             .Where(x => x.Id == secondPlaceholderJobId)
             .FirstAsync();
 
-        firstBatch.Counter.ShouldBe(9);
-        secondBatch.Counter.ShouldBe(10);
+        firstBatch.JobCount.ShouldBe(9);
+        secondBatch.JobCount.ShouldBe(10);
     }
 
     [Fact]
@@ -168,8 +168,8 @@ public abstract partial class JoblyTests : TestBase
             .Where(x => x.Id == secondPlaceholderJobId)
             .FirstAsync();
 
-        firstBatch.Counter.ShouldBe(0);
-        secondBatch.Counter.ShouldBe(2);
+        firstBatch.JobCount.ShouldBe(0);
+        secondBatch.JobCount.ShouldBe(2);
     }
 
     [Fact]
@@ -405,7 +405,7 @@ public abstract partial class JoblyTests : TestBase
             .Where(x => x.Id == secondPlaceholderJobId)
             .FirstAsync();
 
-        secondBatch.Counter.ShouldBe(2);
+        secondBatch.JobCount.ShouldBe(2);
     }
 
     [Fact]

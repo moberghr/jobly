@@ -102,6 +102,7 @@ public static class ServiceConfiguration
         services.AddHostedService<ServerCleanupTask<TContext>>();
         services.AddHostedService<StaleJobRecoveryTask<TContext>>();
         services.AddHostedService<ExpirationCleanupTask<TContext>>();
+        services.AddHostedService<RecurringJobSchedulerTask<TContext>>();
 
         return services;
     }

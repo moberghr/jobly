@@ -77,6 +77,28 @@ public static class PerfTrace
         }
     }
 
+    public static long[]? Detach()
+    {
+        if (!_enabled)
+        {
+            return null;
+        }
+
+        var ticks = CurrentTicks.Value;
+        CurrentTicks.Value = null;
+        return ticks;
+    }
+
+    public static void Attach(long[]? ticks)
+    {
+        if (!_enabled || ticks == null)
+        {
+            return;
+        }
+
+        CurrentTicks.Value = ticks;
+    }
+
     public static void End()
     {
         if (!_enabled)

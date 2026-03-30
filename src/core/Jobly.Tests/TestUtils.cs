@@ -92,26 +92,53 @@ public static class TestUtils
         await CounterAggregatorTask<TestContext>.AggregateCounters(context);
     }
 
-    public static JoblyWorkerService<TestContext> CreateJoblyWorkerService(IServiceScopeFactory serviceScopeFactory)
+    public static IOptions<JoblyWorkerConfiguration> CreateWorkerConfig()
     {
-        IOptions<JoblyWorkerConfiguration> joblyWorkerConfigOptions = new OptionsWrapper<JoblyWorkerConfiguration>(new JoblyWorkerConfiguration
+        return new OptionsWrapper<JoblyWorkerConfiguration>(new JoblyWorkerConfiguration
         {
             WorkerCount = 1,
             ServerId = TestServerId,
             Queues = DefaultQueues,
         });
+    }
 
-        var groupConfig = new WorkerGroupConfiguration
+    public static WorkerGroupConfiguration CreateGroupConfig()
+    {
+        return new WorkerGroupConfiguration
         {
             WorkerCount = 1,
             Queues = DefaultQueues,
         };
+    }
 
+    public static JoblyWorkerService<TestContext> CreateJoblyWorkerService(IServiceScopeFactory serviceScopeFactory)
+    {
         return new JoblyWorkerService<TestContext>(
             TestWorkerId,
             serviceScopeFactory,
             new NullLogger<JoblyWorkerService<TestContext>>(),
-            joblyWorkerConfigOptions,
-            groupConfig);
+            CreateWorkerConfig(),
+            CreateGroupConfig());
+    }
+
+    public static JoblyDispatcher<TestContext> CreateDispatcher(IServiceScopeFactory serviceScopeFactory)
+    {
+        return new JoblyDispatcher<TestContext>(
+            serviceScopeFactory,
+            new NullLogger<JoblyDispatcher<TestContext>>(),
+            CreateWorkerConfig(),
+            CreateGroupConfig());
+    }
+
+    public static JoblyDispatcherWorker<TestContext> CreateDispatcherWorker(
+        IServiceScopeFactory serviceScopeFactory,
+        System.Threading.Channels.ChannelReader<Jobly.Core.Entities.Job> jobReader)
+    {
+        return new JoblyDispatcherWorker<TestContext>(
+            TestWorkerId,
+            jobReader,
+            serviceScopeFactory,
+            new NullLogger<JoblyDispatcherWorker<TestContext>>(),
+            CreateWorkerConfig());
     }
 }

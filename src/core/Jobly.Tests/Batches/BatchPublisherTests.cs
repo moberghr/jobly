@@ -41,7 +41,7 @@ public abstract partial class JoblyTests : TestBase
 
         foreach (var newBatch in newBatches)
         {
-            newBatch.Counter.ShouldBe(10);
+            newBatch.JobCount.ShouldBe(10);
         }
     }
 

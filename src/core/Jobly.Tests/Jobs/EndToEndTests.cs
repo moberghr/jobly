@@ -35,8 +35,10 @@ public class EndToEndTests : IAsyncLifetime
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    [Fact]
-    public async Task GivenComplexWorkload_WhenProcessedByRealWorkers_ThenAllJobsReachTerminalState()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GivenComplexWorkload_WhenProcessedByRealWorkers_ThenAllJobsReachTerminalState(bool useDispatcher)
     {
         var host = Host.CreateDefaultBuilder()
             .ConfigureServices(services =>
@@ -53,6 +55,7 @@ public class EndToEndTests : IAsyncLifetime
                     options.Queues = DefaultQueues;
                     options.PollingInterval = TimeSpan.FromMilliseconds(100);
                     options.HealthCheckInterval = TimeSpan.FromSeconds(5);
+                    options.UseDispatcher = useDispatcher;
                 });
             })
             .Build();
@@ -150,6 +153,7 @@ public class EndToEndTests : IAsyncLifetime
                 allDone = true;
                 break;
             }
+
         }
 
         // Stop the host gracefully
@@ -189,7 +193,7 @@ public class EndToEndTests : IAsyncLifetime
 
         // All batches completed (counter = 0)
         var incompleteBatches = await ctx.Set<Batch>()
-            .Where(b => b.Counter > 0)
+            .Where(b => b.JobCount > 0)
             .CountAsync();
         incompleteBatches.ShouldBe(0, "All batch counters should be 0");
 
