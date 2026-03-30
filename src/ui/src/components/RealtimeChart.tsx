@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import {
   Chart,
   LineController,
@@ -8,6 +8,7 @@ import {
   Filler,
   Tooltip,
   Legend,
+  CategoryScale,
 } from 'chart.js';
 import 'chartjs-adapter-luxon';
 import StreamingPlugin, { RealTimeScale } from 'chartjs-plugin-streaming';
@@ -18,6 +19,7 @@ Chart.register(
   LineElement,
   PointElement,
   LinearScale,
+  CategoryScale,
   Filler,
   Tooltip,
   Legend,
@@ -33,6 +35,8 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
   const prevTotals = useRef<{ succeeded: number; failed: number } | null>(null);
+  const recentValues = useRef<number[]>([]);
+  const [stats, setStats] = useState({ current: 0, max: 0, avg: 0 });
 
   useEffect(() => {
     if (!canvasRef.current) {
@@ -54,6 +58,8 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
             borderWidth: 2,
             fill: true,
             pointRadius: 0,
+            pointHitRadius: 0,
+            pointHoverRadius: 0,
             tension: 0.3,
             data: [],
           },
@@ -64,6 +70,8 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
             borderWidth: 2,
             fill: true,
             pointRadius: 0,
+            pointHitRadius: 0,
+            pointHoverRadius: 0,
             tension: 0.3,
             data: [],
           },
@@ -73,6 +81,14 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
+        interaction: {
+          mode: 'nearest',
+          axis: 'x',
+          intersect: false,
+        },
+        hover: {
+          mode: undefined,
+        },
         scales: {
           x: {
             type: 'realtime',
@@ -95,9 +111,18 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
                 if (prevTotals.current) {
                   const succeeded = current.succeeded - prevTotals.current.succeeded;
                   const failed = current.failed - prevTotals.current.failed;
+                  const total = succeeded + failed;
 
                   chart.data.datasets[0].data.push({ x: now, y: succeeded });
                   chart.data.datasets[1].data.push({ x: now, y: failed });
+
+                  recentValues.current = [...recentValues.current.slice(-59), total];
+                  const vals = recentValues.current;
+                  setStats({
+                    current: total,
+                    max: Math.max(...vals),
+                    avg: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
+                  });
                 }
 
                 prevTotals.current = current;
@@ -135,9 +160,7 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
             display: false,
           },
           tooltip: {
-            enabled: true,
-            mode: 'index' as const,
-            intersect: false,
+            enabled: false,
           },
         },
       },
@@ -153,8 +176,15 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
   }, []);
 
   return (
-    <div style={{ height }}>
-      <canvas ref={canvasRef} />
+    <div>
+      <div className="flex gap-6 mb-2 text-sm">
+        <span className="text-muted-foreground">Current: <span className="font-medium text-foreground">{stats.current}/s</span></span>
+        <span className="text-muted-foreground">Avg: <span className="font-medium text-foreground">{stats.avg}/s</span></span>
+        <span className="text-muted-foreground">Peak: <span className="font-medium text-foreground">{stats.max}/s</span></span>
+      </div>
+      <div style={{ height }}>
+        <canvas ref={canvasRef} />
+      </div>
     </div>
   );
 }

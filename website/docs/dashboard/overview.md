@@ -9,7 +9,7 @@ Jobly ships with a built-in web dashboard for monitoring and managing jobs.
 ## Setup
 
 ```csharp
-app.UseJoblyUI(); // Serves at /dashboard by default
+app.UseJoblyUI(); // Serves at /jobly
 ```
 
 ## Dashboard

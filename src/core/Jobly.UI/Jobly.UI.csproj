@@ -11,6 +11,11 @@
 		<EmbeddedResource Include="dist/**/*" />
 	</ItemGroup>
 
+	<!-- Rebuild React UI before embedding -->
+	<Target Name="BuildUI" BeforeTargets="BeforeBuild" Condition="'$(BuildingInsideVisualStudio)' != 'true'">
+		<Exec Command="npm run build" WorkingDirectory="$(ProjectDir)..\..\ui" />
+	</Target>
+
 	<ItemGroup>
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>

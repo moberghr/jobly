@@ -100,9 +100,9 @@ export default function DashboardPage() {
         <MetricCard label="Servers" value={stats.servers} icon={<Server className="h-5 w-5" />} />
       </div>
 
-      {/* Realtime Graph — last 30 seconds, smooth scrolling */}
+      {/* Realtime Graph */}
       <Card className="mb-8">
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Realtime (jobs/sec)</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Realtime — last 60 seconds</CardTitle></CardHeader>
         <CardContent>
           <RealtimeChart height={200} />
         </CardContent>

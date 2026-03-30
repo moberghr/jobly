@@ -16,8 +16,8 @@ Ships as NuGet packages (Jobly.Core, Jobly.UI, Jobly.Worker). Supports PostgreSQ
 ```bash
 # Backend (from src/)
 dotnet build Jobly.sln
-dotnet test Jobly.sln --filter "Category!=SqlServer"   # PostgreSQL only (~10s with Respawn)
-dotnet test Jobly.sln                                    # All databases
+dotnet test Jobly.sln --filter "Category!=SqlServer"   # PostgreSQL only
+dotnet test Jobly.sln                                    # All databases (295 tests, ~27s)
 
 # Run a specific test
 dotnet test Jobly.sln --filter "FullyQualifiedName~ConcurrencyTests"
@@ -51,7 +51,7 @@ public interface IPipelineBehavior<in T> where T : class { Task HandleAsync(T me
 ### Data Model
 
 - **Message** — Published intent (Type, Payload, Queue, State, JobCount, ExpireAt).
-- **Job** — Execution unit (Type, Message, HandlerType, MessageId, Queue, State, ScheduleTime, MaxRetries, RetriedTimes, ParentJobId, BatchId, CurrentWorkerId, ExpireAt).
+- **Job** — Execution unit (Type, Message, HandlerType, MessageId, Queue, State, ScheduleTime, MaxRetries, RetriedTimes, ParentJobId, BatchId, CurrentWorkerId, TraceId, SpawnedByJobId, ExpireAt).
 - **JobLog** — Unified audit trail. EventType: Created, Processing, Completed, Failed, Requeued, Deleted, Log (ILogger output).
 - **Statistic** — Persistent counters (totals + hourly time-series). Seeded via HasData. Atomic ExecuteUpdateAsync increments.
 - **Batch** — Groups Jobs with counter for batch completion.
@@ -77,17 +77,18 @@ Queue order is alphabetical. Row locking (`FOR UPDATE SKIP LOCKED`) prevents dup
 
 ### Backend (.NET 10)
 
-- **Jobly.Core** — Entities, handlers, JobDispatcher, Publisher, services, logging (JobLogContext/JobLoggerProvider).
-- **Jobly.Worker** — JoblyWorkerService, JoblyWorkerSetup, JoblyHealthManager.
-- **Jobly.UI** — Minimal API endpoints + dashboard.
+- **Jobly.Core** — Entities, handlers, JobDispatcher, Publisher, logging (JobLogContext/JobLoggerProvider). Services split into 6 focused classes in `Services/`: `JobQueryService`, `JobCommandService`, `MessageQueryService`, `RecurringJobService`, `BatchQueryService`, `DashboardStatsService`.
+- **Jobly.Worker** — JoblyWorkerService, JoblyWorkerSetup, JoblyHealthManager. Crash recovery via LastKeepAlive + RequeueStaleJobs.
+- **Jobly.UI** — Minimal API endpoints + embedded SPA served at `/jobly`.
+- **Static analyzers** — StyleCop, Roslynator, SonarAnalyzer, Meziantou.
 
 ### Frontend (Vite + React 18 + TypeScript)
 
-`src/ui/`. Tailwind + shadcn/ui, Zustand, Axios, Recharts. Features: dashboard with realtime (jobs/sec) + historical (24h) graphs, job list by state with bulk actions, per-page selector, dark mode, Hangfire-style job detail (colored state cards + handler output), messages, recurring jobs, servers.
+`src/ui/`. Tailwind + shadcn/ui, Zustand, Axios. Chart.js with chartjs-plugin-streaming for realtime graph, Recharts for historical (24h) chart. Features: dashboard with realtime (jobs/sec) + historical graphs, job list by state with bulk actions, per-page selector, dark mode, Hangfire-style job detail (colored state cards + handler output), messages, recurring jobs, servers.
 
 ### Testing
 
-296 integration tests using xUnit, Shouldly, Testcontainers + Respawn (~24s). Covers: lifecycle logs, concurrency (row locking), queue ordering, scheduling, retries, continuations, batches, recurring jobs, server monitoring, log capture, retention, statistics, bulk operations, time-series stats, crash recovery (keep-alive + stale job requeue), job tracing (TraceId/SpawnedByJobId), pipeline behavior logging, batch continuation options. Tests run on both PostgreSQL and SQL Server.
+295 integration tests (148 PostgreSQL + 147 SQL Server) using xUnit, Shouldly, Testcontainers + Respawn (~27s). Covers: lifecycle logs, concurrency (row locking), queue ordering, scheduling, retries, continuations, batches, recurring jobs, server monitoring, log capture, retention, statistics, bulk operations, time-series stats, crash recovery (keep-alive + stale job requeue), job tracing (TraceId/SpawnedByJobId), pipeline behavior logging, batch continuation options.
 
 ### Key Design Decisions
 

@@ -51,7 +51,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     options.Queues = new[] { "default", "critical" };
 });
 
-// Dashboard
+// Dashboard (serves at /jobly)
 app.UseJoblyUI();
 ```
 
