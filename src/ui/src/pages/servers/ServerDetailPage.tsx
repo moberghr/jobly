@@ -148,8 +148,8 @@ function TaskSection({ serverId, task }: { serverId: string; task: ServerTaskSum
           ) : (
             <span className="text-yellow-600 dark:text-yellow-400 font-medium">Disabled</span>
           )}
-          {task.lastDurationMs != null && <span>{task.lastDurationMs.toFixed(0)}ms</span>}
-          {task.lastRun && <span><RelativeTime date={task.lastRun} /></span>}
+          {task.lastDurationMs != null && <span>took {task.lastDurationMs.toFixed(0)}ms</span>}
+          {task.lastRun && <span>ran <RelativeTime date={task.lastRun} /></span>}
         </div>
       </button>
 
@@ -189,7 +189,7 @@ function TaskSection({ serverId, task }: { serverId: string; task: ServerTaskSum
               )}
             </>
           ) : (
-            <p className="text-muted-foreground text-sm py-2 text-center">Loading...</p>
+            <p className="text-muted-foreground text-sm py-2 text-center">{logs ? 'No logs yet' : 'Loading...'}</p>
           )}
         </CardContent>
       )}

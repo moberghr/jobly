@@ -332,6 +332,11 @@ public static class ServiceConfiguration
         serverTask.Property(p => p.LastRun);
         serverTask.Property(p => p.LastDurationMs);
 
+        serverTask.HasOne<Server>()
+            .WithMany()
+            .HasForeignKey(p => p.ServerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         serverTask.HasIndex(p => p.ServerId);
     }
 
@@ -348,6 +353,11 @@ public static class ServiceConfiguration
         serverLog.Property(p => p.Message);
         serverLog.Property(p => p.Timestamp);
         serverLog.Property(p => p.DurationMs);
+
+        serverLog.HasOne<Server>()
+            .WithMany()
+            .HasForeignKey(p => p.ServerId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         serverLog.HasIndex(p => p.ServerId);
         serverLog.HasIndex(p => p.ServerTaskId);

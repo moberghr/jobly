@@ -49,12 +49,6 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
     /// </summary>
     protected virtual bool LogOnSuccess => true;
 
-    /// <summary>
-    /// How long to keep ServerLog entries for this task.
-    /// Used by ExpirationCleanupService. Default 1 day.
-    /// </summary>
-    protected virtual TimeSpan LogRetention => TimeSpan.FromDays(1);
-
     protected Guid ServerId => _configuration.ServerId;
 
     protected JoblyWorkerConfiguration Configuration => _configuration;
@@ -120,8 +114,7 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
         // Always update the ServerTask row (last run info)
         await UpdateServerTask("Completed", message, sw.Elapsed.TotalMilliseconds);
 
-        // Only write a ServerLog when there was actual work done
-        if (LogOnSuccess && message != null)
+        if (LogOnSuccess)
         {
             await WriteServerLog("Completed", message, sw.Elapsed.TotalMilliseconds);
         }

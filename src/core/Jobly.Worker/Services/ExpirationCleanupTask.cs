@@ -68,21 +68,27 @@ public class ExpirationCleanupTask<TContext> : ServerTaskBase<TContext>
                         && x.Key.CompareTo($"stats:failed:{oldHourPrefix}") < 0)
             .ExecuteDeleteAsync();
 
-        // Cleanup old server logs — 1 hour for aggregate task logs, 1 day for others
-        var aggregateTaskIds = await context.Set<ServerTask>()
-            .Where(x => x.TaskName == "AggregateCounters")
-            .Select(x => x.Id)
+        // Cleanup server logs — retention = interval * 300 per task
+        var serverTasks = await context.Set<ServerTask>()
+            .Select(x => new { x.Id, x.IntervalSeconds })
             .ToListAsync();
 
-        var aggregateCutoff = DateTime.UtcNow.AddHours(-1);
+        foreach (var task in serverTasks)
+        {
+            var retentionSeconds = (task.IntervalSeconds ?? 60) * 300;
+            var cutoff = DateTime.UtcNow.AddSeconds(-retentionSeconds);
+            await context.Set<ServerLog>()
+                .Where(x => x.ServerTaskId == task.Id && x.Timestamp < cutoff)
+                .ExecuteDeleteAsync();
+        }
+
+        // Cleanup orphaned server logs (no task) older than 1 day
         await context.Set<ServerLog>()
-            .Where(x => x.ServerTaskId != null && aggregateTaskIds.Contains(x.ServerTaskId.Value) && x.Timestamp < aggregateCutoff)
+            .Where(x => x.ServerTaskId == null && x.Timestamp < DateTime.UtcNow.AddDays(-1))
             .ExecuteDeleteAsync();
 
-        var generalCutoff = DateTime.UtcNow.AddDays(-1);
-        await context.Set<ServerLog>()
-            .Where(x => (x.ServerTaskId == null || !aggregateTaskIds.Contains(x.ServerTaskId.Value)) && x.Timestamp < generalCutoff)
-            .ExecuteDeleteAsync();
+        // ServerTasks and ServerLogs for dead servers are cleaned up via cascade delete
+        // when ServerCleanupTask removes the Server record.
 
         return expiredJobIds.Count;
     }

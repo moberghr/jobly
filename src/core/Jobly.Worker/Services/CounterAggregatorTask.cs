@@ -23,8 +23,6 @@ public class CounterAggregatorTask<TContext> : ServerTaskBase<TContext>
 
     protected override TimeSpan DefaultInterval => Configuration.CounterAggregationInterval;
 
-    protected override TimeSpan LogRetention => TimeSpan.FromHours(1);
-
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
         var count = await AggregateCounters(context);
