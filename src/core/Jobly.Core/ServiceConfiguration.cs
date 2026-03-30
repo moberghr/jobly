@@ -2,14 +2,12 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Interceptors;
 using Jobly.Core.Services;
-using Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.SqlServer.Infrastructure.Internal;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.Internal;
 
@@ -53,14 +51,6 @@ public static class ServiceConfiguration
     private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services)
         where TContext : DbContext
     {
-        var assembly = typeof(ServiceConfiguration).Assembly;
-
-        var builder = services.AddControllersWithViews();
-        builder.AddApplicationPart(assembly)
-            .AddRazorRuntimeCompilation();
-
-        services.Configure<MvcRazorRuntimeCompilationOptions>(options => options.FileProviders.Add(new EmbeddedFileProvider(assembly)));
-
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(
             x.GetRequiredService<TContext>(),
             x.GetRequiredService<IOptions<JoblyConfiguration>>()));
@@ -121,6 +111,8 @@ public static class ServiceConfiguration
         AddJobLogEntity(modelBuilder);
         AddStatisticEntity(modelBuilder);
         AddCounterEntity(modelBuilder);
+        AddServerTaskEntity(modelBuilder);
+        AddServerLogEntity(modelBuilder);
     }
 
     private static void AddJobEntity(ModelBuilder modelBuilder)
@@ -297,5 +289,42 @@ public static class ServiceConfiguration
         counter.Property(p => p.Value);
 
         counter.HasIndex(p => p.Key);
+    }
+
+    private static void AddServerTaskEntity(ModelBuilder modelBuilder)
+    {
+        var serverTask = modelBuilder.Entity<ServerTask>();
+        serverTask.ToTable(nameof(ServerTask));
+
+        serverTask.Property(p => p.Id);
+        serverTask.HasKey(p => p.Id);
+        serverTask.Property(p => p.ServerId);
+        serverTask.Property(p => p.TaskName);
+        serverTask.Property(p => p.IntervalSeconds);
+        serverTask.Property(p => p.LastStatus);
+        serverTask.Property(p => p.LastMessage);
+        serverTask.Property(p => p.LastRun);
+        serverTask.Property(p => p.LastDurationMs);
+
+        serverTask.HasIndex(p => p.ServerId);
+    }
+
+    private static void AddServerLogEntity(ModelBuilder modelBuilder)
+    {
+        var serverLog = modelBuilder.Entity<ServerLog>();
+        serverLog.ToTable(nameof(ServerLog));
+
+        serverLog.Property(p => p.Id);
+        serverLog.HasKey(p => p.Id);
+        serverLog.Property(p => p.ServerId);
+        serverLog.Property(p => p.ServerTaskId);
+        serverLog.Property(p => p.Status);
+        serverLog.Property(p => p.Message);
+        serverLog.Property(p => p.Timestamp);
+        serverLog.Property(p => p.DurationMs);
+
+        serverLog.HasIndex(p => p.ServerId);
+        serverLog.HasIndex(p => p.ServerTaskId);
+        serverLog.HasIndex(p => p.Timestamp);
     }
 }

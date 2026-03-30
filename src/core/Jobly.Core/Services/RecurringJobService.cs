@@ -1,4 +1,3 @@
-using System.Globalization;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
@@ -37,9 +36,9 @@ public class RecurringJobService<TContext> : IRecurringJobService
             .Select(x => new RecurringJobModel
             {
                 Id = x.Id,
-                Name = x.Name,
-                Cron = x.Cron,
-                Type = x.Type,
+                Name = x.Name!,
+                Cron = x.Cron!,
+                Type = x.Type!,
                 NextExecution = x.NextExecution,
                 LastExecution = x.LastExecution,
                 CreatedAt = x.CreatedAt,
@@ -54,9 +53,9 @@ public class RecurringJobService<TContext> : IRecurringJobService
             .Select(x => new RecurringJobDetailModel
             {
                 Id = x.Id,
-                Name = x.Name,
-                Cron = x.Cron,
-                Type = x.Type,
+                Name = x.Name!,
+                Cron = x.Cron!,
+                Type = x.Type!,
                 Message = x.Message,
                 NextExecution = x.NextExecution,
                 LastExecution = x.LastExecution,

@@ -3,6 +3,7 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
+using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 
@@ -27,7 +28,7 @@ public abstract partial class JoblyTests : TestBase
                 .SetProperty(p => p.CurrentWorkerId, TestUtils.TestWorkerId)
                 .SetProperty(p => p.LastKeepAlive, DateTime.UtcNow.AddMinutes(-6)));
 
-        var requeued = await JoblyHealthManager<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
+        var requeued = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
 
         requeued.ShouldBe(1);
         var job = await GetJob(jobId);
@@ -59,7 +60,7 @@ public abstract partial class JoblyTests : TestBase
                 .SetProperty(p => p.CurrentWorkerId, TestUtils.TestWorkerId)
                 .SetProperty(p => p.LastKeepAlive, DateTime.UtcNow));
 
-        var requeued = await JoblyHealthManager<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
+        var requeued = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
 
         requeued.ShouldBe(0);
         var job = await GetJob(jobId);
@@ -85,7 +86,7 @@ public abstract partial class JoblyTests : TestBase
                 .SetProperty(p => p.LastKeepAlive, DateTime.UtcNow.AddMinutes(-6))
                 .SetProperty(p => p.RetriedTimes, 2));
 
-        await JoblyHealthManager<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
+        await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
 
         var job = await GetJob(jobId);
         job.CurrentState.ShouldBe(State.Enqueued);
@@ -118,7 +119,7 @@ public abstract partial class JoblyTests : TestBase
                     .SetProperty(p => p.LastKeepAlive, DateTime.UtcNow.AddMinutes(-6)));
         }
 
-        var requeued = await JoblyHealthManager<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
+        var requeued = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
 
         requeued.ShouldBe(3);
         foreach (var id in jobIds)
@@ -155,7 +156,7 @@ public abstract partial class JoblyTests : TestBase
                 .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastKeepAlive, staleTime));
         }
 
-        var requeued = await JoblyHealthManager<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
+        var requeued = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
         requeued.ShouldBe(0);
     }
 
@@ -176,7 +177,7 @@ public abstract partial class JoblyTests : TestBase
                 .SetProperty(p => p.CurrentWorkerId, TestUtils.TestWorkerId)
                 .SetProperty(p => p.LastKeepAlive, DateTime.UtcNow.AddMinutes(-6)));
 
-        await JoblyHealthManager<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
+        await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
 
         // Now process normally
         await ProcessJob();
@@ -209,7 +210,7 @@ public abstract partial class JoblyTests : TestBase
                 .SetProperty(p => p.CurrentWorkerId, TestUtils.TestWorkerId)
                 .SetProperty(p => p.LastKeepAlive, DateTime.UtcNow.AddMinutes(-6)));
 
-        await JoblyHealthManager<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
+        await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
 
         var job = await GetJob(jobId);
         job.RetriedTimes.ShouldBe(0); // Crash didn't count
@@ -238,7 +239,7 @@ public abstract partial class JoblyTests : TestBase
             .Where(x => x.Id == TestUtils.TestServerId)
             .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastHeartbeatTime, DateTime.UtcNow.AddMinutes(-6)));
 
-        var removed = await JoblyHealthManager<TestContext>.CleanUpServers(CreateContext(), TimeSpan.FromMinutes(5));
+        var removed = await ServerCleanupTask<TestContext>.CleanUpServers(CreateContext(), TimeSpan.FromMinutes(5));
 
         removed.ShouldBe(1);
         var servers = await CreateContext().Set<Server>().ToListAsync();
@@ -271,7 +272,7 @@ public abstract partial class JoblyTests : TestBase
             .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastHeartbeatTime, DateTime.UtcNow.AddMinutes(-6)));
 
         // CleanUpServers only removes server/workers, not jobs
-        await JoblyHealthManager<TestContext>.CleanUpServers(CreateContext(), TimeSpan.FromMinutes(5));
+        await ServerCleanupTask<TestContext>.CleanUpServers(CreateContext(), TimeSpan.FromMinutes(5));
 
         var job = await GetJob(jobId);
         job.CurrentState.ShouldBe(State.Processing); // Not failed — RequeueStaleJobs handles this
@@ -305,8 +306,8 @@ public abstract partial class JoblyTests : TestBase
             .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastHeartbeatTime, DateTime.UtcNow.AddMinutes(-6)));
 
         // Run both recovery methods (as health manager would)
-        var requeued = await JoblyHealthManager<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
-        var removed = await JoblyHealthManager<TestContext>.CleanUpServers(CreateContext(), TimeSpan.FromMinutes(5));
+        var requeued = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
+        var removed = await ServerCleanupTask<TestContext>.CleanUpServers(CreateContext(), TimeSpan.FromMinutes(5));
 
         requeued.ShouldBe(2);
         removed.ShouldBe(1);
@@ -362,7 +363,7 @@ public abstract partial class JoblyTests : TestBase
 
         // Run 5 concurrent requeue attempts
         var tasks = Enumerable.Range(0, 5)
-            .Select(_ => JoblyHealthManager<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5)))
+            .Select(_ => StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5)))
             .ToList();
 
         var results = await Task.WhenAll(tasks);
@@ -406,7 +407,7 @@ public abstract partial class JoblyTests : TestBase
             .FirstAsync();
         var counterBefore = batchBefore.Counter;
 
-        await JoblyHealthManager<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
+        await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
 
         // Batch counter unchanged by crash requeue
         var batchAfter = await CreateContext().Set<Batch>()
@@ -450,7 +451,7 @@ public abstract partial class JoblyTests : TestBase
                 .SetProperty(p => p.CurrentWorkerId, TestUtils.TestWorkerId)
                 .SetProperty(p => p.LastKeepAlive, DateTime.UtcNow.AddMinutes(-6)));
 
-        await JoblyHealthManager<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
+        await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
 
         // Message should still be Processing with same JobCount (crash requeue doesn't touch messages)
         var messageAfter = await GetMessage(messageId);

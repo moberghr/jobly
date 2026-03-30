@@ -32,14 +32,14 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         _context = context;
     }
 
-    public async Task AddOrUpdateRecurringJob<T>(T message, string name, string cronExpression)
+    public async Task AddOrUpdateRecurringJob<T>(T message, string name, string cron)
         where T : class, IJob
     {
-        ValidateCronExpression(cronExpression);
+        ValidateCronExpression(cron);
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var job = CreateJobForRecurringJob(message, cronExpression);
+        var job = CreateJobForRecurringJob(message, cron);
         _context.Set<Job>().Add(job);
         _context.Set<JobLog>().Add(new JobLog
         {
@@ -51,7 +51,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         });
         await _context.SaveChangesAsync();
 
-        var recurringJob = await AddOrUpdateRecurringJobToDb(message, name, cronExpression, job);
+        var recurringJob = await AddOrUpdateRecurringJobToDb(message, name, cron, job);
         job.RecurringJob = recurringJob;
         await _context.SaveChangesAsync();
 

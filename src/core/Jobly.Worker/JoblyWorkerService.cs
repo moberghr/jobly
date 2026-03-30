@@ -410,7 +410,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         // Atomic decrement to avoid race when sibling jobs complete simultaneously
         await context.Set<Message>()
             .Where(x => x.Id == messageId)
-            .ExecuteUpdateAsync(x => x
+            .ExecuteUpdateAsync(
+                x => x
                 .SetProperty(p => p.JobCount, p => p.JobCount - 1), cancellationToken);
 
         // Check if all jobs are done and mark message as completed

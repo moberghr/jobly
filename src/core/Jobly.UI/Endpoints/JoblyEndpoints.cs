@@ -93,6 +93,16 @@ public static class JoblyEndpoints
 
         apiGroup.MapGet("servers", async ([FromServices] IDashboardStatsService statsService) => await statsService.GetServers());
 
+        apiGroup.MapGet("servers/{serverId}", async ([FromServices] IDashboardStatsService statsService, Guid serverId) =>
+        {
+            var model = await statsService.GetServerById(serverId);
+            return model is null ? Results.NotFound() : Results.Ok(model);
+        });
+
+        apiGroup.MapGet("servers/{serverId}/tasks", async ([FromServices] IDashboardStatsService statsService, Guid serverId) => await statsService.GetServerTaskSummaries(serverId));
+
+        apiGroup.MapGet("servers/{serverId}/logs", async ([FromServices] IDashboardStatsService statsService, Guid serverId, [AsParameters] BaseListRequest request, [FromQuery] string? taskName) => await statsService.GetServerLogs(serverId, request, taskName));
+
         apiGroup.MapGet("created", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobsList(request, State.Enqueued));
 
         apiGroup.MapGet("completed", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobsList(request, State.Completed));

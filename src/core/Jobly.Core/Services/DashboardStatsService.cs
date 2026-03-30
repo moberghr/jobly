@@ -16,6 +16,12 @@ public interface IDashboardStatsService
     Task<List<ServerModel>> GetServers();
 
     Task<int> GetServerCount();
+
+    Task<ServerModel?> GetServerById(Guid serverId);
+
+    Task<PagedList<ServerLogModel>> GetServerLogs(Guid serverId, BaseListRequest request, string? taskName = null);
+
+    Task<List<ServerTaskSummary>> GetServerTaskSummaries(Guid serverId);
 }
 
 public class DashboardStatsService<TContext> : IDashboardStatsService
@@ -119,6 +125,107 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
                     };
                 }),
         });
+    }
+
+    public async Task<ServerModel?> GetServerById(Guid serverId)
+    {
+        var server = await _context.Set<Server>()
+            .Where(s => s.Id == serverId)
+            .FirstOrDefaultAsync();
+
+        if (server == null)
+        {
+            return null;
+        }
+
+        var workers = await _context.Set<Worker>()
+            .Where(w => w.ServerId == serverId)
+            .ToListAsync();
+
+        var processingJobs = await _context.Set<Job>()
+            .Where(x => x.CurrentState == State.Processing && x.CurrentWorkerId != null)
+            .Select(x => new { x.CurrentWorkerId, x.Id, x.Type })
+            .ToListAsync();
+
+        var jobByWorker = processingJobs.ToDictionary(j => j.CurrentWorkerId!.Value);
+
+        return new ServerModel
+        {
+            Id = server.Id,
+            ServerName = server.ServerName,
+            StartedTime = server.StartedTime,
+            LastHeartbeatTime = server.LastHeartbeatTime,
+            ServiceCount = server.ServiceCount,
+            CpuUsagePercent = server.CpuUsagePercent,
+            MemoryWorkingSetBytes = server.MemoryWorkingSetBytes,
+            Workers = workers.ConvertAll(w =>
+            {
+                jobByWorker.TryGetValue(w.Id, out var activeJob);
+                return new WorkerModel
+                {
+                    WorkerId = w.Id,
+                    StartedTime = w.StartedTime,
+                    LastHeartbeatTime = w.LastHeartbeatTime,
+                    CurrentJobId = activeJob?.Id,
+                    CurrentJobType = activeJob?.Type,
+                };
+            }),
+        };
+    }
+
+    public async Task<List<ServerTaskSummary>> GetServerTaskSummaries(Guid serverId)
+    {
+        return await _context.Set<ServerTask>()
+            .Where(x => x.ServerId == serverId)
+            .Select(x => new ServerTaskSummary
+            {
+                TaskName = x.TaskName,
+                IntervalSeconds = x.IntervalSeconds,
+                LastStatus = x.LastStatus,
+                LastMessage = x.LastMessage,
+                LastRun = x.LastRun,
+                LastDurationMs = x.LastDurationMs,
+            })
+            .ToListAsync();
+    }
+
+    public async Task<PagedList<ServerLogModel>> GetServerLogs(Guid serverId, BaseListRequest request, string? taskName = null)
+    {
+        var query = _context.Set<ServerLog>()
+            .Where(x => x.ServerId == serverId);
+
+        if (taskName != null)
+        {
+            // Find the ServerTask ID for this task name, then filter logs
+            var taskId = await _context.Set<ServerTask>()
+                .Where(x => x.ServerId == serverId && x.TaskName == taskName)
+                .Select(x => (int?)x.Id)
+                .FirstOrDefaultAsync();
+
+            if (taskId == null)
+            {
+                return new PagedList<ServerLogModel>(0, [], 0);
+            }
+
+            query = query.Where(x => x.ServerTaskId == taskId);
+        }
+
+        var tasks = _context.Set<ServerTask>();
+
+        return await query
+            .OrderByDescending(x => x.Timestamp)
+            .Select(x => new ServerLogModel
+            {
+                Id = x.Id,
+                TaskName = x.ServerTaskId != null
+                    ? tasks.Where(t => t.Id == x.ServerTaskId).Select(t => t.TaskName).FirstOrDefault() ?? "Server"
+                    : "Server",
+                Status = x.Status,
+                Message = x.Message,
+                Timestamp = x.Timestamp,
+                DurationMs = x.DurationMs,
+            })
+            .ToPagedListAsync(request);
     }
 
     public async Task<List<StatsHistoryPoint>> GetStatsHistory(int hours = 24)
@@ -255,16 +362,16 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
 
         var parts = connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries)
             .Select(p => p.Trim())
-            .Where(p => p.Contains('='))
+            .Where(p => p.Contains('=', StringComparison.Ordinal))
             .ToDictionary(
-                p => p[..p.IndexOf('=')].Trim(),
-                p => p[(p.IndexOf('=') + 1)..].Trim(),
+                p => p[..p.IndexOf('=', StringComparison.Ordinal)].Trim(),
+                p => p[(p.IndexOf('=', StringComparison.Ordinal) + 1)..].Trim(),
                 StringComparer.OrdinalIgnoreCase);
 
         var isPostgres = parts.ContainsKey("Host");
         var provider = isPostgres ? "PostgreSQL Server" : "SQL Server";
         var host = parts.GetValueOrDefault("Host") ?? parts.GetValueOrDefault("Server") ?? parts.GetValueOrDefault("Data Source") ?? "unknown";
-        var db = parts.GetValueOrDefault("Database") ?? parts.GetValueOrDefault("Initial Catalog") ?? "";
+        var db = parts.GetValueOrDefault("Database") ?? parts.GetValueOrDefault("Initial Catalog") ?? string.Empty;
 
         return $"{provider}: Host: {host}, DB: {db}";
     }

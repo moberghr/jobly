@@ -2,6 +2,7 @@ using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Services;
 using Jobly.Worker;
+using Jobly.Worker.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -88,7 +89,7 @@ public static class TestUtils
 
     public static async Task AggregateCounters(TestContext context)
     {
-        await JoblyHealthManager<TestContext>.AggregateCounters(context);
+        await CounterAggregatorTask<TestContext>.AggregateCounters(context);
     }
 
     public static JoblyWorkerService<TestContext> CreateJoblyWorkerService(IServiceScopeFactory serviceScopeFactory)

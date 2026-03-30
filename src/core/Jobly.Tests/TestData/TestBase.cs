@@ -4,6 +4,7 @@ using Jobly.Core.Entities;
 using Jobly.Core.Handlers;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
+using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -204,7 +205,7 @@ public abstract class TestBase
         await EnsureServerRegistered();
         var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactory);
         await worker.GetAndProcessJob(CancellationToken.None);
-        await JoblyHealthManager<TestContext>.AggregateCounters(CreateContext());
+        await CounterAggregatorTask<TestContext>.AggregateCounters(CreateContext());
     }
 
     protected async Task ProcessAllJobs(int workerCount = 1)
@@ -223,7 +224,7 @@ public abstract class TestBase
         }
 
         await Task.WhenAll(tasks);
-        await JoblyHealthManager<TestContext>.AggregateCounters(CreateContext());
+        await CounterAggregatorTask<TestContext>.AggregateCounters(CreateContext());
     }
 
     protected async Task<bool> TryProcessJob()

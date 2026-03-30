@@ -104,6 +104,24 @@ export interface ServerModel {
   workers: WorkerModel[];
 }
 
+export interface ServerTaskSummary {
+  taskName: string;
+  lastStatus: string | null;
+  lastMessage: string | null;
+  lastRun: string | null;
+  lastDurationMs: number | null;
+  intervalSeconds: number | null;
+}
+
+export interface ServerLogModel {
+  id: number;
+  taskName: string;
+  status: string;
+  message: string | null;
+  timestamp: string;
+  durationMs: number | null;
+}
+
 export interface WorkerModel {
   workerId: string;
   startedTime: string;

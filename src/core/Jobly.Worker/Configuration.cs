@@ -18,6 +18,14 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
 
     public TimeSpan HealthCheckTimeout { get; set; } = TimeSpan.FromMinutes(5);
 
+    public TimeSpan CounterAggregationInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    public TimeSpan ServerCleanupInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    public TimeSpan StaleJobRecoveryInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    public TimeSpan ExpirationCleanupInterval { get; set; } = TimeSpan.FromSeconds(60);
+
     /// <summary>
     /// How long a job can go without a keep-alive refresh before being considered stale and requeued.
     /// Workers refresh keep-alive every InvisibilityTimeout / 5 during execution.

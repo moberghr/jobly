@@ -31,7 +31,7 @@ public static class PerfTrace
     private const int MaxSteps = 13;
 
     private static readonly string[] StepNames =
-    {
+    [
         "BeginTransaction1",
         "FetchJob",
         "SaveProcessing",
@@ -45,7 +45,7 @@ public static class PerfTrace
         "SaveCompleted",
         "CommitTransaction2",
         "Done",
-    };
+    ];
 
     public static bool Enabled => _enabled;
 
@@ -144,7 +144,7 @@ public static class PerfTrace
 
                 if (!stepData.TryGetValue(name, out var list))
                 {
-                    list = new List<double>();
+                    list = [];
                     stepData[name] = list;
                 }
 

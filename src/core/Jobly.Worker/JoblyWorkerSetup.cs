@@ -87,9 +87,24 @@ public class JoblyWorkerSetup<TContext> : IHostedService
         }
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
         var tasks = _workers.Select(worker => worker.StopAsync(cancellationToken));
-        return Task.WhenAll(tasks);
+        await Task.WhenAll(tasks);
+
+        // Remove server and workers from the database on graceful shutdown
+        using var scope = _serviceScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TContext>();
+
+        var server = await context.Set<Server>().FindAsync([_configuration.ServerId], cancellationToken);
+        if (server != null)
+        {
+            var workers = await context.Set<Jobly.Core.Data.Entities.Worker>()
+                .Where(w => w.ServerId == server.Id)
+                .ToListAsync(cancellationToken);
+            context.Set<Jobly.Core.Data.Entities.Worker>().RemoveRange(workers);
+            context.Set<Server>().Remove(server);
+            await context.SaveChangesAsync(cancellationToken);
+        }
     }
 }

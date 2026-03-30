@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-using Jobly.Core.Data.Entities;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Enums;
 

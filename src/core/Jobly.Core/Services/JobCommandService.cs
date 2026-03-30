@@ -16,7 +16,6 @@ public interface IJobCommandService
     Task<BulkResultModel> BulkDeleteJobs(Guid[] jobIds);
 
     Task<BulkResultModel> BulkRequeueJobs(Guid[] jobIds);
-
 }
 
 public class JobCommandService<TContext> : IJobCommandService

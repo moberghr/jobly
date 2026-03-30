@@ -1,5 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Jobly.Core.Handlers;
 
+[SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix", Justification = "Public API")]
 public delegate Task JobHandlerDelegate();
 
 /// <summary>
@@ -9,5 +12,6 @@ public delegate Task JobHandlerDelegate();
 public interface IPipelineBehavior<in T>
     where T : class
 {
+    [SuppressMessage("Naming", "CA1716:Identifiers should not match keywords", Justification = "Public API")]
     Task HandleAsync(T message, JobHandlerDelegate next, CancellationToken cancellationToken);
 }

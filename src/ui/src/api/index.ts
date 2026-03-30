@@ -1,5 +1,5 @@
 import api from './client';
-import type { DashboardStatistics, JobModel, JobDetailModel, MessageModel, MessageDetailModel, RecurringJobModel, RecurringJobDetailModel, ServerModel, PagedList, BulkResult, StatsHistoryPoint, BatchModel, BatchDetailModel } from '@/types';
+import type { DashboardStatistics, JobModel, JobDetailModel, MessageModel, MessageDetailModel, RecurringJobModel, RecurringJobDetailModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint, BatchModel, BatchDetailModel } from '@/types';
 
 // Dashboard
 export const getStatus = () => api.get<DashboardStatistics>('/status').then(r => r.data);
@@ -81,6 +81,15 @@ export const getBatchJobs = (batchId: string, page = 0, pageSize = 20) =>
 
 // Servers
 export const getServers = () => api.get<ServerModel[]>('/servers').then(r => r.data);
+
+export const getServerById = (serverId: string) =>
+  api.get<ServerModel>(`/servers/${serverId}`).then(r => r.data);
+
+export const getServerTaskSummaries = (serverId: string) =>
+  api.get<ServerTaskSummary[]>(`/servers/${serverId}/tasks`).then(r => r.data);
+
+export const getServerLogs = (serverId: string, page = 0, pageSize = 20, taskName?: string) =>
+  api.get<PagedList<ServerLogModel>>(`/servers/${serverId}/logs`, { params: { page, pageSize, taskName } }).then(r => r.data);
 
 export const getStatsHistory = (hours = 24) =>
   api.get<StatsHistoryPoint[]>('/stats/history', { params: { hours } }).then(r => r.data);

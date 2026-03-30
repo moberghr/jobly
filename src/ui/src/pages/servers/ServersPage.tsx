@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { shortId, formatBytes } from '@/utils/format';
+import { formatBytes } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import type { ServerModel } from '@/types';
@@ -37,7 +36,9 @@ export default function ServersPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2">
                     <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
-                    {server.serverName}
+                    <Link to={`/servers/${server.id}`} className="text-primary hover:underline">
+                      {server.serverName}
+                    </Link>
                   </CardTitle>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span>{server.serviceCount} workers</span>
@@ -48,40 +49,6 @@ export default function ServersPage() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                {server.workers.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Worker ID</TableHead>
-                        <TableHead>Started</TableHead>
-                        <TableHead>Current Job</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {server.workers.map((w) => (
-                        <TableRow key={w.workerId}>
-                          <TableCell className="font-mono text-xs">{shortId(w.workerId)}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            <RelativeTime date={w.startedTime} />
-                          </TableCell>
-                          <TableCell>
-                            {w.currentJobId ? (
-                              <Link to={`/jobs/detail/${w.currentJobId}`} className="text-primary hover:underline text-xs font-mono">
-                                {shortId(w.currentJobId)}
-                              </Link>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">Idle</span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No workers registered</p>
-                )}
-              </CardContent>
             </Card>
           ))}
         </div>

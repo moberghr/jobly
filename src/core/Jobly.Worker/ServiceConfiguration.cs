@@ -1,5 +1,9 @@
 using Jobly.Core;
 using Jobly.Core.Logging;
+using Jobly.Worker.Services;
+using Medallion.Threading;
+using Medallion.Threading.Postgres;
+using Medallion.Threading.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -75,8 +79,29 @@ public static class ServiceConfiguration
 
         services.AddLogging(builder => builder.AddProvider(new JobLoggerProvider()));
 
+        // Register distributed locks — resolved lazily from the DbContext's connection string
+        services.AddSingleton<IDistributedLockProvider>(sp =>
+        {
+            using var scope = sp.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<TContext>();
+            var connectionString = context.Database.GetConnectionString()
+                ?? throw new InvalidOperationException("Cannot resolve connection string for distributed locks.");
+
+            var isPostgres = context.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
+            if (isPostgres)
+            {
+                return new PostgresDistributedSynchronizationProvider(connectionString);
+            }
+
+            return new SqlDistributedSynchronizationProvider(connectionString);
+        });
+
         services.AddHostedService<JoblyWorkerSetup<TContext>>();
-        services.AddHostedService<JoblyHealthManager<TContext>>();
+        services.AddHostedService<HeartbeatTask<TContext>>();
+        services.AddHostedService<CounterAggregatorTask<TContext>>();
+        services.AddHostedService<ServerCleanupTask<TContext>>();
+        services.AddHostedService<StaleJobRecoveryTask<TContext>>();
+        services.AddHostedService<ExpirationCleanupTask<TContext>>();
 
         return services;
     }

@@ -4,6 +4,7 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
+using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 
@@ -304,7 +305,7 @@ public abstract partial class JoblyTests : TestBase
             .ExecuteUpdateAsync(x => x.SetProperty(p => p.ExpireAt, DateTime.UtcNow.AddHours(-1)));
 
         // Run actual cleanup code from HealthManager
-        var cleaned = await JoblyHealthManager<TestContext>.RunCleanup(CreateContext());
+        var cleaned = await ExpirationCleanupTask<TestContext>.RunCleanup(CreateContext());
         cleaned.ShouldBeGreaterThanOrEqualTo(1);
 
         // Job should be gone
@@ -338,7 +339,7 @@ public abstract partial class JoblyTests : TestBase
             .Where(x => x.Id == jobId)
             .ExecuteUpdateAsync(x => x.SetProperty(p => p.ExpireAt, DateTime.UtcNow.AddHours(-1)));
 
-        await JoblyHealthManager<TestContext>.RunCleanup(CreateContext());
+        await ExpirationCleanupTask<TestContext>.RunCleanup(CreateContext());
 
         // Stats should still be there after job deletion
         var statsAfter = await CreateContext().Set<Statistic>()
@@ -358,7 +359,7 @@ public abstract partial class JoblyTests : TestBase
         await ProcessJob();
 
         // Run actual cleanup from HealthManager — should not touch failed jobs
-        var cleaned = await JoblyHealthManager<TestContext>.RunCleanup(CreateContext());
+        var cleaned = await ExpirationCleanupTask<TestContext>.RunCleanup(CreateContext());
         cleaned.ShouldBe(0); // nothing to clean — failed jobs don't expire
 
         // Failed job still exists in DB
