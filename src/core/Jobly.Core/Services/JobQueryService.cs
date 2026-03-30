@@ -198,8 +198,16 @@ public class JobQueryService<TContext> : IJobQueryService
 
     private IQueryable<JobModel> GetJobsByState(State state)
     {
-        var query = Jobs()
-            .Where(x => x.CurrentState == state)
+        var jobs = Jobs()
+            .Where(x => x.CurrentState == state);
+
+        // Enqueued: exclude future-scheduled jobs (those show under Scheduled)
+        if (state == State.Enqueued)
+        {
+            jobs = jobs.Where(x => x.ScheduleTime <= DateTime.UtcNow);
+        }
+
+        return jobs
             .Select(x =>
                 new JobModel
                 {
@@ -211,7 +219,5 @@ public class JobQueryService<TContext> : IJobQueryService
                     Type = x.Type,
                 })
             .AsQueryable();
-
-        return query;
     }
 }

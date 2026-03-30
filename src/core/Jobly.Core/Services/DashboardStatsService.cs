@@ -40,8 +40,12 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
 
         var servers = await GetServerCount();
         var awaiting = await GetJobsCount(State.Awaiting);
-        var messages = await _context.Set<Message>().CountAsync();
-        var batches = await _context.Set<Batch>().CountAsync();
+        var messages = await _context.Set<Message>()
+            .Where(x => x.CurrentState != State.Completed)
+            .CountAsync();
+        var batches = await _context.Set<Batch>()
+            .Where(x => x.Counter > 0)
+            .CountAsync();
 
         var totalSucceeded = await _context.Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
@@ -209,9 +213,15 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
 
     private async Task<int> GetJobsCount(State state)
     {
-        return await Jobs()
-            .Where(x => x.CurrentState == state)
-            .CountAsync();
+        var query = Jobs()
+            .Where(x => x.CurrentState == state);
+
+        if (state == State.Enqueued)
+        {
+            query = query.Where(x => x.ScheduleTime <= DateTime.UtcNow);
+        }
+
+        return await query.CountAsync();
     }
 
     private async Task<int> GetProcessingJobsCount()

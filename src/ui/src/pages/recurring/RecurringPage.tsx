@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/Pagination';
-import { formatRelativeTime } from '@/utils/format';
+import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import type { RecurringJobModel, PagedList } from '@/types';
@@ -59,10 +59,10 @@ export default function RecurringPage() {
                   <TableCell className="font-mono text-xs">{rj.cron}</TableCell>
                   <TableCell>{rj.type.split(',')[0].split('.').pop()}</TableCell>
                   <TableCell className="text-sm">
-                    {rj.nextExecution ? formatRelativeTime(rj.nextExecution) : 'N/A'}
+                    {rj.nextExecution ? <RelativeTime date={rj.nextExecution} /> : 'N/A'}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {rj.lastExecution ? formatRelativeTime(rj.lastExecution) : 'Never'}
+                    {rj.lastExecution ? <RelativeTime date={rj.lastExecution} /> : 'Never'}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" onClick={() => { api.triggerRecurringJob(rj.id).then(fetchData); }}>

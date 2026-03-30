@@ -12,7 +12,7 @@ import ServersPage from '@/pages/servers/ServersPage';
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={(window as unknown as Record<string, string>).basePath || '/'}>
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<DashboardPage />} />

@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StateBadge } from '@/components/StateBadge';
 import { Pagination } from '@/components/Pagination';
-import { shortType, formatRelativeTime, shortId } from '@/utils/format';
+import { shortType, shortId } from '@/utils/format';
+import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import type { MessageModel, PagedList } from '@/types';
@@ -69,7 +70,7 @@ export default function MessagesPage() {
                   <TableCell><StateBadge state={msg.currentState} /></TableCell>
                   <TableCell>{msg.jobCount}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {formatRelativeTime(msg.createTime)}
+                    <RelativeTime date={msg.createTime} />
                   </TableCell>
                 </TableRow>
               ))

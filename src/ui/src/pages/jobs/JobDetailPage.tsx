@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { StateBadge } from '@/components/StateBadge';
-import { shortType, formatDateTime, shortId, formatRelativeTime } from '@/utils/format';
+import { shortType, formatDateTime, shortId } from '@/utils/format';
+import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import type { JobDetailModel, JobLogModel } from '@/types';
 import * as api from '@/api';
@@ -193,7 +194,7 @@ export default function JobDetailPage() {
                     <div className="flex items-center justify-between">
                       <span className={`font-semibold ${colors.text}`}>{event.eventType}</span>
                       <span className="text-xs text-muted-foreground">
-                        {formatRelativeTime(event.timestamp)}
+                        <RelativeTime date={event.timestamp} />
                         {duration && <span className="ml-2 opacity-60">({duration})</span>}
                       </span>
                     </div>

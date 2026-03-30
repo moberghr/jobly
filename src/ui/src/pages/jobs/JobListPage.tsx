@@ -102,13 +102,14 @@ export default function JobListPage() {
               <TableHead>Type</TableHead>
               <TableHead>State</TableHead>
               <TableHead>Created</TableHead>
+              {state === 'scheduled' && <TableHead>Scheduled</TableHead>}
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={state === 'scheduled' ? 7 : 6} className="text-center text-muted-foreground py-8">
                   No jobs found
                 </TableCell>
               </TableRow>
@@ -137,6 +138,11 @@ export default function JobListPage() {
                   <TableCell className="text-sm text-muted-foreground">
                     <RelativeTime date={job.createTime} />
                   </TableCell>
+                  {state === 'scheduled' && (
+                    <TableCell className="text-sm text-muted-foreground">
+                      <RelativeTime date={job.scheduleTime ?? job.createTime} />
+                    </TableCell>
+                  )}
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" onClick={() => { api.requeueJob(job.id).then(fetchData); }}>
                       Requeue

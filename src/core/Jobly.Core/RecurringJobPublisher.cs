@@ -40,11 +40,18 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
         var job = CreateJobForRecurringJob(message, cronExpression);
-
-        var recurringJob = await AddOrUpdateRecurringJobToDb(message, name, cronExpression, job);
-
+        _context.Set<Job>().Add(job);
+        _context.Set<JobLog>().Add(new JobLog
+        {
+            JobId = job.Id,
+            EventType = "Created",
+            Timestamp = DateTime.UtcNow,
+            Level = "Information",
+            Message = $"Job {job.Id} created for recurring job \"{name}\"",
+        });
         await _context.SaveChangesAsync();
 
+        var recurringJob = await AddOrUpdateRecurringJobToDb(message, name, cronExpression, job);
         job.RecurringJob = recurringJob;
         await _context.SaveChangesAsync();
 

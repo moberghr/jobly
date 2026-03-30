@@ -8,7 +8,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<EmbeddedResource Include="UI/**/*" />
+		<EmbeddedResource Include="dist/**/*" />
 	</ItemGroup>
 
 	<ItemGroup>

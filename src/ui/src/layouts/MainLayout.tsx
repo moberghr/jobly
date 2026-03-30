@@ -57,19 +57,28 @@ export default function MainLayout() {
                 >
                   <Icon className="h-4 w-4" />
                   {item.label}
-                  {item.label === 'Jobs' && stats && (
-                    <span className="ml-1 text-xs opacity-75">
-                      {stats.created + stats.failed}
+                  {item.label === 'Jobs' && stats && stats.created > 0 && (
+                    <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                      {stats.created}
                     </span>
                   )}
-                  {item.label === 'Messages' && stats && (
-                    <span className="ml-1 text-xs opacity-75">{stats.messages}</span>
+                  {item.label === 'Jobs' && stats && stats.failed > 0 && (
+                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
+                      {stats.failed}
+                    </span>
                   )}
-                  {item.label === 'Batches' && stats && (
-                    <span className="ml-1 text-xs opacity-75">{stats.batches}</span>
+                  {item.label === 'Messages' && stats && stats.messages > 0 && (
+                    <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                      {stats.messages}
+                    </span>
+                  )}
+                  {item.label === 'Batches' && stats && stats.batches > 0 && (
+                    <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                      {stats.batches}
+                    </span>
                   )}
                   {item.label === 'Servers' && stats && (
-                    <span className="ml-1 text-xs opacity-75">{stats.servers}</span>
+                    <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{stats.servers}</span>
                   )}
                 </Link>
               );
@@ -108,12 +117,12 @@ function JobsSidebar({ stats }: { stats: DashboardStatistics | null }) {
   const location = useLocation();
 
   const sidebarItems = [
-    { to: '/jobs/enqueued', label: 'Enqueued', count: stats?.created ?? 0 },
-    { to: '/jobs/scheduled', label: 'Scheduled', count: stats?.scheduled ?? 0 },
-    { to: '/jobs/processing', label: 'Processing', count: stats?.processing ?? 0 },
-    { to: '/jobs/completed', label: 'Completed', count: stats?.completed ?? 0 },
-    { to: '/jobs/failed', label: 'Failed', count: stats?.failed ?? 0 },
-    { to: '/jobs/awaiting', label: 'Awaiting', count: stats?.awaiting ?? 0 },
+    { to: '/jobs/enqueued', label: 'Enqueued', count: stats?.created ?? 0, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
+    { to: '/jobs/scheduled', label: 'Scheduled', count: stats?.scheduled ?? 0, color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' },
+    { to: '/jobs/processing', label: 'Processing', count: stats?.processing ?? 0, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
+    { to: '/jobs/completed', label: 'Completed', count: stats?.completed ?? 0, color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
+    { to: '/jobs/failed', label: 'Failed', count: stats?.failed ?? 0, color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
+    { to: '/jobs/awaiting', label: 'Awaiting', count: stats?.awaiting ?? 0, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' },
   ];
 
   return (
@@ -133,8 +142,8 @@ function JobsSidebar({ stats }: { stats: DashboardStatistics | null }) {
               }`}
             >
               <span>{item.label}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                item.count > 0 ? 'bg-muted text-muted-foreground' : 'text-muted-foreground/50'
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                item.count > 0 ? item.color : 'text-muted-foreground/50'
               }`}>
                 {item.count}
               </span>

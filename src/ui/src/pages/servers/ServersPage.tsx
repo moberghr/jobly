@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatRelativeTime, shortId } from '@/utils/format';
+import { shortId } from '@/utils/format';
+import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import type { ServerModel } from '@/types';
 import * as api from '@/api';
@@ -40,8 +41,8 @@ export default function ServersPage() {
                   </CardTitle>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span>{server.serviceCount} workers</span>
-                    <span>Started {formatRelativeTime(server.startedTime)}</span>
-                    <span>Heartbeat {formatRelativeTime(server.lastHeartbeatTime)}</span>
+                    <span>Started <RelativeTime date={server.startedTime} /></span>
+                    <span>Heartbeat <RelativeTime date={server.lastHeartbeatTime} /></span>
                   </div>
                 </div>
               </CardHeader>
@@ -60,7 +61,7 @@ export default function ServersPage() {
                         <TableRow key={w.workerId}>
                           <TableCell className="font-mono text-xs">{shortId(w.workerId)}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {formatRelativeTime(w.startedTime)}
+                            <RelativeTime date={w.startedTime} />
                           </TableCell>
                           <TableCell>
                             {w.currentJobId ? (

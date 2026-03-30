@@ -5,14 +5,19 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  base: './',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    outDir: '../core/Jobly.UI/dist',
+    emptyOutDir: true,
+  },
   server: {
     proxy: {
-      '/dashboard': 'http://localhost:5104',
+      '/jobly': 'http://localhost:5104',
     },
   },
 })

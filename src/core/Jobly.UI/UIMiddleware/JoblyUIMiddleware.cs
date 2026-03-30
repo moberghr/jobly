@@ -15,7 +15,7 @@ public class JoblyUIMiddleware
     private readonly RequestDelegate _next;
     private readonly JoblyUIOptions _options;
     private readonly StaticFileMiddleware _staticFileMiddleware;
-    private const string EmbeddedFileNamespace = "Jobly.Core.UI";
+    private const string EmbeddedFileNamespace = "Jobly.UI.dist";
 
     public JoblyUIMiddleware(RequestDelegate next, IWebHostEnvironment hostingEnv, ILoggerFactory loggerFactory, JoblyUIOptions options)
     {
@@ -71,13 +71,13 @@ public class JoblyUIMiddleware
 
         var htmlString = htmlBuilder.ToString();
 
-        htmlString = htmlString.Replace("href=\"static", $"href=\"{_options.RoutePrefix}/static", StringComparison.Ordinal);
-        htmlString = htmlString.Replace("href=\"favicon", $"href=\"{_options.RoutePrefix}/favicon", StringComparison.Ordinal);
-        htmlString = htmlString.Replace("src=\"static", $"src=\"{_options.RoutePrefix}/static", StringComparison.Ordinal);
+        // Rewrite relative paths to use the route prefix (works for both Vite and CRA output)
+        htmlString = htmlString.Replace("href=\"./", $"href=\"{_options.RoutePrefix}/", StringComparison.Ordinal);
+        htmlString = htmlString.Replace("src=\"./", $"src=\"{_options.RoutePrefix}/", StringComparison.Ordinal);
 
         var headEndIndex = htmlString.IndexOf("</head>", StringComparison.Ordinal);
 
-        var appSettingsString = $"<script> window.apiPath = \"{_options.RoutePrefix}/api/\";</script>";
+        var appSettingsString = $"<script> window.apiPath = \"{_options.RoutePrefix}/api/\"; window.basePath = \"{_options.RoutePrefix}\";</script>";
         htmlString = htmlString.Insert(headEndIndex, appSettingsString);
 
         await response.WriteAsync(htmlString, Encoding.UTF8, response.HttpContext.RequestAborted);
