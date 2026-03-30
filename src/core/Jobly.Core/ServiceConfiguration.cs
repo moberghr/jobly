@@ -51,6 +51,8 @@ public static class ServiceConfiguration
     private static IServiceCollection CreateJoblyServices<TContext>(this IServiceCollection services)
         where TContext : DbContext
     {
+        ConfigureDbContextOptions<TContext>(services);
+
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(
             x.GetRequiredService<TContext>(),
             x.GetRequiredService<IOptions<JoblyConfiguration>>()));
@@ -66,6 +68,30 @@ public static class ServiceConfiguration
         services.AddTransient<IBatchPublisher, BatchPublisher<TContext>>();
 
         return services;
+    }
+
+    private static void ConfigureDbContextOptions<TContext>(IServiceCollection services)
+        where TContext : DbContext
+    {
+        var descriptor = services.LastOrDefault(d => d.ServiceType == typeof(DbContextOptions<TContext>));
+        if (descriptor?.ImplementationFactory == null)
+        {
+            return;
+        }
+
+        var originalFactory = descriptor.ImplementationFactory;
+        services.Remove(descriptor);
+        services.Add(ServiceDescriptor.Describe(
+            typeof(DbContextOptions<TContext>),
+            sp =>
+            {
+                var options = (DbContextOptions<TContext>)originalFactory(sp);
+                var builder = new DbContextOptionsBuilder<TContext>(options);
+                builder.AddJoblyInterceptors();
+                builder.ReplaceService<IModelCustomizer, JoblyModelCustomizer>();
+                return builder.Options;
+            },
+            descriptor.Lifetime));
     }
 
     public static DbContextOptionsBuilder AddJoblyInterceptors(this DbContextOptionsBuilder optionsBuilder)

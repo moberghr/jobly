@@ -101,10 +101,17 @@ public static class TestUtils
             Queues = DefaultQueues,
         });
 
+        var groupConfig = new WorkerGroupConfiguration
+        {
+            WorkerCount = 1,
+            Queues = DefaultQueues,
+        };
+
         return new JoblyWorkerService<TestContext>(
             TestWorkerId,
             serviceScopeFactory,
             new NullLogger<JoblyWorkerService<TestContext>>(),
-            joblyWorkerConfigOptions);
+            joblyWorkerConfigOptions,
+            groupConfig);
     }
 }

@@ -2,17 +2,34 @@ using Jobly.Core;
 
 namespace Jobly.Worker;
 
+public class WorkerGroupConfiguration
+{
+    public int WorkerCount { get; set; } = Math.Min(Environment.ProcessorCount * 5, 20);
+
+    public string[] Queues { get; set; } = ["default"];
+
+    public TimeSpan PollingInterval { get; set; } = TimeSpan.FromSeconds(1);
+}
+
 public class JoblyWorkerConfiguration : JoblyConfiguration
 {
+    private static readonly int DefaultWorkerCount = Math.Min(Environment.ProcessorCount * 5, 20);
+
     /// <summary>
-    /// How many worker instances should be created.
+    /// How many worker instances should be created. Applies to the implicit default worker group.
     /// </summary>
-    public int WorkerCount { get; set; } = 10;
+    public int WorkerCount { get; set; } = DefaultWorkerCount;
 
     /// <summary>
     /// Each time the worker polls for a job, it will wait for this interval before polling again.
+    /// Applies to the implicit default worker group.
     /// </summary>
     public TimeSpan PollingInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Queues this worker subscribes to. Applies to the implicit default worker group.
+    /// </summary>
+    public string[] Queues { get; set; } = ["default"];
 
     public TimeSpan HealthCheckInterval { get; set; } = TimeSpan.FromSeconds(10);
 
@@ -42,9 +59,45 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     /// </summary>
     public string? ServerName { get; set; }
 
-    public string[] Queues { get; set; } = ["default"];
-
     public TimeSpan JobExpirationTimeout { get; set; } = TimeSpan.FromDays(1);
 
     public int ExpirationBatchSize { get; set; } = 1000;
+
+    internal List<WorkerGroupConfiguration> ExplicitWorkerGroups { get; } = [];
+
+    /// <summary>
+    /// Adds a worker group with its own worker count, queues, and polling interval.
+    /// Top-level WorkerCount/Queues/PollingInterval become an additional implicit group.
+    /// </summary>
+    public void AddWorkerGroup(Action<WorkerGroupConfiguration> configure)
+    {
+        var group = new WorkerGroupConfiguration();
+        configure(group);
+        ExplicitWorkerGroups.Add(group);
+    }
+
+    /// <summary>
+    /// Returns all effective worker groups. Top-level settings always form the first group.
+    /// Any groups added via <see cref="AddWorkerGroup"/> are appended after.
+    /// </summary>
+    internal List<WorkerGroupConfiguration> GetEffectiveWorkerGroups()
+    {
+        var groups = new List<WorkerGroupConfiguration>
+        {
+            new()
+            {
+                WorkerCount = WorkerCount,
+                Queues = Queues,
+                PollingInterval = PollingInterval,
+            },
+        };
+
+        groups.AddRange(ExplicitWorkerGroups);
+        return groups;
+    }
+
+    /// <summary>
+    /// Total number of workers across all groups.
+    /// </summary>
+    internal int TotalWorkerCount => GetEffectiveWorkerGroups().Sum(g => g.WorkerCount);
 }

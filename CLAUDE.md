@@ -78,7 +78,7 @@ Queue order is alphabetical. Row locking (`FOR UPDATE SKIP LOCKED`) prevents dup
 ### Backend (.NET 10)
 
 - **Jobly.Core** — Entities, handlers, JobDispatcher, Publisher, logging (JobLogContext/JobLoggerProvider). Services split into 6 focused classes in `Services/`: `JobQueryService`, `JobCommandService`, `MessageQueryService`, `RecurringJobService`, `BatchQueryService`, `DashboardStatsService`.
-- **Jobly.Worker** — JoblyWorkerService, JoblyWorkerSetup, JoblyHealthManager. Crash recovery via LastKeepAlive + RequeueStaleJobs.
+- **Jobly.Worker** — JoblyWorkerService, JoblyWorkerSetup, worker groups (WorkerGroupConfiguration). Background tasks in `Services/`: HeartbeatTask, CounterAggregatorTask, ServerCleanupTask, StaleJobRecoveryTask, ExpirationCleanupTask. Crash recovery via LastKeepAlive + RequeueStaleJobs.
 - **Jobly.UI** — Minimal API endpoints + embedded SPA served at `/jobly`.
 - **Static analyzers** — StyleCop, Roslynator, SonarAnalyzer, Meziantou.
 
@@ -89,6 +89,17 @@ Queue order is alphabetical. Row locking (`FOR UPDATE SKIP LOCKED`) prevents dup
 ### Testing
 
 295 integration tests (148 PostgreSQL + 147 SQL Server) using xUnit, Shouldly, Testcontainers + Respawn (~27s). Covers: lifecycle logs, concurrency (row locking), queue ordering, scheduling, retries, continuations, batches, recurring jobs, server monitoring, log capture, retention, statistics, bulk operations, time-series stats, crash recovery (keep-alive + stale job requeue), job tracing (TraceId/SpawnedByJobId), pipeline behavior logging, batch continuation options.
+
+### Registration
+
+`AddJobly<TContext>()` / `AddJoblyWorker<TContext>()` automatically configures the user's DbContext:
+- Wraps the existing `DbContextOptions<TContext>` service descriptor to add row-lock interceptors
+- Replaces `IModelCustomizer` with `JoblyModelCustomizer` to auto-apply entity configurations
+- Users just register their DbContext normally — no manual `AddJoblyInterceptors()` or `AddOutboxStateEntity()` needed
+
+### Worker Groups
+
+Workers can be split into groups with independent queues and polling intervals. Top-level `WorkerCount`/`Queues`/`PollingInterval` become the first implicit group. `AddWorkerGroup()` adds additional groups. Default `WorkerCount = Math.Min(Environment.ProcessorCount * 5, 20)`.
 
 ### Key Design Decisions
 

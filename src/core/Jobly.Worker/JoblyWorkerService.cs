@@ -27,13 +27,15 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<JoblyWorkerService<TContext>> _logger;
     private readonly JoblyWorkerConfiguration _configuration;
+    private readonly WorkerGroupConfiguration _groupConfiguration;
 
-    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration)
+    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration)
     {
         _workerId = workerId;
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
         _configuration = configuration.Value;
+        _groupConfiguration = groupConfiguration;
     }
 
     public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
@@ -61,7 +63,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         var message = await context.Set<Message>()
             .Where(x => x.CurrentState == State.Enqueued)
-            .Where(x => _configuration.Queues.Contains(x.Queue))
+            .Where(x => _groupConfiguration.Queues.Contains(x.Queue))
             .OrderBy(x => x.Queue)
             .ThenBy(x => x.CreateTime)
             .TagWith(InterceptorConstants.RowLockTableMessage)
@@ -141,7 +143,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         var job = await context.Set<Job>()
             .Where(x => x.CurrentState == State.Enqueued)
             .Where(x => x.ScheduleTime < DateTime.UtcNow)
-            .Where(x => _configuration.Queues.Contains(x.Queue))
+            .Where(x => _groupConfiguration.Queues.Contains(x.Queue))
             .OrderBy(x => x.Queue)
             .ThenBy(x => x.ScheduleTime)
             .TagWith(InterceptorConstants.RowLockTableJob)

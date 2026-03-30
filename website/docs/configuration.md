@@ -31,7 +31,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     // Worker
     options.WorkerCount = 10;
     options.PollingInterval = TimeSpan.FromSeconds(1);
-    options.Queues = new[] { "a-critical", "b-default", "c-low" };
+    options.Queues = ["a-critical", "b-default", "c-low"];
 
     // Server identity
     options.ServerName = "my-api-server";
@@ -56,9 +56,39 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `WorkerCount` | `int` | `10` | Number of concurrent worker threads |
+| `WorkerCount` | `int` | `min(CPU * 5, 20)` | Number of concurrent worker threads |
 | `PollingInterval` | `TimeSpan` | `1 second` | Delay between polls when no jobs are available |
 | `Queues` | `string[]` | `["default"]` | Queues this worker subscribes to. Processed in alphabetical order |
+
+### Worker Groups
+
+By default, all workers share the same queues and polling interval. Use worker groups for fine-grained control:
+
+```csharp
+builder.Services.AddJoblyWorker<AppDbContext>(options =>
+{
+    // Top-level settings become the first worker group
+    options.WorkerCount = 5;
+    options.Queues = ["critical"];
+    options.PollingInterval = TimeSpan.FromMilliseconds(100);
+
+    // Additional groups
+    options.AddWorkerGroup(group =>
+    {
+        group.WorkerCount = 2;
+        group.Queues = ["reports", "default"];
+        group.PollingInterval = TimeSpan.FromSeconds(5);
+    });
+});
+```
+
+This creates 7 workers total: 5 polling `critical` every 100ms, and 2 polling `reports`/`default` every 5s. All workers share the same server identity and health monitoring.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `WorkerCount` | `int` | `min(CPU * 5, 20)` | Number of workers in this group |
+| `Queues` | `string[]` | `["default"]` | Queues this group subscribes to |
+| `PollingInterval` | `TimeSpan` | `1 second` | Delay between polls for this group |
 
 ### Server Identity
 
@@ -91,7 +121,7 @@ Failed jobs have `ExpireAt = null` and are never automatically deleted. They mus
 Queues are processed in **alphabetical order**. Use prefixes to control priority:
 
 ```csharp
-options.Queues = new[] { "a-critical", "b-default", "c-low" };
+options.Queues = ["a-critical", "b-default", "c-low"];
 ```
 
 A worker always picks up jobs from `a-critical` before `b-default`, and `b-default` before `c-low`. Within a queue, jobs are ordered by schedule time.

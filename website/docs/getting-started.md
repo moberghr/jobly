@@ -19,43 +19,44 @@ dotnet add package Jobly.UI      # Dashboard
 
 ## Setup
 
-### 1. Register Jobly in your DbContext
+### 1. Register your DbContext
+
+Register your DbContext as usual — no special configuration needed:
 
 ```csharp
-public class AppDbContext : DbContext
-{
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        modelBuilder.AddOutboxStateEntity(); // Adds Job, Message, Batch, etc.
-    }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder options)
-    {
-        options.UseNpgsql(connectionString)
-               .AddJoblyInterceptors(); // Required for row locking
-    }
-}
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(connectionString));
 ```
 
-### 2. Register services
+Jobly automatically adds its interceptors (row locking) and entity configuration (Job, Message, Batch, etc.) when you register Jobly services in the next step.
+
+### 2. Register Jobly
 
 ```csharp
-// In your app (publisher side)
+// Publisher only — for apps that create jobs but don't process them
 builder.Services.AddJobly<AppDbContext>();
 builder.Services.AddJobHandlers(typeof(Program).Assembly);
+```
 
-// In your worker
+### 3. Add a worker (optional)
+
+For apps that process jobs, use `AddJoblyWorker` instead (includes `AddJobly` internally):
+
+```csharp
 builder.Services.AddJoblyWorker<AppDbContext>(options =>
 {
     options.WorkerCount = 10;
-    options.Queues = new[] { "default", "critical" };
+    options.Queues = ["default", "critical"];
 });
-
-// Dashboard (serves at /jobly)
-app.UseJoblyUI();
 ```
 
-### 3. Define handlers
+### 4. Add the dashboard (optional)
+
+```csharp
+app.UseJoblyUI(); // Serves at /jobly
+```
+
+### 5. Define handlers
 
 ```csharp
 public class SendEmailRequest : IJob { public string Email { get; set; } }
@@ -69,7 +70,7 @@ public class SendEmailHandler : IJobHandler<SendEmailRequest>
 }
 ```
 
-### 4. Publish
+### 6. Publish
 
 ```csharp
 public class OrderController : ControllerBase

@@ -19,48 +19,62 @@ A distributed job processing and message queue library for .NET 10. Supports pub
 
 ## Integration Guide
 
-### 1. Set Up Your DbContext
+### 1. Register Services
 
-```csharp
-public class AppDbContext : DbContext
-{
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-
-    public DbSet<Order> Orders { get; set; }
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        base.OnModelCreating(modelBuilder);
-        modelBuilder.AddOutboxStateEntity(); // Add Jobly tables
-    }
-}
-```
-
-### 2. Register Services
+Register your DbContext as usual — Jobly hooks into it automatically when you call `AddJobly` or `AddJoblyWorker`:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
+// Register your DbContext (Jobly adds interceptors and entity configuration automatically)
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Default"))
-           .AddJoblyInterceptors());
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
+// Register Jobly worker (includes AddJobly internally)
 builder.Services.AddJoblyWorker<AppDbContext>(options =>
 {
     options.WorkerCount = 5;
     options.PollingInterval = TimeSpan.FromSeconds(1);
-    options.Queues = new[] { "critical", "default", "low" };
+    options.Queues = ["critical", "default", "low"];
     options.JobExpirationTimeout = TimeSpan.FromDays(7);
 });
 
+// Scan assembly for IJobHandler<T> and IMessageHandler<T> implementations
 builder.Services.AddJobHandlers(typeof(Program).Assembly);
 
 var app = builder.Build();
-app.UseJoblyUI(); // Dashboard
+
+// Dashboard UI (serves at /jobly)
+app.UseJoblyUI();
+
 app.Run();
 ```
 
-### 3. Define Messages (Pub/Sub)
+If you only need to publish jobs (no worker), use `AddJobly` instead:
+
+```csharp
+builder.Services.AddJobly<AppDbContext>();
+```
+
+For fine-grained control, use worker groups to assign different queues and polling intervals:
+
+```csharp
+builder.Services.AddJoblyWorker<AppDbContext>(options =>
+{
+    options.WorkerCount = 5;
+    options.Queues = ["critical"];
+    options.PollingInterval = TimeSpan.FromMilliseconds(100);
+
+    options.AddWorkerGroup(group =>
+    {
+        group.WorkerCount = 2;
+        group.Queues = ["reports", "default"];
+        group.PollingInterval = TimeSpan.FromSeconds(5);
+    });
+});
+```
+
+### 2. Define Messages (Pub/Sub)
 
 ```csharp
 public class OrderCreated : IMessage
@@ -108,7 +122,7 @@ public async Task<IActionResult> CreateOrder(CreateOrderRequest request)
 }
 ```
 
-### 4. Define Jobs (Orchestration)
+### 3. Define Jobs (Orchestration)
 
 ```csharp
 public class GenerateReport : IJob
@@ -138,7 +152,7 @@ await publisher.Enqueue(new GenerateReport { Month = 3 }, queue: "reports");
 await publisher.Enqueue(new FollowUp(), parentJobId: prepareId); // continuation
 ```
 
-### 5. Pipeline Behaviors
+### 4. Pipeline Behaviors
 
 ```csharp
 public class LoggingBehavior<T> : IPipelineBehavior<T> where T : class
@@ -157,17 +171,17 @@ public class LoggingBehavior<T> : IPipelineBehavior<T> where T : class
 builder.Services.AddPipelineBehaviors(typeof(Program).Assembly);
 ```
 
-### 6. Named Queues
+### 5. Named Queues
 
 ```csharp
-options.Queues = new[] { "a-critical", "b-default", "c-low" };
+options.Queues = ["a-critical", "b-default", "c-low"];
 // Alphabetical order = priority. "a-critical" processed first.
 
 await publisher.Enqueue(new UrgentTask(), queue: "a-critical");
 await publisher.Publish(new LowPriorityEvent(), queue: "c-low");
 ```
 
-### 7. Recurring Jobs
+### 6. Recurring Jobs
 
 ```csharp
 await recurringPublisher.AddOrUpdateRecurringJob(

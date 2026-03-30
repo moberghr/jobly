@@ -30,10 +30,13 @@ public class JoblyWorkerSetup<TContext> : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        var workerIds = new List<Guid>();
-        for (var i = 0; i < _configuration.WorkerCount; i++)
+        var workerGroups = _configuration.GetEffectiveWorkerGroups();
+        var totalWorkerCount = workerGroups.Sum(g => g.WorkerCount);
+
+        var allWorkerIds = new List<Guid>();
+        for (var i = 0; i < totalWorkerCount; i++)
         {
-            workerIds.Add(Guid.NewGuid());
+            allWorkerIds.Add(Guid.NewGuid());
         }
 
         // Register server and all workers in one transaction
@@ -48,11 +51,11 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                 ServerName = _configuration.ServerName ?? $"{Environment.MachineName}.{_configuration.ServerId}",
                 StartedTime = now,
                 LastHeartbeatTime = now,
-                ServiceCount = _configuration.WorkerCount,
+                ServiceCount = totalWorkerCount,
             };
             await context.Set<Server>().AddAsync(server, cancellationToken);
 
-            foreach (var workerId in workerIds)
+            foreach (var workerId in allWorkerIds)
             {
                 await context.Set<Jobly.Core.Data.Entities.Worker>().AddAsync(
                     new Jobly.Core.Data.Entities.Worker
@@ -68,22 +71,28 @@ public class JoblyWorkerSetup<TContext> : IHostedService
             await context.SaveChangesAsync(cancellationToken);
         }
 
-        // Start worker background services with their assigned IDs
-        for (var i = 0; i < _configuration.WorkerCount; i++)
+        // Start worker background services per group
+        var workerIndex = 0;
+        foreach (var group in workerGroups)
         {
-            var workerService = new JoblyWorkerService<TContext>(
-                workerIds[i],
-                _serviceScopeFactory,
-                _serviceProvider.GetRequiredService<ILogger<JoblyWorkerService<TContext>>>(),
-                _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>());
+            for (var i = 0; i < group.WorkerCount; i++)
+            {
+                var workerService = new JoblyWorkerService<TContext>(
+                    allWorkerIds[workerIndex],
+                    _serviceScopeFactory,
+                    _serviceProvider.GetRequiredService<ILogger<JoblyWorkerService<TContext>>>(),
+                    _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>(),
+                    group);
 
-            var worker = new JoblyWorker<TContext>(
-                workerService,
-                _serviceProvider.GetRequiredService<ILogger<JoblyWorker<TContext>>>(),
-                _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>());
+                var worker = new JoblyWorker<TContext>(
+                    workerService,
+                    _serviceProvider.GetRequiredService<ILogger<JoblyWorker<TContext>>>(),
+                    group);
 
-            await worker.StartAsync(cancellationToken);
-            _workers.Add(worker);
+                await worker.StartAsync(cancellationToken);
+                _workers.Add(worker);
+                workerIndex++;
+            }
         }
     }
 

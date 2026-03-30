@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Jobly.Worker;
 
@@ -10,13 +9,13 @@ public class JoblyWorker<TContext> : BackgroundService
 {
     private readonly ILogger<JoblyWorker<TContext>> _logger;
     private readonly IJoblyWorkerService _joblyWorkerService;
-    private readonly JoblyWorkerConfiguration _configuration;
+    private readonly WorkerGroupConfiguration _groupConfiguration;
 
-    public JoblyWorker(IJoblyWorkerService joblyWorkerService, ILogger<JoblyWorker<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration)
+    public JoblyWorker(IJoblyWorkerService joblyWorkerService, ILogger<JoblyWorker<TContext>> logger, WorkerGroupConfiguration groupConfiguration)
     {
         _joblyWorkerService = joblyWorkerService;
         _logger = logger;
-        _configuration = configuration.Value;
+        _groupConfiguration = groupConfiguration;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -26,7 +25,7 @@ public class JoblyWorker<TContext> : BackgroundService
             var didProcessJob = await _joblyWorkerService.GetAndProcessJob(stoppingToken);
             if (!didProcessJob)
             {
-                await Task.Delay(_configuration.PollingInterval, stoppingToken);
+                await Task.Delay(_groupConfiguration.PollingInterval, stoppingToken);
             }
         }
 

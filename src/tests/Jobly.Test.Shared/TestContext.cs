@@ -13,11 +13,4 @@ public class TestContext : DbContext
     public DbSet<Registration> Registrations => Set<Registration>();
 
     public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        base.OnModelCreating(modelBuilder);
-
-        modelBuilder.AddOutboxStateEntity();
-    }
 }
