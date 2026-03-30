@@ -129,11 +129,15 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
     private async Task<bool> TryExecuteJob(CancellationToken cancellationToken)
     {
+        PerfTrace.Begin();
+
         using var scope = _serviceScopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
+        PerfTrace.Mark(PerfTrace.BeginTransaction1);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
+        PerfTrace.Mark(PerfTrace.FetchJob);
         var job = await context.Set<Job>()
             .Where(x => x.CurrentState == State.Enqueued)
             .Where(x => x.ScheduleTime < DateTime.UtcNow)
@@ -158,7 +162,10 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await CreateNextJob(context, job, cancellationToken);
         }
 
+        PerfTrace.Mark(PerfTrace.SaveProcessing);
         await context.SaveChangesAsync(cancellationToken);
+
+        PerfTrace.Mark(PerfTrace.CommitTransaction1);
         await transaction.CommitAsync(cancellationToken);
 
         // Set up log capture and execution context for this job
@@ -176,16 +183,25 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         try
         {
+            PerfTrace.Mark(PerfTrace.ExecuteHandler);
             _logger.LogInformation("Worker {workerId} executing job {id}", _workerId, job.Id);
             await ExecuteJob(job, scope.ServiceProvider, cancellationToken);
             _logger.LogInformation("Worker {workerId} completed job {id}", _workerId, job.Id);
+
+            PerfTrace.Mark(PerfTrace.CancelKeepAlive);
             await keepAliveCts.CancelAsync();
             await keepAliveTask;
 
+            PerfTrace.Mark(PerfTrace.BeginTransaction2);
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
+
             await UpdateJobData(context, job, null, default);
             await SaveJobLogs(context, logCollector);
+
+            PerfTrace.Mark(PerfTrace.SaveCompleted);
             await context.SaveChangesAsync(default);
+
+            PerfTrace.Mark(PerfTrace.CommitTransaction2);
             await endTransaction.CommitAsync(default);
         }
         catch (Exception e)
@@ -205,6 +221,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             JobLogContext.Current = null;
             JobExecutionContext.Current = null;
         }
+
+        PerfTrace.Mark(PerfTrace.Done);
+        PerfTrace.End();
 
         return true;
     }
@@ -343,29 +362,33 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         job.LastKeepAlive = null;
 
         // Set expiration and increment statistics (total + hourly)
+        PerfTrace.Mark(PerfTrace.IncrementStats);
         var hourSuffix = DateTime.UtcNow.ToString("yyyy-MM-dd-HH");
         if (state == State.Completed)
         {
             job.ExpireAt = DateTime.UtcNow.AddDays(1);
-            await IncrementStatistic(context, "stats:succeeded");
-            await IncrementStatistic(context, $"stats:succeeded:{hourSuffix}");
+            AddCounters(context, "stats:succeeded", $"stats:succeeded:{hourSuffix}");
         }
         else if (state == State.Failed && job.RetriedTimes >= job.MaxRetries)
         {
-            await IncrementStatistic(context, "stats:failed");
-            await IncrementStatistic(context, $"stats:failed:{hourSuffix}");
+            AddCounters(context, "stats:failed", $"stats:failed:{hourSuffix}");
         }
 
-        // Check for child job continuations
-        var isParent = await context.Set<Job>()
-            .Where(x => x.ParentJobId == job.Id)
-            .AnyAsync(cancellationToken);
-
-        if (job.CurrentState == State.Completed && isParent)
+        // Check for child job continuations — skip DB query if job can't have children
+        PerfTrace.Mark(PerfTrace.CheckChildren);
+        if (job.CurrentState == State.Completed)
         {
-            await UpdateChildJobs(context, job.Id, cancellationToken);
+            var isParent = await context.Set<Job>()
+                .Where(x => x.ParentJobId == job.Id)
+                .AnyAsync(cancellationToken);
+
+            if (isParent)
+            {
+                await UpdateChildJobs(context, job.Id, cancellationToken);
+            }
         }
 
+        PerfTrace.Mark(PerfTrace.CheckBatchMessage);
         if (job.BatchId != null && (state == State.Completed || state == State.Failed))
         {
             await UpdateCurrentAndNextBatchFromChildJob(context, job.BatchId.Value, cancellationToken);
@@ -384,11 +407,16 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
     private static async Task UpdateMessageJobCount(TContext context, Guid messageId, CancellationToken cancellationToken)
     {
+        // Atomic decrement to avoid race when sibling jobs complete simultaneously
+        await context.Set<Message>()
+            .Where(x => x.Id == messageId)
+            .ExecuteUpdateAsync(x => x
+                .SetProperty(p => p.JobCount, p => p.JobCount - 1), cancellationToken);
+
+        // Check if all jobs are done and mark message as completed
         var msg = await context.Set<Message>()
             .Where(x => x.Id == messageId)
             .FirstAsync(cancellationToken);
-
-        msg.JobCount--;
 
         if (msg.JobCount <= 0)
         {
@@ -537,26 +565,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         }
     }
 
-    private static async Task IncrementStatistic(TContext context, string key)
+    private static void AddCounters(TContext context, string totalKey, string hourlyKey)
     {
-        var updated = await context.Set<Statistic>()
-            .Where(x => x.Key == key)
-            .ExecuteUpdateAsync(x => x.SetProperty(p => p.Value, p => p.Value + 1));
-
-        if (updated == 0)
-        {
-            try
-            {
-                await context.Set<Statistic>().AddAsync(new Statistic { Key = key, Value = 1 });
-                await context.SaveChangesAsync();
-            }
-            catch (DbUpdateException)
-            {
-                // Race: another worker inserted first — retry update
-                await context.Set<Statistic>()
-                    .Where(x => x.Key == key)
-                    .ExecuteUpdateAsync(x => x.SetProperty(p => p.Value, p => p.Value + 1));
-            }
-        }
+        context.Set<Counter>().Add(new Counter { Key = totalKey, Value = 1 });
+        context.Set<Counter>().Add(new Counter { Key = hourlyKey, Value = 1 });
     }
 }

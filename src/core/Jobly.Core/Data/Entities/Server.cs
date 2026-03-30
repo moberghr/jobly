@@ -11,4 +11,8 @@ public class Server
     public required DateTime LastHeartbeatTime { get; set; }
 
     public int ServiceCount { get; set; }
+
+    public double? CpuUsagePercent { get; set; }
+
+    public long? MemoryWorkingSetBytes { get; set; }
 }

@@ -86,6 +86,11 @@ public static class TestUtils
         return new BatchPublisher<TestContext>(context, joblyConfigOptions);
     }
 
+    public static async Task AggregateCounters(TestContext context)
+    {
+        await JoblyHealthManager<TestContext>.AggregateCounters(context);
+    }
+
     public static JoblyWorkerService<TestContext> CreateJoblyWorkerService(IServiceScopeFactory serviceScopeFactory)
     {
         IOptions<JoblyWorkerConfiguration> joblyWorkerConfigOptions = new OptionsWrapper<JoblyWorkerConfiguration>(new JoblyWorkerConfiguration

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StateBadge } from '@/components/StateBadge';
-import { shortType, shortId, formatDateTime } from '@/utils/format';
+import { RelatedJobsTable } from '@/components/RelatedJobsTable';
+import { shortId, formatDateTime } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import type { BatchDetailModel } from '@/types';
 import * as api from '@/api';
@@ -51,31 +51,11 @@ export default function BatchDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Jobs ({batch.jobs.length})</CardTitle></CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>State</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {batch.jobs.map((job) => (
-                <TableRow key={job.id}>
-                  <TableCell className="font-mono text-xs">
-                    <Link to={`/jobs/detail/${job.id}`} className="text-primary hover:underline">{shortId(job.id)}</Link>
-                  </TableCell>
-                  <TableCell>{shortType(job.type)}</TableCell>
-                  <TableCell><StateBadge state={job.currentState} /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <RelatedJobsTable
+        title="Jobs"
+        count={batch.totalJobs}
+        fetchJobs={(page, pageSize) => api.getBatchJobs(batch.id, page, pageSize)}
+      />
     </div>
   );
 }

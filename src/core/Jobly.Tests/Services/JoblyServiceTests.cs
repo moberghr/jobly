@@ -32,8 +32,8 @@ public abstract partial class ServiceTests : TestBase
         job.ShouldNotBeNull();
         job.Id.ShouldBe(jobId);
         job.Logs.Count.ShouldBeGreaterThanOrEqualTo(2); // Enqueued + Processing + Completed
-        job.SiblingJobs.ShouldBeEmpty();
-        job.ChildJobs.ShouldBeEmpty();
+        job.SiblingJobCount.ShouldBe(0);
+        job.ChildJobCount.ShouldBe(0);
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public abstract partial class ServiceTests : TestBase
 
         message.ShouldNotBeNull();
         message.Id.ShouldBe(messageId);
-        message.Jobs.Count.ShouldBe(2); // MultiHandlerA + MultiHandlerB
+        message.JobsCount.ShouldBe(2); // MultiHandlerA + MultiHandlerB
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public abstract partial class ServiceTests : TestBase
     }
 
     [Fact]
-    public async Task GetJobById_WithSiblingJobs_ReturnsSiblings()
+    public async Task GetJobById_WithSiblingJobs_ReturnsSiblingCount()
     {
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
@@ -169,12 +169,16 @@ public abstract partial class ServiceTests : TestBase
         var jobDetail = await service.GetJobById(jobs[0].Id);
 
         jobDetail.ShouldNotBeNull();
-        jobDetail.SiblingJobs.Count.ShouldBe(1);
-        jobDetail.SiblingJobs[0].Id.ShouldBe(jobs[1].Id);
+        jobDetail.SiblingJobCount.ShouldBe(1);
+
+        // Verify paged endpoint returns the sibling
+        var siblings = await service.GetSiblingJobs(jobs[0].Id, new BaseListRequest { Page = 0, PageSize = 10 });
+        siblings.TotalCount.ShouldBe(1);
+        siblings.Items[0].Id.ShouldBe(jobs[1].Id);
     }
 
     [Fact]
-    public async Task GetJobById_WithChildJobs_ReturnsChildren()
+    public async Task GetJobById_WithChildJobs_ReturnsChildCount()
     {
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
@@ -187,7 +191,11 @@ public abstract partial class ServiceTests : TestBase
         var jobDetail = await service.GetJobById(parentId);
 
         jobDetail.ShouldNotBeNull();
-        jobDetail.ChildJobs.Count.ShouldBe(1);
-        jobDetail.ChildJobs[0].Id.ShouldBe(childId);
+        jobDetail.ChildJobCount.ShouldBe(1);
+
+        // Verify paged endpoint returns the child
+        var children = await service.GetChildJobs(parentId, new BaseListRequest { Page = 0, PageSize = 10 });
+        children.TotalCount.ShouldBe(1);
+        children.Items[0].Id.ShouldBe(childId);
     }
 }

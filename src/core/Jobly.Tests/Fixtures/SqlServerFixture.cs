@@ -29,7 +29,6 @@ public class SqlServerFixture : IAsyncLifetime
         await conn.OpenAsync();
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
-            TablesToIgnore = [new Respawn.Graph.Table("Statistic")],
             DbAdapter = DbAdapter.SqlServer,
         });
     }
@@ -39,8 +38,6 @@ public class SqlServerFixture : IAsyncLifetime
         await using var conn = new SqlConnection(_connectionString);
         await conn.OpenAsync();
         await _respawner.ResetAsync(conn);
-        await using var context = CreateContext();
-        await context.Database.ExecuteSqlRawAsync("UPDATE [Statistic] SET [Value] = 0");
     }
 
     public TestContext CreateContext()

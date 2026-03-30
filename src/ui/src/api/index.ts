@@ -1,5 +1,5 @@
 import api from './client';
-import type { DashboardStatistics, JobModel, JobDetailModel, MessageModel, MessageDetailModel, RecurringJobModel, ServerModel, PagedList, BulkResult, StatsHistoryPoint, BatchModel, BatchDetailModel } from '@/types';
+import type { DashboardStatistics, JobModel, JobDetailModel, MessageModel, MessageDetailModel, RecurringJobModel, RecurringJobDetailModel, ServerModel, PagedList, BulkResult, StatsHistoryPoint, BatchModel, BatchDetailModel } from '@/types';
 
 // Dashboard
 export const getStatus = () => api.get<DashboardStatistics>('/status').then(r => r.data);
@@ -27,6 +27,15 @@ export const getAwaitingJobs = (page = 0, pageSize = 20) =>
 export const getJobById = (jobId: string) =>
   api.get<JobDetailModel>(`/jobs/${jobId}`).then(r => r.data);
 
+export const getSiblingJobs = (jobId: string, page = 0, pageSize = 20) =>
+  api.get<PagedList<JobModel>>(`/jobs/${jobId}/siblings`, { params: { page, pageSize } }).then(r => r.data);
+
+export const getChildJobs = (jobId: string, page = 0, pageSize = 20) =>
+  api.get<PagedList<JobModel>>(`/jobs/${jobId}/children`, { params: { page, pageSize } }).then(r => r.data);
+
+export const getTraceJobs = (jobId: string, page = 0, pageSize = 20) =>
+  api.get<PagedList<JobModel>>(`/jobs/${jobId}/trace`, { params: { page, pageSize } }).then(r => r.data);
+
 export const requeueJob = (jobId: string) => api.post(`/jobs/${jobId}/requeue`);
 export const deleteJob = (jobId: string) => api.post(`/jobs/${jobId}/delete`);
 
@@ -37,9 +46,18 @@ export const getMessages = (page = 0, pageSize = 20) =>
 export const getMessageById = (messageId: string) =>
   api.get<MessageDetailModel>(`/messages/${messageId}`).then(r => r.data);
 
+export const getMessageJobs = (messageId: string, page = 0, pageSize = 20) =>
+  api.get<PagedList<JobModel>>(`/messages/${messageId}/jobs`, { params: { page, pageSize } }).then(r => r.data);
+
 // Recurring jobs
 export const getRecurringJobs = (page = 0, pageSize = 20) =>
   api.get<PagedList<RecurringJobModel>>('/recurring', { params: { page, pageSize } }).then(r => r.data);
+
+export const getRecurringJobById = (id: number) =>
+  api.get<RecurringJobDetailModel>(`/recurring/${id}`).then(r => r.data);
+
+export const getRecurringJobJobs = (id: number, page = 0, pageSize = 20) =>
+  api.get<PagedList<JobModel>>(`/recurring/${id}/jobs`, { params: { page, pageSize } }).then(r => r.data);
 
 export const triggerRecurringJob = (id: number) => api.post(`/recurring/${id}/trigger`);
 export const deleteRecurringJob = (id: number) => api.delete(`/recurring/${id}`);
@@ -57,6 +75,9 @@ export const getBatches = (page = 0, pageSize = 20) =>
 
 export const getBatchById = (batchId: string) =>
   api.get<BatchDetailModel>(`/batches/${batchId}`).then(r => r.data);
+
+export const getBatchJobs = (batchId: string, page = 0, pageSize = 20) =>
+  api.get<PagedList<JobModel>>(`/batches/${batchId}/jobs`, { params: { page, pageSize } }).then(r => r.data);
 
 // Servers
 export const getServers = () => api.get<ServerModel[]>('/servers').then(r => r.data);

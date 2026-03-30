@@ -24,6 +24,7 @@ export interface DashboardStatistics {
   totalDeleted: number;
   totalCreated: number;
   batches: number;
+  databaseConnection: string | null;
 }
 
 export interface JobModel {
@@ -44,11 +45,11 @@ export interface JobDetailModel extends JobModel {
   retriedTimes: number;
   maxRetries: number;
   logs: JobLogModel[];
-  siblingJobs: JobModel[];
-  childJobs: JobModel[];
+  siblingJobCount: number;
+  childJobCount: number;
   traceId: string | null;
   spawnedByJobId: string | null;
-  traceJobs: JobModel[];
+  traceJobCount: number;
 }
 
 export interface JobLogModel {
@@ -71,7 +72,7 @@ export interface MessageModel {
 }
 
 export interface MessageDetailModel extends MessageModel {
-  jobs: JobModel[];
+  jobsCount: number;
 }
 
 export interface RecurringJobModel {
@@ -84,12 +85,22 @@ export interface RecurringJobModel {
   createdAt: string;
 }
 
+export interface RecurringJobDetailModel extends RecurringJobModel {
+  message: string | null;
+  updatedAt: string | null;
+  nextJobId: string | null;
+  lastJobId: string | null;
+  totalJobCount: number;
+}
+
 export interface ServerModel {
   id: string;
   serverName: string;
   startedTime: string;
   lastHeartbeatTime: string;
   serviceCount: number;
+  cpuUsagePercent: number | null;
+  memoryWorkingSetBytes: number | null;
   workers: WorkerModel[];
 }
 
@@ -116,7 +127,6 @@ export interface BatchModel {
 }
 
 export interface BatchDetailModel extends BatchModel {
-  jobs: JobModel[];
   continuationJobId: string | null;
 }
 

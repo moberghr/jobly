@@ -161,6 +161,45 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     });
 });
 
+app.MapPost("/seed-perf", async (IPublisher publisher, TestContext context, int? count) =>
+{
+    var total = count ?? 10000;
+    const int batchSize = 500;
+    var created = 0;
+
+    while (created < total)
+    {
+        var remaining = Math.Min(batchSize, total - created);
+        for (var i = 0; i < remaining; i++)
+        {
+            await publisher.Enqueue(new EmptyRequest());
+        }
+
+        await context.SaveChangesAsync();
+        created += remaining;
+    }
+
+    return Results.Ok(new { created });
+});
+
+app.MapPost("/perf-trace/enable", () =>
+{
+    Jobly.Worker.PerfTrace.Enable();
+    return Results.Ok("Perf tracing enabled");
+});
+
+app.MapPost("/perf-trace/disable", () =>
+{
+    Jobly.Worker.PerfTrace.Disable();
+    return Results.Ok("Perf tracing disabled");
+});
+
+app.MapGet("/perf-trace/dump", () =>
+{
+    var result = Jobly.Worker.PerfTrace.Dump();
+    return Results.Text(result);
+});
+
 await app.RunAsync();
 
 async Task Migrate()

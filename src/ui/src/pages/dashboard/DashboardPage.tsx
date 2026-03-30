@@ -14,7 +14,6 @@ import {
   Mail,
   Loader,
   Hourglass,
-  AlertTriangle,
 } from 'lucide-react';
 
 function padHistory(data: StatsHistoryPoint[], hours: number) {
@@ -42,7 +41,7 @@ function padHistory(data: StatsHistoryPoint[], hours: number) {
 }
 
 export default function DashboardPage() {
-  const { stats, error } = useDashboardStore();
+  const { stats } = useDashboardStore();
 
   // Historical graph — hourly data
   const [history, setHistory] = useState<StatsHistoryPoint[]>([]);
@@ -55,23 +54,6 @@ export default function DashboardPage() {
     }, 60000);
     return () => clearInterval(id);
   }, [historyHours]);
-
-  if (error) {
-    return (
-      <div>
-        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-        <Card>
-          <CardContent className="py-12 text-center">
-            <AlertTriangle className="h-10 w-10 text-destructive mx-auto mb-3" />
-            <p className="text-lg font-medium">{error}</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Make sure the Jobly backend is running and accessible.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   if (!stats) {
     return (

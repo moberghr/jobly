@@ -31,4 +31,6 @@ public class DashboardStatistics
     public long TotalCreated { get; set; }
 
     public int Batches { get; set; }
+
+    public string? DatabaseConnection { get; set; }
 }

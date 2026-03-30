@@ -204,6 +204,7 @@ public abstract class TestBase
         await EnsureServerRegistered();
         var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactory);
         await worker.GetAndProcessJob(CancellationToken.None);
+        await JoblyHealthManager<TestContext>.AggregateCounters(CreateContext());
     }
 
     protected async Task ProcessAllJobs(int workerCount = 1)
@@ -222,6 +223,7 @@ public abstract class TestBase
         }
 
         await Task.WhenAll(tasks);
+        await JoblyHealthManager<TestContext>.AggregateCounters(CreateContext());
     }
 
     protected async Task<bool> TryProcessJob()

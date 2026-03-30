@@ -47,18 +47,9 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             .Where(x => x.Counter > 0)
             .CountAsync();
 
-        var totalSucceeded = await _context.Set<Statistic>()
-            .Where(x => x.Key == "stats:succeeded")
-            .Select(x => x.Value)
-            .FirstOrDefaultAsync();
-        var totalFailed = await _context.Set<Statistic>()
-            .Where(x => x.Key == "stats:failed")
-            .Select(x => x.Value)
-            .FirstOrDefaultAsync();
-        var totalDeleted = await _context.Set<Statistic>()
-            .Where(x => x.Key == "stats:deleted")
-            .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+        var totalSucceeded = await GetCombinedStatValue("stats:succeeded");
+        var totalFailed = await GetCombinedStatValue("stats:failed");
+        var totalDeleted = await GetCombinedStatValue("stats:deleted");
         var model = new DashboardStatistics
         {
             Total = total,
@@ -76,6 +67,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             TotalFailed = totalFailed,
             TotalDeleted = totalDeleted,
             TotalCreated = 0,
+            DatabaseConnection = GetSafeDatabaseConnection(),
         };
 
         return model;
@@ -111,6 +103,8 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             StartedTime = s.StartedTime,
             LastHeartbeatTime = s.LastHeartbeatTime,
             ServiceCount = s.ServiceCount,
+            CpuUsagePercent = s.CpuUsagePercent,
+            MemoryWorkingSetBytes = s.MemoryWorkingSetBytes,
             Workers = workersByServer.GetValueOrDefault(s.Id, [])
                 .ConvertAll(w =>
                 {
@@ -131,9 +125,22 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
     {
         var since = DateTime.UtcNow.AddHours(-hours);
 
-        var hourlyStats = await _context.Set<Statistic>()
+        var aggregated = await _context.Set<Statistic>()
             .Where(x => x.Key.StartsWith("stats:succeeded:") || x.Key.StartsWith("stats:failed:"))
+            .Select(x => new { x.Key, x.Value })
             .ToListAsync();
+
+        var pending = await _context.Set<Counter>()
+            .Where(x => x.Key.StartsWith("stats:succeeded:") || x.Key.StartsWith("stats:failed:"))
+            .GroupBy(x => x.Key)
+            .Select(g => new { Key = g.Key, Value = (long)g.Sum(c => c.Value) })
+            .ToListAsync();
+
+        // Merge both into a single list
+        var hourlyStats = aggregated.Concat(pending)
+            .GroupBy(x => x.Key)
+            .Select(g => new { Key = g.Key, Value = g.Sum(x => x.Value) })
+            .ToList();
 
         // Parse keys like "stats:succeeded:2026-03-28-14" into date + metric
         var points = new Dictionary<string, StatsHistoryPoint>(StringComparer.Ordinal);
@@ -183,6 +190,20 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
         return [.. points.Values.OrderBy(p => p.Hour)];
     }
 
+    private async Task<long> GetCombinedStatValue(string key)
+    {
+        var aggregated = await _context.Set<Statistic>()
+            .Where(x => x.Key == key)
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync();
+
+        var pending = await _context.Set<Counter>()
+            .Where(x => x.Key == key)
+            .SumAsync(x => x.Value);
+
+        return aggregated + pending;
+    }
+
     /// <summary>
     /// Base query that excludes batch placeholder jobs from results.
     /// </summary>
@@ -222,6 +243,30 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
         }
 
         return await query.CountAsync();
+    }
+
+    private string? GetSafeDatabaseConnection()
+    {
+        var connectionString = _context.Database.GetConnectionString();
+        if (string.IsNullOrEmpty(connectionString))
+        {
+            return null;
+        }
+
+        var parts = connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Trim())
+            .Where(p => p.Contains('='))
+            .ToDictionary(
+                p => p[..p.IndexOf('=')].Trim(),
+                p => p[(p.IndexOf('=') + 1)..].Trim(),
+                StringComparer.OrdinalIgnoreCase);
+
+        var isPostgres = parts.ContainsKey("Host");
+        var provider = isPostgres ? "PostgreSQL Server" : "SQL Server";
+        var host = parts.GetValueOrDefault("Host") ?? parts.GetValueOrDefault("Server") ?? parts.GetValueOrDefault("Data Source") ?? "unknown";
+        var db = parts.GetValueOrDefault("Database") ?? parts.GetValueOrDefault("Initial Catalog") ?? "";
+
+        return $"{provider}: Host: {host}, DB: {db}";
     }
 
     private async Task<int> GetProcessingJobsCount()

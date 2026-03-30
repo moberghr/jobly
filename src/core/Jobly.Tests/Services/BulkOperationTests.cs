@@ -35,6 +35,8 @@ public abstract partial class ServiceTests : TestBase
         (await GetJob(id2)).CurrentState.ShouldBe(State.Deleted);
         (await GetJob(id3)).CurrentState.ShouldBe(State.Deleted);
 
+        await TestUtils.AggregateCounters(CreateContext());
+
         var deletedAfter = await CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:deleted")
             .Select(x => x.Value)
@@ -68,6 +70,8 @@ public abstract partial class ServiceTests : TestBase
         (await GetJob(id1)).CurrentState.ShouldBe(State.Enqueued);
         (await GetJob(id2)).CurrentState.ShouldBe(State.Enqueued);
         (await GetJob(id3)).CurrentState.ShouldBe(State.Enqueued);
+
+        await TestUtils.AggregateCounters(CreateContext());
 
         var failedAfter = await CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:failed")

@@ -12,6 +12,10 @@ public class ServerModel
 
     public int ServiceCount { get; set; }
 
+    public double? CpuUsagePercent { get; set; }
+
+    public long? MemoryWorkingSetBytes { get; set; }
+
     public List<WorkerModel> Workers { get; set; } = [];
 }
 

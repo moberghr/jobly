@@ -10,6 +10,8 @@ public interface IMessageQueryService
     Task<PagedList<MessageModel>> GetMessages(BaseListRequest request);
 
     Task<MessageDetailModel?> GetMessageById(Guid messageId);
+
+    Task<PagedList<JobModel>> GetMessageJobs(Guid messageId, BaseListRequest request);
 }
 
 public class MessageQueryService<TContext> : IMessageQueryService
@@ -60,8 +62,18 @@ public class MessageQueryService<TContext> : IMessageQueryService
             return null;
         }
 
-        message.Jobs = await _context.Set<Job>()
+        message.JobsCount = await _context.Set<Job>()
             .Where(x => x.MessageId == messageId)
+            .CountAsync();
+
+        return message;
+    }
+
+    public async Task<PagedList<JobModel>> GetMessageJobs(Guid messageId, BaseListRequest request)
+    {
+        return await _context.Set<Job>()
+            .Where(x => x.MessageId == messageId)
+            .OrderByDescending(x => x.CreateTime)
             .Select(x => new JobModel
             {
                 Id = x.Id,
@@ -71,8 +83,6 @@ public class MessageQueryService<TContext> : IMessageQueryService
                 ScheduleTime = x.ScheduleTime,
                 CurrentState = x.CurrentState,
             })
-            .ToListAsync();
-
-        return message;
+            .ToPagedListAsync(request);
     }
 }

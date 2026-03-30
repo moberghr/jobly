@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/Pagination';
@@ -55,7 +56,7 @@ export default function RecurringPage() {
             ) : (
               data.items.map((rj) => (
                 <TableRow key={rj.id}>
-                  <TableCell className="font-medium">{rj.name}</TableCell>
+                  <TableCell className="font-medium"><Link to={`/recurring/${rj.id}`} className="text-primary hover:underline">{rj.name}</Link></TableCell>
                   <TableCell className="font-mono text-xs">{rj.cron}</TableCell>
                   <TableCell>{rj.type.split(',')[0].split('.').pop()}</TableCell>
                   <TableCell className="text-sm">

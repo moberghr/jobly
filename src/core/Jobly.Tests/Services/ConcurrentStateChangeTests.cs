@@ -81,6 +81,8 @@ public abstract partial class ServiceTests : TestBase
 
         await Task.WhenAll(tasks);
 
+        await TestUtils.AggregateCounters(CreateContext());
+
         // stats:succeeded should be decremented exactly once
         // First requeue: Completed -> Enqueued (stats:succeeded -1)
         // Subsequent requeues: Enqueued -> Enqueued (no stat change for Enqueued)
@@ -189,6 +191,8 @@ public abstract partial class ServiceTests : TestBase
         });
         await Task.WhenAll(deleteTask, requeueTask);
 
+        await TestUtils.AggregateCounters(CreateContext());
+
         var job = await GetJob(jobId);
         var succeededAfter = await CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
@@ -228,6 +232,8 @@ public abstract partial class ServiceTests : TestBase
             await service.DeleteJob(id);
         }));
         await Task.WhenAll(tasks);
+
+        await TestUtils.AggregateCounters(CreateContext());
 
         var deletedAfter = await CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:deleted")

@@ -9,6 +9,7 @@ public static class InterceptorConstants
     public static readonly string RowLockTableJob = "LOCK ROW TABLE JOB";
     public static readonly string RowLockTableBatch = "LOCK ROW TABLE BATCH";
     public static readonly string RowLockTableMessage = "LOCK ROW TABLE MESSAGE";
+    public static readonly string RowLockTableCounter = "LOCK ROW TABLE COUNTER";
 }
 
 public class PostgresRowLockInterceptor : DbCommandInterceptor
@@ -52,6 +53,10 @@ public class PostgresRowLockInterceptor : DbCommandInterceptor
         {
             command.CommandText += " FOR NO KEY UPDATE SKIP LOCKED";
         }
+        else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableCounter}", StringComparison.Ordinal))
+        {
+            command.CommandText += " FOR UPDATE SKIP LOCKED";
+        }
     }
 }
 
@@ -91,6 +96,10 @@ public class SqlServerRowLockInterceptor : DbCommandInterceptor
         else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableMessage}", StringComparison.Ordinal))
         {
             command.CommandText = command.CommandText.Replace("FROM [Message] AS [m]", "FROM [Message] AS [m] WITH (ROWLOCK, UPDLOCK, READPAST)", StringComparison.Ordinal);
+        }
+        else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableCounter}", StringComparison.Ordinal))
+        {
+            command.CommandText = command.CommandText.Replace("FROM [Counter] AS [c]", "FROM [Counter] AS [c] WITH (ROWLOCK, UPDLOCK, READPAST)", StringComparison.Ordinal);
         }
     }
 }

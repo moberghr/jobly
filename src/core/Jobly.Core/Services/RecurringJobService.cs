@@ -11,6 +11,10 @@ public interface IRecurringJobService
 {
     Task<PagedList<RecurringJobModel>> GetRecurringJobs(BaseListRequest request);
 
+    Task<RecurringJobDetailModel?> GetRecurringJobById(int id);
+
+    Task<PagedList<JobModel>> GetRecurringJobHistory(int id, BaseListRequest request);
+
     Task TriggerRecurringJob(int id);
 
     Task DeleteRecurringJob(int id);
@@ -39,6 +43,45 @@ public class RecurringJobService<TContext> : IRecurringJobService
                 NextExecution = x.NextExecution,
                 LastExecution = x.LastExecution,
                 CreatedAt = x.CreatedAt,
+            })
+            .ToPagedListAsync(request);
+    }
+
+    public async Task<RecurringJobDetailModel?> GetRecurringJobById(int id)
+    {
+        return await _context.Set<RecurringJob>()
+            .Where(x => x.Id == id)
+            .Select(x => new RecurringJobDetailModel
+            {
+                Id = x.Id,
+                Name = x.Name,
+                Cron = x.Cron,
+                Type = x.Type,
+                Message = x.Message,
+                NextExecution = x.NextExecution,
+                LastExecution = x.LastExecution,
+                CreatedAt = x.CreatedAt,
+                UpdatedAt = x.UpdatedAt,
+                NextJobId = x.NextJobId,
+                LastJobId = x.LastJobId,
+                TotalJobCount = _context.Set<Job>().Count(j => j.RecurringJobId == x.Id),
+            })
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<PagedList<JobModel>> GetRecurringJobHistory(int id, BaseListRequest request)
+    {
+        return await _context.Set<Job>()
+            .Where(j => j.RecurringJobId == id)
+            .OrderByDescending(j => j.CreateTime)
+            .Select(j => new JobModel
+            {
+                Id = j.Id,
+                Type = j.Type,
+                Message = j.Message,
+                CreateTime = j.CreateTime,
+                ScheduleTime = j.ScheduleTime,
+                CurrentState = j.CurrentState,
             })
             .ToPagedListAsync(request);
     }

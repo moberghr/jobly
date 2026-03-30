@@ -24,7 +24,7 @@ const navItems = [
 ];
 
 export default function MainLayout() {
-  const { stats, fetchStats } = useDashboardStore();
+  const { stats, error, fetchStats } = useDashboardStore();
   const location = useLocation();
   const { theme, toggle } = useTheme();
 
@@ -33,7 +33,7 @@ export default function MainLayout() {
   const isJobsSection = location.pathname.startsWith('/jobs');
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Top navbar */}
       <header className="border-b bg-card">
         <div className="flex h-14 items-center px-6">
@@ -91,7 +91,14 @@ export default function MainLayout() {
         </div>
       </header>
 
-      <div className="flex">
+      {error && (
+        <div className="bg-destructive/10 border-b border-destructive/20 px-6 py-2 text-sm text-destructive flex items-center gap-2">
+          <span className="font-medium">Connection lost</span>
+          <span className="text-destructive/70">— Unable to connect to Jobly API. Retrying...</span>
+        </div>
+      )}
+
+      <div className="flex flex-1">
         {/* Left sidebar for jobs section */}
         {isJobsSection && <JobsSidebar stats={stats} />}
 
@@ -103,7 +110,7 @@ export default function MainLayout() {
 
       {/* Footer */}
       <footer className="border-t bg-card px-6 py-3 text-xs text-muted-foreground flex items-center justify-between">
-        <span>Jobly Dashboard</span>
+        <span>{stats?.databaseConnection ?? 'Jobly Dashboard'}</span>
         <div className="flex items-center gap-4">
           {stats && <span>Servers: {stats.servers} · Workers active</span>}
           <span>UTC: {new Date().toISOString().replace('T', ' ').substring(0, 19)}</span>

@@ -166,6 +166,8 @@ public abstract partial class JoblyTests : TestBase
         var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.DeleteJob(jobId);
 
+        await TestUtils.AggregateCounters(CreateContext());
+
         var statAfter = await CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:deleted")
             .Select(x => x.Value)
@@ -207,6 +209,8 @@ public abstract partial class JoblyTests : TestBase
         var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.RequeueJob(jobId); // requeue failed job → stats:failed -1
 
+        await TestUtils.AggregateCounters(CreateContext());
+
         var failedAfter = await CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:failed")
             .Select(x => x.Value)
@@ -233,6 +237,8 @@ public abstract partial class JoblyTests : TestBase
 
         var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.RequeueJob(jobId); // requeue → stats:succeeded -1
+
+        await TestUtils.AggregateCounters(CreateContext());
 
         var succeededAfter = await CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
@@ -264,6 +270,8 @@ public abstract partial class JoblyTests : TestBase
 
         var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.DeleteJob(jobId); // delete → stats:succeeded -1, stats:deleted +1
+
+        await TestUtils.AggregateCounters(CreateContext());
 
         var succeededAfter = await CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")

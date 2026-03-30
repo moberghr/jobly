@@ -17,7 +17,5 @@ public class BatchModel
 
 public class BatchDetailModel : BatchModel
 {
-    public List<JobModel> Jobs { get; set; } = [];
-
     public Guid? ContinuationJobId { get; set; }
 }

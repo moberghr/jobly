@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StateBadge } from '@/components/StateBadge';
+import { RelatedJobsTable } from '@/components/RelatedJobsTable';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import type { MessageDetailModel } from '@/types';
@@ -45,37 +45,11 @@ export default function MessageDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Spawned Jobs ({message.jobs.length})</CardTitle></CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>State</TableHead>
-                <TableHead>Created</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {message.jobs.map((job) => (
-                <TableRow key={job.id}>
-                  <TableCell className="font-mono text-xs">
-                    <Link to={`/jobs/detail/${job.id}`} className="text-primary hover:underline">
-                      {shortId(job.id)}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{shortType(job.type)}</TableCell>
-                  <TableCell><StateBadge state={job.currentState} /></TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDateTime(job.createTime)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <RelatedJobsTable
+        title="Spawned Jobs"
+        count={message.jobsCount}
+        fetchJobs={(page, pageSize) => api.getMessageJobs(message.id, page, pageSize)}
+      />
     </div>
   );
 }

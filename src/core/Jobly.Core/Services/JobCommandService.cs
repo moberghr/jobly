@@ -16,6 +16,7 @@ public interface IJobCommandService
     Task<BulkResultModel> BulkDeleteJobs(Guid[] jobIds);
 
     Task<BulkResultModel> BulkRequeueJobs(Guid[] jobIds);
+
 }
 
 public class JobCommandService<TContext> : IJobCommandService
@@ -49,14 +50,12 @@ public class JobCommandService<TContext> : IJobCommandService
             return;
         }
 
-        await DecrementStatForState(job.CurrentState);
+        DecrementStatForState(job.CurrentState);
 
         job.CurrentState = State.Deleted;
         job.ExpireAt = DateTime.UtcNow.AddDays(1);
 
-        await _context.Set<Statistic>()
-            .Where(x => x.Key == "stats:deleted")
-            .ExecuteUpdateAsync(x => x.SetProperty(p => p.Value, p => p.Value + 1));
+        _context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
 
         await _context.Set<JobLog>().AddAsync(new JobLog
         {
@@ -91,7 +90,7 @@ public class JobCommandService<TContext> : IJobCommandService
             return;
         }
 
-        await DecrementStatForState(job.CurrentState);
+        DecrementStatForState(job.CurrentState);
 
         job.CurrentState = State.Enqueued;
         job.HandlerType = null;
@@ -147,7 +146,7 @@ public class JobCommandService<TContext> : IJobCommandService
         return result;
     }
 
-    private async Task DecrementStatForState(State state)
+    private void DecrementStatForState(State state)
     {
         var key = state switch
         {
@@ -159,9 +158,7 @@ public class JobCommandService<TContext> : IJobCommandService
 
         if (key != null)
         {
-            await _context.Set<Statistic>()
-                .Where(x => x.Key == key)
-                .ExecuteUpdateAsync(x => x.SetProperty(p => p.Value, p => p.Value - 1));
+            _context.Set<Counter>().Add(new Counter { Key = key, Value = -1 });
         }
     }
 }

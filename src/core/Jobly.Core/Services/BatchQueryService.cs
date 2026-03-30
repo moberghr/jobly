@@ -10,6 +10,8 @@ public interface IBatchQueryService
     Task<PagedList<BatchModel>> GetBatches(BaseListRequest request);
 
     Task<BatchDetailModel?> GetBatchById(Guid batchId);
+
+    Task<PagedList<JobModel>> GetBatchJobs(Guid batchId, BaseListRequest request);
 }
 
 public class BatchQueryService<TContext> : IBatchQueryService
@@ -62,19 +64,6 @@ public class BatchQueryService<TContext> : IBatchQueryService
             .Where(j => j.BatchId == batchId)
             .CountAsync();
 
-        var jobs = await _context.Set<Job>()
-            .Where(j => j.BatchId == batchId)
-            .Select(j => new JobModel
-            {
-                Id = j.Id,
-                Type = j.Type,
-                Message = j.Message,
-                CreateTime = j.CreateTime,
-                ScheduleTime = j.ScheduleTime,
-                CurrentState = j.CurrentState,
-            })
-            .ToListAsync();
-
         var continuationJob = await _context.Set<Job>()
             .Where(j => j.ParentJobId == batchId)
             .Select(j => j.Id)
@@ -87,8 +76,24 @@ public class BatchQueryService<TContext> : IBatchQueryService
             RemainingJobs = batch.Counter,
             PlaceholderState = placeholderJob.CurrentState,
             CreateTime = placeholderJob.CreateTime,
-            Jobs = jobs,
             ContinuationJobId = continuationJob == Guid.Empty ? null : continuationJob,
         };
+    }
+
+    public async Task<PagedList<JobModel>> GetBatchJobs(Guid batchId, BaseListRequest request)
+    {
+        return await _context.Set<Job>()
+            .Where(j => j.BatchId == batchId)
+            .OrderByDescending(j => j.CreateTime)
+            .Select(j => new JobModel
+            {
+                Id = j.Id,
+                Type = j.Type,
+                Message = j.Message,
+                CreateTime = j.CreateTime,
+                ScheduleTime = j.ScheduleTime,
+                CurrentState = j.CurrentState,
+            })
+            .ToPagedListAsync(request);
     }
 }

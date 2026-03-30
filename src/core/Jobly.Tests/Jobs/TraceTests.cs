@@ -153,7 +153,11 @@ public abstract partial class JoblyTests : TestBase
 
         detail.ShouldNotBeNull();
         detail.TraceId.ShouldBe(parentJobId);
-        detail.TraceJobs.Count.ShouldBe(1);
-        detail.TraceJobs[0].Id.ShouldNotBe(parentJobId); // The child, not self
+        detail.TraceJobCount.ShouldBe(1);
+
+        // Verify paged endpoint returns the trace jobs
+        var traceJobs = await service.GetTraceJobs(parentJobId, new BaseListRequest { Page = 0, PageSize = 10 });
+        traceJobs.TotalCount.ShouldBe(1);
+        traceJobs.Items[0].Id.ShouldNotBe(parentJobId); // The child, not self
     }
 }

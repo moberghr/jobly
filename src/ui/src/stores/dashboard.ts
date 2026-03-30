@@ -16,7 +16,7 @@ interface DashboardStore {
   fetchStats: () => Promise<void>;
 }
 
-const WINDOW_SIZE = 30;
+const WINDOW_SIZE = 60;
 
 export const useDashboardStore = create<DashboardStore>((set) => {
   let prevTotals: { succeeded: number; failed: number } | null = null;
@@ -36,8 +36,8 @@ export const useDashboardStore = create<DashboardStore>((set) => {
         if (prevTotals) {
           newPoint = {
             ts: Math.floor(Date.now() / 1000),
-            succeeded: current.succeeded - prevTotals.succeeded,
-            failed: current.failed - prevTotals.failed,
+            succeeded: Math.max(0, current.succeeded - prevTotals.succeeded),
+            failed: Math.max(0, current.failed - prevTotals.failed),
           };
         }
 
@@ -53,6 +53,7 @@ export const useDashboardStore = create<DashboardStore>((set) => {
         }));
       } catch {
         set({ loading: false, error: 'Unable to connect to Jobly API' });
+        prevTotals = null;
       }
     },
   };

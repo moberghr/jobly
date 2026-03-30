@@ -120,6 +120,7 @@ public static class ServiceConfiguration
         AddMessageEntity(modelBuilder);
         AddJobLogEntity(modelBuilder);
         AddStatisticEntity(modelBuilder);
+        AddCounterEntity(modelBuilder);
     }
 
     private static void AddJobEntity(ModelBuilder modelBuilder)
@@ -282,9 +283,19 @@ public static class ServiceConfiguration
         stat.HasKey(p => p.Key);
         stat.Property(p => p.Value);
 
-        stat.HasData(
-            new Statistic { Key = "stats:succeeded", Value = 0 },
-            new Statistic { Key = "stats:failed", Value = 0 },
-            new Statistic { Key = "stats:deleted", Value = 0 });
+        // No seed data — Statistic rows are created by the counter aggregator on demand.
+    }
+
+    private static void AddCounterEntity(ModelBuilder modelBuilder)
+    {
+        var counter = modelBuilder.Entity<Counter>();
+        counter.ToTable(nameof(Counter));
+
+        counter.Property(p => p.Id);
+        counter.HasKey(p => p.Id);
+        counter.Property(p => p.Key);
+        counter.Property(p => p.Value);
+
+        counter.HasIndex(p => p.Key);
     }
 }

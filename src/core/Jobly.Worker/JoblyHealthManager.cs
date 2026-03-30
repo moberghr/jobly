@@ -21,6 +21,8 @@ public class JoblyHealthManager<TContext> : BackgroundService
     private readonly ILogger<JoblyHealthManager<TContext>> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly JoblyWorkerConfiguration _configuration;
+    private TimeSpan _previousCpuTime;
+    private DateTime _previousWallTime;
 
     public JoblyHealthManager(
         IServiceScopeFactory serviceScopeFactory,
@@ -30,6 +32,10 @@ public class JoblyHealthManager<TContext> : BackgroundService
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
         _configuration = configuration.Value;
+
+        var process = System.Diagnostics.Process.GetCurrentProcess();
+        _previousCpuTime = process.TotalProcessorTime;
+        _previousWallTime = DateTime.UtcNow;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -39,6 +45,12 @@ public class JoblyHealthManager<TContext> : BackgroundService
             using var scope = _serviceScopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<TContext>();
             await UpdateHeartbeat(context);
+
+            using (var aggregateScope = _serviceScopeFactory.CreateScope())
+            {
+                await AggregateCounters(aggregateScope.ServiceProvider.GetRequiredService<TContext>());
+            }
+
             await CleanUpServers(context, _configuration.HealthCheckTimeout);
             await RequeueStaleJobs(context, _configuration.InvisibilityTimeout);
             await CleanupExpiredJobs(context);
@@ -54,6 +66,60 @@ public class JoblyHealthManager<TContext> : BackgroundService
         var server = await context.Set<Server>()
             .FindAsync(_configuration.ServerId) ?? throw new InvalidOperationException("Server not found in the database. Another health manager removed this server due to stale heartbeat.");
         server.LastHeartbeatTime = DateTime.UtcNow;
+
+        var process = System.Diagnostics.Process.GetCurrentProcess();
+        server.MemoryWorkingSetBytes = process.WorkingSet64;
+
+        var currentCpuTime = process.TotalProcessorTime;
+        var currentWallTime = DateTime.UtcNow;
+        var wallElapsed = (currentWallTime - _previousWallTime).TotalMilliseconds;
+
+        if (wallElapsed > 0)
+        {
+            var cpuElapsed = (currentCpuTime - _previousCpuTime).TotalMilliseconds;
+            server.CpuUsagePercent = Math.Round(cpuElapsed / wallElapsed / Environment.ProcessorCount * 100, 1);
+        }
+
+        _previousCpuTime = currentCpuTime;
+        _previousWallTime = currentWallTime;
+
+        await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Aggregates pending Counter rows into the Statistic table.
+    /// Uses a transaction to atomically read, merge, and delete counter rows.
+    /// Safe for multiple servers — each batch is locked with FOR UPDATE SKIP LOCKED.
+    /// Public static so tests can call it directly.
+    /// </summary>
+    public static async Task AggregateCounters<TCtx>(TCtx context)
+        where TCtx : DbContext
+    {
+        var counters = await context.Set<Counter>().ToListAsync();
+
+        if (counters.Count == 0)
+        {
+            return;
+        }
+
+        var grouped = counters
+            .GroupBy(c => c.Key)
+            .Select(g => new { Key = g.Key, Sum = g.Sum(c => c.Value) });
+
+        foreach (var group in grouped)
+        {
+            var stat = await context.Set<Statistic>().FindAsync(group.Key);
+            if (stat != null)
+            {
+                stat.Value += group.Sum;
+            }
+            else
+            {
+                context.Set<Statistic>().Add(new Statistic { Key = group.Key, Value = group.Sum });
+            }
+        }
+
+        context.Set<Counter>().RemoveRange(counters);
         await context.SaveChangesAsync();
     }
 

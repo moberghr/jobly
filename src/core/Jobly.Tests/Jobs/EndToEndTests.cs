@@ -216,6 +216,8 @@ public class EndToEndTests : IAsyncLifetime
 
         // Statistics should be consistent
         // completedJobs/failedJobs exclude batch placeholders (hidden from dashboard)
+        await TestUtils.AggregateCounters(_fixture.CreateContext());
+
         var statsSucceeded = await ctx.Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded").Select(x => x.Value).FirstOrDefaultAsync();
         var statsFailed = await ctx.Set<Statistic>()

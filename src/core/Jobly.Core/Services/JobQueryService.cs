@@ -18,6 +18,12 @@ public interface IJobQueryService
 
     Task<JobDetailModel?> GetJobById(Guid jobId);
 
+    Task<PagedList<JobModel>> GetSiblingJobs(Guid jobId, BaseListRequest request);
+
+    Task<PagedList<JobModel>> GetChildJobs(Guid jobId, BaseListRequest request);
+
+    Task<PagedList<JobModel>> GetTraceJobs(Guid jobId, BaseListRequest request);
+
     Task<int> CountProcessingJobs();
 }
 
@@ -116,26 +122,43 @@ public class JobQueryService<TContext> : IJobQueryService
             })
             .ToListAsync();
 
-        // Sibling jobs (from same message)
+        // Counts for related jobs
         if (job.MessageId != null)
         {
-            job.SiblingJobs = await _context.Set<Job>()
+            job.SiblingJobCount = await _context.Set<Job>()
                 .Where(x => x.MessageId == job.MessageId && x.Id != jobId)
-                .Select(x => new JobModel
-                {
-                    Id = x.Id,
-                    Type = x.Type,
-                    Message = x.Message,
-                    CreateTime = x.CreateTime,
-                    ScheduleTime = x.ScheduleTime,
-                    CurrentState = x.CurrentState,
-                })
-                .ToListAsync();
+                .CountAsync();
         }
 
-        // Child jobs (continuations)
-        job.ChildJobs = await _context.Set<Job>()
+        job.ChildJobCount = await _context.Set<Job>()
             .Where(x => x.ParentJobId == jobId)
+            .CountAsync();
+
+        if (job.TraceId != null)
+        {
+            job.TraceJobCount = await _context.Set<Job>()
+                .Where(x => x.TraceId == job.TraceId && x.Id != jobId)
+                .CountAsync();
+        }
+
+        return job;
+    }
+
+    public async Task<PagedList<JobModel>> GetSiblingJobs(Guid jobId, BaseListRequest request)
+    {
+        var messageId = await _context.Set<Job>()
+            .Where(x => x.Id == jobId)
+            .Select(x => x.MessageId)
+            .FirstOrDefaultAsync();
+
+        if (messageId == null)
+        {
+            return new PagedList<JobModel>(0, [], 0);
+        }
+
+        return await _context.Set<Job>()
+            .Where(x => x.MessageId == messageId && x.Id != jobId)
+            .OrderByDescending(x => x.CreateTime)
             .Select(x => new JobModel
             {
                 Id = x.Id,
@@ -145,27 +168,51 @@ public class JobQueryService<TContext> : IJobQueryService
                 ScheduleTime = x.ScheduleTime,
                 CurrentState = x.CurrentState,
             })
-            .ToListAsync();
+            .ToPagedListAsync(request);
+    }
 
-        // Trace: all jobs sharing the same TraceId
-        if (job.TraceId != null)
+    public async Task<PagedList<JobModel>> GetChildJobs(Guid jobId, BaseListRequest request)
+    {
+        return await _context.Set<Job>()
+            .Where(x => x.ParentJobId == jobId)
+            .OrderByDescending(x => x.CreateTime)
+            .Select(x => new JobModel
+            {
+                Id = x.Id,
+                Type = x.Type,
+                Message = x.Message,
+                CreateTime = x.CreateTime,
+                ScheduleTime = x.ScheduleTime,
+                CurrentState = x.CurrentState,
+            })
+            .ToPagedListAsync(request);
+    }
+
+    public async Task<PagedList<JobModel>> GetTraceJobs(Guid jobId, BaseListRequest request)
+    {
+        var traceId = await _context.Set<Job>()
+            .Where(x => x.Id == jobId)
+            .Select(x => x.TraceId)
+            .FirstOrDefaultAsync();
+
+        if (traceId == null)
         {
-            job.TraceJobs = await _context.Set<Job>()
-                .Where(x => x.TraceId == job.TraceId && x.Id != jobId)
-                .OrderBy(x => x.CreateTime)
-                .Select(x => new JobModel
-                {
-                    Id = x.Id,
-                    Type = x.Type,
-                    Message = x.Message,
-                    CreateTime = x.CreateTime,
-                    ScheduleTime = x.ScheduleTime,
-                    CurrentState = x.CurrentState,
-                })
-                .ToListAsync();
+            return new PagedList<JobModel>(0, [], 0);
         }
 
-        return job;
+        return await _context.Set<Job>()
+            .Where(x => x.TraceId == traceId && x.Id != jobId)
+            .OrderBy(x => x.CreateTime)
+            .Select(x => new JobModel
+            {
+                Id = x.Id,
+                Type = x.Type,
+                Message = x.Message,
+                CreateTime = x.CreateTime,
+                ScheduleTime = x.ScheduleTime,
+                CurrentState = x.CurrentState,
+            })
+            .ToPagedListAsync(request);
     }
 
     /// <summary>

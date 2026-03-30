@@ -8,6 +8,7 @@ import MessageDetailPage from '@/pages/messages/MessageDetailPage';
 import BatchesPage from '@/pages/batches/BatchesPage';
 import BatchDetailPage from '@/pages/batches/BatchDetailPage';
 import RecurringPage from '@/pages/recurring/RecurringPage';
+import RecurringDetailPage from '@/pages/recurring/RecurringDetailPage';
 import ServersPage from '@/pages/servers/ServersPage';
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
           <Route path="/messages/:id" element={<MessageDetailPage />} />
           <Route path="/batches" element={<BatchesPage />} />
           <Route path="/batches/:id" element={<BatchDetailPage />} />
+          <Route path="/recurring/:id" element={<RecurringDetailPage />} />
           <Route path="/recurring" element={<RecurringPage />} />
           <Route path="/servers" element={<ServersPage />} />
         </Route>

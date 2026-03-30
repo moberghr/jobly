@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect } from 'react';
 import {
   Chart,
   LineController,
@@ -34,9 +34,13 @@ interface RealtimeChartProps {
 export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
-  const prevTotals = useRef<{ succeeded: number; failed: number } | null>(null);
-  const recentValues = useRef<number[]>([]);
-  const [stats, setStats] = useState({ current: 0, max: 0, avg: 0 });
+  const renderedCount = useRef(0);
+  const realtimeData = useDashboardStore((s) => s.realtimeData);
+
+  const vals = realtimeData.map((p) => p.succeeded + p.failed);
+  const current = vals.length > 0 ? vals[vals.length - 1] : 0;
+  const max = vals.length > 0 ? Math.max(...vals) : 0;
+  const avg = vals.length >= 5 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
 
   useEffect(() => {
     if (!canvasRef.current) {
@@ -46,6 +50,9 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
     const isDark = document.documentElement.classList.contains('dark');
     const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
     const textColor = isDark ? '#888' : '#666';
+
+    const storeData = useDashboardStore.getState().realtimeData;
+    renderedCount.current = storeData.length;
 
     const chart = new Chart(canvasRef.current, {
       type: 'line',
@@ -61,7 +68,7 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
             pointHitRadius: 0,
             pointHoverRadius: 0,
             tension: 0.3,
-            data: [],
+            data: storeData.map((p) => ({ x: p.ts * 1000, y: p.succeeded })),
           },
           {
             label: 'Failed/s',
@@ -73,7 +80,7 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
             pointHitRadius: 0,
             pointHoverRadius: 0,
             tension: 0.3,
-            data: [],
+            data: storeData.map((p) => ({ x: p.ts * 1000, y: p.failed })),
           },
         ],
       },
@@ -81,14 +88,8 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
-        interaction: {
-          mode: 'nearest',
-          axis: 'x',
-          intersect: false,
-        },
-        hover: {
-          mode: undefined,
-        },
+        interaction: { mode: 'nearest', axis: 'x', intersect: false },
+        hover: { mode: undefined },
         scales: {
           x: {
             type: 'realtime',
@@ -96,73 +97,28 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
               duration: 60000,
               refresh: 1000,
               delay: 1000,
-              onRefresh: (chart) => {
-                const state = useDashboardStore.getState();
-                if (!state.stats) {
-                  return;
-                }
-
-                const current = {
-                  succeeded: state.stats.totalSucceeded,
-                  failed: state.stats.totalFailed,
-                };
+              onRefresh: (c) => {
+                const data = useDashboardStore.getState().realtimeData;
                 const now = Date.now();
-
-                if (prevTotals.current) {
-                  const succeeded = current.succeeded - prevTotals.current.succeeded;
-                  const failed = current.failed - prevTotals.current.failed;
-                  const total = succeeded + failed;
-
-                  chart.data.datasets[0].data.push({ x: now, y: succeeded });
-                  chart.data.datasets[1].data.push({ x: now, y: failed });
-
-                  recentValues.current = [...recentValues.current.slice(-59), total];
-                  const vals = recentValues.current;
-                  setStats({
-                    current: total,
-                    max: Math.max(...vals),
-                    avg: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length),
-                  });
+                for (let i = renderedCount.current; i < data.length; i++) {
+                  const p = data[i];
+                  c.data.datasets[0].data.push({ x: now, y: p.succeeded });
+                  c.data.datasets[1].data.push({ x: now, y: p.failed });
                 }
-
-                prevTotals.current = current;
+                renderedCount.current = data.length;
               },
             },
-            time: {
-              displayFormats: {
-                second: 'HH:mm:ss',
-                minute: 'HH:mm',
-                hour: 'HH:mm',
-              },
-            },
-            ticks: {
-              color: textColor,
-              font: { size: 10 },
-            },
-            grid: {
-              color: gridColor,
-            },
+            time: { displayFormats: { second: 'HH:mm:ss', minute: 'HH:mm', hour: 'HH:mm' } },
+            ticks: { color: textColor, font: { size: 10 } },
+            grid: { color: gridColor },
           },
           y: {
             beginAtZero: true,
-            ticks: {
-              color: textColor,
-              font: { size: 10 },
-              precision: 0,
-            },
-            grid: {
-              color: gridColor,
-            },
+            ticks: { color: textColor, font: { size: 10 }, precision: 0 },
+            grid: { color: gridColor },
           },
         },
-        plugins: {
-          legend: {
-            display: false,
-          },
-          tooltip: {
-            enabled: false,
-          },
-        },
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
       },
     });
 
@@ -178,9 +134,9 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
   return (
     <div>
       <div className="flex gap-6 mb-2 text-sm">
-        <span className="text-muted-foreground">Current: <span className="font-medium text-foreground">{stats.current}/s</span></span>
-        <span className="text-muted-foreground">Avg: <span className="font-medium text-foreground">{stats.avg}/s</span></span>
-        <span className="text-muted-foreground">Peak: <span className="font-medium text-foreground">{stats.max}/s</span></span>
+        <span className="text-muted-foreground">Current: <span className="font-medium text-foreground">{current}/s</span></span>
+        <span className="text-muted-foreground">Avg: <span className="font-medium text-foreground">{avg != null ? `${avg}/s` : '-'}</span></span>
+        <span className="text-muted-foreground">Peak: <span className="font-medium text-foreground">{max}/s</span></span>
       </div>
       <div style={{ height }}>
         <canvas ref={canvasRef} />

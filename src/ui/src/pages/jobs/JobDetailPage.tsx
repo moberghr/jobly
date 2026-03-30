@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { StateBadge } from '@/components/StateBadge';
+import { RelatedJobsTable } from '@/components/RelatedJobsTable';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
@@ -117,67 +117,13 @@ export default function JobDetailPage() {
           </Card>
 
           {/* Sibling Jobs */}
-          {job.siblingJobs.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Sibling Jobs ({job.siblingJobs.length})</CardTitle></CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Type</TableHead><TableHead>State</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {job.siblingJobs.map((s) => (
-                      <TableRow key={s.id}>
-                        <TableCell className="font-mono text-xs"><Link to={`/jobs/detail/${s.id}`} className="text-primary hover:underline">{shortId(s.id)}</Link></TableCell>
-                        <TableCell>{shortType(s.type)}</TableCell>
-                        <TableCell><StateBadge state={s.currentState} /></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
+          <RelatedJobsTable title="Sibling Jobs" count={job.siblingJobCount} fetchJobs={(page, pageSize) => api.getSiblingJobs(job.id, page, pageSize)} />
 
           {/* Child Jobs */}
-          {job.childJobs.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Child Jobs ({job.childJobs.length})</CardTitle></CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Type</TableHead><TableHead>State</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {job.childJobs.map((c) => (
-                      <TableRow key={c.id}>
-                        <TableCell className="font-mono text-xs"><Link to={`/jobs/detail/${c.id}`} className="text-primary hover:underline">{shortId(c.id)}</Link></TableCell>
-                        <TableCell>{shortType(c.type)}</TableCell>
-                        <TableCell><StateBadge state={c.currentState} /></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
+          <RelatedJobsTable title="Child Jobs" count={job.childJobCount} fetchJobs={(page, pageSize) => api.getChildJobs(job.id, page, pageSize)} />
 
           {/* Trace Jobs */}
-          {job.traceJobs.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Trace ({job.traceJobs.length + 1} jobs)</CardTitle></CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Type</TableHead><TableHead>State</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {job.traceJobs.map((t) => (
-                      <TableRow key={t.id}>
-                        <TableCell className="font-mono text-xs"><Link to={`/jobs/detail/${t.id}`} className="text-primary hover:underline">{shortId(t.id)}</Link></TableCell>
-                        <TableCell>{shortType(t.type)}</TableCell>
-                        <TableCell><StateBadge state={t.currentState} /></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
+          <RelatedJobsTable title="Trace" count={job.traceJobCount} fetchJobs={(page, pageSize) => api.getTraceJobs(job.id, page, pageSize)} />
         </div>
 
         {/* Right column: History + Logs */}
