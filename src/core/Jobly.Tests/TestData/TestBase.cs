@@ -13,7 +13,7 @@ namespace Jobly.Tests;
 
 public abstract class TestBase
 {
-    private readonly IServiceScopeFactory _serviceScopeFactory;
+    protected readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly Func<TestContext> _createContext;
     private readonly SemaphoreSlim _serverRegistrationLock = new(1, 1);
     private bool _serverRegistered;
