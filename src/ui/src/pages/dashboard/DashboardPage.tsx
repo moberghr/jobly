@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useState, useEffect, useRef } from 'react';
+import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import { useDashboardStore } from '@/stores/dashboard';
 import { MetricCard } from '@/components/MetricCard';
 import { RealtimeChart } from '@/components/RealtimeChart';
@@ -20,24 +20,44 @@ import {
 function padHistory(data: StatsHistoryPoint[], hours: number) {
   const now = new Date();
   now.setMinutes(0, 0, 0);
-  const result = [];
   const dataMap = new Map(data.map(d => [new Date(d.hour).getTime(), d]));
 
-  for (var i = hours - 1; i >= 0; i--) {
-    const hourDate = new Date(now.getTime() - i * 3600000);
-    const key = hourDate.getTime();
-    const point = dataMap.get(key);
-    const label = hours <= 24
-      ? hourDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-      : hourDate.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
-
-    result.push({
-      label,
-      succeeded: point?.succeeded ?? 0,
-      failed: point?.failed ?? 0,
-    });
+  if (hours <= 24) {
+    const result = [];
+    for (let i = hours - 1; i >= 0; i--) {
+      const hourDate = new Date(now.getTime() - i * 3600000);
+      const point = dataMap.get(hourDate.getTime());
+      result.push({
+        label: hourDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+        succeeded: point?.succeeded ?? 0,
+        failed: point?.failed ?? 0,
+      });
+    }
+    return result;
   }
 
+  // Aggregate into daily totals
+  const days = Math.ceil(hours / 24);
+  const result = [];
+  for (let d = days - 1; d >= 0; d--) {
+    const dayStart = new Date(now.getTime() - d * 86400000);
+    dayStart.setHours(0, 0, 0, 0);
+    let succeeded = 0;
+    let failed = 0;
+    for (let h = 0; h < 24; h++) {
+      const hourKey = new Date(dayStart.getTime() + h * 3600000).getTime();
+      const point = dataMap.get(hourKey);
+      if (point) {
+        succeeded += point.succeeded;
+        failed += point.failed;
+      }
+    }
+    result.push({
+      label: `${dayStart.toLocaleDateString([], { weekday: 'short' })} ${String(dayStart.getDate()).padStart(2, '0')}.${String(dayStart.getMonth() + 1).padStart(2, '0')}`,
+      succeeded,
+      failed,
+    });
+  }
   return result;
 }
 
@@ -118,18 +138,71 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={padHistory(history, historyHours)}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} className="text-muted-foreground" />
-              <YAxis tick={{ fontSize: 10 }} allowDecimals={false} className="text-muted-foreground" />
-              <Tooltip />
-              <Area type="monotone" dataKey="succeeded" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} />
-              <Area type="monotone" dataKey="failed" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.3} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <HistoryChart data={padHistory(history, historyHours)} />
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, ChartTooltip, Legend);
+
+function HistoryChart({ data }: { data: { label: string; succeeded: number; failed: number }[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+
+  // Create chart once
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    const isDark = document.documentElement.classList.contains('dark');
+    const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+    const textColor = isDark ? '#888' : '#666';
+
+    chartRef.current = new Chart(canvasRef.current, {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: 'Succeeded', data: [], borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.15)', borderWidth: 2, fill: true, pointRadius: 0, pointHitRadius: 10, tension: 0.3 },
+        { label: 'Failed', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 2, fill: true, pointRadius: 0, pointHitRadius: 10, tension: 0.3 },
+      ]},
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: { ticks: { color: textColor, font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 24 }, grid: { color: gridColor } },
+          y: { beginAtZero: true, ticks: { color: textColor, font: { size: 10 }, precision: 0 }, grid: { color: gridColor } },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: isDark ? '#1f1f23' : '#fff',
+            titleColor: isDark ? '#e4e4e7' : '#18181b',
+            bodyColor: isDark ? '#a1a1aa' : '#52525b',
+            borderColor: isDark ? '#27272a' : '#e4e4e7',
+            borderWidth: 1,
+          },
+        },
+      },
+    });
+
+    return () => { chartRef.current?.destroy(); chartRef.current = null; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Update data in-place
+  useEffect(() => {
+    if (!chartRef.current) return;
+    chartRef.current.data.labels = data.map(d => d.label);
+    chartRef.current.data.datasets[0].data = data.map(d => d.succeeded);
+    chartRef.current.data.datasets[1].data = data.map(d => d.failed);
+    chartRef.current.update();
+  }, [data]);
+
+  return (
+    <div style={{ height: 200 }}>
+      <canvas ref={canvasRef} />
     </div>
   );
 }

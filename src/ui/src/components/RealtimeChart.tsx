@@ -5,23 +5,19 @@ import {
   LineElement,
   PointElement,
   LinearScale,
+  TimeScale,
   Filler,
-  Tooltip,
-  Legend,
-  CategoryScale,
 } from 'chart.js';
 import 'chartjs-adapter-luxon';
-import StreamingPlugin, { RealTimeScale } from 'chartjs-plugin-streaming';
 import { useDashboardStore } from '@/stores/dashboard';
 
-Chart.register(
-  LineController, LineElement, PointElement, LinearScale, CategoryScale,
-  Filler, Tooltip, Legend, RealTimeScale, StreamingPlugin,
-);
+Chart.register(LineController, LineElement, PointElement, LinearScale, TimeScale, Filler);
 
 export function RealtimeChart({ height = 200 }: { height?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
   const lastRenderedTs = useRef(0);
+  const rafId = useRef(0);
   const realtimeData = useDashboardStore((s) => s.realtimeData);
 
   const vals = realtimeData.map((p) => p.succeeded + p.failed);
@@ -29,20 +25,21 @@ export function RealtimeChart({ height = 200 }: { height?: number }) {
   const max = vals.length > 0 ? Math.max(...vals) : 0;
   const avg = vals.length >= 5 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
 
-  // Create chart once — component is never unmounted
   useEffect(() => {
     if (!canvasRef.current) return;
 
     const isDark = document.documentElement.classList.contains('dark');
     const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
     const textColor = isDark ? '#888' : '#666';
+    const now = Date.now();
 
     const storeData = useDashboardStore.getState().realtimeData;
     if (storeData.length > 0) {
       lastRenderedTs.current = storeData[storeData.length - 1].ts;
     }
 
-    const chart = new Chart(canvasRef.current, {
+    // Delay data by 1s so points exist before the axis reaches them
+    chartRef.current = new Chart(canvasRef.current, {
       type: 'line',
       data: {
         datasets: [
@@ -72,28 +69,14 @@ export function RealtimeChart({ height = 200 }: { height?: number }) {
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
-        interaction: { mode: 'nearest', axis: 'x', intersect: false },
-        hover: { mode: undefined },
+        events: [],
         scales: {
           x: {
-            type: 'realtime',
-            realtime: {
-              duration: 60000,
-              refresh: 1000,
-              delay: 1000,
-              onRefresh: (c) => {
-                const data = useDashboardStore.getState().realtimeData;
-                const now = Date.now();
-                for (const p of data) {
-                  if (p.ts <= lastRenderedTs.current) continue;
-                  c.data.datasets[0].data.push({ x: now, y: p.succeeded });
-                  c.data.datasets[1].data.push({ x: now, y: p.failed });
-                  lastRenderedTs.current = p.ts;
-                }
-              },
-            },
-            time: { displayFormats: { second: 'HH:mm:ss', minute: 'HH:mm', hour: 'HH:mm' } },
-            ticks: { color: textColor, font: { size: 10 } },
+            type: 'time',
+            time: { unit: 'second', displayFormats: { second: 'HH:mm:ss' } },
+            min: now - 62000,
+            max: now - 2000,
+            ticks: { display: false },
             grid: { color: gridColor },
           },
           y: {
@@ -106,9 +89,48 @@ export function RealtimeChart({ height = 200 }: { height?: number }) {
       },
     });
 
-    return () => chart.destroy();
+    // Scroll at 30fps — enough for smooth appearance, less CPU than 60fps
+    const scroll = () => {
+      if (!chartRef.current) return;
+      const t = Date.now();
+      const xScale = chartRef.current.options.scales!.x!;
+      xScale.min = t - 62000;
+      xScale.max = t - 2000;
+      chartRef.current.update('none');
+      rafId.current = requestAnimationFrame(scroll);
+    };
+    rafId.current = requestAnimationFrame(scroll);
+
+    return () => {
+      cancelAnimationFrame(rafId.current);
+      chartRef.current?.destroy();
+      chartRef.current = null;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Push new data points from store
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    const data = useDashboardStore.getState().realtimeData;
+    const now = Date.now();
+
+    for (const p of data) {
+      if (p.ts <= lastRenderedTs.current) continue;
+      (chart.data.datasets[0].data as { x: number; y: number }[]).push({ x: p.ts * 1000, y: p.succeeded });
+      (chart.data.datasets[1].data as { x: number; y: number }[]).push({ x: p.ts * 1000, y: p.failed });
+      lastRenderedTs.current = p.ts;
+    }
+
+    // Trim old points
+    const cutoff = now - 70000;
+    for (const ds of chart.data.datasets) {
+      const arr = ds.data as { x: number; y: number }[];
+      while (arr.length > 0 && arr[0].x < cutoff) arr.shift();
+    }
+  }, [realtimeData]);
 
   return (
     <div>
