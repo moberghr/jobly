@@ -92,8 +92,13 @@ public class JobCommandService<TContext> : IJobCommandService
         DecrementStatForState(job.CurrentState);
 
         job.CurrentState = State.Enqueued;
-        job.HandlerType = null;
         job.ExpireAt = null;
+
+        // Only clear HandlerType for direct jobs — message-spawned jobs need it to re-execute the correct handler
+        if (job.MessageId == null)
+        {
+            job.HandlerType = null;
+        }
 
         // Restore batch/message counters so they wait for this job again
         if (job.BatchId != null)
