@@ -79,6 +79,71 @@ public abstract partial class ServiceTests : TestBase
     }
 
     [Fact]
+    public async Task RequeueBatchJob_IncrementsBatchJobCount()
+    {
+        var context = CreateContext();
+        var batchPublisher = TestUtils.CreateBatchPublisher(context);
+        var batchId = await batchPublisher.StartNew(new List<UnitRequest> { new(), new() });
+        await context.SaveChangesAsync();
+
+        // Process all jobs to completion
+        await ProcessAllJobs();
+
+        // Batch JobCount should be 0 (both finished)
+        var batchBefore = await CreateContext().Set<Batch>().FindAsync(batchId);
+        batchBefore!.JobCount.ShouldBe(0);
+
+        // Find a completed job in the batch
+        var completedJob = await CreateContext().Set<Job>()
+            .Where(x => x.BatchId == batchId && x.CurrentState == State.Completed)
+            .FirstAsync();
+
+        // Requeue it
+        var service = TestUtils.CreateJobCommandService(CreateContext());
+        await service.RequeueJob(completedJob.Id);
+
+        // Batch JobCount should be incremented back to 1
+        var batchAfter = await CreateContext().Set<Batch>().FindAsync(batchId);
+        batchAfter!.JobCount.ShouldBe(1);
+
+        var requeuedJob = await GetJob(completedJob.Id);
+        requeuedJob!.CurrentState.ShouldBe(State.Enqueued);
+    }
+
+    [Fact]
+    public async Task RequeueMessageJob_IncrementsMessageJobCountAndReopensMessage()
+    {
+        var context = CreateContext();
+        var publisher = TestUtils.CreatePublisher(context);
+        await publisher.Publish(new SingleHandlerMessage());
+        await context.SaveChangesAsync();
+
+        // Route the message and process the spawned job
+        await ProcessAllJobs();
+
+        // Message should be completed
+        var messages = await CreateContext().Set<Message>().ToListAsync();
+        var message = messages.First();
+        message.CurrentState.ShouldBe(State.Completed);
+        message.JobCount.ShouldBe(0);
+
+        // Find the completed job spawned from this message
+        var messageJob = await CreateContext().Set<Job>()
+            .Where(x => x.MessageId == message.Id)
+            .FirstAsync();
+
+        // Requeue it
+        var service = TestUtils.CreateJobCommandService(CreateContext());
+        await service.RequeueJob(messageJob.Id);
+
+        // Message should be reopened with JobCount = 1
+        var updatedMessage = await CreateContext().Set<Message>().FindAsync(message.Id);
+        updatedMessage!.JobCount.ShouldBe(1);
+        updatedMessage.CurrentState.ShouldBe(State.Processing);
+        updatedMessage.ExpireAt.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task GetMessages_ReturnsPaginatedMessages()
     {
         var context = CreateContext();

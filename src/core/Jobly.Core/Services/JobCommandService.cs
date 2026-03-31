@@ -95,6 +95,34 @@ public class JobCommandService<TContext> : IJobCommandService
         job.HandlerType = null;
         job.ExpireAt = null;
 
+        // Restore batch/message counters so they wait for this job again
+        if (job.BatchId != null)
+        {
+            var batch = await _context.Set<Batch>()
+                .Where(x => x.Id == job.BatchId)
+                .FirstOrDefaultAsync();
+            if (batch != null)
+            {
+                batch.JobCount++;
+            }
+        }
+
+        if (job.MessageId != null)
+        {
+            var message = await _context.Set<Message>()
+                .Where(x => x.Id == job.MessageId)
+                .FirstOrDefaultAsync();
+            if (message != null)
+            {
+                message.JobCount++;
+                if (message.CurrentState == State.Completed)
+                {
+                    message.CurrentState = State.Processing;
+                    message.ExpireAt = null;
+                }
+            }
+        }
+
         await _context.Set<JobLog>().AddAsync(new JobLog
         {
             JobId = job.Id,
