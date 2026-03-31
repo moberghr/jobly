@@ -10,7 +10,7 @@ interface PaginationProps {
 }
 
 export function Pagination({ page, pageCount, onPageChange, pageSize, onPageSizeChange }: PaginationProps) {
-  if (pageCount <= 1 && !onPageSizeChange) return null;
+  if (pageCount <= 0 && !onPageSizeChange) return null;
 
   return (
     <div className="flex items-center gap-2 justify-center mt-4">
@@ -22,9 +22,11 @@ export function Pagination({ page, pageCount, onPageChange, pageSize, onPageSize
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
-      <span className="text-sm text-muted-foreground">
-        Page {page + 1} of {pageCount}
-      </span>
+      {pageCount > 0 && (
+        <span className="text-sm text-muted-foreground">
+          Page {page + 1} of {pageCount}
+        </span>
+      )}
       <Button
         variant="outline"
         size="sm"

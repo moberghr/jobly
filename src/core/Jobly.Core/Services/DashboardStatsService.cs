@@ -71,8 +71,10 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             .Select(g => new { State = g.Key, Count = g.Count() })
             .ToListAsync();
 
+        var messagesEnqueued = messageStateCounts.Where(x => x.State == State.Enqueued).Sum(x => x.Count);
         var messagesProcessing = messageStateCounts.Where(x => x.State == State.Processing).Sum(x => x.Count);
         var messagesCompleted = messageStateCounts.Where(x => x.State == State.Completed).Sum(x => x.Count);
+        var messagesFailed = messageStateCounts.Where(x => x.State == State.Failed).Sum(x => x.Count);
 
         var totalSucceeded = await GetCombinedStatValue("stats:succeeded");
         var totalFailed = await GetCombinedStatValue("stats:failed");
@@ -94,8 +96,10 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             BatchesActive = batchesActive,
             BatchesCompleted = batchesCompleted,
             BatchesFailed = batchesFailed,
+            MessagesEnqueued = messagesEnqueued,
             MessagesProcessing = messagesProcessing,
             MessagesCompleted = messagesCompleted,
+            MessagesFailed = messagesFailed,
             TotalSucceeded = totalSucceeded,
             TotalFailed = totalFailed,
             TotalDeleted = totalDeleted,

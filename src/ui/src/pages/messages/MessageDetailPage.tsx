@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StateBadge } from '@/components/StateBadge';
-import { RelatedJobsTable } from '@/components/RelatedJobsTable';
+import { FilteredJobsTable } from '@/components/FilteredJobsTable';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import type { MessageDetailModel } from '@/types';
@@ -45,10 +45,10 @@ export default function MessageDetailPage() {
         </CardContent>
       </Card>
 
-      <RelatedJobsTable
+      <FilteredJobsTable
         title="Spawned Jobs"
-        count={message.jobsCount}
-        fetchJobs={(page, pageSize) => api.getMessageJobs(message.id, page, pageSize)}
+        fetchJobs={(page, pageSize, state) => api.getMessageJobs(message.id, page, pageSize, state)}
+        fetchCounts={() => api.getMessageJobCounts(message.id)}
       />
     </div>
   );

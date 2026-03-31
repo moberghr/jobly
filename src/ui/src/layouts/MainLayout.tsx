@@ -17,8 +17,8 @@ import type { DashboardStatistics } from '@/types';
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/jobs/enqueued', label: 'Jobs', icon: Briefcase },
-  { to: '/messages', label: 'Messages', icon: Mail },
-  { to: '/batches', label: 'Batches', icon: Layers },
+  { to: '/messages/enqueued', label: 'Messages', icon: Mail },
+  { to: '/batches/active', label: 'Batches', icon: Layers },
   { to: '/recurring', label: 'Recurring', icon: RefreshCw },
   { to: '/servers', label: 'Servers', icon: Server },
 ];
@@ -44,7 +44,9 @@ export default function MainLayout() {
           <nav className="flex gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const matchPath = item.to === '/jobs/enqueued' ? '/jobs' : item.to;
+              const matchPath = item.to.includes('/') && item.to !== '/'
+                ? '/' + item.to.split('/')[1]
+                : item.to;
               const isActive = item.to === '/'
                 ? location.pathname === '/'
                 : location.pathname.startsWith(matchPath);
@@ -222,7 +224,6 @@ function SidebarNav({ title, items }: { title: string; items: { to: string; labe
 function BatchesSidebar({ stats }: { stats: DashboardStatistics | null }) {
   return (
     <SidebarNav title="Batches" items={[
-      { to: '/batches', label: 'All', count: (stats?.batchesActive ?? 0) + (stats?.batchesCompleted ?? 0) + (stats?.batchesFailed ?? 0), color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
       { to: '/batches/active', label: 'Active', count: stats?.batchesActive ?? 0, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
       { to: '/batches/completed', label: 'Completed', count: stats?.batchesCompleted ?? 0, color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
       { to: '/batches/failed', label: 'Failed', count: stats?.batchesFailed ?? 0, color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
@@ -233,9 +234,10 @@ function BatchesSidebar({ stats }: { stats: DashboardStatistics | null }) {
 function MessagesSidebar({ stats }: { stats: DashboardStatistics | null }) {
   return (
     <SidebarNav title="Messages" items={[
-      { to: '/messages', label: 'All', count: (stats?.messagesProcessing ?? 0) + (stats?.messagesCompleted ?? 0), color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
+      { to: '/messages/enqueued', label: 'Enqueued', count: stats?.messagesEnqueued ?? 0, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
       { to: '/messages/processing', label: 'Processing', count: stats?.messagesProcessing ?? 0, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
       { to: '/messages/completed', label: 'Completed', count: stats?.messagesCompleted ?? 0, color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
+      { to: '/messages/failed', label: 'Failed', count: stats?.messagesFailed ?? 0, color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
     ]} />
   );
 }

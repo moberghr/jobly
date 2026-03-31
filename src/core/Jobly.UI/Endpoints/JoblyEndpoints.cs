@@ -59,7 +59,9 @@ public static class JoblyEndpoints
             return model is null ? Results.NotFound() : Results.Ok(model);
         });
 
-        apiGroup.MapGet("messages/{messageId}/jobs", async ([FromServices] IMessageQueryService messageQueryService, Guid messageId, [AsParameters] BaseListRequest request) => await messageQueryService.GetMessageJobs(messageId, request));
+        apiGroup.MapGet("messages/{messageId}/jobs", async ([FromServices] IMessageQueryService messageQueryService, Guid messageId, [AsParameters] BaseListRequest request, string? state) => await messageQueryService.GetMessageJobs(messageId, request, state));
+
+        apiGroup.MapGet("messages/{messageId}/jobs/counts", async ([FromServices] IMessageQueryService messageQueryService, Guid messageId) => await messageQueryService.GetMessageJobCounts(messageId));
 
         apiGroup.MapGet("recurring", async ([FromServices] IRecurringJobService recurringJobService, [AsParameters] BaseListRequest request) => await recurringJobService.GetRecurringJobs(request));
 
@@ -89,7 +91,9 @@ public static class JoblyEndpoints
             return model is null ? Results.NotFound() : Results.Ok(model);
         });
 
-        apiGroup.MapGet("batches/{batchId}/jobs", async ([FromServices] IBatchQueryService batchQueryService, Guid batchId, [AsParameters] BaseListRequest request) => await batchQueryService.GetBatchJobs(batchId, request));
+        apiGroup.MapGet("batches/{batchId}/jobs", async ([FromServices] IBatchQueryService batchQueryService, Guid batchId, [AsParameters] BaseListRequest request, string? state) => await batchQueryService.GetBatchJobs(batchId, request, state));
+
+        apiGroup.MapGet("batches/{batchId}/jobs/counts", async ([FromServices] IBatchQueryService batchQueryService, Guid batchId) => await batchQueryService.GetBatchJobCounts(batchId));
 
         apiGroup.MapGet("stats/history", async ([FromServices] IDashboardStatsService statsService, [FromQuery] int? hours) => await statsService.GetStatsHistory(hours ?? 24));
 

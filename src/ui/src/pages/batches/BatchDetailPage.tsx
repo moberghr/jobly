@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StateBadge } from '@/components/StateBadge';
-import { RelatedJobsTable } from '@/components/RelatedJobsTable';
+import { FilteredJobsTable } from '@/components/FilteredJobsTable';
 import { shortId, formatDateTime } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import type { BatchDetailModel } from '@/types';
@@ -12,16 +12,24 @@ export default function BatchDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [batch, setBatch] = useState<BatchDetailModel | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [jobCounts, setJobCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (id) api.getBatchById(id).then(setBatch).catch(() => setError('Unable to load batch'));
   }, [id]);
 
+  const handleCountsUpdate = useCallback((counts: Record<string, number>) => {
+    setJobCounts(counts);
+  }, []);
+
   if (error) return <ErrorState message={error} />;
   if (!batch) return <LoadingState />;
 
-  const completed = batch.totalJobs - batch.remainingJobs;
-  const pct = batch.totalJobs > 0 ? Math.round((completed / batch.totalJobs) * 100) : 0;
+  const totalJobs = Object.keys(jobCounts).length > 0
+    ? Object.values(jobCounts).reduce((a, b) => a + b, 0)
+    : batch.totalJobs;
+  const completedJobs = jobCounts['completed'] ?? (batch.totalJobs - batch.remainingJobs);
+  const pct = totalJobs > 0 ? Math.round((completedJobs / totalJobs) * 100) : 0;
 
   return (
     <div>
@@ -37,7 +45,7 @@ export default function BatchDetailPage() {
             <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden">
               <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
             </div>
-            <span className="text-sm font-medium">{completed}/{batch.totalJobs} ({pct}%)</span>
+            <span className="text-sm font-medium">{completedJobs}/{totalJobs} ({pct}%)</span>
           </div>
           <div className="mt-3 text-sm text-muted-foreground space-y-1">
             <div>Created: {formatDateTime(batch.createTime)}</div>
@@ -51,10 +59,11 @@ export default function BatchDetailPage() {
         </CardContent>
       </Card>
 
-      <RelatedJobsTable
+      <FilteredJobsTable
         title="Jobs"
-        count={batch.totalJobs}
-        fetchJobs={(page, pageSize) => api.getBatchJobs(batch.id, page, pageSize)}
+        fetchJobs={(page, pageSize, state) => api.getBatchJobs(batch.id, page, pageSize, state)}
+        fetchCounts={() => api.getBatchJobCounts(batch.id)}
+        onCountsUpdate={handleCountsUpdate}
       />
     </div>
   );

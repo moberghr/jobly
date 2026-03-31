@@ -40,9 +40,13 @@ public class DashboardStatistics
 
     public int BatchesFailed { get; set; }
 
+    public int MessagesEnqueued { get; set; }
+
     public int MessagesProcessing { get; set; }
 
     public int MessagesCompleted { get; set; }
+
+    public int MessagesFailed { get; set; }
 
     public string? DatabaseConnection { get; set; }
 }

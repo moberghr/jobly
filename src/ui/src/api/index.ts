@@ -49,8 +49,11 @@ export const getMessages = (page = 0, pageSize = 20, state?: string) =>
 export const getMessageById = (messageId: string) =>
   api.get<MessageDetailModel>(`/messages/${messageId}`).then(r => r.data);
 
-export const getMessageJobs = (messageId: string, page = 0, pageSize = 20) =>
-  api.get<PagedList<JobModel>>(`/messages/${messageId}/jobs`, { params: { page, pageSize } }).then(r => r.data);
+export const getMessageJobCounts = (messageId: string) =>
+  api.get<Record<string, number>>(`/messages/${messageId}/jobs/counts`).then(r => r.data);
+
+export const getMessageJobs = (messageId: string, page = 0, pageSize = 20, state?: string) =>
+  api.get<PagedList<JobModel>>(`/messages/${messageId}/jobs`, { params: { page, pageSize, state } }).then(r => r.data);
 
 // Recurring jobs
 export const getRecurringJobs = (page = 0, pageSize = 20) =>
@@ -79,8 +82,11 @@ export const getBatches = (page = 0, pageSize = 20, state?: string) =>
 export const getBatchById = (batchId: string) =>
   api.get<BatchDetailModel>(`/batches/${batchId}`).then(r => r.data);
 
-export const getBatchJobs = (batchId: string, page = 0, pageSize = 20) =>
-  api.get<PagedList<JobModel>>(`/batches/${batchId}/jobs`, { params: { page, pageSize } }).then(r => r.data);
+export const getBatchJobCounts = (batchId: string) =>
+  api.get<Record<string, number>>(`/batches/${batchId}/jobs/counts`).then(r => r.data);
+
+export const getBatchJobs = (batchId: string, page = 0, pageSize = 20, state?: string) =>
+  api.get<PagedList<JobModel>>(`/batches/${batchId}/jobs`, { params: { page, pageSize, state } }).then(r => r.data);
 
 // Servers
 export const getServers = () => api.get<ServerModel[]>('/servers').then(r => r.data);

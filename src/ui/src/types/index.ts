@@ -22,8 +22,10 @@ export interface DashboardStatistics {
   batchesActive: number;
   batchesCompleted: number;
   batchesFailed: number;
+  messagesEnqueued: number;
   messagesProcessing: number;
   messagesCompleted: number;
+  messagesFailed: number;
   messages: number;
   totalSucceeded: number;
   totalFailed: number;

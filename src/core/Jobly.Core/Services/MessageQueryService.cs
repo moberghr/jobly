@@ -12,7 +12,9 @@ public interface IMessageQueryService
 
     Task<MessageDetailModel?> GetMessageById(Guid messageId);
 
-    Task<PagedList<JobModel>> GetMessageJobs(Guid messageId, BaseListRequest request);
+    Task<PagedList<JobModel>> GetMessageJobs(Guid messageId, BaseListRequest request, string? state = null);
+
+    Task<Dictionary<string, int>> GetMessageJobCounts(Guid messageId);
 }
 
 public class MessageQueryService<TContext> : IMessageQueryService
@@ -31,8 +33,10 @@ public class MessageQueryService<TContext> : IMessageQueryService
 
         query = state switch
         {
+            "enqueued" => query.Where(x => x.CurrentState == State.Enqueued),
             "processing" => query.Where(x => x.CurrentState == State.Processing),
             "completed" => query.Where(x => x.CurrentState == State.Completed),
+            "failed" => query.Where(x => x.CurrentState == State.Failed),
             _ => query,
         };
 
@@ -79,10 +83,21 @@ public class MessageQueryService<TContext> : IMessageQueryService
         return message;
     }
 
-    public async Task<PagedList<JobModel>> GetMessageJobs(Guid messageId, BaseListRequest request)
+    public async Task<PagedList<JobModel>> GetMessageJobs(Guid messageId, BaseListRequest request, string? state = null)
     {
-        return await _context.Set<Job>()
-            .Where(x => x.MessageId == messageId)
+        var query = _context.Set<Job>()
+            .Where(x => x.MessageId == messageId);
+
+        query = state switch
+        {
+            "enqueued" => query.Where(x => x.CurrentState == State.Enqueued),
+            "processing" => query.Where(x => x.CurrentState == State.Processing),
+            "completed" => query.Where(x => x.CurrentState == State.Completed),
+            "failed" => query.Where(x => x.CurrentState == State.Failed),
+            _ => query,
+        };
+
+        return await query
             .OrderByDescending(x => x.CreateTime)
             .Select(x => new JobModel
             {
@@ -94,5 +109,16 @@ public class MessageQueryService<TContext> : IMessageQueryService
                 CurrentState = x.CurrentState,
             })
             .ToPagedListAsync(request);
+    }
+
+    public async Task<Dictionary<string, int>> GetMessageJobCounts(Guid messageId)
+    {
+        var counts = await _context.Set<Job>()
+            .Where(x => x.MessageId == messageId)
+            .GroupBy(x => x.CurrentState)
+            .Select(g => new { State = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        return counts.ToDictionary(x => x.State.ToString().ToLowerInvariant(), x => x.Count);
     }
 }

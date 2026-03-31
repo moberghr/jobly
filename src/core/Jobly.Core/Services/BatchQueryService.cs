@@ -12,7 +12,9 @@ public interface IBatchQueryService
 
     Task<BatchDetailModel?> GetBatchById(Guid batchId);
 
-    Task<PagedList<JobModel>> GetBatchJobs(Guid batchId, BaseListRequest request);
+    Task<PagedList<JobModel>> GetBatchJobs(Guid batchId, BaseListRequest request, string? state = null);
+
+    Task<Dictionary<string, int>> GetBatchJobCounts(Guid batchId);
 }
 
 public class BatchQueryService<TContext> : IBatchQueryService
@@ -91,10 +93,14 @@ public class BatchQueryService<TContext> : IBatchQueryService
         };
     }
 
-    public async Task<PagedList<JobModel>> GetBatchJobs(Guid batchId, BaseListRequest request)
+    public async Task<PagedList<JobModel>> GetBatchJobs(Guid batchId, BaseListRequest request, string? state = null)
     {
-        return await _context.Set<Job>()
-            .Where(j => j.BatchId == batchId)
+        var query = _context.Set<Job>()
+            .Where(j => j.BatchId == batchId);
+
+        query = FilterByState(query, state);
+
+        return await query
             .OrderByDescending(j => j.CreateTime)
             .Select(j => new JobModel
             {
@@ -106,5 +112,28 @@ public class BatchQueryService<TContext> : IBatchQueryService
                 CurrentState = j.CurrentState,
             })
             .ToPagedListAsync(request);
+    }
+
+    public async Task<Dictionary<string, int>> GetBatchJobCounts(Guid batchId)
+    {
+        var counts = await _context.Set<Job>()
+            .Where(j => j.BatchId == batchId)
+            .GroupBy(j => j.CurrentState)
+            .Select(g => new { State = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        return counts.ToDictionary(x => x.State.ToString().ToLowerInvariant(), x => x.Count);
+    }
+
+    private static IQueryable<Job> FilterByState(IQueryable<Job> query, string? state)
+    {
+        return state switch
+        {
+            "enqueued" => query.Where(j => j.CurrentState == State.Enqueued),
+            "processing" => query.Where(j => j.CurrentState == State.Processing),
+            "completed" => query.Where(j => j.CurrentState == State.Completed),
+            "failed" => query.Where(j => j.CurrentState == State.Failed),
+            _ => query,
+        };
     }
 }
