@@ -124,7 +124,12 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
 
     chartRef.current = chart;
 
+    // Resize chart when container gets actual dimensions (fixes blank chart on navigation)
+    const observer = new ResizeObserver(() => chart.resize());
+    observer.observe(canvasRef.current.parentElement!);
+
     return () => {
+      observer.disconnect();
       chart.destroy();
       chartRef.current = null;
     };
