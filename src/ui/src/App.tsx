@@ -20,12 +20,12 @@ function App() {
           <Route index element={<DashboardPage />} />
           <Route path="/jobs/detail/:id" element={<JobDetailPage />} />
           <Route path="/jobs/:state" element={<JobListPage />} />
+          <Route path="/messages/detail/:id" element={<MessageDetailPage />} />
           <Route path="/messages/:state" element={<MessagesPage />} />
           <Route path="/messages" element={<MessagesPage />} />
-          <Route path="/messages/:id" element={<MessageDetailPage />} />
+          <Route path="/batches/detail/:id" element={<BatchDetailPage />} />
           <Route path="/batches/:state" element={<BatchesPage />} />
           <Route path="/batches" element={<BatchesPage />} />
-          <Route path="/batches/:id" element={<BatchDetailPage />} />
           <Route path="/recurring/:id" element={<RecurringDetailPage />} />
           <Route path="/recurring" element={<RecurringPage />} />
           <Route path="/servers/:id" element={<ServerDetailPage />} />

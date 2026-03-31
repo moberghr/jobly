@@ -101,13 +101,13 @@ export default function JobDetailPage() {
               {job.batchId && (
                 <div>
                   <span className="text-muted-foreground">Batch:</span>{' '}
-                  <Link to={`/batches/${job.batchId}`} className="text-primary hover:underline font-mono text-xs">{shortId(job.batchId)}</Link>
+                  <Link to={`/batches/detail/${job.batchId}`} className="text-primary hover:underline font-mono text-xs">{shortId(job.batchId)}</Link>
                 </div>
               )}
               {job.messageId && (
                 <div>
                   <span className="text-muted-foreground">Spawned from Message:</span>{' '}
-                  <Link to={`/messages/${job.messageId}`} className="text-primary hover:underline font-mono text-xs">{shortId(job.messageId)}</Link>
+                  <Link to={`/messages/detail/${job.messageId}`} className="text-primary hover:underline font-mono text-xs">{shortId(job.messageId)}</Link>
                 </div>
               )}
               {job.parentJobId && (
