@@ -19,6 +19,11 @@ export interface DashboardStatistics {
   servers: number;
   awaiting: number;
   deleted: number;
+  batchesActive: number;
+  batchesCompleted: number;
+  batchesFailed: number;
+  messagesProcessing: number;
+  messagesCompleted: number;
   messages: number;
   totalSucceeded: number;
   totalFailed: number;

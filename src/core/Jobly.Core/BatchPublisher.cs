@@ -16,6 +16,8 @@ public interface IBatchPublisher
 
     Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded)
         where T : class, IJob;
+
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 
 public class BatchPublisher<TContext> : IBatchPublisher
@@ -118,5 +120,10 @@ public class BatchPublisher<TContext> : IBatchPublisher
         _context.Set<Batch>().Add(newBatch);
 
         return newBatch.Id;
+    }
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        return _context.SaveChangesAsync(cancellationToken);
     }
 }

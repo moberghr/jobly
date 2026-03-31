@@ -141,7 +141,7 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     await recurringPublisher.AddOrUpdateRecurringJob(
         new SendEmailRequest { EmailLogId = 1 }, "cleanup-hourly", "0 * * * *");
 
-    await context.SaveChangesAsync();
+    await publisher.SaveChangesAsync();
 
     return Results.Ok(new
     {
@@ -159,7 +159,7 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     });
 });
 
-app.MapPost("/seed-perf", async (IPublisher publisher, TestContext context, int? count) =>
+app.MapPost("/seed-perf", async (IPublisher publisher, int? count) =>
 {
     var total = count ?? 10000;
     const int batchSize = 500;
@@ -173,14 +173,14 @@ app.MapPost("/seed-perf", async (IPublisher publisher, TestContext context, int?
             await publisher.Enqueue(new EmptyRequest());
         }
 
-        await context.SaveChangesAsync();
+        await publisher.SaveChangesAsync();
         created += remaining;
     }
 
     return Results.Ok(new { created });
 });
 
-app.MapGet("/seed-perf-batch", async (IBatchPublisher batchPublisher, TestContext context, int? jobsPerBatch, int? batchCount) =>
+app.MapGet("/seed-perf-batch", async (IBatchPublisher batchPublisher, int? jobsPerBatch, int? batchCount) =>
 {
     var jobs = jobsPerBatch ?? 100;
     var batches = batchCount ?? 10;
@@ -193,11 +193,11 @@ app.MapGet("/seed-perf-batch", async (IBatchPublisher batchPublisher, TestContex
         totalJobs += jobs;
     }
 
-    await context.SaveChangesAsync();
+    await batchPublisher.SaveChangesAsync();
     return Results.Ok(new { batches, jobsPerBatch = jobs, totalJobs });
 });
 
-app.MapGet("/seed-perf-messages", async (IPublisher publisher, TestContext context, int? count) =>
+app.MapGet("/seed-perf-messages", async (IPublisher publisher, int? count) =>
 {
     var total = count ?? 100;
     for (var i = 0; i < total; i++)
@@ -205,7 +205,7 @@ app.MapGet("/seed-perf-messages", async (IPublisher publisher, TestContext conte
         await publisher.Publish(new EmptyMessage());
     }
 
-    await context.SaveChangesAsync();
+    await publisher.SaveChangesAsync();
     return Results.Ok(new { messages = total, jobsPerMessage = 3, totalJobs = total * 3 });
 });
 

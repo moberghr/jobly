@@ -43,8 +43,8 @@ export const requeueJob = (jobId: string) => api.post(`/jobs/${jobId}/requeue`);
 export const deleteJob = (jobId: string) => api.post(`/jobs/${jobId}/delete`);
 
 // Messages
-export const getMessages = (page = 0, pageSize = 20) =>
-  api.get<PagedList<MessageModel>>('/messages', { params: { page, pageSize } }).then(r => r.data);
+export const getMessages = (page = 0, pageSize = 20, state?: string) =>
+  api.get<PagedList<MessageModel>>('/messages', { params: { page, pageSize, state } }).then(r => r.data);
 
 export const getMessageById = (messageId: string) =>
   api.get<MessageDetailModel>(`/messages/${messageId}`).then(r => r.data);
@@ -73,8 +73,8 @@ export const bulkRequeueJobs = (jobIds: string[]) =>
   api.post<BulkResult>('/jobs/bulk/requeue', { jobIds }).then(r => r.data);
 
 // Batches
-export const getBatches = (page = 0, pageSize = 20) =>
-  api.get<PagedList<BatchModel>>('/batches', { params: { page, pageSize } }).then(r => r.data);
+export const getBatches = (page = 0, pageSize = 20, state?: string) =>
+  api.get<PagedList<BatchModel>>('/batches', { params: { page, pageSize, state } }).then(r => r.data);
 
 export const getBatchById = (batchId: string) =>
   api.get<BatchDetailModel>(`/batches/${batchId}`).then(r => r.data);

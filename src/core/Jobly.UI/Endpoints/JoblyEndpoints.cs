@@ -51,7 +51,7 @@ public static class JoblyEndpoints
 
         apiGroup.MapPost("jobs/bulk/requeue", async ([FromServices] IJobCommandService jobCommandService, [FromBody] BulkJobRequest request) => await jobCommandService.BulkRequeueJobs(request.JobIds));
 
-        apiGroup.MapGet("messages", async ([FromServices] IMessageQueryService messageQueryService, [AsParameters] BaseListRequest request) => await messageQueryService.GetMessages(request));
+        apiGroup.MapGet("messages", async ([FromServices] IMessageQueryService messageQueryService, [AsParameters] BaseListRequest request, string? state) => await messageQueryService.GetMessages(request, state));
 
         apiGroup.MapGet("messages/{messageId}", async ([FromServices] IMessageQueryService messageQueryService, Guid messageId) =>
         {
@@ -81,7 +81,7 @@ public static class JoblyEndpoints
             return job?.Logs ?? [];
         });
 
-        apiGroup.MapGet("batches", async ([FromServices] IBatchQueryService batchQueryService, [AsParameters] BaseListRequest request) => await batchQueryService.GetBatches(request));
+        apiGroup.MapGet("batches", async ([FromServices] IBatchQueryService batchQueryService, [AsParameters] BaseListRequest request, string? state) => await batchQueryService.GetBatches(request, state));
 
         apiGroup.MapGet("batches/{batchId}", async ([FromServices] IBatchQueryService batchQueryService, Guid batchId) =>
         {

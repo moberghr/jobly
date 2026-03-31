@@ -70,6 +70,8 @@ public interface IPublisher
 
     Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, Guid parentJobId, string? queue)
         where T : class, IJob;
+
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 
 public class Publisher<TContext> : IPublisher
@@ -224,5 +226,10 @@ public class Publisher<TContext> : IPublisher
         });
 
         return newJob.Id;
+    }
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        return _context.SaveChangesAsync(cancellationToken);
     }
 }

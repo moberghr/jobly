@@ -6,6 +6,7 @@ import { Pagination } from '@/components/Pagination';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
+import { useRefreshKey } from '@/hooks/useRefreshKey';
 import type { RecurringJobModel, PagedList } from '@/types';
 import * as api from '@/api';
 
@@ -14,6 +15,7 @@ export default function RecurringPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
+  const refreshKey = useRefreshKey();
 
   const fetchData = useCallback(async () => {
     try {
@@ -25,7 +27,7 @@ export default function RecurringPage() {
     }
   }, [page, pageSize]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
 
   if (error) return <ErrorState message={error} />;
   if (!data) return <LoadingState />;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StateBadge } from '@/components/StateBadge';
 import { Pagination } from '@/components/Pagination';
@@ -7,26 +7,31 @@ import { shortId } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
+import { useRefreshKey } from '@/hooks/useRefreshKey';
 import type { BatchModel, PagedList } from '@/types';
 import * as api from '@/api';
 
 export default function BatchesPage() {
+  const { state } = useParams<{ state?: string }>();
   const [data, setData] = useState<PagedList<BatchModel> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
+  const refreshKey = useRefreshKey();
+
+  useEffect(() => { setPage(0); }, [state]);
 
   const fetchData = useCallback(async () => {
     try {
-      const result = await api.getBatches(page, pageSize);
+      const result = await api.getBatches(page, pageSize, state);
       setData(result);
       setError(null);
     } catch {
       setError('Unable to load batches');
     }
-  }, [page, pageSize]);
+  }, [page, pageSize, state]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
 
   if (error) return <ErrorState message={error} />;
   if (!data) return <LoadingState />;
@@ -34,7 +39,7 @@ export default function BatchesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Batches</h1>
+        <h1 className="text-2xl font-bold">{state ? `${state.charAt(0).toUpperCase() + state.slice(1)} Batches` : 'Batches'}</h1>
         <span className="text-sm text-muted-foreground">{data.totalCount} total</span>
       </div>
 

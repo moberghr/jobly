@@ -8,6 +8,7 @@ import { shortType, shortId } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
+import { useRefreshKey } from '@/hooks/useRefreshKey';
 import type { JobModel, PagedList } from '@/types';
 import * as api from '@/api';
 
@@ -28,6 +29,7 @@ export default function JobListPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const refreshKey = useRefreshKey();
 
   const fetchData = useCallback(async () => {
     const fetcher = stateEndpoints[state ?? 'enqueued'];
@@ -48,7 +50,7 @@ export default function JobListPage() {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, refreshKey]);
 
   const handlePageSizeChange = (size: number) => {
     setPageSize(size);

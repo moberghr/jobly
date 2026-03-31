@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useDashboardStore } from '@/stores/dashboard';
 import { usePolling } from '@/hooks/usePolling';
 import {
@@ -26,11 +26,14 @@ const navItems = [
 export default function MainLayout() {
   const { stats, error, fetchStats } = useDashboardStore();
   const location = useLocation();
+  const navigate = useNavigate();
   const { theme, toggle } = useTheme();
 
   usePolling(fetchStats, 1000);
 
   const isJobsSection = location.pathname.startsWith('/jobs');
+  const isBatchesSection = location.pathname.startsWith('/batches');
+  const isMessagesSection = location.pathname.startsWith('/messages');
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -49,6 +52,12 @@ export default function MainLayout() {
                 <Link
                   key={item.to}
                   to={item.to}
+                  onClick={(e) => {
+                    if (isActive) {
+                      e.preventDefault();
+                      navigate(item.to, { replace: true, state: { refreshKey: Date.now() } });
+                    }
+                  }}
                   className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-primary text-primary-foreground'
@@ -100,6 +109,8 @@ export default function MainLayout() {
 
       <div className="flex flex-1">
         {isJobsSection && <JobsSidebar stats={stats} />}
+        {isBatchesSection && <BatchesSidebar stats={stats} />}
+        {isMessagesSection && <MessagesSidebar stats={stats} />}
 
         <main className="flex-1 p-6">
           <Outlet />
@@ -120,6 +131,7 @@ export default function MainLayout() {
 
 function JobsSidebar({ stats }: { stats: DashboardStatistics | null }) {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const sidebarItems = [
     { to: '/jobs/enqueued', label: 'Enqueued', count: stats?.created ?? 0, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
@@ -141,6 +153,12 @@ function JobsSidebar({ stats }: { stats: DashboardStatistics | null }) {
             <Link
               key={item.to}
               to={item.to}
+              onClick={(e) => {
+                if (isActive) {
+                  e.preventDefault();
+                  navigate(item.to, { replace: true, state: { refreshKey: Date.now() } });
+                }
+              }}
               className={`flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
                 isActive
                   ? 'bg-accent text-accent-foreground font-medium'
@@ -158,5 +176,66 @@ function JobsSidebar({ stats }: { stats: DashboardStatistics | null }) {
         })}
       </nav>
     </aside>
+  );
+}
+
+function SidebarNav({ title, items }: { title: string; items: { to: string; label: string; count: number; color: string }[] }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  return (
+    <aside className="w-64 shrink-0 border-r bg-card min-h-[calc(100vh-3.5rem)] p-4">
+      <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3">{title}</h3>
+      <nav className="space-y-1">
+        {items.map((item) => {
+          const isActive = location.pathname === item.to;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              onClick={(e) => {
+                if (isActive) {
+                  e.preventDefault();
+                  navigate(item.to, { replace: true, state: { refreshKey: Date.now() } });
+                }
+              }}
+              className={`flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
+                isActive
+                  ? 'bg-accent text-accent-foreground font-medium'
+                  : 'text-muted-foreground hover:bg-accent/50'
+              }`}
+            >
+              <span>{item.label}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                item.count > 0 ? item.color : 'text-muted-foreground/50'
+              }`}>
+                {item.count}
+              </span>
+            </Link>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+function BatchesSidebar({ stats }: { stats: DashboardStatistics | null }) {
+  return (
+    <SidebarNav title="Batches" items={[
+      { to: '/batches', label: 'All', count: (stats?.batchesActive ?? 0) + (stats?.batchesCompleted ?? 0) + (stats?.batchesFailed ?? 0), color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
+      { to: '/batches/active', label: 'Active', count: stats?.batchesActive ?? 0, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
+      { to: '/batches/completed', label: 'Completed', count: stats?.batchesCompleted ?? 0, color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
+      { to: '/batches/failed', label: 'Failed', count: stats?.batchesFailed ?? 0, color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
+    ]} />
+  );
+}
+
+function MessagesSidebar({ stats }: { stats: DashboardStatistics | null }) {
+  return (
+    <SidebarNav title="Messages" items={[
+      { to: '/messages', label: 'All', count: (stats?.messagesProcessing ?? 0) + (stats?.messagesCompleted ?? 0), color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
+      { to: '/messages/processing', label: 'Processing', count: stats?.messagesProcessing ?? 0, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
+      { to: '/messages/completed', label: 'Completed', count: stats?.messagesCompleted ?? 0, color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
+    ]} />
   );
 }

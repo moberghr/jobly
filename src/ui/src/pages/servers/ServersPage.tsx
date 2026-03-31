@@ -4,16 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatBytes } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
+import { useRefreshKey } from '@/hooks/useRefreshKey';
 import type { ServerModel } from '@/types';
 import * as api from '@/api';
 
 export default function ServersPage() {
   const [servers, setServers] = useState<ServerModel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const refreshKey = useRefreshKey();
 
   useEffect(() => {
     api.getServers().then(setServers).catch(() => setError('Unable to load servers'));
-  }, []);
+  }, [refreshKey]);
 
   if (error) return <ErrorState message={error} />;
   if (!servers) return <LoadingState />;

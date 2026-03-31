@@ -34,5 +34,15 @@ public class DashboardStatistics
 
     public int Batches { get; set; }
 
+    public int BatchesActive { get; set; }
+
+    public int BatchesCompleted { get; set; }
+
+    public int BatchesFailed { get; set; }
+
+    public int MessagesProcessing { get; set; }
+
+    public int MessagesCompleted { get; set; }
+
     public string? DatabaseConnection { get; set; }
 }

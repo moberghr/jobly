@@ -45,6 +45,39 @@ public abstract partial class ServiceTests : TestBase
     }
 
     [Fact]
+    public async Task PublisherSaveChangesAsync_PersistsEnqueuedJob()
+    {
+        var context = CreateContext();
+        var publisher = TestUtils.CreatePublisher(context);
+
+        var jobId = await publisher.Enqueue(new UnitRequest());
+        await publisher.SaveChangesAsync();
+
+        var job = await GetJob(jobId);
+        job.ShouldNotBeNull();
+        job.CurrentState.ShouldBe(State.Enqueued);
+    }
+
+    [Fact]
+    public async Task BatchPublisherSaveChangesAsync_PersistsBatchAndJobs()
+    {
+        var context = CreateContext();
+        var batchPublisher = TestUtils.CreateBatchPublisher(context);
+
+        var batchId = await batchPublisher.StartNew(new List<UnitRequest> { new(), new(), new() });
+        await batchPublisher.SaveChangesAsync();
+
+        var batch = await CreateContext().Set<Batch>().FindAsync(batchId);
+        batch.ShouldNotBeNull();
+        batch.JobCount.ShouldBe(3);
+
+        var jobs = await CreateContext().Set<Job>()
+            .Where(j => j.BatchId == batchId)
+            .CountAsync();
+        jobs.ShouldBe(3);
+    }
+
+    [Fact]
     public async Task DeleteJob_SetsStateToDeleted()
     {
         var context = CreateContext();
@@ -183,6 +216,52 @@ public abstract partial class ServiceTests : TestBase
 
         result.TotalCount.ShouldBe(2);
         result.Items.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task GetMessages_WithStateFilter_ReturnsFilteredMessages()
+    {
+        var context = CreateContext();
+        var publisher = TestUtils.CreatePublisher(context);
+
+        await publisher.Publish(new MultiRequest());
+        await publisher.Publish(new SingleHandlerMessage());
+        await context.SaveChangesAsync();
+
+        // Route messages and process all jobs so some messages complete
+        await ProcessAllJobs();
+
+        var service = TestUtils.CreateMessageQueryService(CreateContext());
+
+        var completed = await service.GetMessages(new BaseListRequest { Page = 0, PageSize = 10 }, "completed");
+        completed.Items.ShouldAllBe(m => m.CurrentState == State.Completed);
+
+        var all = await service.GetMessages(new BaseListRequest { Page = 0, PageSize = 10 });
+        all.TotalCount.ShouldBeGreaterThanOrEqualTo(completed.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetBatches_WithStateFilter_ReturnsFilteredBatches()
+    {
+        var context = CreateContext();
+        var batchPublisher = TestUtils.CreateBatchPublisher(context);
+
+        // Create a batch and process it to completion
+        await batchPublisher.StartNew(new List<UnitRequest> { new(), new() });
+        await context.SaveChangesAsync();
+        await ProcessAllJobs();
+
+        var service = TestUtils.CreateBatchQueryService(CreateContext());
+
+        var completed = await service.GetBatches(new BaseListRequest { Page = 0, PageSize = 10 }, "completed");
+        completed.TotalCount.ShouldBeGreaterThan(0);
+        completed.Items.ShouldAllBe(b => b.PlaceholderState == State.Completed);
+
+        var active = await service.GetBatches(new BaseListRequest { Page = 0, PageSize = 10 }, "active");
+        active.Items.ShouldAllBe(b => b.RemainingJobs > 0);
+
+        var all = await service.GetBatches(new BaseListRequest { Page = 0, PageSize = 10 });
+        all.TotalCount.ShouldBeGreaterThanOrEqualTo(completed.TotalCount);
     }
 
     [Fact]

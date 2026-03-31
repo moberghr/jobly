@@ -1,5 +1,6 @@
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
+using Jobly.Core.Enums;
 using Jobly.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,7 +8,7 @@ namespace Jobly.Core.Services;
 
 public interface IMessageQueryService
 {
-    Task<PagedList<MessageModel>> GetMessages(BaseListRequest request);
+    Task<PagedList<MessageModel>> GetMessages(BaseListRequest request, string? state = null);
 
     Task<MessageDetailModel?> GetMessageById(Guid messageId);
 
@@ -24,9 +25,18 @@ public class MessageQueryService<TContext> : IMessageQueryService
         _context = context;
     }
 
-    public async Task<PagedList<MessageModel>> GetMessages(BaseListRequest request)
+    public async Task<PagedList<MessageModel>> GetMessages(BaseListRequest request, string? state = null)
     {
-        return await _context.Set<Message>()
+        var query = _context.Set<Message>().AsQueryable();
+
+        query = state switch
+        {
+            "processing" => query.Where(x => x.CurrentState == State.Processing),
+            "completed" => query.Where(x => x.CurrentState == State.Completed),
+            _ => query,
+        };
+
+        return await query
             .OrderByDescending(x => x.CreateTime)
             .Select(x => new MessageModel
             {

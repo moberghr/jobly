@@ -54,6 +54,26 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             .Where(x => x.JobCount > 0)
             .CountAsync();
 
+        // Per-state batch counts (via placeholder job state)
+        var batchStateCounts = await _context.Set<Batch>()
+            .Join(_context.Set<Job>(), b => b.Id, j => j.Id, (b, j) => new { b.JobCount, j.CurrentState })
+            .GroupBy(x => x.CurrentState)
+            .Select(g => new { State = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        var batchesActive = batchStateCounts.Where(x => x.State == State.Awaiting).Sum(x => x.Count);
+        var batchesCompleted = batchStateCounts.Where(x => x.State == State.Completed).Sum(x => x.Count);
+        var batchesFailed = batchStateCounts.Where(x => x.State == State.Failed).Sum(x => x.Count);
+
+        // Per-state message counts
+        var messageStateCounts = await _context.Set<Message>()
+            .GroupBy(x => x.CurrentState)
+            .Select(g => new { State = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        var messagesProcessing = messageStateCounts.Where(x => x.State == State.Processing).Sum(x => x.Count);
+        var messagesCompleted = messageStateCounts.Where(x => x.State == State.Completed).Sum(x => x.Count);
+
         var totalSucceeded = await GetCombinedStatValue("stats:succeeded");
         var totalFailed = await GetCombinedStatValue("stats:failed");
         var totalDeleted = await GetCombinedStatValue("stats:deleted");
@@ -71,6 +91,11 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             Deleted = deleted,
             Messages = messages,
             Batches = batches,
+            BatchesActive = batchesActive,
+            BatchesCompleted = batchesCompleted,
+            BatchesFailed = batchesFailed,
+            MessagesProcessing = messagesProcessing,
+            MessagesCompleted = messagesCompleted,
             TotalSucceeded = totalSucceeded,
             TotalFailed = totalFailed,
             TotalDeleted = totalDeleted,

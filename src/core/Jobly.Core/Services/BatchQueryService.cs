@@ -1,5 +1,6 @@
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
+using Jobly.Core.Enums;
 using Jobly.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,7 +8,7 @@ namespace Jobly.Core.Services;
 
 public interface IBatchQueryService
 {
-    Task<PagedList<BatchModel>> GetBatches(BaseListRequest request);
+    Task<PagedList<BatchModel>> GetBatches(BaseListRequest request, string? state = null);
 
     Task<BatchDetailModel?> GetBatchById(Guid batchId);
 
@@ -24,10 +25,20 @@ public class BatchQueryService<TContext> : IBatchQueryService
         _context = context;
     }
 
-    public async Task<PagedList<BatchModel>> GetBatches(BaseListRequest request)
+    public async Task<PagedList<BatchModel>> GetBatches(BaseListRequest request, string? state = null)
     {
-        return await _context.Set<Batch>()
-            .Join(_context.Set<Job>(), b => b.Id, j => j.Id, (b, j) => new { Batch = b, PlaceholderJob = j })
+        var query = _context.Set<Batch>()
+            .Join(_context.Set<Job>(), b => b.Id, j => j.Id, (b, j) => new { Batch = b, PlaceholderJob = j });
+
+        query = state switch
+        {
+            "active" => query.Where(x => x.PlaceholderJob.CurrentState == State.Awaiting && x.Batch.JobCount > 0),
+            "completed" => query.Where(x => x.PlaceholderJob.CurrentState == State.Completed),
+            "failed" => query.Where(x => x.PlaceholderJob.CurrentState == State.Failed),
+            _ => query,
+        };
+
+        return await query
             .OrderByDescending(x => x.PlaceholderJob.CreateTime)
             .Select(x => new BatchModel
             {
