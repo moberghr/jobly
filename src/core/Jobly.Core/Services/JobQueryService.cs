@@ -119,6 +119,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 Level = x.Level,
                 Message = x.Message,
                 Exception = x.Exception,
+                DurationMs = x.DurationMs,
             })
             .ToListAsync();
 

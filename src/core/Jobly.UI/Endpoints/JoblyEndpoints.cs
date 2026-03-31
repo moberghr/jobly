@@ -29,6 +29,8 @@ public static class JoblyEndpoints
 
         apiGroup.MapGet("jobs/awaiting", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetAwaitingJobs(request));
 
+        apiGroup.MapGet("jobs/deleted", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobsList(request, State.Deleted));
+
         apiGroup.MapGet("jobs/{jobId}", async ([FromServices] IJobQueryService jobQueryService, Guid jobId) =>
         {
             var model = await jobQueryService.GetJobById(jobId);

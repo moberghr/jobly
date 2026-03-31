@@ -44,8 +44,8 @@ export default function BatchesPage() {
             <TableRow>
               <TableHead className="w-[100px]">ID</TableHead>
               <TableHead>Progress</TableHead>
-              <TableHead>State</TableHead>
-              <TableHead>Created</TableHead>
+              <TableHead className="w-[100px] text-right">State</TableHead>
+              <TableHead className="w-[120px] text-right">Created</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -71,13 +71,13 @@ export default function BatchesPage() {
                         <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                           <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
                         </div>
-                        <span className="text-xs text-muted-foreground w-20">
+                        <span className="text-xs text-muted-foreground w-28 text-right shrink-0">
                           {completed}/{batch.totalJobs} ({pct}%)
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell><StateBadge state={batch.placeholderState} /></TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="text-right"><StateBadge state={batch.placeholderState} /></TableCell>
+                    <TableCell className="text-sm text-muted-foreground text-right">
                       <RelativeTime date={batch.createTime} />
                     </TableCell>
                   </TableRow>

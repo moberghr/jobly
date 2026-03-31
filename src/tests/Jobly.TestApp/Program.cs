@@ -14,9 +14,6 @@ builder.Services.AddServices(builder.Configuration);
 builder.Services.AddJobHandlers(typeof(Program).Assembly);
 builder.Services.AddJobHandlers(typeof(Jobly.Test.Shared.ServiceConfiguration).Assembly);
 
-// Register open generic pipeline behavior
-builder.Services.AddTransient(typeof(IPipelineBehavior<>), typeof(TimingPipelineBehavior<>));
-
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -181,6 +178,35 @@ app.MapPost("/seed-perf", async (IPublisher publisher, TestContext context, int?
     }
 
     return Results.Ok(new { created });
+});
+
+app.MapGet("/seed-perf-batch", async (IBatchPublisher batchPublisher, TestContext context, int? jobsPerBatch, int? batchCount) =>
+{
+    var jobs = jobsPerBatch ?? 100;
+    var batches = batchCount ?? 10;
+    var totalJobs = 0;
+
+    for (var b = 0; b < batches; b++)
+    {
+        var batchJobs = Enumerable.Range(0, jobs).Select(_ => new EmptyRequest()).ToList();
+        await batchPublisher.StartNew(batchJobs);
+        totalJobs += jobs;
+    }
+
+    await context.SaveChangesAsync();
+    return Results.Ok(new { batches, jobsPerBatch = jobs, totalJobs });
+});
+
+app.MapGet("/seed-perf-messages", async (IPublisher publisher, TestContext context, int? count) =>
+{
+    var total = count ?? 100;
+    for (var i = 0; i < total; i++)
+    {
+        await publisher.Publish(new EmptyMessage());
+    }
+
+    await context.SaveChangesAsync();
+    return Results.Ok(new { messages = total, jobsPerMessage = 3, totalJobs = total * 3 });
 });
 
 app.MapPost("/perf-trace/enable", () =>

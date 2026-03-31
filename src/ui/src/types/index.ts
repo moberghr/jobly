@@ -18,6 +18,7 @@ export interface DashboardStatistics {
   processing: number;
   servers: number;
   awaiting: number;
+  deleted: number;
   messages: number;
   totalSucceeded: number;
   totalFailed: number;
@@ -59,6 +60,7 @@ export interface JobLogModel {
   level: string;
   message: string;
   exception: string | null;
+  durationMs: number | null;
 }
 
 export interface MessageModel {

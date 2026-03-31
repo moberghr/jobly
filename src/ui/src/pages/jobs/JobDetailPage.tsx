@@ -19,14 +19,26 @@ const eventColors: Record<string, { border: string; bg: string; text: string }> 
   Deleted:    { border: 'border-l-gray-500', bg: 'bg-gray-50 dark:bg-gray-950/30', text: 'text-gray-700 dark:text-gray-400' },
 };
 
+function formatDuration(ms: number): string {
+  if (ms < 1) return '<1ms';
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  const mins = Math.floor(ms / 60000);
+  const secs = ((ms % 60000) / 1000).toFixed(0);
+  return `${mins}m ${secs}s`;
+}
+
 function getDuration(logs: JobLogModel[], currentIndex: number): string | null {
+  // Use high-resolution Stopwatch duration if available
+  const log = logs[currentIndex];
+  if (log.durationMs != null) return formatDuration(log.durationMs);
+
+  // Fall back to timestamp diff
   if (currentIndex >= logs.length - 1) return null;
   const current = new Date(logs[currentIndex].timestamp).getTime();
   const previous = new Date(logs[currentIndex + 1].timestamp).getTime();
   const ms = current - previous;
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${(ms / 60000).toFixed(1)}m`;
+  return formatDuration(ms);
 }
 
 export default function JobDetailPage() {
@@ -86,6 +98,12 @@ export default function JobDetailPage() {
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">Flow</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
+              {job.batchId && (
+                <div>
+                  <span className="text-muted-foreground">Batch:</span>{' '}
+                  <Link to={`/batches/${job.batchId}`} className="text-primary hover:underline font-mono text-xs">{shortId(job.batchId)}</Link>
+                </div>
+              )}
               {job.messageId && (
                 <div>
                   <span className="text-muted-foreground">Spawned from Message:</span>{' '}

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Jobly.Core;
 using Jobly.Core.Data.Entities;
@@ -164,24 +165,33 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         PerfTrace.Mark(PerfTrace.CommitTransaction1);
         await transaction.CommitAsync(cancellationToken);
 
-        // Set up log capture and execution context for this job
         var logCollector = new JobLogCollector { JobId = job.Id };
-        JobLogContext.Current = logCollector;
-        JobExecutionContext.Current = new JobExecutionInfo
-        {
-            JobId = job.Id,
-            TraceId = job.TraceId ?? job.Id,
-        };
 
         // Start keep-alive background loop
         using var keepAliveCts = new CancellationTokenSource();
         var keepAliveTask = RunKeepAlive(job.Id, keepAliveCts.Token);
 
+        Stopwatch? handlerStopwatch = null;
         try
         {
             PerfTrace.Mark(PerfTrace.ExecuteHandler);
             _logger.LogInformation("Worker {workerId} executing job {id}", _workerId, job.Id);
+
+            // Enable log capture only during handler execution
+            JobLogContext.Current = logCollector;
+            JobExecutionContext.Current = new JobExecutionInfo
+            {
+                JobId = job.Id,
+                TraceId = job.TraceId ?? job.Id,
+            };
+
+            handlerStopwatch = Stopwatch.StartNew();
             await ExecuteJob(job, scope.ServiceProvider, cancellationToken);
+            handlerStopwatch.Stop();
+
+            JobLogContext.Current = null;
+            JobExecutionContext.Current = null;
+
             _logger.LogInformation("Worker {workerId} completed job {id}", _workerId, job.Id);
 
             PerfTrace.Mark(PerfTrace.CancelKeepAlive);
@@ -191,7 +201,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             PerfTrace.Mark(PerfTrace.BeginTransaction2);
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
 
-            await UpdateJobData(context, job, null, default);
+            await UpdateJobData(context, job, null, handlerStopwatch.Elapsed.TotalMilliseconds, default);
             await SaveJobLogs(context, logCollector);
 
             PerfTrace.Mark(PerfTrace.SaveCompleted);
@@ -202,12 +212,15 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         }
         catch (Exception e)
         {
+            handlerStopwatch?.Stop();
+            JobLogContext.Current = null;
+            JobExecutionContext.Current = null;
             _logger.LogError(e, "Error executing job {id}", job.Id);
             await keepAliveCts.CancelAsync();
             await keepAliveTask;
 
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
-            await UpdateJobData(context, job, e, default);
+            await UpdateJobData(context, job, e, handlerStopwatch?.Elapsed.TotalMilliseconds, default);
             await SaveJobLogs(context, logCollector);
             await context.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
@@ -301,7 +314,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         }
     }
 
-    private static async Task UpdateJobData(TContext context, Job job, Exception? error, CancellationToken cancellationToken)
+    private static async Task UpdateJobData(TContext context, Job job, Exception? error, double? durationMs, CancellationToken cancellationToken)
     {
         var failed = error != null;
         var state = failed ? State.Failed : State.Completed;
@@ -357,7 +370,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         var logMessage = error != null ? error.Message : $"Job {job.Id} completed";
         var logException = error?.ToString(); // Full stack trace
 
-        await CreateJobLog(context, job.Id, state, logMessage, cancellationToken, logException);
+        await CreateJobLog(context, job.Id, state, logMessage, durationMs, cancellationToken, logException);
     }
 
     private static async Task UpdateMessageJobCount(TContext context, Guid messageId, CancellationToken cancellationToken)
@@ -386,7 +399,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         await context.Set<JobLog>().AddRangeAsync(collector.Entries);
     }
 
-    private static async Task CreateJobLog(TContext context, Guid jobId, State state, string? message, CancellationToken cancellationToken, string? exception = null)
+    private static async Task CreateJobLog(TContext context, Guid jobId, State state, string? message, double? durationMs, CancellationToken cancellationToken, string? exception = null)
     {
         var eventType = state switch
         {
@@ -408,6 +421,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
                 Level = level,
                 Message = message ?? string.Empty,
                 Exception = exception,
+                DurationMs = durationMs,
             },
             cancellationToken);
     }

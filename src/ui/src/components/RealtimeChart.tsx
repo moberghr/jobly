@@ -15,26 +15,13 @@ import StreamingPlugin, { RealTimeScale } from 'chartjs-plugin-streaming';
 import { useDashboardStore } from '@/stores/dashboard';
 
 Chart.register(
-  LineController,
-  LineElement,
-  PointElement,
-  LinearScale,
-  CategoryScale,
-  Filler,
-  Tooltip,
-  Legend,
-  RealTimeScale,
-  StreamingPlugin,
+  LineController, LineElement, PointElement, LinearScale, CategoryScale,
+  Filler, Tooltip, Legend, RealTimeScale, StreamingPlugin,
 );
 
-interface RealtimeChartProps {
-  height?: number;
-}
-
-export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
+export function RealtimeChart({ height = 200 }: { height?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const chartRef = useRef<Chart | null>(null);
-  const renderedCount = useRef(0);
+  const lastRenderedTs = useRef(0);
   const realtimeData = useDashboardStore((s) => s.realtimeData);
 
   const vals = realtimeData.map((p) => p.succeeded + p.failed);
@@ -42,17 +29,18 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
   const max = vals.length > 0 ? Math.max(...vals) : 0;
   const avg = vals.length >= 5 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
 
+  // Create chart once — component is never unmounted
   useEffect(() => {
-    if (!canvasRef.current) {
-      return;
-    }
+    if (!canvasRef.current) return;
 
     const isDark = document.documentElement.classList.contains('dark');
     const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
     const textColor = isDark ? '#888' : '#666';
 
     const storeData = useDashboardStore.getState().realtimeData;
-    renderedCount.current = storeData.length;
+    if (storeData.length > 0) {
+      lastRenderedTs.current = storeData[storeData.length - 1].ts;
+    }
 
     const chart = new Chart(canvasRef.current, {
       type: 'line',
@@ -65,8 +53,6 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
             borderWidth: 2,
             fill: true,
             pointRadius: 0,
-            pointHitRadius: 0,
-            pointHoverRadius: 0,
             tension: 0.3,
             data: storeData.map((p) => ({ x: p.ts * 1000, y: p.succeeded })),
           },
@@ -77,8 +63,6 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
             borderWidth: 2,
             fill: true,
             pointRadius: 0,
-            pointHitRadius: 0,
-            pointHoverRadius: 0,
             tension: 0.3,
             data: storeData.map((p) => ({ x: p.ts * 1000, y: p.failed })),
           },
@@ -100,12 +84,12 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
               onRefresh: (c) => {
                 const data = useDashboardStore.getState().realtimeData;
                 const now = Date.now();
-                for (let i = renderedCount.current; i < data.length; i++) {
-                  const p = data[i];
+                for (const p of data) {
+                  if (p.ts <= lastRenderedTs.current) continue;
                   c.data.datasets[0].data.push({ x: now, y: p.succeeded });
                   c.data.datasets[1].data.push({ x: now, y: p.failed });
+                  lastRenderedTs.current = p.ts;
                 }
-                renderedCount.current = data.length;
               },
             },
             time: { displayFormats: { second: 'HH:mm:ss', minute: 'HH:mm', hour: 'HH:mm' } },
@@ -122,17 +106,7 @@ export function RealtimeChart({ height = 200 }: RealtimeChartProps) {
       },
     });
 
-    chartRef.current = chart;
-
-    // Resize chart when container gets actual dimensions (fixes blank chart on navigation)
-    const observer = new ResizeObserver(() => chart.resize());
-    observer.observe(canvasRef.current.parentElement!);
-
-    return () => {
-      observer.disconnect();
-      chart.destroy();
-      chartRef.current = null;
-    };
+    return () => chart.destroy();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -17,7 +17,7 @@ function App() {
     <BrowserRouter basename={(window as unknown as Record<string, string>).basePath || '/'}>
       <Routes>
         <Route element={<MainLayout />}>
-          <Route path="/" element={<DashboardPage />} />
+          <Route index element={<DashboardPage />} />
           <Route path="/jobs/detail/:id" element={<JobDetailPage />} />
           <Route path="/jobs/:state" element={<JobListPage />} />
           <Route path="/messages" element={<MessagesPage />} />

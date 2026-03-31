@@ -46,6 +46,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
 
         var servers = await GetServerCount();
         var awaiting = await GetJobsCount(State.Awaiting);
+        var deleted = await GetJobsCount(State.Deleted);
         var messages = await _context.Set<Message>()
             .Where(x => x.CurrentState != State.Completed)
             .CountAsync();
@@ -67,6 +68,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             Processing = processing,
             Servers = servers,
             Awaiting = awaiting,
+            Deleted = deleted,
             Messages = messages,
             Batches = batches,
             TotalSucceeded = totalSucceeded,

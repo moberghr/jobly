@@ -13,4 +13,6 @@ public class JobLogModel
     public string Message { get; set; } = string.Empty;
 
     public string? Exception { get; set; }
+
+    public double? DurationMs { get; set; }
 }

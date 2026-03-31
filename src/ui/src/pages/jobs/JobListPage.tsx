@@ -18,6 +18,7 @@ const stateEndpoints: Record<string, (page: number, pageSize: number) => Promise
   completed: api.getCompletedJobs,
   failed: api.getFailedJobs,
   awaiting: api.getAwaitingJobs,
+  deleted: api.getDeletedJobs,
 };
 
 export default function JobListPage() {

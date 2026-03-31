@@ -20,6 +20,8 @@ public class DashboardStatistics
 
     public int Awaiting { get; set; }
 
+    public int Deleted { get; set; }
+
     public int Messages { get; set; }
 
     public long TotalSucceeded { get; set; }

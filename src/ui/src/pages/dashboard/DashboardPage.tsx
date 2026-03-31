@@ -14,6 +14,7 @@ import {
   Mail,
   Loader,
   Hourglass,
+  Trash2,
 } from 'lucide-react';
 
 function padHistory(data: StatsHistoryPoint[], hours: number) {
@@ -72,12 +73,13 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
       {/* Live counts */}
       <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">Current</h2>
-      <div className="grid grid-cols-7 gap-4 mb-8">
+      <div className="grid grid-cols-8 gap-4 mb-8">
         <MetricCard label="Enqueued" value={stats.created} icon={<Briefcase className="h-5 w-5" />} />
         <MetricCard label="Processing" value={stats.processing} icon={<Loader className="h-5 w-5" />} color="text-purple-600" />
         <MetricCard label="Scheduled" value={stats.scheduled} icon={<Clock className="h-5 w-5" />} />
         <MetricCard label="Awaiting" value={stats.awaiting} icon={<Hourglass className="h-5 w-5" />} />
         <MetricCard label="Failed" value={stats.failed} icon={<XCircle className="h-5 w-5" />} color="text-red-600" />
+        <MetricCard label="Deleted" value={stats.deleted} icon={<Trash2 className="h-5 w-5" />} />
         <MetricCard label="Messages" value={stats.messages} icon={<Mail className="h-5 w-5" />} />
         <MetricCard label="Servers" value={stats.servers} icon={<Server className="h-5 w-5" />} />
       </div>

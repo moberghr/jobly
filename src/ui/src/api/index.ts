@@ -23,6 +23,9 @@ export const getScheduledJobs = (page = 0, pageSize = 20) =>
 export const getAwaitingJobs = (page = 0, pageSize = 20) =>
   api.get<PagedList<JobModel>>('/jobs/awaiting', { params: { page, pageSize } }).then(r => r.data);
 
+export const getDeletedJobs = (page = 0, pageSize = 20) =>
+  api.get<PagedList<JobModel>>('/jobs/deleted', { params: { page, pageSize } }).then(r => r.data);
+
 // Job details & actions
 export const getJobById = (jobId: string) =>
   api.get<JobDetailModel>(`/jobs/${jobId}`).then(r => r.data);

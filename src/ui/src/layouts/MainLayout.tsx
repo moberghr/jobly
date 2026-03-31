@@ -99,11 +99,9 @@ export default function MainLayout() {
       )}
 
       <div className="flex flex-1">
-        {/* Left sidebar for jobs section */}
         {isJobsSection && <JobsSidebar stats={stats} />}
 
-        {/* Main content */}
-        <main className={`flex-1 p-6 ${isJobsSection ? '' : ''}`}>
+        <main className="flex-1 p-6">
           <Outlet />
         </main>
       </div>
@@ -130,10 +128,11 @@ function JobsSidebar({ stats }: { stats: DashboardStatistics | null }) {
     { to: '/jobs/completed', label: 'Completed', count: stats?.completed ?? 0, color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
     { to: '/jobs/failed', label: 'Failed', count: stats?.failed ?? 0, color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
     { to: '/jobs/awaiting', label: 'Awaiting', count: stats?.awaiting ?? 0, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' },
+    { to: '/jobs/deleted', label: 'Deleted', count: stats?.deleted ?? 0, color: 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300' },
   ];
 
   return (
-    <aside className="w-56 border-r bg-card min-h-[calc(100vh-3.5rem)] p-4">
+    <aside className="w-64 shrink-0 border-r bg-card min-h-[calc(100vh-3.5rem)] p-4">
       <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Jobs</h3>
       <nav className="space-y-1">
         {sidebarItems.map((item) => {

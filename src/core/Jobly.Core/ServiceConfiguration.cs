@@ -289,6 +289,7 @@ public static class ServiceConfiguration
         jobLog.Property(p => p.Level);
         jobLog.Property(p => p.Message);
         jobLog.Property(p => p.Exception);
+        jobLog.Property(p => p.DurationMs);
 
         jobLog.HasIndex(p => p.JobId);
     }

@@ -95,12 +95,6 @@ public class JoblyDispatcher<TContext> : BackgroundService
             .TagWith(InterceptorConstants.RowLockTableJob)
             .ToListAsync(ct);
 
-        if (jobs.Count == 0)
-        {
-            await transaction.CommitAsync(ct);
-            return false;
-        }
-
         // Always try to route messages
         {
             var messages = await context.Set<Message>()
@@ -160,6 +154,14 @@ public class JoblyDispatcher<TContext> : BackgroundService
                 message.JobCount = handlerTypes.Count;
                 message.CurrentState = State.Processing;
             }
+        }
+
+        if (jobs.Count == 0)
+        {
+            // No jobs found, but messages may have been routed — save and return
+            await context.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return false;
         }
 
         // Batch mark all fetched jobs as Processing
