@@ -74,8 +74,8 @@ export function RealtimeChart({ height = 200 }: { height?: number }) {
           x: {
             type: 'time',
             time: { unit: 'second', displayFormats: { second: 'HH:mm:ss' } },
-            min: now - 62000,
-            max: now - 2000,
+            min: now - 61000,
+            max: now - 1000,
             ticks: { display: false },
             grid: { color: gridColor },
           },

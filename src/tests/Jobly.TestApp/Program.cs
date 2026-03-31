@@ -31,7 +31,7 @@ builder.Services.AddJoblyWorker<TestContext>(options =>
     options.HealthCheckInterval = TimeSpan.FromSeconds(10);
     options.HealthCheckTimeout = TimeSpan.FromSeconds(30);
     options.JobExpirationTimeout = TimeSpan.FromMinutes(30);
-    options.UseDispatcher = true;
+    options.UseDispatcher = false;
 });
 
 var app = builder.Build();
