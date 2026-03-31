@@ -70,7 +70,7 @@ public class JoblyTestServer : IAsyncDisposable
                     config.Queues = ["a-critical", "b-default", "c-low", "default", "high"];
                     config.PollingInterval = TimeSpan.FromMilliseconds(100);
                     config.CancellationCheckInterval = TimeSpan.FromSeconds(1);
-                    config.OrchestrationInterval = TimeSpan.FromSeconds(1);
+                    config.OrchestrationInterval = TimeSpan.FromMilliseconds(100);
                     config.MessageRoutingInterval = TimeSpan.FromMilliseconds(500);
                     config.InvisibilityTimeout = TimeSpan.FromMinutes(1);
                     config.HealthCheckInterval = TimeSpan.FromSeconds(30);
@@ -150,7 +150,6 @@ public class JoblyTestServer : IAsyncDisposable
 
             if (activeJobs == 0 && activeMessages == 0)
             {
-                await Task.Delay(500);
                 return;
             }
 
