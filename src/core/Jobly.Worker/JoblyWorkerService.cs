@@ -202,11 +202,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     private async Task RunJobMonitor(Guid jobId, CancellationTokenSource jobCts, CancellationToken stoppingToken)
     {
         var interval = _configuration.CancellationCheckInterval;
-        while (!stoppingToken.IsCancellationRequested && !jobCts.IsCancellationRequested)
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, jobCts.Token);
+        while (!linked.IsCancellationRequested)
         {
             try
             {
-                await Task.Delay(interval, stoppingToken);
+                await Task.Delay(interval, linked.Token);
             }
             catch (OperationCanceledException)
             {

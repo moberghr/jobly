@@ -95,7 +95,7 @@ public class EndToEndIntegrationTests : IAsyncLifetime
         await publisher.SaveChangesAsync();
 
         // Wait for everything to complete
-        await _server.WaitForCompletion(timeout: TimeSpan.FromSeconds(120));
+        await _server.WaitForCompletion(timeout: TimeSpan.FromSeconds(60));
 
         // Aggregate counters
         await CounterAggregatorTask<TestContext>.AggregateCounters(_server.CreateContext());
