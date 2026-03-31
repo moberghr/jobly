@@ -94,47 +94,28 @@ public class JobCommandService<TContext> : IJobCommandService
         job.CurrentState = State.Enqueued;
         job.ExpireAt = null;
 
+        // Restore parent counters so they wait for this job again
+        Job? parent = null;
+        if (job.ParentJobId != null)
+        {
+            parent = await _context.Set<Job>()
+                .Where(x => x.Id == job.ParentJobId)
+                .FirstOrDefaultAsync();
+            if (parent != null)
+            {
+                parent.JobCount++;
+                if (parent.CurrentState == State.Completed || parent.CurrentState == State.Failed)
+                {
+                    parent.CurrentState = parent.Kind == JobKind.Batch ? State.Awaiting : State.Processing;
+                    parent.ExpireAt = null;
+                }
+            }
+        }
+
         // Only clear HandlerType for direct jobs — message-spawned jobs need it to re-execute the correct handler
-        if (job.MessageId == null)
+        if (parent == null || parent.Kind != JobKind.Message)
         {
             job.HandlerType = null;
-        }
-
-        // Restore batch/message counters so they wait for this job again
-        if (job.BatchId != null)
-        {
-            var batch = await _context.Set<Batch>()
-                .Where(x => x.Id == job.BatchId)
-                .FirstOrDefaultAsync();
-            if (batch != null)
-            {
-                batch.JobCount++;
-
-                // Reset placeholder job so continuation can re-trigger when all jobs finish again
-                var placeholderJob = await _context.Set<Job>()
-                    .Where(x => x.Id == batch.Id)
-                    .FirstOrDefaultAsync();
-                if (placeholderJob != null && placeholderJob.CurrentState == State.Completed)
-                {
-                    placeholderJob.CurrentState = State.Awaiting;
-                }
-            }
-        }
-
-        if (job.MessageId != null)
-        {
-            var message = await _context.Set<Message>()
-                .Where(x => x.Id == job.MessageId)
-                .FirstOrDefaultAsync();
-            if (message != null)
-            {
-                message.JobCount++;
-                if (message.CurrentState == State.Completed)
-                {
-                    message.CurrentState = State.Processing;
-                    message.ExpireAt = null;
-                }
-            }
         }
 
         await _context.Set<JobLog>().AddAsync(new JobLog

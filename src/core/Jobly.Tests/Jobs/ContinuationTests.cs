@@ -22,10 +22,7 @@ public abstract partial class JoblyTests : TestBase
         childJob.CurrentState.ShouldBe(State.Awaiting);
         childJob.ParentJobId.ShouldBe(jobId);
 
-        for (var i = 0; i < 3; i++)
-        {
-            await ProcessJob();
-        }
+        await ProcessAllJobs();
 
         childJob = await GetJob(childJobId);
 

@@ -1,5 +1,5 @@
 import api from './client';
-import type { DashboardStatistics, JobModel, JobDetailModel, MessageModel, MessageDetailModel, RecurringJobModel, RecurringJobDetailModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint, BatchModel, BatchDetailModel } from '@/types';
+import type { DashboardStatistics, JobModel, JobDetailModel, JobGroupModel, JobGroupDetailModel, RecurringJobModel, RecurringJobDetailModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint } from '@/types';
 
 // Dashboard
 export const getStatus = () => api.get<DashboardStatistics>('/status').then(r => r.data);
@@ -44,10 +44,10 @@ export const deleteJob = (jobId: string) => api.post(`/jobs/${jobId}/delete`);
 
 // Messages
 export const getMessages = (page = 0, pageSize = 20, state?: string) =>
-  api.get<PagedList<MessageModel>>('/messages', { params: { page, pageSize, state } }).then(r => r.data);
+  api.get<PagedList<JobGroupModel>>('/messages', { params: { page, pageSize, state } }).then(r => r.data);
 
 export const getMessageById = (messageId: string) =>
-  api.get<MessageDetailModel>(`/messages/${messageId}`).then(r => r.data);
+  api.get<JobGroupDetailModel>(`/messages/${messageId}`).then(r => r.data);
 
 export const getMessageJobCounts = (messageId: string) =>
   api.get<Record<string, number>>(`/messages/${messageId}/jobs/counts`).then(r => r.data);
@@ -77,10 +77,10 @@ export const bulkRequeueJobs = (jobIds: string[]) =>
 
 // Batches
 export const getBatches = (page = 0, pageSize = 20, state?: string) =>
-  api.get<PagedList<BatchModel>>('/batches', { params: { page, pageSize, state } }).then(r => r.data);
+  api.get<PagedList<JobGroupModel>>('/batches', { params: { page, pageSize, state } }).then(r => r.data);
 
 export const getBatchById = (batchId: string) =>
-  api.get<BatchDetailModel>(`/batches/${batchId}`).then(r => r.data);
+  api.get<JobGroupDetailModel>(`/batches/${batchId}`).then(r => r.data);
 
 export const getBatchJobCounts = (batchId: string) =>
   api.get<Record<string, number>>(`/batches/${batchId}/jobs/counts`).then(r => r.data);

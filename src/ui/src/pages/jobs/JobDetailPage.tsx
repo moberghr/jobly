@@ -98,21 +98,9 @@ export default function JobDetailPage() {
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">Flow</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
-              {job.batchId && (
-                <div>
-                  <span className="text-muted-foreground">Batch:</span>{' '}
-                  <Link to={`/batches/detail/${job.batchId}`} className="text-primary hover:underline font-mono text-xs">{shortId(job.batchId)}</Link>
-                </div>
-              )}
-              {job.messageId && (
-                <div>
-                  <span className="text-muted-foreground">Spawned from Message:</span>{' '}
-                  <Link to={`/messages/detail/${job.messageId}`} className="text-primary hover:underline font-mono text-xs">{shortId(job.messageId)}</Link>
-                </div>
-              )}
               {job.parentJobId && (
                 <div>
-                  <span className="text-muted-foreground">Continuation of Job:</span>{' '}
+                  <span className="text-muted-foreground">Parent:</span>{' '}
                   <Link to={`/jobs/detail/${job.parentJobId}`} className="text-primary hover:underline font-mono text-xs">{shortId(job.parentJobId)}</Link>
                 </div>
               )}
@@ -128,7 +116,7 @@ export default function JobDetailPage() {
                   <span className="font-mono text-xs">{shortId(job.traceId)}</span>
                 </div>
               )}
-              {!job.messageId && !job.parentJobId && !job.spawnedByJobId && (
+              {!job.parentJobId && !job.spawnedByJobId && (
                 <div className="text-muted-foreground">Direct job (no parent)</div>
               )}
             </CardContent>

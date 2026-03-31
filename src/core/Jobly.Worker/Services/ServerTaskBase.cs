@@ -70,6 +70,7 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
             }
 
             var sw = Stopwatch.StartNew();
+            var didWork = false;
             try
             {
                 if (_distributedLock != null)
@@ -82,11 +83,11 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
                         continue;
                     }
 
-                    await RunAndLog(sw, stoppingToken);
+                    didWork = await RunAndLog(sw, stoppingToken);
                 }
                 else
                 {
-                    await RunAndLog(sw, stoppingToken);
+                    didWork = await RunAndLog(sw, stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -100,11 +101,17 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
                 await TryWriteServerLog("Failed", ex.Message, sw.Elapsed.TotalMilliseconds);
             }
 
+            // If work was done, run again immediately instead of sleeping
+            if (didWork)
+            {
+                continue;
+            }
+
             await Task.Delay(interval.Value, stoppingToken);
         }
     }
 
-    private async Task RunAndLog(Stopwatch sw, CancellationToken ct)
+    private async Task<bool> RunAndLog(Stopwatch sw, CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
@@ -118,6 +125,8 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
         {
             await WriteServerLog("Completed", message, sw.Elapsed.TotalMilliseconds);
         }
+
+        return message != null; // non-null message = work was done
     }
 
     private async Task EnsureServerTaskRegistered(CancellationToken ct)

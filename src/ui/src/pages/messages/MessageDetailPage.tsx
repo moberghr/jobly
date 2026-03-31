@@ -5,12 +5,12 @@ import { StateBadge } from '@/components/StateBadge';
 import { FilteredJobsTable } from '@/components/FilteredJobsTable';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
-import type { MessageDetailModel } from '@/types';
+import type { JobGroupDetailModel } from '@/types';
 import * as api from '@/api';
 
 export default function MessageDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [message, setMessage] = useState<MessageDetailModel | null>(null);
+  const [message, setMessage] = useState<JobGroupDetailModel | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,7 +31,7 @@ export default function MessageDetailPage() {
       <Card className="mb-6">
         <CardHeader className="pb-2"><CardTitle className="text-sm">Details</CardTitle></CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <div><span className="text-muted-foreground">Type:</span> {shortType(message.type)}</div>
+          <div><span className="text-muted-foreground">Type:</span> {message.type ? shortType(message.type) : '—'}</div>
           <div><span className="text-muted-foreground">Created:</span> {formatDateTime(message.createTime)}</div>
           <div><span className="text-muted-foreground">Jobs remaining:</span> {message.jobCount}</div>
           <div><span className="text-muted-foreground">ID:</span> <span className="font-mono text-xs">{message.id}</span></div>

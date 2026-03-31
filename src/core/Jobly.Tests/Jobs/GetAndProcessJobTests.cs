@@ -132,18 +132,23 @@ public abstract partial class JoblyTests : TestBase
 
         await context.SaveChangesAsync();
 
+        // Process one job from the first batch
         await ProcessJob();
 
-        var firstBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == firstPlaceholderJobId)
-            .FirstAsync();
+        // First batch: 1 completed, 9 still enqueued — not yet finalized
+        var firstBatchCompletedCount = await CreateContext().Set<Job>()
+            .Where(x => x.ParentJobId == firstPlaceholderJobId && x.Kind == JobKind.Job && x.CurrentState == State.Completed)
+            .CountAsync();
+        firstBatchCompletedCount.ShouldBe(1);
 
-        var secondBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == secondPlaceholderJobId)
-            .FirstAsync();
-
-        firstBatch.JobCount.ShouldBe(9);
-        secondBatch.JobCount.ShouldBe(10);
+        // Second batch children should still be awaiting
+        var secondBatchJobs = await CreateContext().Set<Job>()
+            .Where(x => x.ParentJobId == secondPlaceholderJobId && x.Kind == JobKind.Job)
+            .ToListAsync();
+        foreach (var batchJob in secondBatchJobs)
+        {
+            batchJob.CurrentState.ShouldBe(State.Awaiting);
+        }
     }
 
     [Fact]
@@ -159,17 +164,23 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessJob();
         await ProcessJob();
+        await RunOrchestration();
 
-        var firstBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == firstPlaceholderJobId)
+        // First batch: all children completed, orchestrator marks it completed
+        var firstBatch = await CreateContext().Set<Job>()
+            .Where(x => x.Id == firstPlaceholderJobId && x.Kind == JobKind.Batch)
             .FirstAsync();
+        firstBatch.CurrentState.ShouldBe(State.Completed);
 
-        var secondBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == secondPlaceholderJobId)
-            .FirstAsync();
-
-        firstBatch.JobCount.ShouldBe(0);
-        secondBatch.JobCount.ShouldBe(2);
+        // Second batch: not yet started (awaiting first batch completion activation)
+        // After orchestration, second batch children should now be enqueued
+        var secondBatchChildren = await CreateContext().Set<Job>()
+            .Where(x => x.ParentJobId == secondPlaceholderJobId && x.Kind == JobKind.Job)
+            .ToListAsync();
+        foreach (var child in secondBatchChildren)
+        {
+            child.CurrentState.ShouldBe(State.Enqueued);
+        }
     }
 
     [Fact]
@@ -185,12 +196,13 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessJob();
         await ProcessJob();
+        await RunOrchestration();
 
         var firstPlaceholderJob = await CreateContext().Set<Job>()
             .Where(x => x.Id == firstPlaceholderJobId)
             .FirstAsync();
 
-        firstPlaceholderJob.BatchId.ShouldBeNull();
+        firstPlaceholderJob.ParentJobId.ShouldBeNull();
         firstPlaceholderJob.ParentJobId.ShouldBeNull();
         firstPlaceholderJob.CurrentState.ShouldBe(State.Completed);
     }
@@ -208,6 +220,7 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessJob();
         await ProcessJob();
+        await RunOrchestration();
 
         var currentBatchJob = await CreateContext().Set<Job>()
             .Where(x => x.Id == firstPlaceholderJobId)
@@ -229,11 +242,11 @@ public abstract partial class JoblyTests : TestBase
 
         await ProcessJob();
         await ProcessJob();
+        await RunOrchestration();
 
-        var secondBatchJobs = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == secondPlaceholderJobId)
-            .Select(x => x.Jobs)
-            .FirstAsync();
+        var secondBatchJobs = await CreateContext().Set<Job>()
+            .Where(x => x.ParentJobId == secondPlaceholderJobId && x.Kind == JobKind.Job)
+            .ToListAsync();
 
         foreach (var batchJob in secondBatchJobs)
         {
@@ -252,10 +265,7 @@ public abstract partial class JoblyTests : TestBase
 
         await context.SaveChangesAsync();
 
-        await ProcessJob();
-        await ProcessJob();
-        await ProcessJob();
-        await ProcessJob();
+        await ProcessAllJobs();
 
         var firstPlaceholderJob = await CreateContext().Set<Job>()
             .Where(x => x.Id == firstPlaceholderJobId)
@@ -263,12 +273,8 @@ public abstract partial class JoblyTests : TestBase
 
         firstPlaceholderJob.CurrentState.ShouldBe(State.Completed);
 
-        var firstBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == firstPlaceholderJobId)
-            .FirstAsync();
-
         var firstBatchJobs = await CreateContext().Set<Job>()
-            .Where(x => x.BatchId == firstBatch.Id)
+            .Where(x => x.ParentJobId == firstPlaceholderJobId && x.Kind == JobKind.Job)
             .ToListAsync();
 
         foreach (var batchJob in firstBatchJobs)
@@ -282,12 +288,8 @@ public abstract partial class JoblyTests : TestBase
 
         secondPlaceholderJob.CurrentState.ShouldBe(State.Completed);
 
-        var secondBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == secondPlaceholderJobId)
-            .FirstAsync();
-
         var secondBatchJobs = await CreateContext().Set<Job>()
-            .Where(x => x.BatchId == secondBatch.Id)
+            .Where(x => x.ParentJobId == secondPlaceholderJobId && x.Kind == JobKind.Job)
             .ToListAsync();
 
         foreach (var batchJob in secondBatchJobs)
@@ -349,9 +351,8 @@ public abstract partial class JoblyTests : TestBase
 
         await context.SaveChangesAsync();
 
-        await ProcessJob();
-        await ProcessJob();
-        await ProcessJob();
+        // Process first batch (2 jobs) + single continuation job, with orchestration
+        await ProcessAllJobs();
 
         var singleJob = await CreateContext().Set<Job>()
             .Where(x => x.Id == singleJobId)
@@ -401,8 +402,8 @@ public abstract partial class JoblyTests : TestBase
         await ProcessJob();
         await ProcessJob();
 
-        var secondBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == secondPlaceholderJobId)
+        var secondBatch = await CreateContext().Set<Job>()
+            .Where(x => x.Id == secondPlaceholderJobId && x.Kind == JobKind.Batch)
             .FirstAsync();
 
         secondBatch.JobCount.ShouldBe(2);
@@ -421,14 +422,22 @@ public abstract partial class JoblyTests : TestBase
 
         await context.SaveChangesAsync();
 
-        await ProcessJob();
+        // Process first batch (2 jobs)
         await ProcessJob();
         await ProcessJob();
 
-        var secondBatchJobs = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == secondPlaceholderJobId)
-            .Select(x => x.Jobs)
-            .FirstAsync();
+        // Orchestrate: finalize batch1 -> activate single job
+        await RunOrchestration();
+
+        // Process the single continuation job
+        await ProcessJob();
+
+        // Orchestrate: activate second batch children
+        await RunOrchestration();
+
+        var secondBatchJobs = await CreateContext().Set<Job>()
+            .Where(x => x.ParentJobId == secondPlaceholderJobId && x.Kind == JobKind.Job)
+            .ToListAsync();
 
         foreach (var batchJob in secondBatchJobs)
         {

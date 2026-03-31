@@ -28,7 +28,7 @@ public abstract partial class JoblyTests : TestBase
         batchPlaceholderJob.CurrentState.ShouldBe(State.Awaiting);
 
         var batchJobs = await CreateContext().Set<Job>()
-            .Where(x => x.BatchId == batchPlaceholderJobId)
+            .Where(x => x.ParentJobId == batchPlaceholderJobId && x.Kind == JobKind.Job)
             .ToListAsync();
 
         batchJobs.ShouldNotBeEmpty();

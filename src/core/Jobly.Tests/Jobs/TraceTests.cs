@@ -104,7 +104,7 @@ public abstract partial class JoblyTests : TestBase
         var messageId = await publisher.Publish(new MultiRequest());
         await context.SaveChangesAsync();
 
-        await ProcessJob(); // Routes message → creates 2 jobs + executes first
+        await RouteMessages();
 
         var jobs = await GetJobsForMessage(messageId);
         jobs.Count.ShouldBe(2);

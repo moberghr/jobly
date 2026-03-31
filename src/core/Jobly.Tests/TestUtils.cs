@@ -49,19 +49,14 @@ public static class TestUtils
         return new JobCommandService<TestContext>(context);
     }
 
-    public static MessageQueryService<TestContext> CreateMessageQueryService(TestContext context)
+    public static JobGroupQueryService<TestContext> CreateJobGroupQueryService(TestContext context)
     {
-        return new MessageQueryService<TestContext>(context);
+        return new JobGroupQueryService<TestContext>(context);
     }
 
     public static RecurringJobService<TestContext> CreateRecurringJobService(TestContext context)
     {
         return new RecurringJobService<TestContext>(context);
-    }
-
-    public static BatchQueryService<TestContext> CreateBatchQueryService(TestContext context)
-    {
-        return new BatchQueryService<TestContext>(context);
     }
 
     public static DashboardStatsService<TestContext> CreateDashboardStatsService(TestContext context)

@@ -12,7 +12,7 @@ namespace Jobly.Core;
 
 public interface IPublisher
 {
-    // Queue: create Message (IMessage), immediate routing by worker
+    // Queue: create Message-kind Job (IMessage), immediate routing by worker
     Task<Guid> Publish<T>(T message)
         where T : class, IMessage;
 
@@ -86,7 +86,7 @@ public class Publisher<TContext> : IPublisher
         _configuration = configuration.Value;
     }
 
-    // --- IMessage: create Message rows ---
+    // --- IMessage: create Message-kind Job ---
     public async Task<Guid> Publish<T>(T message)
         where T : class, IMessage
     {
@@ -102,17 +102,22 @@ public class Publisher<TContext> : IPublisher
     private async Task<Guid> CreateMessage<T>(T message, string? queue = null)
         where T : class, IMessage
     {
-        var msg = new Message
+        var now = DateTime.UtcNow;
+        var msg = new Job
         {
+            Kind = JobKind.Message,
             Type = message.GetType().AssemblyQualifiedName!,
-            Payload = JsonSerializer.Serialize(message),
+            Message = JsonSerializer.Serialize(message),
             Queue = queue ?? "default",
-            CreateTime = DateTime.UtcNow,
+            CreateTime = now,
+            ScheduleTime = now,
             CurrentState = State.Enqueued,
             JobCount = 0,
         };
 
-        await _context.Set<Message>().AddAsync(msg);
+        msg.TraceId = msg.Id;
+
+        await _context.Set<Job>().AddAsync(msg);
 
         return msg.Id;
     }

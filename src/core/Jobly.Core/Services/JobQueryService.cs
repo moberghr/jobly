@@ -93,9 +93,8 @@ public class JobQueryService<TContext> : IJobQueryService
                 ScheduleTime = x.ScheduleTime,
                 CurrentState = x.CurrentState,
                 HandlerType = x.HandlerType,
-                MessageId = x.MessageId,
+                Kind = x.Kind,
                 ParentJobId = x.ParentJobId,
-                BatchId = x.BatchId,
                 RetriedTimes = x.RetriedTimes,
                 MaxRetries = x.MaxRetries,
                 TraceId = x.TraceId,
@@ -124,10 +123,10 @@ public class JobQueryService<TContext> : IJobQueryService
             .ToListAsync();
 
         // Counts for related jobs
-        if (job.MessageId != null)
+        if (job.ParentJobId != null)
         {
             job.SiblingJobCount = await _context.Set<Job>()
-                .Where(x => x.MessageId == job.MessageId && x.Id != jobId)
+                .Where(x => x.ParentJobId == job.ParentJobId && x.Kind == JobKind.Job && x.Id != jobId)
                 .CountAsync();
         }
 
@@ -147,18 +146,18 @@ public class JobQueryService<TContext> : IJobQueryService
 
     public async Task<PagedList<JobModel>> GetSiblingJobs(Guid jobId, BaseListRequest request)
     {
-        var messageId = await _context.Set<Job>()
+        var parentJobId = await _context.Set<Job>()
             .Where(x => x.Id == jobId)
-            .Select(x => x.MessageId)
+            .Select(x => x.ParentJobId)
             .FirstOrDefaultAsync();
 
-        if (messageId == null)
+        if (parentJobId == null)
         {
             return new PagedList<JobModel>(0, [], 0);
         }
 
         return await _context.Set<Job>()
-            .Where(x => x.MessageId == messageId && x.Id != jobId)
+            .Where(x => x.ParentJobId == parentJobId && x.Kind == JobKind.Job && x.Id != jobId)
             .OrderByDescending(x => x.CreateTime)
             .Select(x => new JobModel
             {
@@ -217,12 +216,11 @@ public class JobQueryService<TContext> : IJobQueryService
     }
 
     /// <summary>
-    /// Base query that excludes batch placeholder jobs from results.
+    /// Base query that returns only actual jobs (excludes messages and batches).
     /// </summary>
     private IQueryable<Job> Jobs()
     {
-        var batchIds = _context.Set<Batch>().Select(b => b.Id);
-        return _context.Set<Job>().Where(j => !batchIds.Contains(j.Id));
+        return _context.Set<Job>().Where(j => j.Kind == JobKind.Job);
     }
 
     private IQueryable<JobModel> GetScheduledJobsQuery()

@@ -5,12 +5,12 @@ import { StateBadge } from '@/components/StateBadge';
 import { FilteredJobsTable } from '@/components/FilteredJobsTable';
 import { shortId, formatDateTime } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
-import type { BatchDetailModel } from '@/types';
+import type { JobGroupDetailModel } from '@/types';
 import * as api from '@/api';
 
 export default function BatchDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [batch, setBatch] = useState<BatchDetailModel | null>(null);
+  const [batch, setBatch] = useState<JobGroupDetailModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [jobCounts, setJobCounts] = useState<Record<string, number>>({});
 
@@ -28,14 +28,14 @@ export default function BatchDetailPage() {
   const totalJobs = Object.keys(jobCounts).length > 0
     ? Object.values(jobCounts).reduce((a, b) => a + b, 0)
     : batch.totalJobs;
-  const completedJobs = jobCounts['completed'] ?? (batch.totalJobs - batch.remainingJobs);
+  const completedJobs = jobCounts['completed'] ?? (batch.totalJobs - batch.jobCount);
   const pct = totalJobs > 0 ? Math.round((completedJobs / totalJobs) * 100) : 0;
 
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Batch {shortId(batch.id)}</h1>
-        <StateBadge state={batch.placeholderState} />
+        <StateBadge state={batch.currentState} />
       </div>
 
       <Card className="mb-6">

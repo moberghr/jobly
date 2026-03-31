@@ -11,10 +11,10 @@ namespace Jobly.Core;
 
 public interface IBatchPublisher
 {
-    Task<Guid> StartNew<T>(List<T> batchJobMessages, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded)
+    Task<Guid> StartNew<T>(List<T> batchJobMessages, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded)
         where T : class, IJob;
 
-    Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded)
+    Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded)
         where T : class, IJob;
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
@@ -32,19 +32,19 @@ public class BatchPublisher<TContext> : IBatchPublisher
         _joblyConfiguration = configuration.Value;
     }
 
-    public async Task<Guid> StartNew<T>(List<T> batchJobMessages, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded)
+    public async Task<Guid> StartNew<T>(List<T> batchJobMessages, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded)
         where T : class, IJob
     {
-        return await BaseCreateBatch(batchJobMessages, State.Enqueued, null, options);
+        return await BaseCreateBatch(batchJobMessages, State.Enqueued, null, name, options);
     }
 
-    public async Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, BatchContinuationOptions options = BatchContinuationOptions.OnlyOnSucceeded)
+    public async Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded)
         where T : class, IJob
     {
-        return await BaseCreateBatch(batchJobMessages, State.Awaiting, parentId, options);
+        return await BaseCreateBatch(batchJobMessages, State.Awaiting, parentId, name, options);
     }
 
-    private async Task<Guid> BaseCreateBatch<T>(List<T> batchJobMessages, State batchJobsState, Guid? parentId, BatchContinuationOptions options)
+    private async Task<Guid> BaseCreateBatch<T>(List<T> batchJobMessages, State batchJobsState, Guid? parentId, string? name, ContinuationOptions options)
         where T : class, IJob
     {
         if (batchJobMessages == null || batchJobMessages.Count == 0)
@@ -52,48 +52,49 @@ public class BatchPublisher<TContext> : IBatchPublisher
             throw new ArgumentException("List cannot be empty", nameof(batchJobMessages));
         }
 
-        var placeholderJob = JobHelper.CreateJob(batchJobMessages[0], 0, null, null, _joblyConfiguration.DefaultQueue, parentId, State.Awaiting);
-
-        var newBatch = new Batch
+        // Create the batch job (replaces both the old Batch entity and placeholder job)
+        var batchJob = new Job
         {
-            Id = placeholderJob.Id,
+            Kind = JobKind.Batch,
+            Type = name,
+            CreateTime = DateTime.UtcNow,
+            CurrentState = State.Awaiting,
+            Queue = _joblyConfiguration.DefaultQueue ?? "default",
+            ParentJobId = parentId,
             JobCount = batchJobMessages.Count,
             ContinuationOptions = options,
         };
 
-        var batchJobs = batchJobMessages.ConvertAll(x => JobHelper.CreateJob(x, 0, null, null, _joblyConfiguration.DefaultQueue, null, batchJobsState))
-;
+        var batchChildJobs = batchJobMessages.ConvertAll(x => JobHelper.CreateJob(x, 0, null, null, _joblyConfiguration.DefaultQueue, batchJob.Id, batchJobsState));
 
         // Propagate trace from execution context
         var executionContext = JobExecutionContext.Current;
-        foreach (var batchJob in batchJobs)
+        foreach (var childJob in batchChildJobs)
         {
             if (executionContext != null)
             {
-                batchJob.TraceId = executionContext.TraceId;
-                batchJob.SpawnedByJobId = executionContext.JobId;
+                childJob.TraceId = executionContext.TraceId;
+                childJob.SpawnedByJobId = executionContext.JobId;
             }
             else
             {
-                batchJob.TraceId = placeholderJob.Id; // Batch root trace
+                childJob.TraceId = batchJob.Id; // Batch root trace
             }
         }
 
-        // Placeholder job also gets the trace
+        // Batch job also gets the trace
         if (executionContext != null)
         {
-            placeholderJob.TraceId = executionContext.TraceId;
-            placeholderJob.SpawnedByJobId = executionContext.JobId;
+            batchJob.TraceId = executionContext.TraceId;
+            batchJob.SpawnedByJobId = executionContext.JobId;
         }
         else
         {
-            placeholderJob.TraceId = placeholderJob.Id;
+            batchJob.TraceId = batchJob.Id;
         }
 
-        newBatch.Jobs = batchJobs;
-
         var logs = new List<JobLog>();
-        foreach (var job in batchJobs)
+        foreach (var job in batchChildJobs)
         {
             logs.Add(new JobLog
             {
@@ -107,19 +108,18 @@ public class BatchPublisher<TContext> : IBatchPublisher
 
         logs.Add(new JobLog
         {
-            JobId = placeholderJob.Id,
+            JobId = batchJob.Id,
             EventType = "Created",
             Level = "Information",
             Timestamp = DateTime.UtcNow,
-            Message = $"Batch placeholder job created in queue \"{placeholderJob.Queue}\"",
+            Message = $"Batch job created in queue \"{batchJob.Queue}\"",
         });
 
-        _context.Set<Job>().AddRange(batchJobs);
-        _context.Set<Job>().Add(placeholderJob);
+        _context.Set<Job>().AddRange(batchChildJobs);
+        _context.Set<Job>().Add(batchJob);
         _context.Set<JobLog>().AddRange(logs);
-        _context.Set<Batch>().Add(newBatch);
 
-        return newBatch.Id;
+        return batchJob.Id;
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)

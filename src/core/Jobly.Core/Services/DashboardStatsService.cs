@@ -47,16 +47,16 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
         var servers = await GetServerCount();
         var awaiting = await GetJobsCount(State.Awaiting);
         var deleted = await GetJobsCount(State.Deleted);
-        var messages = await _context.Set<Message>()
-            .Where(x => x.CurrentState != State.Completed)
+        var messages = await _context.Set<Job>()
+            .Where(x => x.Kind == JobKind.Message && x.CurrentState != State.Completed)
             .CountAsync();
-        var batches = await _context.Set<Batch>()
-            .Where(x => x.JobCount > 0)
+        var batches = await _context.Set<Job>()
+            .Where(x => x.Kind == JobKind.Batch && x.JobCount > 0)
             .CountAsync();
 
-        // Per-state batch counts (via placeholder job state)
-        var batchStateCounts = await _context.Set<Batch>()
-            .Join(_context.Set<Job>(), b => b.Id, j => j.Id, (b, j) => new { b.JobCount, j.CurrentState })
+        // Per-state batch counts
+        var batchStateCounts = await _context.Set<Job>()
+            .Where(x => x.Kind == JobKind.Batch)
             .GroupBy(x => x.CurrentState)
             .Select(g => new { State = g.Key, Count = g.Count() })
             .ToListAsync();
@@ -66,7 +66,8 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
         var batchesFailed = batchStateCounts.Where(x => x.State == State.Failed).Sum(x => x.Count);
 
         // Per-state message counts
-        var messageStateCounts = await _context.Set<Message>()
+        var messageStateCounts = await _context.Set<Job>()
+            .Where(x => x.Kind == JobKind.Message)
             .GroupBy(x => x.CurrentState)
             .Select(g => new { State = g.Key, Count = g.Count() })
             .ToListAsync();
@@ -343,12 +344,11 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
     }
 
     /// <summary>
-    /// Base query that excludes batch placeholder jobs from results.
+    /// Base query that returns only actual jobs (excludes messages and batches).
     /// </summary>
     private IQueryable<Job> Jobs()
     {
-        var batchIds = _context.Set<Batch>().Select(b => b.Id);
-        return _context.Set<Job>().Where(j => !batchIds.Contains(j.Id));
+        return _context.Set<Job>().Where(j => j.Kind == JobKind.Job);
     }
 
     private async Task<int> GetTotalJobsCount()

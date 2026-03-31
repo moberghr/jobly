@@ -1,6 +1,7 @@
 using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
+using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
@@ -152,7 +153,7 @@ public abstract class TestBase
         return await batchPublisher.StartNew(requests);
     }
 
-    protected static async Task<Guid> CreateBatchWithOptions(TestContext context, int numberOfJobs, BatchContinuationOptions options)
+    protected static async Task<Guid> CreateBatchWithOptions(TestContext context, int numberOfJobs, ContinuationOptions options)
     {
         var requests = new List<UnitRequest>();
         for (var i = 0; i < numberOfJobs; i++)
@@ -161,7 +162,7 @@ public abstract class TestBase
         }
 
         var batchPublisher = TestUtils.CreateBatchPublisher(context);
-        return await batchPublisher.StartNew(requests, options);
+        return await batchPublisher.StartNew(requests, options: options);
     }
 
     protected static async Task<Guid> ContinueBatchWith(TestContext context, int numberOfJobs, Guid placeholderJobId)
@@ -184,10 +185,10 @@ public abstract class TestBase
             .SingleAsync();
     }
 
-    protected async Task<Message> GetMessage(Guid messageId)
+    protected async Task<Job> GetMessage(Guid messageId)
     {
-        return await CreateContext().Set<Message>()
-            .Where(x => x.Id == messageId)
+        return await CreateContext().Set<Job>()
+            .Where(x => x.Id == messageId && x.Kind == JobKind.Message)
             .AsNoTracking()
             .SingleAsync();
     }
@@ -195,7 +196,7 @@ public abstract class TestBase
     protected async Task<List<Job>> GetJobsForMessage(Guid messageId)
     {
         return await CreateContext().Set<Job>()
-            .Where(x => x.MessageId == messageId)
+            .Where(x => x.ParentJobId == messageId)
             .AsNoTracking()
             .ToListAsync();
     }
@@ -208,22 +209,67 @@ public abstract class TestBase
         await CounterAggregatorTask<TestContext>.AggregateCounters(CreateContext());
     }
 
+    protected async Task RouteMessages()
+    {
+        await MessageRoutingTask<TestContext>.RunMessageRouting(CreateContext(), _serviceScopeFactory, CancellationToken.None);
+    }
+
+    protected async Task RunOrchestration()
+    {
+        // Use fresh context each iteration to avoid EF change tracker interference between steps
+        while (await OrchestrationTask<TestContext>.RunOrchestration(CreateContext(), CancellationToken.None))
+        {
+            // Continue with a fresh context for the next pass
+        }
+    }
+
     protected async Task ProcessAllJobs(int workerCount = 1)
     {
         await EnsureServerRegistered();
-        var tasks = new List<Task>();
-        for (var i = 0; i < workerCount; i++)
+
+        // Loop: route messages → process jobs → orchestrate, until no more work
+        var madeProgress = true;
+        while (madeProgress)
         {
-            tasks.Add(Task.Run(async () =>
+            madeProgress = false;
+
+            // Route any pending messages
+            var routed = await MessageRoutingTask<TestContext>.RunMessageRouting(CreateContext(), _serviceScopeFactory, CancellationToken.None);
+            if (routed > 0)
             {
-                var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactory);
-                while (await worker.GetAndProcessJob(CancellationToken.None))
+                madeProgress = true;
+            }
+
+            // Process jobs concurrently
+            var tasks = new List<Task<bool>>();
+            for (var i = 0; i < workerCount; i++)
+            {
+                tasks.Add(Task.Run(async () =>
                 {
-                }
-            }));
+                    var worker = TestUtils.CreateJoblyWorkerService(_serviceScopeFactory);
+                    var didWork = false;
+                    while (await worker.GetAndProcessJob(CancellationToken.None))
+                    {
+                        didWork = true;
+                    }
+
+                    return didWork;
+                }));
+            }
+
+            var results = await Task.WhenAll(tasks);
+            if (results.Any(r => r))
+            {
+                madeProgress = true;
+            }
+
+            // Run orchestration (finalize parents, activate continuations)
+            if (await OrchestrationTask<TestContext>.RunOrchestration(CreateContext(), CancellationToken.None))
+            {
+                madeProgress = true;
+            }
         }
 
-        await Task.WhenAll(tasks);
         await CounterAggregatorTask<TestContext>.AggregateCounters(CreateContext());
     }
 

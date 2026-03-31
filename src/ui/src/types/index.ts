@@ -47,9 +47,8 @@ export interface JobModel {
 
 export interface JobDetailModel extends JobModel {
   handlerType: string | null;
-  messageId: string | null;
+  kind: number;
   parentJobId: string | null;
-  batchId: string | null;
   retriedTimes: number;
   maxRetries: number;
   logs: JobLogModel[];
@@ -70,18 +69,22 @@ export interface JobLogModel {
   durationMs: number | null;
 }
 
-export interface MessageModel {
+export interface JobGroupModel {
   id: string;
-  type: string;
-  payload: string;
-  queue: string;
+  kind: number;
   currentState: State;
   jobCount: number;
   createTime: string;
+  type: string | null;
+  payload: string | null;
+  queue: string | null;
+  totalJobs: number;
+  continuationOptions: number | null;
 }
 
-export interface MessageDetailModel extends MessageModel {
-  jobsCount: number;
+export interface JobGroupDetailModel extends JobGroupModel {
+  spawnedJobsCount: number;
+  continuationJobId: string | null;
 }
 
 export interface RecurringJobModel {
@@ -145,17 +148,7 @@ export interface PagedList<T> {
   items: T[];
 }
 
-export interface BatchModel {
-  id: string;
-  totalJobs: number;
-  remainingJobs: number;
-  placeholderState: State;
-  createTime: string;
-}
-
-export interface BatchDetailModel extends BatchModel {
-  continuationJobId: string | null;
-}
+// BatchModel and MessageModel are now unified as JobGroupModel above
 
 export interface BulkResult {
   succeeded: number;

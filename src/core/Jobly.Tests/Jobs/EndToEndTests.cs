@@ -143,7 +143,8 @@ public class EndToEndTests : IAsyncLifetime
                     j.CurrentState == State.Processing ||
                     j.CurrentState == State.Awaiting);
 
-            var activeMessages = await checkContext.Set<Message>()
+            var activeMessages = await checkContext.Set<Job>()
+                .Where(j => j.Kind == JobKind.Message)
                 .CountAsync(m => m.CurrentState != State.Completed);
 
             if (activeJobs == 0 && activeMessages == 0)
@@ -164,8 +165,8 @@ public class EndToEndTests : IAsyncLifetime
         var ctx = _fixture.CreateContext();
 
         // Helper: exclude batch placeholder jobs (same as dashboard)
-        var batchIds = ctx.Set<Batch>().Select(b => b.Id);
-        var jobs = ctx.Set<Job>().Where(j => !batchIds.Contains(j.Id));
+        var batchIds = ctx.Set<Job>().Where(j => j.Kind == JobKind.Batch).Select(b => b.Id);
+        var jobs = ctx.Set<Job>().Where(j => j.Kind == JobKind.Job);
 
         // No jobs stuck in non-terminal states
         var stuckJobs = await jobs
@@ -176,8 +177,8 @@ public class EndToEndTests : IAsyncLifetime
         stuckJobs.ShouldBe(0, "No jobs should be stuck in non-terminal states");
 
         // All messages completed
-        var incompleteMessages = await ctx.Set<Message>()
-            .Where(m => m.CurrentState != State.Completed)
+        var incompleteMessages = await ctx.Set<Job>()
+            .Where(m => m.Kind == JobKind.Message && m.CurrentState != State.Completed)
             .CountAsync();
         incompleteMessages.ShouldBe(0, "All messages should be completed");
 
@@ -191,11 +192,11 @@ public class EndToEndTests : IAsyncLifetime
             .CountAsync(j => j.CurrentState == State.Failed);
         failedJobs.ShouldBe(15, "Should have exactly 15 failed jobs");
 
-        // All batches completed (counter = 0)
-        var incompleteBatches = await ctx.Set<Batch>()
-            .Where(b => b.JobCount > 0)
+        // All batches completed
+        var incompleteBatches = await ctx.Set<Job>()
+            .Where(b => b.Kind == JobKind.Batch && b.CurrentState != State.Completed)
             .CountAsync();
-        incompleteBatches.ShouldBe(0, "All batch counters should be 0");
+        incompleteBatches.ShouldBe(0, "All batches should be completed");
 
         // All jobs should have a TraceId
         var jobsWithoutTrace = await jobs

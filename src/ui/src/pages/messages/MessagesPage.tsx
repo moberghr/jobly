@@ -8,12 +8,12 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import { useRefreshKey } from '@/hooks/useRefreshKey';
-import type { MessageModel, PagedList } from '@/types';
+import type { JobGroupModel, PagedList } from '@/types';
 import * as api from '@/api';
 
 export default function MessagesPage() {
   const { state } = useParams<{ state?: string }>();
-  const [data, setData] = useState<PagedList<MessageModel> | null>(null);
+  const [data, setData] = useState<PagedList<JobGroupModel> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
@@ -70,8 +70,8 @@ export default function MessagesPage() {
                       {shortId(msg.id)}
                     </Link>
                   </TableCell>
-                  <TableCell>{shortType(msg.type)}</TableCell>
-                  <TableCell>{msg.queue}</TableCell>
+                  <TableCell>{msg.type ? shortType(msg.type) : '—'}</TableCell>
+                  <TableCell>{msg.queue ?? '—'}</TableCell>
                   <TableCell><StateBadge state={msg.currentState} /></TableCell>
                   <TableCell>{msg.jobCount}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">

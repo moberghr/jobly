@@ -7,6 +7,8 @@ public class Job
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
+    public JobKind Kind { get; set; } = JobKind.Job;
+
     public string? Type { get; set; }
 
     public string? Message { get; set; }
@@ -33,17 +35,9 @@ public class Job
 
     public List<Job> ChildJobs { get; set; } = [];
 
-    public Batch? Batch { get; set; }
-
-    public Guid? BatchId { get; set; }
-
     public Guid? CurrentWorkerId { get; set; }
 
     public string? HandlerType { get; set; }
-
-    public Guid? MessageId { get; set; }
-
-    public Message? MessageEntity { get; set; }
 
     public DateTime? ExpireAt { get; set; }
 
@@ -52,4 +46,8 @@ public class Job
     public Guid? TraceId { get; set; }
 
     public Guid? SpawnedByJobId { get; set; }
+
+    public int JobCount { get; set; }
+
+    public ContinuationOptions? ContinuationOptions { get; set; }
 }

@@ -8,12 +8,12 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import { useRefreshKey } from '@/hooks/useRefreshKey';
-import type { BatchModel, PagedList } from '@/types';
+import type { JobGroupModel, PagedList } from '@/types';
 import * as api from '@/api';
 
 export default function BatchesPage() {
   const { state } = useParams<{ state?: string }>();
-  const [data, setData] = useState<PagedList<BatchModel> | null>(null);
+  const [data, setData] = useState<PagedList<JobGroupModel> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
@@ -62,7 +62,7 @@ export default function BatchesPage() {
               </TableRow>
             ) : (
               data.items.map((batch) => {
-                const completed = batch.totalJobs - batch.remainingJobs;
+                const completed = batch.totalJobs - batch.jobCount;
                 const pct = batch.totalJobs > 0 ? Math.round((completed / batch.totalJobs) * 100) : 0;
                 return (
                   <TableRow key={batch.id}>
@@ -81,7 +81,7 @@ export default function BatchesPage() {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right"><StateBadge state={batch.placeholderState} /></TableCell>
+                    <TableCell className="text-right"><StateBadge state={batch.currentState} /></TableCell>
                     <TableCell className="text-sm text-muted-foreground text-right">
                       <RelativeTime date={batch.createTime} />
                     </TableCell>

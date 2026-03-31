@@ -17,11 +17,7 @@ public abstract partial class JoblyTests : TestBase
         _ = await publisher.Publish(new MultiRequest());
         await context.SaveChangesAsync();
 
-        // ProcessJob routes the message and immediately executes one handler job
-        await ProcessJob();
-
-        // ProcessJob executes the second handler job
-        await ProcessJob();
+        await ProcessAllJobs();
 
         var counter = GetMultiHandlerCounter();
         counter.CountA.ShouldBe(1);
@@ -37,18 +33,13 @@ public abstract partial class JoblyTests : TestBase
         var messageId = await publisher.Publish(new MultiRequest());
         await context.SaveChangesAsync();
 
-        // Route + execute first handler
-        await ProcessJob();
+        await ProcessAllJobs();
 
-        // Execute second handler
-        await ProcessJob();
-
-        var message = await CreateContext().Set<Message>()
-            .Where(m => m.Id == messageId)
+        var message = await CreateContext().Set<Job>()
+            .Where(m => m.Id == messageId && m.Kind == JobKind.Message)
             .FirstAsync();
 
         message.CurrentState.ShouldBe(State.Completed);
-        message.JobCount.ShouldBe(0);
     }
 
     [Fact]
@@ -61,10 +52,10 @@ public abstract partial class JoblyTests : TestBase
         await context.SaveChangesAsync();
 
         // Route the message (creates handler jobs)
-        await ProcessJob();
+        await RouteMessages();
 
         var handlerJobs = await CreateContext().Set<Job>()
-            .Where(j => j.MessageId == messageId)
+            .Where(j => j.ParentJobId == messageId && j.Kind == JobKind.Job)
             .ToListAsync();
 
         handlerJobs.Count.ShouldBe(2);

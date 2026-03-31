@@ -19,7 +19,8 @@ public abstract partial class JoblyTests : TestBase
 
         await context.SaveChangesAsync();
 
-        var newBatches = await CreateContext().Set<Batch>()
+        var newBatches = await CreateContext().Set<Job>()
+            .Where(x => x.Kind == JobKind.Batch)
             .ToListAsync();
 
         newBatches.Count.ShouldBe(2);
@@ -36,7 +37,8 @@ public abstract partial class JoblyTests : TestBase
 
         await context.SaveChangesAsync();
 
-        var newBatches = await CreateContext().Set<Batch>()
+        var newBatches = await CreateContext().Set<Job>()
+            .Where(x => x.Kind == JobKind.Batch)
             .ToListAsync();
 
         foreach (var newBatch in newBatches)
@@ -63,22 +65,22 @@ public abstract partial class JoblyTests : TestBase
         firstPlaceholderJob.ShouldNotBeNull();
         firstPlaceholderJob.CurrentState.ShouldBe(State.Awaiting);
 
-        var firstBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == firstPlaceholderJob.Id)
+        var firstBatch = await CreateContext().Set<Job>()
+            .Where(x => x.Id == firstPlaceholderJob.Id && x.Kind == JobKind.Batch)
             .FirstOrDefaultAsync();
 
         firstBatch.ShouldNotBeNull();
 
         var secondPlaceholderJob = await CreateContext().Set<Job>()
-            .Where(x => x.ParentJobId == firstBatch.Id)
+            .Where(x => x.ParentJobId == firstBatch.Id && x.Kind == JobKind.Batch)
             .FirstOrDefaultAsync();
 
         secondPlaceholderJob.ShouldNotBeNull();
         secondPlaceholderJob.CurrentState.ShouldBe(State.Awaiting);
         secondPlaceholderJob.Id.ShouldBe(secondPlaceholderJobId);
 
-        var secondBatch = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == secondPlaceholderJob.Id)
+        var secondBatch = await CreateContext().Set<Job>()
+            .Where(x => x.Id == secondPlaceholderJob.Id && x.Kind == JobKind.Batch)
             .FirstOrDefaultAsync();
 
         secondBatch.ShouldNotBeNull();

@@ -43,6 +43,10 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
 
     public TimeSpan ExpirationCleanupInterval { get; set; } = TimeSpan.FromSeconds(60);
 
+    public TimeSpan OrchestrationInterval { get; set; } = TimeSpan.FromSeconds(10);
+
+    public TimeSpan MessageRoutingInterval { get; set; } = TimeSpan.FromSeconds(1);
+
     /// <summary>
     /// How long a job can go without a keep-alive refresh before being considered stale and requeued.
     /// Workers refresh keep-alive every InvisibilityTimeout / 5 during execution.

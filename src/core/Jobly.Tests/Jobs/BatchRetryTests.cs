@@ -22,11 +22,11 @@ public abstract partial class JoblyTests : TestBase
 
         // Give BOTH jobs MaxRetries=1 so they retry on first failure
         await CreateContext().Set<Job>()
-            .Where(x => x.BatchId == batchId)
+            .Where(x => x.ParentJobId == batchId && x.Kind == JobKind.Job)
             .ExecuteUpdateAsync(x => x.SetProperty(p => p.MaxRetries, 1));
 
-        var batchBefore = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == batchId)
+        var batchBefore = await CreateContext().Set<Job>()
+            .Where(x => x.Id == batchId && x.Kind == JobKind.Batch)
             .FirstAsync();
         batchBefore.JobCount.ShouldBe(2);
 
@@ -34,13 +34,13 @@ public abstract partial class JoblyTests : TestBase
         await ProcessJob();
 
         var processedJob = await CreateContext().Set<Job>()
-            .Where(x => x.BatchId == batchId && x.RetriedTimes == 1)
+            .Where(x => x.ParentJobId == batchId && x.Kind == JobKind.Job && x.RetriedTimes == 1)
             .FirstOrDefaultAsync();
         processedJob.ShouldNotBeNull();
         processedJob.CurrentState.ShouldBe(State.Enqueued);
 
-        var batchAfterRetry = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == batchId)
+        var batchAfterRetry = await CreateContext().Set<Job>()
+            .Where(x => x.Id == batchId && x.Kind == JobKind.Batch)
             .FirstAsync();
         batchAfterRetry.JobCount.ShouldBe(2); // Not decremented — job is retrying, not finished
     }
@@ -62,7 +62,7 @@ public abstract partial class JoblyTests : TestBase
 
         // Continuation batch jobs should have been enqueued and completed
         var continuationJobs = await CreateContext().Set<Job>()
-            .Where(x => x.BatchId == continuationId)
+            .Where(x => x.ParentJobId == continuationId && x.Kind == JobKind.Job)
             .ToListAsync();
         continuationJobs.ShouldAllBe(j => j.CurrentState == State.Completed);
     }
@@ -94,7 +94,7 @@ public abstract partial class JoblyTests : TestBase
         continuationBatchJob.CurrentState.ShouldBe(State.Awaiting);
 
         var continuationJobs = await CreateContext().Set<Job>()
-            .Where(x => x.BatchId == continuationId)
+            .Where(x => x.ParentJobId == continuationId && x.Kind == JobKind.Job)
             .ToListAsync();
         continuationJobs.ShouldAllBe(j => j.CurrentState == State.Awaiting);
     }
@@ -108,7 +108,7 @@ public abstract partial class JoblyTests : TestBase
         // Create batch with OnAnyFinishedState
         var requests = new List<ThrowExceptionRequest> { new(), new() };
         var batchPublisher = TestUtils.CreateBatchPublisher(context);
-        var batchId = await batchPublisher.StartNew(requests, BatchContinuationOptions.OnAnyFinishedState);
+        var batchId = await batchPublisher.StartNew(requests, options: ContinuationOptions.OnAnyFinishedState);
 
         // Create continuation
         var continuationRequests = new List<UnitRequest> { new() };
@@ -123,7 +123,7 @@ public abstract partial class JoblyTests : TestBase
 
         // Continuation should have been enqueued and completed
         var continuationJobs = await CreateContext().Set<Job>()
-            .Where(x => x.BatchId == continuationId)
+            .Where(x => x.ParentJobId == continuationId && x.Kind == JobKind.Job)
             .ToListAsync();
         continuationJobs.ShouldAllBe(j => j.CurrentState == State.Completed);
     }
@@ -134,7 +134,7 @@ public abstract partial class JoblyTests : TestBase
         await EnsureServerRegistered();
         var context = CreateContext();
 
-        var batchId = await CreateBatchWithOptions(context, 2, BatchContinuationOptions.OnAnyFinishedState);
+        var batchId = await CreateBatchWithOptions(context, 2, ContinuationOptions.OnAnyFinishedState);
         var continuationId = await ContinueBatchWith(context, 1, batchId);
         await context.SaveChangesAsync();
 
@@ -144,7 +144,7 @@ public abstract partial class JoblyTests : TestBase
         batchJob.CurrentState.ShouldBe(State.Completed);
 
         var continuationJobs = await CreateContext().Set<Job>()
-            .Where(x => x.BatchId == continuationId)
+            .Where(x => x.ParentJobId == continuationId && x.Kind == JobKind.Job)
             .ToListAsync();
         continuationJobs.ShouldAllBe(j => j.CurrentState == State.Completed);
     }

@@ -145,7 +145,7 @@ public abstract partial class JoblyTests : TestBase
         var messageId = await publisher.Publish(new SingleHandlerMessage(), "a-critical");
         await context.SaveChangesAsync();
 
-        await ProcessJob();
+        await RouteMessages();
 
         var jobs = await GetJobsForMessage(messageId);
         jobs.Count.ShouldBe(1);

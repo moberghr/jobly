@@ -51,17 +51,17 @@ public static class JoblyEndpoints
 
         apiGroup.MapPost("jobs/bulk/requeue", async ([FromServices] IJobCommandService jobCommandService, [FromBody] BulkJobRequest request) => await jobCommandService.BulkRequeueJobs(request.JobIds));
 
-        apiGroup.MapGet("messages", async ([FromServices] IMessageQueryService messageQueryService, [AsParameters] BaseListRequest request, string? state) => await messageQueryService.GetMessages(request, state));
+        apiGroup.MapGet("messages", async ([FromServices] IJobGroupQueryService svc, [AsParameters] BaseListRequest request, string? state) => await svc.GetJobGroups(JobKind.Message, request, state));
 
-        apiGroup.MapGet("messages/{messageId}", async ([FromServices] IMessageQueryService messageQueryService, Guid messageId) =>
+        apiGroup.MapGet("messages/{messageId}", async ([FromServices] IJobGroupQueryService svc, Guid messageId) =>
         {
-            var model = await messageQueryService.GetMessageById(messageId);
+            var model = await svc.GetJobGroupById(messageId);
             return model is null ? Results.NotFound() : Results.Ok(model);
         });
 
-        apiGroup.MapGet("messages/{messageId}/jobs", async ([FromServices] IMessageQueryService messageQueryService, Guid messageId, [AsParameters] BaseListRequest request, string? state) => await messageQueryService.GetMessageJobs(messageId, request, state));
+        apiGroup.MapGet("messages/{messageId}/jobs", async ([FromServices] IJobGroupQueryService svc, Guid messageId, [AsParameters] BaseListRequest request, string? state) => await svc.GetJobGroupJobs(messageId, request, state));
 
-        apiGroup.MapGet("messages/{messageId}/jobs/counts", async ([FromServices] IMessageQueryService messageQueryService, Guid messageId) => await messageQueryService.GetMessageJobCounts(messageId));
+        apiGroup.MapGet("messages/{messageId}/jobs/counts", async ([FromServices] IJobGroupQueryService svc, Guid messageId) => await svc.GetJobGroupJobCounts(messageId));
 
         apiGroup.MapGet("recurring", async ([FromServices] IRecurringJobService recurringJobService, [AsParameters] BaseListRequest request) => await recurringJobService.GetRecurringJobs(request));
 
@@ -83,17 +83,17 @@ public static class JoblyEndpoints
             return job?.Logs ?? [];
         });
 
-        apiGroup.MapGet("batches", async ([FromServices] IBatchQueryService batchQueryService, [AsParameters] BaseListRequest request, string? state) => await batchQueryService.GetBatches(request, state));
+        apiGroup.MapGet("batches", async ([FromServices] IJobGroupQueryService svc, [AsParameters] BaseListRequest request, string? state) => await svc.GetJobGroups(JobKind.Batch, request, state));
 
-        apiGroup.MapGet("batches/{batchId}", async ([FromServices] IBatchQueryService batchQueryService, Guid batchId) =>
+        apiGroup.MapGet("batches/{batchId}", async ([FromServices] IJobGroupQueryService svc, Guid batchId) =>
         {
-            var model = await batchQueryService.GetBatchById(batchId);
+            var model = await svc.GetJobGroupById(batchId);
             return model is null ? Results.NotFound() : Results.Ok(model);
         });
 
-        apiGroup.MapGet("batches/{batchId}/jobs", async ([FromServices] IBatchQueryService batchQueryService, Guid batchId, [AsParameters] BaseListRequest request, string? state) => await batchQueryService.GetBatchJobs(batchId, request, state));
+        apiGroup.MapGet("batches/{batchId}/jobs", async ([FromServices] IJobGroupQueryService svc, Guid batchId, [AsParameters] BaseListRequest request, string? state) => await svc.GetJobGroupJobs(batchId, request, state));
 
-        apiGroup.MapGet("batches/{batchId}/jobs/counts", async ([FromServices] IBatchQueryService batchQueryService, Guid batchId) => await batchQueryService.GetBatchJobCounts(batchId));
+        apiGroup.MapGet("batches/{batchId}/jobs/counts", async ([FromServices] IJobGroupQueryService svc, Guid batchId) => await svc.GetJobGroupJobCounts(batchId));
 
         apiGroup.MapGet("stats/history", async ([FromServices] IDashboardStatsService statsService, [FromQuery] int? hours) => await statsService.GetStatsHistory(hours ?? 24));
 

@@ -40,7 +40,7 @@ public class ServerCleanupTask<TContext> : ServerTaskBase<TContext>
         var removedCount = 0;
         await using var transaction = await context.Database.BeginTransactionAsync();
         var servers = await context.Set<Server>()
-            .TagWith(InterceptorConstants.RowLockTableBatch)
+            .TagWith(InterceptorConstants.RowLockTableJobWait)
             .ToListAsync();
         foreach (var server in servers)
         {

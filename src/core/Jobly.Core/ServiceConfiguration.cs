@@ -61,9 +61,8 @@ public static class ServiceConfiguration
             new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IJobQueryService>(x => new JobQueryService<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IJobCommandService>(x => new JobCommandService<TContext>(x.GetRequiredService<TContext>()));
-        services.AddScoped<IMessageQueryService>(x => new MessageQueryService<TContext>(x.GetRequiredService<TContext>()));
+        services.AddScoped<IJobGroupQueryService>(x => new JobGroupQueryService<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IRecurringJobService>(x => new RecurringJobService<TContext>(x.GetRequiredService<TContext>()));
-        services.AddScoped<IBatchQueryService>(x => new BatchQueryService<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IDashboardStatsService>(x => new DashboardStatsService<TContext>(x.GetRequiredService<TContext>()));
         services.AddTransient<IBatchPublisher, BatchPublisher<TContext>>();
 
@@ -130,10 +129,8 @@ public static class ServiceConfiguration
     {
         AddJobEntity(modelBuilder);
         AddRecurringJobEntity(modelBuilder);
-        AddBatchEntity(modelBuilder);
         AddServerEntity(modelBuilder);
         AddWorkerEntity(modelBuilder);
-        AddMessageEntity(modelBuilder);
         AddJobLogEntity(modelBuilder);
         AddStatisticEntity(modelBuilder);
         AddCounterEntity(modelBuilder);
@@ -149,6 +146,7 @@ public static class ServiceConfiguration
         job.Property(p => p.Id);
         job.HasKey(p => p.Id);
 
+        job.Property(p => p.Kind);
         job.Property(p => p.Type);
         job.Property(p => p.Message);
         job.Property(p => p.CreateTime);
@@ -159,32 +157,28 @@ public static class ServiceConfiguration
         job.Property(p => p.MaxRetries);
         job.Property(p => p.ParentJobId);
         job.Property(p => p.HandlerType);
-        job.Property(p => p.MessageId);
         job.Property(p => p.ExpireAt);
         job.Property(p => p.LastKeepAlive);
         job.Property(p => p.TraceId);
         job.Property(p => p.SpawnedByJobId);
-
-        job.HasIndex(p => p.ExpireAt);
-        job.HasIndex(p => p.TraceId);
-
-        job.HasOne(p => p.MessageEntity)
-            .WithMany()
-            .HasForeignKey(p => p.MessageId);
-
-        // Configure one-to-many relationship with Batch
-        job.HasOne(p => p.Batch)
-            .WithMany(p => p.Jobs)
-            .HasForeignKey(p => p.BatchId); // Job has the foreign key
+        job.Property(p => p.JobCount);
+        job.Property(p => p.ContinuationOptions);
 
         job.HasMany(x => x.ChildJobs)
             .WithOne(x => x.ParentJob)
             .HasForeignKey(x => x.ParentJobId);
 
-        job.HasIndex(p => new { p.CurrentState, p.Queue, p.ScheduleTime })
-            .IsDescending(false, false, false);
+        // Worker fetch: Kind + State + Queue + ScheduleTime
+        job.HasIndex(p => new { p.Kind, p.CurrentState, p.Queue, p.ScheduleTime });
 
-        job.HasIndex(p => p.CurrentState);
+        // Child job queries + failed children check during completion
+        job.HasIndex(p => new { p.ParentJobId, p.CurrentState });
+
+        // Message/Batch listing pages
+        job.HasIndex(p => new { p.Kind, p.CurrentState, p.CreateTime });
+
+        job.HasIndex(p => p.ExpireAt);
+        job.HasIndex(p => p.TraceId);
     }
 
     private static void AddRecurringJobEntity(ModelBuilder modelBuilder)
@@ -209,18 +203,6 @@ public static class ServiceConfiguration
         recurringJob.HasOne(p => p.LastJob);
 
         recurringJob.Property(p => p.Version).IsConcurrencyToken();
-    }
-
-    private static void AddBatchEntity(ModelBuilder modelBuilder)
-    {
-        var batch = modelBuilder.Entity<Batch>();
-        batch.ToTable(nameof(Batch));
-
-        batch.Property(p => p.Id);
-        batch.HasKey(p => p.Id);
-
-        batch.Property(p => p.JobCount);
-        batch.Property(p => p.ContinuationOptions);
     }
 
     private static void AddServerEntity(ModelBuilder modelBuilder)
@@ -253,26 +235,6 @@ public static class ServiceConfiguration
         worker.HasOne(p => p.Server)
             .WithMany()
             .HasForeignKey(p => p.ServerId);
-    }
-
-    private static void AddMessageEntity(ModelBuilder modelBuilder)
-    {
-        var message = modelBuilder.Entity<Message>();
-        message.ToTable(nameof(Message));
-
-        message.Property(p => p.Id);
-        message.HasKey(p => p.Id);
-
-        message.Property(p => p.Type);
-        message.Property(p => p.Payload);
-        message.Property(p => p.Queue);
-        message.Property(p => p.CreateTime);
-        message.Property(p => p.CurrentState);
-        message.Property(p => p.JobCount);
-        message.Property(p => p.ExpireAt);
-
-        message.HasIndex(p => new { p.CurrentState, p.Queue });
-        message.HasIndex(p => p.ExpireAt);
     }
 
     private static void AddJobLogEntity(ModelBuilder modelBuilder)

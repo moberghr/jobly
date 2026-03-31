@@ -387,7 +387,7 @@ public abstract partial class JoblyTests : TestBase
 
         // Get one of the batch jobs
         var batchJobs = await CreateContext().Set<Job>()
-            .Where(x => x.BatchId == batchId)
+            .Where(x => x.ParentJobId == batchId && x.Kind == JobKind.Job)
             .ToListAsync();
         batchJobs.Count.ShouldBe(3);
 
@@ -401,27 +401,19 @@ public abstract partial class JoblyTests : TestBase
                 .SetProperty(p => p.CurrentWorkerId, TestUtils.TestWorkerId)
                 .SetProperty(p => p.LastKeepAlive, DateTime.UtcNow.AddMinutes(-6)));
 
-        // Check batch counter before requeue
-        var batchBefore = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == batchId)
-            .FirstAsync();
-        var counterBefore = batchBefore.JobCount;
-
         await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
 
-        // Batch counter unchanged by crash requeue
-        var batchAfter = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == batchId)
-            .FirstAsync();
-        batchAfter.JobCount.ShouldBe(counterBefore);
+        // Crashed job should be requeued
+        var requeuedJob = await GetJob(crashedJobId);
+        requeuedJob!.CurrentState.ShouldBe(State.Enqueued);
 
         // Process all jobs (including the requeued one) — batch should complete
         await ProcessAllJobs();
 
-        var batchFinal = await CreateContext().Set<Batch>()
-            .Where(x => x.Id == batchId)
+        var batchFinal = await CreateContext().Set<Job>()
+            .Where(x => x.Id == batchId && x.Kind == JobKind.Batch)
             .FirstAsync();
-        batchFinal.JobCount.ShouldBe(0);
+        batchFinal.CurrentState.ShouldBe(State.Completed);
     }
 
     [Fact]
@@ -433,12 +425,14 @@ public abstract partial class JoblyTests : TestBase
         var messageId = await publisher.Publish(new MultiRequest());
         await context.SaveChangesAsync();
 
-        // Route message (creates 2 jobs) + execute first
+        // Route message (creates 2 jobs)
+        await RouteMessages();
+
+        // Execute first handler job
         await ProcessJob();
 
         var message = await GetMessage(messageId);
         message.CurrentState.ShouldBe(State.Processing);
-        var jobCountBefore = message.JobCount;
 
         // Get the remaining enqueued job and simulate crash on it
         var jobs = await GetJobsForMessage(messageId);
@@ -453,9 +447,8 @@ public abstract partial class JoblyTests : TestBase
 
         await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(CreateContext(), TimeSpan.FromMinutes(5));
 
-        // Message should still be Processing with same JobCount (crash requeue doesn't touch messages)
+        // Message should still be Processing (crash requeue doesn't touch messages)
         var messageAfter = await GetMessage(messageId);
         messageAfter.CurrentState.ShouldBe(State.Processing);
-        messageAfter.JobCount.ShouldBe(jobCountBefore);
     }
 }

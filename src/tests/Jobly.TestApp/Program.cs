@@ -1,9 +1,12 @@
 using Jobly.Core;
+using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
+using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Test.Shared;
 using Jobly.UI.UIMiddleware;
 using Jobly.Worker;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -124,7 +127,7 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     // Can't mix types in BatchPublisher, so use SendEmailRequest for success batch
     var failBatchJobs = Enumerable.Range(0, 5)
         .Select(_ => new ThrowExceptionRequest()).ToList();
-    var failBatchId = await batchPublisher.StartNew(failBatchJobs, BatchContinuationOptions.OnAnyFinishedState);
+    var failBatchId = await batchPublisher.StartNew(failBatchJobs, options: ContinuationOptions.OnAnyFinishedState);
     var afterFailBatchJobs = Enumerable.Range(0, 3)
         .Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
     await batchPublisher.ContinueBatchWith(afterFailBatchJobs, failBatchId);
@@ -197,6 +200,31 @@ app.MapGet("/seed-perf-batch", async (IBatchPublisher batchPublisher, int? jobsP
     return Results.Ok(new { batches, jobsPerBatch = jobs, totalJobs });
 });
 
+app.MapGet("/seed-perf-batch-continuation", async (IBatchPublisher batchPublisher, int? batchCount, int? jobsPerBatch1, int? jobsPerBatch2) =>
+{
+    var batches = batchCount ?? 100;
+    var jobs1 = jobsPerBatch1 ?? 10;
+    var jobs2 = jobsPerBatch2 ?? 100;
+
+    for (var b = 0; b < batches; b++)
+    {
+        var firstBatchJobs = Enumerable.Range(0, jobs1).Select(_ => new EmptyRequest()).ToList();
+        var batchId = await batchPublisher.StartNew(firstBatchJobs);
+
+        var continuationJobs = Enumerable.Range(0, jobs2).Select(_ => new EmptyRequest()).ToList();
+        await batchPublisher.ContinueBatchWith(continuationJobs, batchId);
+    }
+
+    await batchPublisher.SaveChangesAsync();
+    return Results.Ok(new
+    {
+        batches,
+        phase1Jobs = batches * jobs1,
+        phase2Jobs = batches * jobs2,
+        totalJobs = batches * (jobs1 + jobs2),
+    });
+});
+
 app.MapGet("/seed-perf-messages", async (IPublisher publisher, int? count) =>
 {
     var total = count ?? 100;
@@ -207,6 +235,62 @@ app.MapGet("/seed-perf-messages", async (IPublisher publisher, int? count) =>
 
     await publisher.SaveChangesAsync();
     return Results.Ok(new { messages = total, jobsPerMessage = 3, totalJobs = total * 3 });
+});
+
+app.MapGet("/perf-continuation-latency", async (TestContext context) =>
+{
+    // For each batch chain: measure time between last phase-1 child completing
+    // and first phase-2 child starting to process
+    var firstBatchIds = await context.Set<Job>()
+        .Where(b => b.Kind == JobKind.Batch && b.ParentJobId == null)
+        .Select(b => b.Id)
+        .ToListAsync();
+
+    var latencies = new List<double>();
+
+    foreach (var batchId in firstBatchIds)
+    {
+        // Last completion time of first-phase children
+        var lastChildCompleted = await context.Set<JobLog>()
+            .Where(l => context.Set<Job>().Any(j => j.Id == l.JobId && j.ParentJobId == batchId && j.Kind == JobKind.Job))
+            .Where(l => l.EventType == "Completed")
+            .MaxAsync(l => (DateTime?)l.Timestamp);
+
+        if (lastChildCompleted == null) continue;
+
+        // Find continuation batch
+        var contBatchId = await context.Set<Job>()
+            .Where(j => j.ParentJobId == batchId && j.Kind == JobKind.Batch)
+            .Select(j => j.Id)
+            .FirstOrDefaultAsync();
+
+        if (contBatchId == Guid.Empty) continue;
+
+        // First processing time of continuation children
+        var firstContProcessing = await context.Set<JobLog>()
+            .Where(l => context.Set<Job>().Any(j => j.Id == l.JobId && j.ParentJobId == contBatchId && j.Kind == JobKind.Job))
+            .Where(l => l.EventType == "Processing")
+            .MinAsync(l => (DateTime?)l.Timestamp);
+
+        if (firstContProcessing == null) continue;
+
+        var latencyMs = (firstContProcessing.Value - lastChildCompleted.Value).TotalMilliseconds;
+        latencies.Add(latencyMs);
+    }
+
+    if (latencies.Count == 0) return Results.Ok(new { error = "No continuation chains found" });
+
+    latencies.Sort();
+    return Results.Ok(new
+    {
+        chains = latencies.Count,
+        avgMs = Math.Round(latencies.Average(), 1),
+        minMs = Math.Round(latencies.Min(), 1),
+        maxMs = Math.Round(latencies.Max(), 1),
+        p50Ms = Math.Round(latencies[latencies.Count / 2], 1),
+        p95Ms = Math.Round(latencies[(int)(latencies.Count * 0.95)], 1),
+        p99Ms = Math.Round(latencies[(int)(latencies.Count * 0.99)], 1),
+    });
 });
 
 app.MapPost("/perf-trace/enable", () =>

@@ -32,11 +32,11 @@ public abstract partial class JoblyTests : TestBase
         var messageId = await publisher.Publish(new SingleHandlerMessage());
         await context.SaveChangesAsync();
 
-        await ProcessJob(); // routes + executes
+        await RouteMessages();
 
         var jobs = await GetJobsForMessage(messageId);
         jobs.Count.ShouldBe(1);
-        jobs[0].MessageId.ShouldBe(messageId);
+        jobs[0].ParentJobId.ShouldBe(messageId);
         jobs[0].HandlerType.ShouldContain(nameof(SingleMessageHandler));
     }
 
@@ -52,7 +52,7 @@ public abstract partial class JoblyTests : TestBase
         await publisher.Publish(new SingleHandlerMessage());
         await context.SaveChangesAsync();
 
-        await ProcessJob(); // routes message + executes the single handler job
+        await ProcessAllJobs();
 
         counter.CountA.ShouldBe(beforeCount + 1);
     }
@@ -66,11 +66,10 @@ public abstract partial class JoblyTests : TestBase
         var messageId = await publisher.Publish(new SingleHandlerMessage());
         await context.SaveChangesAsync();
 
-        await ProcessJob(); // routes + executes
+        await ProcessAllJobs();
 
         var message = await GetMessage(messageId);
         message.CurrentState.ShouldBe(State.Completed);
-        message.JobCount.ShouldBe(0);
     }
 
     [Fact]
@@ -82,12 +81,17 @@ public abstract partial class JoblyTests : TestBase
         var messageId = await publisher.Publish(new MultiRequest());
         await context.SaveChangesAsync();
 
-        // Route message + execute first handler job
+        // Route message
+        await RouteMessages();
+
+        // Execute only first handler job
         await ProcessJob();
+
+        // Orchestrate — should see 1 child still not terminal, so message stays Processing
+        await RunOrchestration();
 
         var message = await GetMessage(messageId);
         message.CurrentState.ShouldBe(State.Processing);
-        message.JobCount.ShouldBe(1); // 1 remaining
     }
 
     [Fact]
@@ -99,7 +103,7 @@ public abstract partial class JoblyTests : TestBase
         var messageId = await publisher.Publish(new SingleHandlerMessage(), "a-critical");
         await context.SaveChangesAsync();
 
-        await ProcessJob();
+        await RouteMessages();
 
         var jobs = await GetJobsForMessage(messageId);
         jobs.Count.ShouldBe(1);
@@ -118,7 +122,7 @@ public abstract partial class JoblyTests : TestBase
         var job = await GetJob(jobId);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Enqueued);
-        job.MessageId.ShouldBeNull();
+        job.ParentJobId.ShouldBeNull();
     }
 
     [Fact]
@@ -130,7 +134,7 @@ public abstract partial class JoblyTests : TestBase
         await publisher.Enqueue(new UnitRequest());
         await context.SaveChangesAsync();
 
-        var messageCount = await CreateContext().Set<Message>().CountAsync();
+        var messageCount = await CreateContext().Set<Job>().Where(x => x.Kind == JobKind.Message).CountAsync();
         messageCount.ShouldBe(0);
     }
 
@@ -186,41 +190,37 @@ public abstract partial class JoblyTests : TestBase
     }
 
     [Fact]
-    public async Task GivenJobAndMessage_WhenWorkerPolls_ThenJobIsProcessedFirst()
+    public async Task GivenJobAndMessage_WhenWorkerPolls_ThenBothAreProcessed()
     {
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
-        // Publish a message first
         var messageId = await publisher.Publish(new SingleHandlerMessage());
-
-        // Then enqueue a job
         var jobId = await publisher.Enqueue(new UnitRequest());
         await context.SaveChangesAsync();
 
-        // Worker should prefer the Job over the Message
-        await ProcessJob();
+        await ProcessAllJobs();
 
         var job = await GetJob(jobId);
         job.CurrentState.ShouldBe(State.Completed);
 
         var message = await GetMessage(messageId);
-        message.CurrentState.ShouldBe(State.Enqueued); // not yet routed
+        message.CurrentState.ShouldBe(State.Completed);
     }
 
     [Fact]
     public async Task GivenMultipleHandlers_WhenOneJobFails_ThenOtherJobStillCompletes()
     {
-        // We need a message type where one handler fails and another succeeds.
-        // MultiRequest has two handlers that both succeed. For this test,
-        // we verify that each job has independent state by checking after partial processing.
         var context = CreateContext();
         var publisher = TestUtils.CreatePublisher(context);
 
         var messageId = await publisher.Publish(new MultiRequest());
         await context.SaveChangesAsync();
 
-        // Route message (creates 2 jobs) + execute first
+        // Route message (creates 2 jobs)
+        await RouteMessages();
+
+        // Execute first handler job only
         await ProcessJob();
 
         var jobs = await GetJobsForMessage(messageId);

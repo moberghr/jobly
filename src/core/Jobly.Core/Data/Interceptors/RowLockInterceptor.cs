@@ -7,9 +7,7 @@ namespace Jobly.Core.Interceptors;
 public static class InterceptorConstants
 {
     public static readonly string RowLockTableJob = "LOCK ROW TABLE JOB";
-    public static readonly string RowLockTableBatch = "LOCK ROW TABLE BATCH";
-    public static readonly string RowLockTableMessage = "LOCK ROW TABLE MESSAGE";
-    public static readonly string RowLockTableMessageWait = "LOCK ROW TABLE MESSAGE WAIT";
+    public static readonly string RowLockTableJobWait = "LOCK ROW TABLE JOB WAIT";
     public static readonly string RowLockTableCounter = "LOCK ROW TABLE COUNTER";
 }
 
@@ -42,21 +40,14 @@ public class PostgresRowLockInterceptor : DbCommandInterceptor
     /// </summary>
     private static void ManipulateCommand(DbCommand command)
     {
-        if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJob}", StringComparison.Ordinal))
+        if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJob}", StringComparison.Ordinal)
+            && !command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJobWait}", StringComparison.Ordinal))
         {
             command.CommandText += " FOR NO KEY UPDATE SKIP LOCKED";
         }
-        else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableBatch}", StringComparison.Ordinal))
+        else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJobWait}", StringComparison.Ordinal))
         {
             command.CommandText += " FOR NO KEY UPDATE";
-        }
-        else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableMessageWait}", StringComparison.Ordinal))
-        {
-            command.CommandText += " FOR NO KEY UPDATE";
-        }
-        else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableMessage}", StringComparison.Ordinal))
-        {
-            command.CommandText += " FOR NO KEY UPDATE SKIP LOCKED";
         }
         else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableCounter}", StringComparison.Ordinal))
         {
@@ -90,21 +81,14 @@ public class SqlServerRowLockInterceptor : DbCommandInterceptor
 
     private static void ManipulateCommand(DbCommand command)
     {
-        if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJob}", StringComparison.Ordinal))
+        if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJob}", StringComparison.Ordinal)
+            && !command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJobWait}", StringComparison.Ordinal))
+        {
+            command.CommandText = command.CommandText.Replace($"FROM [{nameof(Job)}] AS [j]", $"FROM [{nameof(Job)}] AS [j] WITH (ROWLOCK, UPDLOCK, READPAST)", StringComparison.Ordinal);
+        }
+        else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJobWait}", StringComparison.Ordinal))
         {
             command.CommandText = command.CommandText.Replace($"FROM [{nameof(Job)}] AS [j]", $"FROM [{nameof(Job)}] AS [j] WITH (ROWLOCK, UPDLOCK)", StringComparison.Ordinal);
-        }
-        else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableBatch}", StringComparison.Ordinal))
-        {
-            command.CommandText = command.CommandText.Replace($"FROM [{nameof(Batch)}] AS [b]", $"FROM [{nameof(Batch)}] AS [b] WITH (ROWLOCK, UPDLOCK)", StringComparison.Ordinal);
-        }
-        else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableMessageWait}", StringComparison.Ordinal))
-        {
-            command.CommandText = command.CommandText.Replace("FROM [Message] AS [m]", "FROM [Message] AS [m] WITH (ROWLOCK, UPDLOCK)", StringComparison.Ordinal);
-        }
-        else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableMessage}", StringComparison.Ordinal))
-        {
-            command.CommandText = command.CommandText.Replace("FROM [Message] AS [m]", "FROM [Message] AS [m] WITH (ROWLOCK, UPDLOCK, READPAST)", StringComparison.Ordinal);
         }
         else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableCounter}", StringComparison.Ordinal))
         {

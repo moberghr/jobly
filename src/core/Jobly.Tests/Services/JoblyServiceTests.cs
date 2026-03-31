@@ -67,12 +67,14 @@ public abstract partial class ServiceTests : TestBase
         var batchId = await batchPublisher.StartNew(new List<UnitRequest> { new(), new(), new() });
         await batchPublisher.SaveChangesAsync();
 
-        var batch = await CreateContext().Set<Batch>().FindAsync(batchId);
+        var batch = await CreateContext().Set<Job>()
+            .Where(x => x.Id == batchId && x.Kind == JobKind.Batch)
+            .FirstOrDefaultAsync();
         batch.ShouldNotBeNull();
         batch.JobCount.ShouldBe(3);
 
         var jobs = await CreateContext().Set<Job>()
-            .Where(j => j.BatchId == batchId)
+            .Where(j => j.ParentJobId == batchId && j.Kind == JobKind.Job)
             .CountAsync();
         jobs.ShouldBe(3);
     }
@@ -126,46 +128,29 @@ public abstract partial class ServiceTests : TestBase
         // Process all jobs — batch completes, continuation fires and completes
         await ProcessAllJobs();
 
-        // Batch JobCount should be 0
-        var batchBefore = await CreateContext().Set<Batch>().FindAsync(batchId);
-        batchBefore!.JobCount.ShouldBe(0);
-
         // Placeholder should be Completed
         var placeholderBefore = await GetJob(batchId);
         placeholderBefore!.CurrentState.ShouldBe(State.Completed);
 
-        // Count continuation jobs before requeue
-        var continuationJobCountBefore = await CreateContext().Set<Job>()
-            .Where(x => x.CurrentState == State.Completed)
-            .CountAsync();
-
         // Find a completed job in the batch and requeue it
         var completedJob = await CreateContext().Set<Job>()
-            .Where(x => x.BatchId == batchId && x.CurrentState == State.Completed)
+            .Where(x => x.ParentJobId == batchId && x.Kind == JobKind.Job && x.CurrentState == State.Completed)
             .FirstAsync();
 
         var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.RequeueJob(completedJob.Id);
 
-        // Batch JobCount should be 1, placeholder back to Awaiting
-        var batchAfter = await CreateContext().Set<Batch>().FindAsync(batchId);
-        batchAfter!.JobCount.ShouldBe(1);
-
+        // Placeholder back to Awaiting after requeue
         var placeholderAfter = await GetJob(batchId);
         placeholderAfter!.CurrentState.ShouldBe(State.Awaiting);
 
-        // Process the requeued job — batch completes again, continuation should NOT re-fire
+        // Process the requeued job — batch completes again
         await ProcessAllJobs();
 
-        // Verify continuation didn't create duplicate jobs
-        var continuationJobCountAfter = await CreateContext().Set<Job>()
-            .Where(x => x.CurrentState == State.Completed)
-            .CountAsync();
-
-        // The requeued job completed, so +1 completed. Continuation should fire once more (+1).
-        // If it double-fired, we'd see more.
-        var batchFinal = await CreateContext().Set<Batch>().FindAsync(batchId);
-        batchFinal!.JobCount.ShouldBe(0);
+        var batchFinal = await CreateContext().Set<Job>()
+            .Where(x => x.Id == batchId && x.Kind == JobKind.Batch)
+            .FirstAsync();
+        batchFinal.CurrentState.ShouldBe(State.Completed);
     }
 
     [Fact]
@@ -180,14 +165,16 @@ public abstract partial class ServiceTests : TestBase
         await ProcessAllJobs();
 
         // Message should be completed
-        var messages = await CreateContext().Set<Message>().ToListAsync();
+        var messages = await CreateContext().Set<Job>()
+            .Where(x => x.Kind == JobKind.Message)
+            .ToListAsync();
         var message = messages.First();
         message.CurrentState.ShouldBe(State.Completed);
         message.JobCount.ShouldBe(0);
 
         // Find the completed job spawned from this message
         var messageJob = await CreateContext().Set<Job>()
-            .Where(x => x.MessageId == message.Id)
+            .Where(x => x.ParentJobId == message.Id && x.Kind == JobKind.Job)
             .FirstAsync();
 
         // Requeue it
@@ -195,8 +182,10 @@ public abstract partial class ServiceTests : TestBase
         await service.RequeueJob(messageJob.Id);
 
         // Message should be reopened with JobCount = 1
-        var updatedMessage = await CreateContext().Set<Message>().FindAsync(message.Id);
-        updatedMessage!.JobCount.ShouldBe(1);
+        var updatedMessage = await CreateContext().Set<Job>()
+            .Where(x => x.Id == message.Id && x.Kind == JobKind.Message)
+            .FirstAsync();
+        updatedMessage.JobCount.ShouldBe(1);
         updatedMessage.CurrentState.ShouldBe(State.Processing);
         updatedMessage.ExpireAt.ShouldBeNull();
     }
@@ -211,8 +200,8 @@ public abstract partial class ServiceTests : TestBase
         await publisher.Publish(new SingleHandlerMessage());
         await context.SaveChangesAsync();
 
-        var service = TestUtils.CreateMessageQueryService(CreateContext());
-        var result = await service.GetMessages(new BaseListRequest { Page = 0, PageSize = 10 });
+        var service = TestUtils.CreateJobGroupQueryService(CreateContext());
+        var result = await service.GetJobGroups(JobKind.Message, new BaseListRequest { Page = 0, PageSize = 10 });
 
         result.TotalCount.ShouldBe(2);
         result.Items.Count.ShouldBe(2);
@@ -231,12 +220,12 @@ public abstract partial class ServiceTests : TestBase
         // Route messages and process all jobs so some messages complete
         await ProcessAllJobs();
 
-        var service = TestUtils.CreateMessageQueryService(CreateContext());
+        var service = TestUtils.CreateJobGroupQueryService(CreateContext());
 
-        var completed = await service.GetMessages(new BaseListRequest { Page = 0, PageSize = 10 }, "completed");
+        var completed = await service.GetJobGroups(JobKind.Message, new BaseListRequest { Page = 0, PageSize = 10 }, "completed");
         completed.Items.ShouldAllBe(m => m.CurrentState == State.Completed);
 
-        var all = await service.GetMessages(new BaseListRequest { Page = 0, PageSize = 10 });
+        var all = await service.GetJobGroups(JobKind.Message, new BaseListRequest { Page = 0, PageSize = 10 });
         all.TotalCount.ShouldBeGreaterThanOrEqualTo(completed.TotalCount);
     }
 
@@ -251,16 +240,16 @@ public abstract partial class ServiceTests : TestBase
         await context.SaveChangesAsync();
         await ProcessAllJobs();
 
-        var service = TestUtils.CreateBatchQueryService(CreateContext());
+        var service = TestUtils.CreateJobGroupQueryService(CreateContext());
 
-        var completed = await service.GetBatches(new BaseListRequest { Page = 0, PageSize = 10 }, "completed");
+        var completed = await service.GetJobGroups(JobKind.Batch, new BaseListRequest { Page = 0, PageSize = 10 }, "completed");
         completed.TotalCount.ShouldBeGreaterThan(0);
-        completed.Items.ShouldAllBe(b => b.PlaceholderState == State.Completed);
+        completed.Items.ShouldAllBe(b => b.CurrentState == State.Completed);
 
-        var active = await service.GetBatches(new BaseListRequest { Page = 0, PageSize = 10 }, "active");
-        active.Items.ShouldAllBe(b => b.RemainingJobs > 0);
+        var active = await service.GetJobGroups(JobKind.Batch, new BaseListRequest { Page = 0, PageSize = 10 }, "active");
+        active.Items.ShouldAllBe(b => b.JobCount > 0);
 
-        var all = await service.GetBatches(new BaseListRequest { Page = 0, PageSize = 10 });
+        var all = await service.GetJobGroups(JobKind.Batch, new BaseListRequest { Page = 0, PageSize = 10 });
         all.TotalCount.ShouldBeGreaterThanOrEqualTo(completed.TotalCount);
     }
 
@@ -274,14 +263,14 @@ public abstract partial class ServiceTests : TestBase
         await context.SaveChangesAsync();
 
         // Route the message to create jobs
-        await ProcessJob();
+        await RouteMessages();
 
-        var service = TestUtils.CreateMessageQueryService(CreateContext());
-        var message = await service.GetMessageById(messageId);
+        var service = TestUtils.CreateJobGroupQueryService(CreateContext());
+        var message = await service.GetJobGroupById(messageId);
 
         message.ShouldNotBeNull();
         message.Id.ShouldBe(messageId);
-        message.JobsCount.ShouldBe(2); // MultiHandlerA + MultiHandlerB
+        message.SpawnedJobsCount.ShouldBe(2); // MultiHandlerA + MultiHandlerB
     }
 
     [Fact]
@@ -328,10 +317,10 @@ public abstract partial class ServiceTests : TestBase
         await context.SaveChangesAsync();
 
         // Route message -> creates 2 handler jobs
-        await ProcessJob();
+        await RouteMessages();
 
         var jobs = await CreateContext().Set<Job>()
-            .Where(j => j.MessageId == messageId)
+            .Where(j => j.ParentJobId == messageId && j.Kind == JobKind.Job)
             .ToListAsync();
 
         var service = TestUtils.CreateJobQueryService(CreateContext());

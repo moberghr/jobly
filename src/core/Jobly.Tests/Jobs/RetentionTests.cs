@@ -69,7 +69,7 @@ public abstract partial class JoblyTests : TestBase
         var messageId = await publisher.Publish(new SingleHandlerMessage());
         await context.SaveChangesAsync();
 
-        await ProcessJob(); // routes + executes
+        await ProcessAllJobs();
 
         var message = await GetMessage(messageId);
         message.CurrentState.ShouldBe(State.Completed);

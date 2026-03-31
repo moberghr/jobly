@@ -84,10 +84,9 @@ public class JoblyDispatcher<TContext> : BackgroundService
 
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
 
-        // Batch fetch — single query, single index scan, locks N rows at once
+        // Fetch only Kind=Job (messages are routed by MessageRoutingTask)
         var jobs = await context.Set<Job>()
-            .Where(x => x.CurrentState == State.Enqueued)
-            .Where(x => x.ScheduleTime < DateTime.UtcNow)
+            .Where(x => x.Kind == JobKind.Job && x.CurrentState == State.Enqueued && x.ScheduleTime < DateTime.UtcNow)
             .Where(x => _groupConfiguration.Queues.Contains(x.Queue))
             .OrderBy(x => x.Queue)
             .ThenBy(x => x.ScheduleTime)
@@ -95,71 +94,8 @@ public class JoblyDispatcher<TContext> : BackgroundService
             .TagWith(InterceptorConstants.RowLockTableJob)
             .ToListAsync(ct);
 
-        // Always try to route messages
-        {
-            var messages = await context.Set<Message>()
-                .Where(x => x.CurrentState == State.Enqueued)
-                .Where(x => _groupConfiguration.Queues.Contains(x.Queue))
-                .OrderBy(x => x.Queue)
-                .ThenBy(x => x.CreateTime)
-                .Take(available)
-                .TagWith(InterceptorConstants.RowLockTableMessage)
-                .ToListAsync(ct);
-
-            foreach (var message in messages)
-            {
-                var messageType = Type.GetType(message.Type);
-                if (messageType == null)
-                {
-                    continue;
-                }
-
-                using var handlerScope = _scopeFactory.CreateScope();
-                var handlerTypes = Jobly.Core.Handlers.JobDispatcher.DiscoverMessageHandlers(messageType, handlerScope.ServiceProvider);
-
-                if (handlerTypes.Count == 0)
-                {
-                    message.CurrentState = State.Failed;
-                    continue;
-                }
-
-                var messageTraceId = Guid.NewGuid();
-                foreach (var handlerType in handlerTypes)
-                {
-                    var job = Jobly.Core.Helper.JobHelper.CreateJob(
-                        message: message.Payload,
-                        type: message.Type,
-                        retries: 0,
-                        scheduleTime: null,
-                        maxRetries: 0,
-                        queue: message.Queue,
-                        parentId: null,
-                        state: State.Enqueued);
-
-                    job.HandlerType = handlerType.AssemblyQualifiedName;
-                    job.MessageId = message.Id;
-                    job.TraceId = messageTraceId;
-
-                    context.Set<Job>().Add(job);
-                    context.Set<JobLog>().Add(new JobLog
-                    {
-                        JobId = job.Id,
-                        EventType = "Created",
-                        Timestamp = DateTime.UtcNow,
-                        Level = "Information",
-                        Message = $"Job {job.Id} created from message {message.Id}",
-                    });
-                }
-
-                message.JobCount = handlerTypes.Count;
-                message.CurrentState = State.Processing;
-            }
-        }
-
         if (jobs.Count == 0)
         {
-            // No jobs found, but messages may have been routed — save and return
-            await context.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             return false;
         }
@@ -179,7 +115,6 @@ public class JoblyDispatcher<TContext> : BackgroundService
                 Level = "Information",
                 Message = $"The job {job.Id} is being processed",
             });
-
         }
 
         await context.SaveChangesAsync(ct);
@@ -192,5 +127,4 @@ public class JoblyDispatcher<TContext> : BackgroundService
 
         return true;
     }
-
 }

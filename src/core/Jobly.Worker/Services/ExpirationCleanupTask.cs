@@ -31,7 +31,7 @@ public class ExpirationCleanupTask<TContext> : ServerTaskBase<TContext>
     }
 
     /// <summary>
-    /// Deletes expired jobs, their logs, expired messages, old hourly stats, and old server logs.
+    /// Deletes expired jobs, their logs, old hourly stats, and old server logs.
     /// Public static so tests can call it directly.
     /// </summary>
     public static async Task<int> RunCleanup<TCtx>(TCtx context, int batchSize = 1000)
@@ -54,11 +54,6 @@ public class ExpirationCleanupTask<TContext> : ServerTaskBase<TContext>
 
         await context.Set<Job>()
             .Where(x => expiredJobIds.Contains(x.Id))
-            .ExecuteDeleteAsync();
-
-        await context.Set<Message>()
-            .Where(x => x.ExpireAt != null && x.ExpireAt < DateTime.UtcNow)
-            .Take(batchSize)
             .ExecuteDeleteAsync();
 
         // Cleanup old hourly stats (older than 7 days)
