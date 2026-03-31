@@ -5,7 +5,6 @@ using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Services;
 using Jobly.Worker;
-using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -18,26 +17,24 @@ namespace Jobly.Tests.Integration;
 /// </summary>
 public class JoblyTestServer : IAsyncDisposable
 {
-    private readonly ServiceProvider _serviceProvider;
-    private readonly List<IHostedService> _hostedServices = [];
-    private readonly CancellationTokenSource _cts = new();
+    private readonly IHost _host;
     private readonly Func<TestContext> _createContext;
 
-    private JoblyTestServer(ServiceProvider serviceProvider, Func<TestContext> createContext)
+    private JoblyTestServer(IHost host, Func<TestContext> createContext)
     {
-        _serviceProvider = serviceProvider;
+        _host = host;
         _createContext = createContext;
     }
 
     public IPublisher CreatePublisher()
     {
-        var scope = _serviceProvider.CreateScope();
+        var scope = _host.Services.CreateScope();
         return scope.ServiceProvider.GetRequiredService<IPublisher>();
     }
 
     public IBatchPublisher CreateBatchPublisher()
     {
-        var scope = _serviceProvider.CreateScope();
+        var scope = _host.Services.CreateScope();
         return scope.ServiceProvider.GetRequiredService<IBatchPublisher>();
     }
 
@@ -45,55 +42,46 @@ public class JoblyTestServer : IAsyncDisposable
 
     public IJobCommandService CreateCommandService()
     {
-        var scope = _serviceProvider.CreateScope();
+        var scope = _host.Services.CreateScope();
         return scope.ServiceProvider.GetRequiredService<IJobCommandService>();
     }
 
     public static async Task<JoblyTestServer> StartAsync(Func<TestContext> createContext)
     {
-        var services = new ServiceCollection();
+        var tempCtx = createContext();
+        var connectionString = tempCtx.Database.GetConnectionString()!;
+        tempCtx.Dispose();
 
-        // Register DbContext with the same connection as the fixture
-        services.AddScoped<TestContext>(sp => createContext());
-        services.AddDbContext<TestContext>(options =>
-        {
-            var ctx = createContext();
-            var connString = ctx.Database.GetConnectionString();
-            ctx.Dispose();
-            options.UseNpgsql(connString)
-                .UseSnakeCaseNamingConvention();
-        });
+        var host = Host.CreateDefaultBuilder()
+            .ConfigureServices(services =>
+            {
+                services.AddDbContext<TestContext>(options =>
+                    options.UseNpgsql(connectionString)
+                        .UseSnakeCaseNamingConvention());
 
-        // Register handlers from this test assembly
-        services.AddJobHandlers(typeof(JoblyTestServer).Assembly);
-        services.AddPipelineBehaviors(typeof(JoblyTestServer).Assembly);
+                services.AddJobHandlers(typeof(JoblyTestServer).Assembly);
+                services.AddPipelineBehaviors(typeof(JoblyTestServer).Assembly);
+                services.AddSingleton<TestData.Handlers.CounterService>();
+                services.AddSingleton<TestData.Handlers.MultiHandlerCounter>();
 
-        // Register Jobly worker with fast intervals for testing
-        services.AddJoblyWorker<TestContext>(config =>
-        {
-            config.WorkerCount = 2;
-            config.Queues = ["a-critical", "b-default", "c-low", "default", "high"];
-            config.PollingInterval = TimeSpan.FromMilliseconds(100);
-            config.CancellationCheckInterval = TimeSpan.FromSeconds(1);
-            config.OrchestrationInterval = TimeSpan.FromSeconds(1);
-            config.MessageRoutingInterval = TimeSpan.FromMilliseconds(500);
-            config.InvisibilityTimeout = TimeSpan.FromMinutes(1);
-            config.HealthCheckInterval = TimeSpan.FromSeconds(30);
-            config.UseDispatcher = false;
-        });
+                services.AddJoblyWorker<TestContext>(config =>
+                {
+                    config.WorkerCount = 5;
+                    config.Queues = ["a-critical", "b-default", "c-low", "default", "high"];
+                    config.PollingInterval = TimeSpan.FromMilliseconds(100);
+                    config.CancellationCheckInterval = TimeSpan.FromSeconds(1);
+                    config.OrchestrationInterval = TimeSpan.FromSeconds(1);
+                    config.MessageRoutingInterval = TimeSpan.FromMilliseconds(500);
+                    config.InvisibilityTimeout = TimeSpan.FromMinutes(1);
+                    config.HealthCheckInterval = TimeSpan.FromSeconds(30);
+                    config.UseDispatcher = false;
+                });
+            })
+            .Build();
 
-        var provider = services.BuildServiceProvider();
-        var server = new JoblyTestServer(provider, createContext);
+        await host.StartAsync();
 
-        // Start all hosted services
-        var hostedServices = provider.GetServices<IHostedService>().ToList();
-        foreach (var svc in hostedServices)
-        {
-            await svc.StartAsync(server._cts.Token);
-            server._hostedServices.Add(svc);
-        }
-
-        return server;
+        return new JoblyTestServer(host, createContext);
     }
 
     public async Task WaitForJobState(Guid jobId, State state, TimeSpan? timeout = null)
@@ -122,27 +110,6 @@ public class JoblyTestServer : IAsyncDisposable
         throw new TimeoutException($"Job {jobId} did not reach state {state} within {timeout ?? TimeSpan.FromSeconds(10)}. Current state: {finalState}");
     }
 
-    public async Task WaitForCompletion(TimeSpan? timeout = null)
-    {
-        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));
-        while (DateTime.UtcNow < deadline)
-        {
-            var pending = await CreateContext().Set<Job>()
-                .Where(x => x.Kind == JobKind.Job)
-                .Where(x => x.CurrentState == State.Enqueued || x.CurrentState == State.Processing || x.CurrentState == State.Awaiting)
-                .CountAsync();
-
-            if (pending == 0)
-            {
-                return;
-            }
-
-            await Task.Delay(200);
-        }
-
-        throw new TimeoutException("Not all jobs completed within timeout");
-    }
-
     public async Task WaitForJobLog(Guid jobId, string eventType, TimeSpan? timeout = null)
     {
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));
@@ -164,6 +131,43 @@ public class JoblyTestServer : IAsyncDisposable
         throw new TimeoutException($"Job {jobId} did not get log event '{eventType}' within {timeout ?? TimeSpan.FromSeconds(10)}. Events: {eventTypes}");
     }
 
+    public async Task WaitForCompletion(TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));
+        while (DateTime.UtcNow < deadline)
+        {
+            var ctx = CreateContext();
+
+            var activeJobs = await ctx.Set<Job>()
+                .CountAsync(j =>
+                    j.CurrentState == State.Enqueued ||
+                    j.CurrentState == State.Processing ||
+                    j.CurrentState == State.Awaiting);
+
+            var activeMessages = await ctx.Set<Job>()
+                .Where(j => j.Kind == JobKind.Message)
+                .CountAsync(m => m.CurrentState != State.Completed && m.CurrentState != State.Failed);
+
+            if (activeJobs == 0 && activeMessages == 0)
+            {
+                await Task.Delay(500);
+                return;
+            }
+
+            await Task.Delay(200);
+        }
+
+        var debugCtx = CreateContext();
+        var stuck = await debugCtx.Set<Job>()
+            .Where(j => j.CurrentState == State.Enqueued || j.CurrentState == State.Processing || j.CurrentState == State.Awaiting)
+            .Select(j => new { j.Id, j.Kind, j.CurrentState, j.ParentJobId })
+            .Take(10)
+            .ToListAsync();
+        var stuckInfo = string.Join(", ", stuck.Select(s => $"{s.Kind}:{s.CurrentState}(parent={s.ParentJobId})"));
+
+        throw new TimeoutException($"Not all jobs completed within timeout. Stuck: {stuckInfo}");
+    }
+
     public async Task<List<JobLog>> GetJobLogs(Guid jobId)
     {
         return await CreateContext().Set<JobLog>()
@@ -183,21 +187,7 @@ public class JoblyTestServer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await _cts.CancelAsync();
-
-        foreach (var svc in _hostedServices)
-        {
-            try
-            {
-                await svc.StopAsync(CancellationToken.None);
-            }
-            catch
-            {
-                // Ignore shutdown errors
-            }
-        }
-
-        _cts.Dispose();
-        await _serviceProvider.DisposeAsync();
+        await _host.StopAsync();
+        _host.Dispose();
     }
 }
