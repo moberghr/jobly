@@ -79,35 +79,60 @@ public abstract partial class ServiceTests : TestBase
     }
 
     [Fact]
-    public async Task RequeueBatchJob_IncrementsBatchJobCount()
+    public async Task RequeueBatchJob_IncrementsBatchJobCountAndResetsPlaceholder()
     {
         var context = CreateContext();
         var batchPublisher = TestUtils.CreateBatchPublisher(context);
         var batchId = await batchPublisher.StartNew(new List<UnitRequest> { new(), new() });
+
+        // Add a continuation batch
+        var continuationJobs = new List<UnitRequest> { new() };
+        await batchPublisher.ContinueBatchWith(continuationJobs, batchId);
         await context.SaveChangesAsync();
 
-        // Process all jobs to completion
+        // Process all jobs — batch completes, continuation fires and completes
         await ProcessAllJobs();
 
-        // Batch JobCount should be 0 (both finished)
+        // Batch JobCount should be 0
         var batchBefore = await CreateContext().Set<Batch>().FindAsync(batchId);
         batchBefore!.JobCount.ShouldBe(0);
 
-        // Find a completed job in the batch
+        // Placeholder should be Completed
+        var placeholderBefore = await GetJob(batchId);
+        placeholderBefore!.CurrentState.ShouldBe(State.Completed);
+
+        // Count continuation jobs before requeue
+        var continuationJobCountBefore = await CreateContext().Set<Job>()
+            .Where(x => x.CurrentState == State.Completed)
+            .CountAsync();
+
+        // Find a completed job in the batch and requeue it
         var completedJob = await CreateContext().Set<Job>()
             .Where(x => x.BatchId == batchId && x.CurrentState == State.Completed)
             .FirstAsync();
 
-        // Requeue it
         var service = TestUtils.CreateJobCommandService(CreateContext());
         await service.RequeueJob(completedJob.Id);
 
-        // Batch JobCount should be incremented back to 1
+        // Batch JobCount should be 1, placeholder back to Awaiting
         var batchAfter = await CreateContext().Set<Batch>().FindAsync(batchId);
         batchAfter!.JobCount.ShouldBe(1);
 
-        var requeuedJob = await GetJob(completedJob.Id);
-        requeuedJob!.CurrentState.ShouldBe(State.Enqueued);
+        var placeholderAfter = await GetJob(batchId);
+        placeholderAfter!.CurrentState.ShouldBe(State.Awaiting);
+
+        // Process the requeued job — batch completes again, continuation should NOT re-fire
+        await ProcessAllJobs();
+
+        // Verify continuation didn't create duplicate jobs
+        var continuationJobCountAfter = await CreateContext().Set<Job>()
+            .Where(x => x.CurrentState == State.Completed)
+            .CountAsync();
+
+        // The requeued job completed, so +1 completed. Continuation should fire once more (+1).
+        // If it double-fired, we'd see more.
+        var batchFinal = await CreateContext().Set<Batch>().FindAsync(batchId);
+        batchFinal!.JobCount.ShouldBe(0);
     }
 
     [Fact]

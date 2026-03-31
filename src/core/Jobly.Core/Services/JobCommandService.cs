@@ -104,6 +104,15 @@ public class JobCommandService<TContext> : IJobCommandService
             if (batch != null)
             {
                 batch.JobCount++;
+
+                // Reset placeholder job so continuation can re-trigger when all jobs finish again
+                var placeholderJob = await _context.Set<Job>()
+                    .Where(x => x.Id == batch.Id)
+                    .FirstOrDefaultAsync();
+                if (placeholderJob != null && placeholderJob.CurrentState == State.Completed)
+                {
+                    placeholderJob.CurrentState = State.Awaiting;
+                }
             }
         }
 

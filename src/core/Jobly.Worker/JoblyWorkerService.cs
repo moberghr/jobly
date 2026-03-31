@@ -469,6 +469,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             .Where(x => x.Id == currentBatch.Id)
             .FirstAsync(cancellationToken);
 
+        // Already completed (e.g., after a requeued batch job re-completes) — don't re-trigger
+        if (currentBatchJob.CurrentState == State.Completed || currentBatchJob.CurrentState == State.Failed)
+        {
+            return;
+        }
+
         if (currentBatch.ContinuationOptions == BatchContinuationOptions.OnlyOnSucceeded)
         {
             // Check if any batch jobs failed
