@@ -48,6 +48,12 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     public TimeSpan MessageRoutingInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     /// <summary>
+    /// How often the worker checks if a running job has been cancelled (deleted).
+    /// Also refreshes the keep-alive timestamp on each check.
+    /// </summary>
+    public TimeSpan CancellationCheckInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
     /// How long a job can go without a keep-alive refresh before being considered stale and requeued.
     /// Workers refresh keep-alive every InvisibilityTimeout / 5 during execution.
     /// </summary>

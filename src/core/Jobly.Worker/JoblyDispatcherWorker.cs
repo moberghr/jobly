@@ -78,8 +78,8 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
 
         var logCollector = new JobLogCollector { JobId = job.Id };
 
-        using var keepAliveCts = new CancellationTokenSource();
-        var keepAliveTask = RunKeepAlive(job.Id, keepAliveCts.Token);
+        using var jobCts = new CancellationTokenSource();
+        var monitorTask = RunJobMonitor(job.Id, jobCts, cancellationToken);
 
         Stopwatch? handlerStopwatch = null;
         try
@@ -95,7 +95,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             };
 
             handlerStopwatch = Stopwatch.StartNew();
-            await ExecuteJob(job, scope.ServiceProvider, cancellationToken);
+            await ExecuteJob(job, scope.ServiceProvider, jobCts.Token);
             handlerStopwatch.Stop();
 
             JobLogContext.Current = null;
@@ -104,8 +104,8 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             _logger.LogInformation("Worker {workerId} completed job {id}", _workerId, job.Id);
 
             PerfTrace.Mark(PerfTrace.CancelKeepAlive);
-            await keepAliveCts.CancelAsync();
-            await keepAliveTask;
+            await jobCts.CancelAsync();
+            await monitorTask;
 
             PerfTrace.Mark(PerfTrace.BeginTransaction2);
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
@@ -118,14 +118,38 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             PerfTrace.Mark(PerfTrace.CommitTransaction2);
             await endTransaction.CommitAsync(default);
         }
+        catch (OperationCanceledException) when (jobCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            handlerStopwatch?.Stop();
+            JobLogContext.Current = null;
+            JobExecutionContext.Current = null;
+            _logger.LogInformation("Job {id} was cancelled", job.Id);
+            await monitorTask;
+
+            await using var endTransaction = await context.Database.BeginTransactionAsync(default);
+            job.CurrentWorkerId = null;
+            job.LastKeepAlive = null;
+            context.Set<JobLog>().Add(new JobLog
+            {
+                JobId = job.Id,
+                EventType = "Cancelled",
+                Timestamp = DateTime.UtcNow,
+                Level = "Information",
+                Message = "Job was cancelled by user",
+                DurationMs = handlerStopwatch?.Elapsed.TotalMilliseconds,
+            });
+            await SaveJobLogs(context, logCollector);
+            await context.SaveChangesAsync(default);
+            await endTransaction.CommitAsync(default);
+        }
         catch (Exception e)
         {
             handlerStopwatch?.Stop();
             JobLogContext.Current = null;
             JobExecutionContext.Current = null;
             _logger.LogError(e, "Error executing job {id}", job.Id);
-            await keepAliveCts.CancelAsync();
-            await keepAliveTask;
+            await jobCts.CancelAsync();
+            await monitorTask;
 
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
             UpdateJobState(context, job, e, handlerStopwatch?.Elapsed.TotalMilliseconds);
@@ -162,26 +186,39 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         await JobDispatcher.ExecuteJobHandler(payload, messageType, jobHandlerType, provider, cancellationToken);
     }
 
-    private async Task RunKeepAlive(Guid jobId, CancellationToken ct)
+    private async Task RunJobMonitor(Guid jobId, CancellationTokenSource jobCts, CancellationToken stoppingToken)
     {
-        var interval = _configuration.InvisibilityTimeout / 5;
-        while (!ct.IsCancellationRequested)
+        var interval = _configuration.CancellationCheckInterval;
+        while (!stoppingToken.IsCancellationRequested && !jobCts.IsCancellationRequested)
         {
-            try { await Task.Delay(interval, ct); }
+            try { await Task.Delay(interval, stoppingToken); }
             catch (OperationCanceledException) { return; }
 
             try
             {
                 using var s = _scopeFactory.CreateScope();
                 var ctx = s.ServiceProvider.GetRequiredService<TContext>();
+
+                var state = await ctx.Set<Job>()
+                    .Where(x => x.Id == jobId)
+                    .Select(x => x.CurrentState)
+                    .FirstOrDefaultAsync(stoppingToken);
+
+                if (state != State.Processing)
+                {
+                    _logger.LogInformation("Job {jobId} state changed to {state}, cancelling handler", jobId, state);
+                    await jobCts.CancelAsync();
+                    return;
+                }
+
                 await ctx.Set<Job>()
                     .Where(x => x.Id == jobId)
-                    .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastKeepAlive, DateTime.UtcNow), ct);
+                    .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastKeepAlive, DateTime.UtcNow), stoppingToken);
             }
             catch (OperationCanceledException) { return; }
             catch (Exception e)
             {
-                _logger.LogWarning(e, "Failed to refresh keep-alive for job {jobId}", jobId);
+                _logger.LogWarning(e, "Failed job monitor for {jobId}", jobId);
             }
         }
     }

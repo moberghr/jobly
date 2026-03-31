@@ -7,6 +7,7 @@ import { RelatedJobsTable } from '@/components/RelatedJobsTable';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
+import { State } from '@/types';
 import type { JobDetailModel, JobLogModel } from '@/types';
 import * as api from '@/api';
 
@@ -63,8 +64,14 @@ export default function JobDetailPage() {
         <h1 className="text-2xl font-bold">Job {shortId(job.id)}</h1>
         <StateBadge state={job.currentState} />
         <div className="flex-1" />
-        <Button variant="outline" size="sm" onClick={() => api.requeueJob(job.id)}>Requeue</Button>
-        <Button variant="destructive" size="sm" onClick={() => api.deleteJob(job.id)}>Delete</Button>
+        {job.currentState === State.Processing ? (
+          <Button variant="destructive" size="sm" onClick={() => api.deleteJob(job.id)}>Cancel</Button>
+        ) : (
+          <>
+            <Button variant="outline" size="sm" onClick={() => api.requeueJob(job.id)}>Requeue</Button>
+            <Button variant="destructive" size="sm" onClick={() => api.deleteJob(job.id)}>Delete</Button>
+          </>
+        )}
       </div>
 
       {/* Two-column layout */}
