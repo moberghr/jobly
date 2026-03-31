@@ -7,7 +7,7 @@ export function usePersistedPageSize(): [number, (size: number) => void] {
   const [pageSize, setPageSize] = useState<number>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     const parsed = stored ? parseInt(stored, 10) : NaN;
-    return PAGE_SIZES.includes(parsed as any) ? parsed : 20;
+    return (PAGE_SIZES as readonly number[]).includes(parsed) ? parsed : 20;
   });
 
   const updatePageSize = (size: number) => {

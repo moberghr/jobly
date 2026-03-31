@@ -106,7 +106,6 @@ export function RealtimeChart({ height = 200 }: { height?: number }) {
       chartRef.current?.destroy();
       chartRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Push new data points from store

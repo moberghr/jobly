@@ -188,7 +188,6 @@ function HistoryChart({ data }: { data: { label: string; succeeded: number; fail
     });
 
     return () => { chartRef.current?.destroy(); chartRef.current = null; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update data in-place
