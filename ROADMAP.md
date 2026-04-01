@@ -7,11 +7,11 @@ Feature ideas for future development.
 ### Job Timeout
 Kill jobs running longer than a configured duration. Leverages existing CancellationMode — worker sets a timer, triggers Graceful cancellation on timeout.
 
-### Mutexes
-Only one job of a given type (or resource key) running at a time. Other jobs wait or get rescheduled.
+### ~~Mutexes~~ ✅
+Implemented via `ConcurrencyKey` on Job entity. Set at publish time via `JobParameters.Mutex`. Worker cancels duplicate if another job with same key is already Processing.
 
 ### Semaphores
-Max N concurrent jobs per type/resource. E.g., "max 20 newsletter send jobs at once." Jobs beyond the limit wait.
+Max N concurrent jobs per type/resource. E.g., "max 20 newsletter send jobs at once." Uses same `ConcurrencyKey` column — different enforcement logic (count instead of exists check).
 
 ### Rate Limiting
 Max N executions per time window per type. Fixed window (100/minute) or sliding window. Throttled jobs rescheduled to later.
