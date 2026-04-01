@@ -62,7 +62,7 @@ public class ContinuationIntegrationTests : IAsyncLifetime
         await _server.WaitForJobState(parentId, State.Failed, timeout: TimeSpan.FromSeconds(15));
 
         // Give orchestration time to potentially (incorrectly) activate the child
-        await Task.Delay(2000);
+        await Task.Delay(500);
 
         var ctx = _server.CreateContext();
 

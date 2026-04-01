@@ -181,7 +181,7 @@ public class BatchIntegrationTests : IAsyncLifetime
         await _server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(15));
 
         // Give a moment for orchestration to potentially (incorrectly) activate the continuation
-        await Task.Delay(2000);
+        await Task.Delay(500);
 
         var ctx = _server.CreateContext();
 
