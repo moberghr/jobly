@@ -203,15 +203,15 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql")]
+[Collection("PostgreSql-Integration")]
 public class BatchIntegrationTests_PostgreSql : BatchIntegrationTestsBase
 {
-    public BatchIntegrationTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public BatchIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
 }
 
-[Collection("SqlServer")]
+[Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class BatchIntegrationTests_SqlServer : BatchIntegrationTestsBase
 {
-    public BatchIntegrationTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public BatchIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
 }

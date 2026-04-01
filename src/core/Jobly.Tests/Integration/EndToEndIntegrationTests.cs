@@ -135,15 +135,15 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql")]
+[Collection("PostgreSql-Integration")]
 public class EndToEndIntegrationTests_PostgreSql : EndToEndIntegrationTestsBase
 {
-    public EndToEndIntegrationTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public EndToEndIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
 }
 
-[Collection("SqlServer")]
+[Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class EndToEndIntegrationTests_SqlServer : EndToEndIntegrationTestsBase
 {
-    public EndToEndIntegrationTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public EndToEndIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
 }

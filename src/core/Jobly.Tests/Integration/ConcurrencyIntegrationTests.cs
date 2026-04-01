@@ -108,15 +108,15 @@ public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql")]
+[Collection("PostgreSql-Integration")]
 public class ConcurrencyIntegrationTests_PostgreSql : ConcurrencyIntegrationTestsBase
 {
-    public ConcurrencyIntegrationTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public ConcurrencyIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
 }
 
-[Collection("SqlServer")]
+[Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class ConcurrencyIntegrationTests_SqlServer : ConcurrencyIntegrationTestsBase
 {
-    public ConcurrencyIntegrationTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public ConcurrencyIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
 }

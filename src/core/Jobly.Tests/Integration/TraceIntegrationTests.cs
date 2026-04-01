@@ -110,15 +110,15 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql")]
+[Collection("PostgreSql-Integration")]
 public class TraceIntegrationTests_PostgreSql : TraceIntegrationTestsBase
 {
-    public TraceIntegrationTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public TraceIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
 }
 
-[Collection("SqlServer")]
+[Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class TraceIntegrationTests_SqlServer : TraceIntegrationTestsBase
 {
-    public TraceIntegrationTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public TraceIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
 }
