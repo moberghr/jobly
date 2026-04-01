@@ -17,7 +17,7 @@ Ships as NuGet packages (Jobly.Core, Jobly.UI, Jobly.Worker). Supports PostgreSQ
 # Backend (from src/)
 dotnet build Jobly.sln
 dotnet test Jobly.sln --filter "Category!=SqlServer"   # PostgreSQL only
-dotnet test Jobly.sln                                    # All databases (432 tests, ~30s)
+dotnet test Jobly.sln                                    # All databases (464 tests, ~30s)
 
 # Run specific test suites
 dotnet test Jobly.sln --filter "FullyQualifiedName~Jobly.Tests.Unit"         # Unit tests only
@@ -55,21 +55,22 @@ public interface IPipelineBehavior<in T> where T : class { Task HandleAsync(T me
 ### Job Entity
 
 Single table with `Kind` enum. Key fields:
-- **Shared**: Id, Kind, Type, Message (payload), CreateTime, CurrentState, Queue, ExpireAt, ParentJobId, TraceId, SpawnedByJobId, CancellationMode
+- **Shared**: Id, Kind, Type, Message (payload), CreateTime, CurrentState, Queue, ExpireAt, ParentJobId, TraceId, SpawnedByJobId, CancellationMode, ConcurrencyKey
 - **Job-specific**: ScheduleTime, HandlerType, MaxRetries, RetriedTimes, CurrentWorkerId, LastKeepAlive
 - **Batch-specific**: ContinuationOptions (generalized to all kinds — controls child activation on parent failure)
 - **JobLog** — Unified audit trail. EventType: Created, Processing, Completed, Failed, Requeued, Deleted, Cancelled, CancellationRequested, Log (ILogger output). Includes optional `WorkerId` (set by worker-produced entries, null for command/orchestration entries).
 
 ### Worker Architecture
 
-Workers are **pure executors** — they only fetch and execute `Kind=Job` jobs. All orchestration is handled by dedicated background tasks:
+Workers are **pure executors** — they only fetch and execute `Kind=Job` jobs. All orchestration is handled by dedicated background tasks (all extend `ServerTaskBase`):
 
 ```
 Worker (pure executor):
   1. Fetch Job (Kind=Job, Enqueued, ScheduleTime < now)
-  2. Execute handler
-  3. Update state, counters, logs
-  4. Signal orchestrator
+  2. Mutex check (if ConcurrencyKey set, cancel if another job with same key is Processing)
+  3. Execute handler
+  4. Update state, counters, logs
+  5. Signal orchestrator
 
 MessageRoutingTask (polls every 1s):
   - Routes Kind=Message jobs → discovers handlers, creates N child jobs
@@ -88,13 +89,25 @@ Uses `CancellationMode` enum (`None=0, Graceful=1`) instead of immediate state c
 4. If handler ignores the token and completes: state is `Completed` (work happened), `CancellationMode` cleared
 5. Job stays in Processing tab with "Cancelling..." badge until handler actually exits
 
+### Mutex (Concurrency Control)
+
+`ConcurrencyKey` on Job — only one job per key can be Processing at a time. Set at publish time via `JobParameters.Mutex`. Worker checks after marking job Processing — if another job with same key is already Processing, cancels this one with "mutex held" log. Zero overhead for jobs without a key. Same column designed for future semaphore/rate-limiting extension.
+
 ### Recurring Jobs
 
 - `AddOrUpdateRecurringJob` only registers/updates the definition (cron, message, type). **Does not create jobs.**
 - `RecurringJobSchedulerTask` creates jobs with `ScheduleTime = now` (ready for immediate execution) and sets `NextExecution` to the next cron occurrence.
-- **RecurringJobLog** — Immutable audit trail linking recurring jobs to their created jobs. Fields: `Id, RecurringJobId, JobId (nullable), CreatedAt`. `JobId` has FK with `SET NULL` cascade — when the job is cleaned up, `JobId` becomes null but the log entry survives.
-- Scheduler uses RecurringJobLog for dedup: checks if the most recent log entry's job is still Enqueued/Processing.
+- **RecurringJobLog** — Immutable audit trail linking recurring jobs to their created jobs. Fields: `Id, RecurringJobId, JobId (nullable), CreatedAt`. `JobId` has FK with `SET NULL` cascade — when the job is cleaned up, `JobId` becomes null but the log entry survives. Navigation property `Job` for clean LINQ queries.
+- Scheduler uses RecurringJobLog for dedup: checks if the most recent log entry's job is still Enqueued/Processing via nav property.
 - ExpirationCleanupTask retains last 100 logs per recurring job (uses `HAVING COUNT > 100` to skip most).
+
+### Dashboard Authorization
+
+Two modes:
+- **Built-in login**: `options.UseBuiltInLogin<TValidator>()` — Jobly serves a React login page, manages HTTP-only signed cookie (7 day expiry via ASP.NET Data Protection). Register `IJoblyCredentialValidator` in DI (scoped, can inject DbContext). Login/logout via `/api/auth/login` and `/api/auth/logout`. SPA catches 401 from Axios interceptor and shows login component.
+- **Custom redirect**: `options.Authorization = new MyFilter()` + `options.UnauthorizedRedirectUrl = "/login"` — your app handles login. Filter checks `HttpContext` (claims, roles, etc.). API gets 401, SPA gets 302 redirect.
+
+Default: no auth (open access).
 
 ### Key Design Decisions
 
@@ -106,40 +119,45 @@ Uses `CancellationMode` enum (`None=0, Graceful=1`) instead of immediate state c
 - `ContinuationOptions` is generalized: any job with children can control whether children activate on failure.
 - Failed jobs never auto-deleted.
 - Statistics use Counter rows (write-optimized) aggregated into Statistic rows by CounterAggregatorTask.
-- All background tasks re-run immediately if work was found (ServerTaskBase pattern).
+- All background tasks extend `ServerTaskBase` with signal support (semaphore-based wake-up, capped at 1).
 - `RequeueJob` resets `ScheduleTime` to now — requeued jobs always execute immediately.
-- Count-based cleanup: `MaxExpirableJobCount` (default 20k) — deletes oldest by `ExpireAt` when threshold exceeded. Failed jobs excluded (null `ExpireAt`).
+- Count-based cleanup: `MaxExpirableJobCount` (default null/disabled) — deletes oldest by `ExpireAt` when threshold exceeded. Failed jobs excluded (null `ExpireAt`).
+- `JobExpirationTimeout` configurable on base `JoblyConfiguration` (default 1 day). Used by worker, command service, and orchestration task.
 
 ### Backend (.NET 10)
 
 - **Jobly.Core** — Entities (Job, RecurringJob, RecurringJobLog, JobLog, Server, Worker, ServerTask, ServerLog), handlers, JobDispatcher (cached reflection), Publisher, BatchPublisher, logging (JobLogContext/JobLoggerProvider). Services: `JobQueryService`, `JobCommandService`, `JobGroupQueryService`, `RecurringJobService`, `DashboardStatsService`.
-- **Jobly.Worker** — JoblyWorkerService (pure executor), JoblyDispatcher/JoblyDispatcherWorker (batch-fetch mode), worker groups. Background tasks: HeartbeatTask, CounterAggregatorTask, ServerCleanupTask, StaleJobRecoveryTask, ExpirationCleanupTask, RecurringJobSchedulerTask, MessageRoutingTask, OrchestrationTask.
-- **Jobly.UI** — Minimal API endpoints + embedded SPA served at `/jobly`.
+- **Jobly.Worker** — JoblyWorkerService (pure executor), JoblyDispatcher/JoblyDispatcherWorker (batch-fetch mode), worker groups. Background tasks (all extend ServerTaskBase): HeartbeatTask, CounterAggregatorTask, ServerCleanupTask, StaleJobRecoveryTask, ExpirationCleanupTask, RecurringJobSchedulerTask, MessageRoutingTask, OrchestrationTask.
+- **Jobly.UI** — Minimal API endpoints + embedded SPA served at `/jobly`. Auth middleware (`IJoblyAuthorizationFilter`, `IJoblyCredentialValidator`, built-in cookie login). Typed `config.ts` for window globals.
 - **Static analyzers** — StyleCop, Roslynator, SonarAnalyzer, Meziantou.
 
 ### Frontend (Vite + React 18 + TypeScript)
 
-`src/ui/`. Tailwind + shadcn/ui, Zustand, Axios. Dashboard with realtime + historical graphs, job list by state with bulk actions, dark mode, job detail with colored state cards + handler output, messages, batches, recurring jobs, servers, worker detail page. Cancel button shows "Cancelling..." badge for processing jobs. Failed jobs page has type filter with bulk delete/requeue by type. Batch progress bar shows stacked green/red (completed/failed).
+`src/ui/`. Tailwind + shadcn/ui, Zustand, Axios (with 401 interceptor). Dashboard with clickable metric cards, realtime + historical graphs, dark mode. Job list by state with bulk actions. Failed jobs type filter with bulk delete/requeue by type. Job detail with colored state cards, handler output, "Cancelling..." badge, mutex key. Batch progress bar (stacked green/red). Recurring job execution history with "Cleaned up" for deleted jobs. Worker detail page with activity log. Built-in login page component. Logout button in navbar (when built-in login active).
 
 ## Testing
 
-432 tests (216 PostgreSQL + 216 SQL Server) using xUnit, Shouldly, Testcontainers + Respawn (~30s).
+464 tests (232 PostgreSQL + 232 SQL Server) using xUnit, Shouldly, Testcontainers + Respawn (~30s).
 
 ### Test Structure
 
-Two categories with **separate databases** (no interference):
+Three categories:
 
-**Unit tests** (`src/core/Jobly.Tests/Unit/`) — ~380 tests, ~14s:
+**Unit tests** (`src/core/Jobly.Tests/Unit/`) — ~400 tests, ~14s:
 - Each test calls exactly ONE public method on ONE class
 - State set up via direct DB inserts, not via other services
 - Fresh `CreateContext()` for setup, act, and assert (no shared tracking)
 - Use `[Collection("PostgreSql")]` / `[Collection("SqlServer")]` fixtures (no server running)
 
-**Integration tests** (`src/core/Jobly.Tests/Integration/`) — ~52 tests, ~16s:
+**Integration tests** (`src/core/Jobly.Tests/Integration/`) — ~56 tests, ~16s:
 - Use `JoblyTestServer` — boots full worker + all background tasks against a real database
 - Tests publish jobs, wait for results via `Server.WaitForCompletion()` / `Server.WaitForJobState()`
 - Use `[Collection("PostgreSql-Integration")]` / `[Collection("SqlServer-Integration")]` fixtures (server running)
 - Server shared per collection fixture (boots once, Respawn between tests with retry on lock contention)
+
+**Dashboard auth tests** (`DashboardAuthTests`) — 7 tests, ~400ms:
+- Uses `WebApplication` with `TestServer` — no database, no Jobly services
+- Tests auth middleware in isolation: login, logout, cookie flow, filter, redirect
 
 ### Writing Unit Tests
 
@@ -162,7 +180,7 @@ public abstract class MyTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act: call ONE method on ONE class
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         await svc.DeleteJob(jobId);
 
         // Assert: query DB for result
@@ -228,6 +246,7 @@ public class MyIntegrationTests_SqlServer : MyIntegrationTestsBase
 - No `Task.Delay` in tests except for handlers meant to be cancelled (`CancellableCommand`).
 - No unnecessary abstractions — test handlers are simple (empty, throw, increment counter).
 - Tests run on both PostgreSQL and SQL Server via abstract base + concrete subclasses.
+- Cancel long-running jobs at end of integration tests so they don't block (~600ms vs 30s).
 
 ### Registration
 
