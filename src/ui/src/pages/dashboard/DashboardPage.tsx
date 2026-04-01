@@ -10,15 +10,9 @@ import {
   Briefcase,
   XCircle,
   Clock,
-  Server,
   Mail,
   Loader,
-  Hourglass,
-  Trash2,
-  CheckCircle,
   Layers,
-  TrendingUp,
-  TrendingDown,
 } from 'lucide-react';
 
 function padHistory(data: StatsHistoryPoint[], hours: number) {
@@ -95,32 +89,14 @@ export default function DashboardPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-      {/* Jobs */}
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">Jobs</h2>
-      <div className="grid grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
+      {/* Live counts */}
+      <div className="grid grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         <MetricCard label="Enqueued" value={stats.created} icon={<Briefcase className="h-5 w-5" />} href="/jobs/enqueued" />
-        <MetricCard label="Processing" value={stats.processing} icon={<Loader className="h-5 w-5" />} color="text-purple-600" href="/jobs/processing" />
+        <MetricCard label="Processing" value={stats.processing} icon={<Loader className="h-5 w-5" />} color={stats.processing > 0 ? "text-purple-600" : undefined} href="/jobs/processing" />
         <MetricCard label="Scheduled" value={stats.scheduled} icon={<Clock className="h-5 w-5" />} href="/jobs/scheduled" />
-        <MetricCard label="Awaiting" value={stats.awaiting} icon={<Hourglass className="h-5 w-5" />} href="/jobs/awaiting" />
-        <MetricCard label="Completed" value={stats.completed} icon={<CheckCircle className="h-5 w-5" />} color="text-green-600" href="/jobs/completed" />
-        <MetricCard label="Failed" value={stats.failed} icon={<XCircle className="h-5 w-5" />} color="text-red-600" href="/jobs/failed" />
-        <MetricCard label="Deleted" value={stats.deleted} icon={<Trash2 className="h-5 w-5" />} href="/jobs/deleted" />
-        <MetricCard label="Servers" value={stats.servers} icon={<Server className="h-5 w-5" />} href="/servers" />
-      </div>
-
-      {/* Messages & Batches */}
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">Messages & Batches</h2>
-      <div className="grid grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
+        <MetricCard label="Failed" value={stats.failed} icon={<XCircle className="h-5 w-5" />} color={stats.failed > 0 ? "text-red-600" : undefined} href="/jobs/failed" />
         <MetricCard label="Messages" value={stats.messages} icon={<Mail className="h-5 w-5" />} href="/messages" />
         <MetricCard label="Batches" value={stats.batchesActive} icon={<Layers className="h-5 w-5" />} href="/batches/active" />
-      </div>
-
-      {/* Totals */}
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">Totals</h2>
-      <div className="grid grid-cols-4 lg:grid-cols-8 gap-4 mb-8">
-        <MetricCard label="Succeeded" value={stats.totalSucceeded} icon={<TrendingUp className="h-5 w-5" />} color="text-green-600" />
-        <MetricCard label="Failed" value={stats.totalFailed} icon={<TrendingDown className="h-5 w-5" />} color="text-red-600" />
-        <MetricCard label="Deleted" value={stats.totalDeleted} icon={<Trash2 className="h-5 w-5" />} />
       </div>
 
       {/* Realtime Graph */}
