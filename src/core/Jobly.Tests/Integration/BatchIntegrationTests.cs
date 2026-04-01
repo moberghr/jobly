@@ -177,11 +177,8 @@ public class BatchIntegrationTests : IAsyncLifetime
 
         await batchPublisher.SaveChangesAsync();
 
-        // Wait for batch to fail (not WaitForCompletion, since continuation won't fire)
+        // Wait for batch to fail — orchestrator has already processed continuation by this point
         await _server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(15));
-
-        // Give a moment for orchestration to potentially (incorrectly) activate the continuation
-        await Task.Delay(500);
 
         var ctx = _server.CreateContext();
 

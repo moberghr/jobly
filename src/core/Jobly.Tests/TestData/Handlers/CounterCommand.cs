@@ -11,11 +11,10 @@ public class CounterCommand : IJobHandler<CounterRequest>
 
     private readonly CounterService _counterService;
 
-    public async Task HandleAsync(CounterRequest message, CancellationToken ct)
+    public Task HandleAsync(CounterRequest message, CancellationToken ct)
     {
-        await Task.Delay(500, ct);
-
         _counterService.Increment();
+        return Task.CompletedTask;
     }
 }
 
