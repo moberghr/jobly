@@ -20,6 +20,7 @@ public class JoblyDispatcher<TContext> : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<JoblyDispatcher<TContext>> _logger;
+    private readonly JoblyWorkerConfiguration _configuration;
     private readonly WorkerGroupConfiguration _groupConfiguration;
     private readonly TimeProvider _timeProvider;
     private readonly Channel<Job> _jobChannel;
@@ -34,6 +35,7 @@ public class JoblyDispatcher<TContext> : BackgroundService
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _configuration = configuration.Value;
         _groupConfiguration = groupConfiguration;
         _timeProvider = timeProvider;
         _workerCount = groupConfiguration.WorkerCount;
@@ -122,9 +124,42 @@ public class JoblyDispatcher<TContext> : BackgroundService
         }
 
         await context.SaveChangesAsync(ct);
+
+        // Mutex check: cancel jobs whose ConcurrencyKey is already held
+        var jobsToDistribute = new List<Job>();
+        foreach (var job in jobs)
+        {
+            if (job.ConcurrencyKey != null)
+            {
+                var concurrencyHeld = await context.Set<Job>()
+                    .AnyAsync(j => j.ConcurrencyKey == job.ConcurrencyKey
+                        && j.CurrentState == State.Processing
+                        && j.Id != job.Id, ct);
+
+                if (concurrencyHeld)
+                {
+                    job.CurrentState = State.Deleted;
+                    job.ExpireAt = now.Add(_configuration.JobExpirationTimeout);
+                    context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
+                    context.Set<JobLog>().Add(new JobLog
+                    {
+                        JobId = job.Id,
+                        EventType = "Deleted",
+                        Timestamp = now,
+                        Level = "Information",
+                        Message = $"Cancelled — mutex '{job.ConcurrencyKey}' held by another job",
+                    });
+                    continue;
+                }
+            }
+
+            jobsToDistribute.Add(job);
+        }
+
+        await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 
-        foreach (var job in jobs)
+        foreach (var job in jobsToDistribute)
         {
             await _jobChannel.Writer.WriteAsync(job, ct);
         }

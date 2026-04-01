@@ -97,6 +97,7 @@ export default function JobDetailPage() {
               <div><span className="text-muted-foreground">Created:</span> {formatDateTime(job.createTime)}</div>
               {job.scheduleTime && <div><span className="text-muted-foreground">Scheduled:</span> {formatDateTime(job.scheduleTime)}</div>}
               <div><span className="text-muted-foreground">Retries:</span> {job.retriedTimes}/{job.maxRetries}</div>
+              {job.concurrencyKey && <div><span className="text-muted-foreground">Mutex:</span> <span className="font-mono text-xs">{job.concurrencyKey}</span></div>}
               <div><span className="text-muted-foreground">ID:</span> <span className="font-mono text-xs">{job.id}</span></div>
             </CardContent>
           </Card>

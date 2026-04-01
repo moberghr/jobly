@@ -64,6 +64,7 @@ export interface JobDetailModel extends JobModel {
   traceId: string | null;
   spawnedByJobId: string | null;
   traceJobCount: number;
+  concurrencyKey: string | null;
 }
 
 export interface JobLogModel {

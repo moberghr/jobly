@@ -7,7 +7,7 @@ namespace Jobly.Core.Helper;
 
 public static class JobHelper
 {
-    private static Job CreateJobInternal(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, State? state, DateTime now)
+    private static Job CreateJobInternal(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, State? state, DateTime now, string? concurrencyKey = null)
     {
         var job = new Job
         {
@@ -19,6 +19,7 @@ public static class JobHelper
             MaxRetries = maxRetries ?? retries,
             Queue = queue ?? "default",
             ParentJobId = parentId,
+            ConcurrencyKey = concurrencyKey,
         };
 
         return job;
@@ -32,16 +33,17 @@ public static class JobHelper
         string? queue,
         Guid? parentId,
         State? state,
-        DateTime now)
+        DateTime now,
+        string? concurrencyKey = null)
         where T : class, IJob
     {
         var serializedMessage = JsonSerializer.Serialize(message);
         var type = message!.GetType().AssemblyQualifiedName!;
-        return CreateJobInternal(serializedMessage, type, retries, scheduleTime, maxRetries, queue, parentId, state, now);
+        return CreateJobInternal(serializedMessage, type, retries, scheduleTime, maxRetries, queue, parentId, state, now, concurrencyKey);
     }
 
-    public static Job CreateJob(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, State? state, DateTime now)
+    public static Job CreateJob(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, State? state, DateTime now, string? concurrencyKey = null)
     {
-        return CreateJobInternal(message, type, retries, scheduleTime, maxRetries, queue, parentId, state, now);
+        return CreateJobInternal(message, type, retries, scheduleTime, maxRetries, queue, parentId, state, now, concurrencyKey);
     }
 }

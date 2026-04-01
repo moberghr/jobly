@@ -48,4 +48,6 @@ public class Job
     public ContinuationOptions? ContinuationOptions { get; set; }
 
     public CancellationMode CancellationMode { get; set; }
+
+    public string? ConcurrencyKey { get; set; }
 }

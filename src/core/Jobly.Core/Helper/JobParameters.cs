@@ -19,4 +19,6 @@ public class JobParameters
     public Guid? ParentId { get; set; }
 
     public State? State { get; set; }
+
+    public string? Mutex { get; set; }
 }

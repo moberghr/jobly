@@ -159,7 +159,7 @@ public class Publisher<TContext> : IPublisher
 
     public async Task<Guid> Enqueue<T>(T job, JobParameters jobParameters)
         where T : class, IJob
-        => await CreateJob(job, jobParameters.ScheduleTime, jobParameters.MaxRetries, jobParameters.Queue, jobParameters.ParentId);
+        => await CreateJob(job, jobParameters.ScheduleTime, jobParameters.MaxRetries, jobParameters.Queue, jobParameters.ParentId, jobParameters.Mutex);
 
     public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime)
         where T : class, IJob
@@ -198,7 +198,8 @@ public class Publisher<TContext> : IPublisher
         DateTime? scheduleTime,
         int? maxRetries,
         string? queue,
-        Guid? parentId)
+        Guid? parentId,
+        string? mutex = null)
         where T : class, IJob
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;
@@ -210,7 +211,8 @@ public class Publisher<TContext> : IPublisher
             queue,
             parentId,
             null,
-            now);
+            now,
+            concurrencyKey: mutex);
 
         // Automatic trace propagation: if called from within a job handler, inherit trace
         var executionContext = JobExecutionContext.Current;

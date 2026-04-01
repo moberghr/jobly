@@ -25,4 +25,6 @@ public class JobDetailModel : JobModel
     public Guid? SpawnedByJobId { get; set; }
 
     public int TraceJobCount { get; set; }
+
+    public string? ConcurrencyKey { get; set; }
 }

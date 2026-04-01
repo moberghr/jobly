@@ -107,6 +107,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 MaxRetries = x.MaxRetries,
                 TraceId = x.TraceId,
                 SpawnedByJobId = x.SpawnedByJobId,
+                ConcurrencyKey = x.ConcurrencyKey,
             })
             .FirstOrDefaultAsync();
 

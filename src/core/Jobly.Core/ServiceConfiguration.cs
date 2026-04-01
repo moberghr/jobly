@@ -186,6 +186,8 @@ public static class ServiceConfiguration
         job.HasIndex(p => p.TraceId);
 
         job.Property(p => p.CancellationMode);
+        job.Property(p => p.ConcurrencyKey);
+        job.HasIndex(p => p.ConcurrencyKey);
     }
 
     private static void AddRecurringJobEntity(ModelBuilder modelBuilder)
