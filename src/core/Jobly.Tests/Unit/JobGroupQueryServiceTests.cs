@@ -1,0 +1,272 @@
+using Jobly.Core;
+using Jobly.Core.Entities;
+using Jobly.Core.Enums;
+using Jobly.Core.Services;
+using Jobly.Tests.Fixtures;
+using Microsoft.EntityFrameworkCore;
+using Shouldly;
+
+namespace Jobly.Tests.Unit;
+
+[Collection("PostgreSql")]
+public class JobGroupQueryServiceTests : IAsyncLifetime
+{
+    private readonly PostgreSqlFixture _fixture;
+
+    public JobGroupQueryServiceTests(PostgreSqlFixture fixture) => _fixture = fixture;
+
+    public async Task InitializeAsync() => await _fixture.ResetAsync();
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task GetJobGroups_Message_ReturnsMessageKindJobs()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        for (var i = 0; i < 2; i++)
+        {
+            ctx.Set<Job>().Add(new Job
+            {
+                Id = Guid.NewGuid(),
+                Kind = JobKind.Message,
+                CurrentState = State.Processing,
+                CreateTime = DateTime.UtcNow,
+                ScheduleTime = DateTime.UtcNow,
+                Queue = "default",
+            });
+        }
+
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = Guid.NewGuid(),
+            Kind = JobKind.Batch,
+            CurrentState = State.Awaiting,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var svc = new JobGroupQueryService<TestContext>(_fixture.CreateContext());
+        var result = await svc.GetJobGroups(JobKind.Message, new BaseListRequest { Page = 0, PageSize = 20 });
+
+        // Assert
+        result.TotalCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task GetJobGroups_Batch_ReturnsBatchKindJobs()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = Guid.NewGuid(),
+            Kind = JobKind.Message,
+            CurrentState = State.Processing,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+
+        for (var i = 0; i < 2; i++)
+        {
+            ctx.Set<Job>().Add(new Job
+            {
+                Id = Guid.NewGuid(),
+                Kind = JobKind.Batch,
+                CurrentState = State.Awaiting,
+                CreateTime = DateTime.UtcNow,
+                ScheduleTime = DateTime.UtcNow,
+                Queue = "default",
+            });
+        }
+
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var svc = new JobGroupQueryService<TestContext>(_fixture.CreateContext());
+        var result = await svc.GetJobGroups(JobKind.Batch, new BaseListRequest { Page = 0, PageSize = 20 });
+
+        // Assert
+        result.TotalCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task GetJobGroups_WithStateFilter_FiltersCorrectly()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = Guid.NewGuid(),
+            Kind = JobKind.Message,
+            CurrentState = State.Enqueued,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = Guid.NewGuid(),
+            Kind = JobKind.Message,
+            CurrentState = State.Completed,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var svc = new JobGroupQueryService<TestContext>(_fixture.CreateContext());
+        var result = await svc.GetJobGroups(JobKind.Message, new BaseListRequest { Page = 0, PageSize = 20 }, state: "completed");
+
+        // Assert
+        result.TotalCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task GetJobGroupById_ReturnsDetailWithSpawnedJobsCount()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var messageId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = messageId,
+            Kind = JobKind.Message,
+            CurrentState = State.Processing,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+
+        for (var i = 0; i < 3; i++)
+        {
+            ctx.Set<Job>().Add(new Job
+            {
+                Id = Guid.NewGuid(),
+                Kind = JobKind.Job,
+                CurrentState = State.Enqueued,
+                CreateTime = DateTime.UtcNow,
+                ScheduleTime = DateTime.UtcNow,
+                Queue = "default",
+                ParentJobId = messageId,
+            });
+        }
+
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var svc = new JobGroupQueryService<TestContext>(_fixture.CreateContext());
+        var result = await svc.GetJobGroupById(messageId);
+
+        // Assert
+        result.ShouldNotBeNull();
+        result.SpawnedJobsCount.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task GetJobGroupById_NonExistent_ReturnsNull()
+    {
+        // Act
+        var svc = new JobGroupQueryService<TestContext>(_fixture.CreateContext());
+        var result = await svc.GetJobGroupById(Guid.NewGuid());
+
+        // Assert
+        result.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task GetJobGroupJobs_ReturnsChildJobs()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var batchId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = batchId,
+            Kind = JobKind.Batch,
+            CurrentState = State.Awaiting,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+
+        for (var i = 0; i < 3; i++)
+        {
+            ctx.Set<Job>().Add(new Job
+            {
+                Id = Guid.NewGuid(),
+                Kind = JobKind.Job,
+                CurrentState = State.Enqueued,
+                CreateTime = DateTime.UtcNow,
+                ScheduleTime = DateTime.UtcNow,
+                Queue = "default",
+                ParentJobId = batchId,
+            });
+        }
+
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var svc = new JobGroupQueryService<TestContext>(_fixture.CreateContext());
+        var result = await svc.GetJobGroupJobs(batchId, new BaseListRequest { Page = 0, PageSize = 20 });
+
+        // Assert
+        result.TotalCount.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task GetJobGroupJobCounts_ReturnsStateBreakdown()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var batchId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = batchId,
+            Kind = JobKind.Batch,
+            CurrentState = State.Awaiting,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+
+        for (var i = 0; i < 2; i++)
+        {
+            ctx.Set<Job>().Add(new Job
+            {
+                Id = Guid.NewGuid(),
+                Kind = JobKind.Job,
+                CurrentState = State.Completed,
+                CreateTime = DateTime.UtcNow,
+                ScheduleTime = DateTime.UtcNow,
+                Queue = "default",
+                ParentJobId = batchId,
+            });
+        }
+
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = Guid.NewGuid(),
+            Kind = JobKind.Job,
+            CurrentState = State.Failed,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            ParentJobId = batchId,
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var svc = new JobGroupQueryService<TestContext>(_fixture.CreateContext());
+        var result = await svc.GetJobGroupJobCounts(batchId);
+
+        // Assert
+        result["completed"].ShouldBe(2);
+        result["failed"].ShouldBe(1);
+    }
+}
