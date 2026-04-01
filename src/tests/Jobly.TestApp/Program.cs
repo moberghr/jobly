@@ -18,6 +18,7 @@ builder.Services.AddServices(builder.Configuration);
 builder.Services.AddJobHandlers(typeof(Program).Assembly);
 builder.Services.AddJobHandlers(typeof(Jobly.Test.Shared.ServiceConfiguration).Assembly);
 
+builder.Services.AddDataProtection();
 builder.Services.AddScoped<IJoblyCredentialValidator, DemoCredentialValidator>();
 
 builder.Services.AddCors(options =>

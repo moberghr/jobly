@@ -169,6 +169,7 @@ public class JoblyUIMiddleware
                 SameSite = SameSiteMode.Strict,
                 Secure = httpContext.Request.IsHttps,
                 Path = _options.RoutePrefix,
+                Expires = DateTimeOffset.UtcNow.AddDays(7),
             });
             httpContext.Response.Redirect(returnUrl);
             return;
