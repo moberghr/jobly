@@ -1,6 +1,8 @@
+using Jobly.Core.Data.Entities;
 using Jobly.Core.Enums;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
+using Microsoft.EntityFrameworkCore;
 using Shouldly;
 
 namespace Jobly.Tests.Integration;
@@ -29,6 +31,55 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
 
         var job = await Server.GetJob(jobId);
         job.CurrentState.ShouldBe(State.Deleted);
+    }
+
+    [Fact]
+    public async Task GivenProcessingJob_WhenDeleted_ThenCancellationModeIsSetToGraceful()
+    {
+        var publisher = Server.CreatePublisher();
+        var jobId = await publisher.Enqueue(new CancellableRequest());
+        await publisher.SaveChangesAsync();
+
+        await Server.WaitForJobState(jobId, State.Processing);
+
+        var cmd = Server.CreateCommandService();
+        await cmd.DeleteJob(jobId);
+
+        // Immediately after DeleteJob, the job should have CancellationMode=Graceful and still be Processing
+        var job = await Server.GetJob(jobId);
+        job.CancellationMode.ShouldBe(CancellationMode.Graceful);
+
+        // After the worker processes cancellation, verify the CancellationRequested log exists
+        await Server.WaitForJobLog(jobId, "CancellationRequested", timeout: TimeSpan.FromSeconds(5));
+
+        var logs = await Server.GetJobLogs(jobId);
+        var cancellationLog = logs.First(l => l.EventType == "CancellationRequested");
+        cancellationLog.WorkerId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task GivenProcessingJob_WhenDeleted_ThenWorkerLogsHaveWorkerId()
+    {
+        var publisher = Server.CreatePublisher();
+        var jobId = await publisher.Enqueue(new CancellableRequest());
+        await publisher.SaveChangesAsync();
+
+        await Server.WaitForJobState(jobId, State.Processing);
+
+        var cmd = Server.CreateCommandService();
+        await cmd.DeleteJob(jobId);
+
+        await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(15));
+
+        var logs = await Server.GetJobLogs(jobId);
+
+        // Worker-produced logs (Processing, Cancelled) should have a WorkerId
+        var processingLog = logs.FirstOrDefault(l => l.EventType == "Processing");
+        processingLog.ShouldNotBeNull();
+        processingLog.WorkerId.ShouldNotBeNull();
+
+        var cancelledLog = logs.First(l => l.EventType == "Cancelled");
+        cancelledLog.WorkerId.ShouldNotBeNull();
     }
 
     [Fact]

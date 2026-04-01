@@ -20,18 +20,21 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
     private readonly ILogger _logger;
     private readonly JoblyWorkerConfiguration _configuration;
     private readonly IDistributedLock? _distributedLock;
+    private readonly TimeProvider _timeProvider;
     private int? _serverTaskId;
 
     protected ServerTaskBase(
         IServiceScopeFactory scopeFactory,
         ILogger logger,
         IOptions<JoblyWorkerConfiguration> configuration,
+        TimeProvider timeProvider,
         string? lockName = null,
         IDistributedLockProvider? lockProvider = null)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _configuration = configuration.Value;
+        _timeProvider = timeProvider;
         _distributedLock = lockName != null && lockProvider != null
             ? lockProvider.CreateLock(lockName)
             : null;
@@ -52,6 +55,8 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
     protected Guid ServerId => _configuration.ServerId;
 
     protected JoblyWorkerConfiguration Configuration => _configuration;
+
+    protected TimeProvider TimeProvider => _timeProvider;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -182,7 +187,7 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
         {
             task.LastStatus = status;
             task.LastMessage = message;
-            task.LastRun = DateTime.UtcNow;
+            task.LastRun = _timeProvider.GetUtcNow().UtcDateTime;
             task.LastDurationMs = durationMs;
             await context.SaveChangesAsync();
         }
@@ -211,7 +216,7 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
             Status = status,
             Message = message,
             DurationMs = durationMs,
-            Timestamp = DateTime.UtcNow,
+            Timestamp = _timeProvider.GetUtcNow().UtcDateTime,
         });
         await context.SaveChangesAsync();
     }

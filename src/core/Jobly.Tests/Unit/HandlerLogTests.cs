@@ -83,7 +83,8 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
             scopeFactory,
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
-            groupConfig);
+            groupConfig,
+            TimeProvider.System);
     }
 
     [Fact]

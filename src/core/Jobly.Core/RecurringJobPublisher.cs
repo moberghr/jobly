@@ -26,10 +26,12 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
     where TContext : DbContext
 {
     private readonly TContext _context;
+    private readonly TimeProvider _timeProvider;
 
-    public RecurringJobPublisher(TContext context)
+    public RecurringJobPublisher(TContext context, TimeProvider timeProvider)
     {
         _context = context;
+        _timeProvider = timeProvider;
     }
 
     public async Task AddOrUpdateRecurringJob<T>(T message, string name, string cron)
@@ -39,43 +41,44 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var job = CreateJobForRecurringJob(message, cron);
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var job = CreateJobForRecurringJob(message, cron, now);
         _context.Set<Job>().Add(job);
         _context.Set<JobLog>().Add(new JobLog
         {
             JobId = job.Id,
             EventType = "Created",
-            Timestamp = DateTime.UtcNow,
+            Timestamp = now,
             Level = "Information",
             Message = $"Job {job.Id} created for recurring job \"{name}\"",
         });
         await _context.SaveChangesAsync();
 
-        var recurringJob = await AddOrUpdateRecurringJobToDb(message, name, cron, job);
+        var recurringJob = await AddOrUpdateRecurringJobToDb(message, name, cron, job, now);
         job.RecurringJob = recurringJob;
         await _context.SaveChangesAsync();
 
         await transaction.CommitAsync();
     }
 
-    private static Job CreateJobForRecurringJob<T>(T message, string cronExpression)
+    private static Job CreateJobForRecurringJob<T>(T message, string cronExpression, DateTime now)
         where T : class, IJob
     {
-        var (nextJobScheduleTime, jobMessage, jobType) = GetRecurringJobData(message, cronExpression);
+        var (nextJobScheduleTime, jobMessage, jobType) = GetRecurringJobData(message, cronExpression, now);
         if (nextJobScheduleTime == null || string.IsNullOrWhiteSpace(jobMessage) || string.IsNullOrWhiteSpace(jobType))
         {
             throw new InvalidOperationException("Failed to create job for recurring job.");
         }
 
-        var job = JobHelper.CreateJob(jobMessage, jobType, 0, nextJobScheduleTime, 0, "default", null, State.Enqueued);
+        var job = JobHelper.CreateJob(jobMessage, jobType, 0, nextJobScheduleTime, 0, "default", null, State.Enqueued, now);
 
         return job;
     }
 
-    private async Task<RecurringJob> AddOrUpdateRecurringJobToDb<T>(T message, string name, string cronExpression, Job job)
+    private async Task<RecurringJob> AddOrUpdateRecurringJobToDb<T>(T message, string name, string cronExpression, Job job, DateTime now)
         where T : class, IJob
     {
-        var (nextJobScheduleTime, jobMessage, jobType) = GetRecurringJobData(message, cronExpression);
+        var (nextJobScheduleTime, jobMessage, jobType) = GetRecurringJobData(message, cronExpression, now);
 
         var recurringJob = await _context.Set<RecurringJob>()
             .Where(x => x.Name == name)
@@ -96,7 +99,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
                 {
                     JobId = nextJob.Id,
                     EventType = "Deleted",
-                    Timestamp = DateTime.UtcNow,
+                    Timestamp = now,
                     Level = "Information",
                     Message = $"Job {nextJob.Id} was deleted (recurring job updated)",
                 });
@@ -105,7 +108,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             recurringJob.Cron = cronExpression;
             recurringJob.Message = jobMessage;
             recurringJob.Type = jobType;
-            recurringJob.UpdatedAt = DateTime.UtcNow;
+            recurringJob.UpdatedAt = now;
             recurringJob.LastExecution = recurringJob.NextExecution;
             recurringJob.LastJobId = recurringJob.NextJobId;
             recurringJob.NextExecution = nextJobScheduleTime;
@@ -120,7 +123,7 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
             Message = jobMessage,
             Type = jobType,
             Cron = cronExpression,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = now,
             NextExecution = nextJobScheduleTime,
             NextJob = job,
         };
@@ -130,10 +133,10 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
         return recurringJob;
     }
 
-    private static (DateTime? nextJobScheduleTime, string? jobMessage, string? jobType) GetRecurringJobData<T>(T message, string cronExpression)
+    private static (DateTime? nextJobScheduleTime, string? jobMessage, string? jobType) GetRecurringJobData<T>(T message, string cronExpression, DateTime now)
         where T : class, IJob
     {
-        var nextJobScheduleTime = CronExpression.Parse(cronExpression).GetNextOccurrence(DateTime.UtcNow);
+        var nextJobScheduleTime = CronExpression.Parse(cronExpression).GetNextOccurrence(now);
         var jobMessage = JsonSerializer.Serialize(message);
         var jobType = message.GetType().AssemblyQualifiedName!;
 

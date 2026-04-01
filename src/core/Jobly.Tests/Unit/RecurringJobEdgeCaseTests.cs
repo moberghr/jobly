@@ -55,7 +55,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx);
+        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
 
         // Assert — should skip because the pending job still exists
         count.ShouldBe(0);
@@ -101,7 +101,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx);
+        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
 
         // Assert
         count.ShouldBe(3);
@@ -140,7 +140,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx);
+        await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
 
         // Assert — NextExecution should be updated to a future time
         var readCtx = _fixture.CreateContext();
@@ -182,7 +182,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx);
+        await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
 
         // Assert — LastExecution should be set (was the previous NextExecution)
         var readCtx = _fixture.CreateContext();

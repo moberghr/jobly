@@ -53,7 +53,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var status = await svc.GetJoblyStatus();
 
         // Assert
@@ -81,7 +81,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var status = await svc.GetJoblyStatus();
 
         // Assert
@@ -107,7 +107,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var status = await svc.GetJoblyStatus();
 
         // Assert
@@ -134,7 +134,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var status = await svc.GetJoblyStatus();
 
         // Assert — job state counts should be zero because only Message/Batch kinds exist
@@ -161,7 +161,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var status = await svc.GetJoblyStatus();
 
         // Assert — should combine Statistic(10) + Counter(2+1) = 13

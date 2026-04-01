@@ -28,7 +28,7 @@ public abstract class StatsTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var history = await svc.GetStatsHistory(24);
 
         // Assert
@@ -80,7 +80,7 @@ public abstract class StatsTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var status = await svc.GetJoblyStatus();
 
         // Assert
@@ -123,7 +123,7 @@ public abstract class StatsTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var servers = await svc.GetServers();
 
         // Assert

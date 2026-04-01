@@ -83,7 +83,8 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             scopeFactory,
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
-            groupConfig);
+            groupConfig,
+            TimeProvider.System);
     }
 
     [Fact]
@@ -143,7 +144,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx);
+        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
 
         // Assert — job is deleted, but statistics survive
         var readCtx = _fixture.CreateContext();
@@ -160,7 +161,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
     {
         // Arrange — create a completed job with existing stats
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()));
+        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
         var jobId = await publisher.Enqueue(new UnitRequest());
         await ctx.SaveChangesAsync();
 
@@ -180,7 +181,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             .FirstOrDefaultAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.DeleteJob(jobId);
 
         await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
@@ -230,7 +231,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             .FirstOrDefaultAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.RequeueJob(jobId);
 
         await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());

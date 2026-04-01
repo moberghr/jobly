@@ -74,6 +74,13 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     public int ExpirationBatchSize { get; set; } = 1000;
 
     /// <summary>
+    /// Maximum number of jobs with a non-null ExpireAt to retain.
+    /// When exceeded, the oldest by ExpireAt are deleted first until at threshold.
+    /// Failed jobs are excluded (they have null ExpireAt). Set to 0 to disable.
+    /// </summary>
+    public int MaxExpirableJobCount { get; set; } = 20_000;
+
+    /// <summary>
     /// When true, uses a single dispatcher per worker group that batch-fetches jobs
     /// and distributes them to workers, reducing per-job DB overhead.
     /// When false (default), each worker independently fetches its own jobs.

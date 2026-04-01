@@ -15,8 +15,9 @@ public class ServerCleanupTask<TContext> : ServerTaskBase<TContext>
         IServiceScopeFactory scopeFactory,
         ILogger<ServerCleanupTask<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
-        IDistributedLockProvider lockProvider)
-        : base(scopeFactory, logger, configuration, "jobly:server-cleanup", lockProvider)
+        IDistributedLockProvider lockProvider,
+        TimeProvider timeProvider)
+        : base(scopeFactory, logger, configuration, timeProvider, "jobly:server-cleanup", lockProvider)
     {
     }
 
@@ -26,7 +27,7 @@ public class ServerCleanupTask<TContext> : ServerTaskBase<TContext>
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
-        var count = await CleanUpServers(context, Configuration.HealthCheckTimeout);
+        var count = await CleanUpServers(context, TimeProvider, Configuration.HealthCheckTimeout);
         return count > 0 ? $"Removed {count} stale servers" : null;
     }
 
@@ -34,9 +35,10 @@ public class ServerCleanupTask<TContext> : ServerTaskBase<TContext>
     /// Removes servers that have not sent a heartbeat within the timeout.
     /// Public static so tests can call it directly.
     /// </summary>
-    public static async Task<int> CleanUpServers<TCtx>(TCtx context, TimeSpan healthCheckTimeout)
+    public static async Task<int> CleanUpServers<TCtx>(TCtx context, TimeProvider timeProvider, TimeSpan healthCheckTimeout)
         where TCtx : DbContext
     {
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         var removedCount = 0;
         await using var transaction = await context.Database.BeginTransactionAsync();
         var servers = await context.Set<Server>()
@@ -44,7 +46,7 @@ public class ServerCleanupTask<TContext> : ServerTaskBase<TContext>
             .ToListAsync();
         foreach (var server in servers)
         {
-            if (DateTime.UtcNow - server.LastHeartbeatTime > healthCheckTimeout)
+            if (now - server.LastHeartbeatTime > healthCheckTimeout)
             {
                 context.Set<Server>().Remove(server);
 

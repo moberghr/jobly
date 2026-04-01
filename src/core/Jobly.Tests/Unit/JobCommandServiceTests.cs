@@ -36,7 +36,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.DeleteJob(jobId);
 
         // Assert
@@ -64,7 +64,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.DeleteJob(jobId);
 
         // Assert
@@ -92,7 +92,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.DeleteJob(jobId);
 
         // Assert
@@ -120,7 +120,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act & Assert — should not throw
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.DeleteJob(jobId);
 
         var readCtx = _fixture.CreateContext();
@@ -147,7 +147,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.RequeueJob(jobId);
 
         // Assert
@@ -176,7 +176,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.RequeueJob(jobId);
 
         // Assert
@@ -218,7 +218,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.RequeueJob(childId);
 
         // Assert
@@ -261,7 +261,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.RequeueJob(childId);
 
         // Assert
@@ -303,7 +303,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.RequeueJob(childId);
 
         // Assert
@@ -333,7 +333,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.RequeueJob(jobId);
 
         // Assert
@@ -365,7 +365,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var result = await svc.BulkDeleteJobs(ids);
 
         // Assert
@@ -397,7 +397,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var result = await svc.BulkRequeueJobs(ids);
 
         // Assert

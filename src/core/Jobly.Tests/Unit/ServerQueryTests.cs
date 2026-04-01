@@ -56,7 +56,7 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var request = new BaseListRequest { Page = 0, PageSize = 3 };
         var logs = await svc.GetServerLogs(serverId, request);
 
@@ -126,7 +126,7 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var request = new BaseListRequest { Page = 0, PageSize = 20 };
         var logs = await svc.GetServerLogs(serverId, request, taskName: "StaleJobRecovery");
 
@@ -173,7 +173,7 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var summaries = await svc.GetServerTaskSummaries(serverId);
 
         // Assert

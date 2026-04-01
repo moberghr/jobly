@@ -138,6 +138,7 @@ public class JobGroupQueryService<TContext> : IJobGroupQueryService
                 CreateTime = x.CreateTime,
                 ScheduleTime = x.ScheduleTime,
                 CurrentState = x.CurrentState,
+                CancellationMode = x.CancellationMode,
             })
             .ToPagedListAsync(request);
     }

@@ -83,7 +83,8 @@ public abstract class PipelineTestsBase : IAsyncLifetime
             scopeFactory,
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
-            groupConfig);
+            groupConfig,
+            TimeProvider.System);
     }
 
     [Fact]

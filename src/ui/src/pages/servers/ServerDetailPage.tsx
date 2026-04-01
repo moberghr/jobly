@@ -69,7 +69,11 @@ export default function ServerDetailPage() {
                 <TableBody>
                   {server.workers.map((w) => (
                     <TableRow key={w.workerId}>
-                      <TableCell className="font-mono text-xs">{shortId(w.workerId)}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <Link to={`/workers/${w.workerId}`} className="text-primary hover:underline">
+                          {shortId(w.workerId)}
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         <RelativeTime date={w.startedTime} />
                       </TableCell>

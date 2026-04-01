@@ -53,7 +53,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobQueryService<TestContext>(_fixture.CreateContext());
+        var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var result = await svc.GetJobsList(new BaseListRequest { Page = 0, PageSize = 20 }, State.Completed);
 
         // Assert
@@ -92,7 +92,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobQueryService<TestContext>(_fixture.CreateContext());
+        var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var result = await svc.GetJobById(jobId);
 
         // Assert
@@ -104,7 +104,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
     public async Task GetJobById_NonExistent_ReturnsNull()
     {
         // Act
-        var svc = new JobQueryService<TestContext>(_fixture.CreateContext());
+        var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var result = await svc.GetJobById(Guid.NewGuid());
 
         // Assert
@@ -144,7 +144,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobQueryService<TestContext>(_fixture.CreateContext());
+        var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var result = await svc.GetJobById(parentId);
 
         // Assert
@@ -197,7 +197,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobQueryService<TestContext>(_fixture.CreateContext());
+        var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var result = await svc.GetJobById(child1Id);
 
         // Assert
@@ -236,7 +236,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobQueryService<TestContext>(_fixture.CreateContext());
+        var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var result = await svc.GetScheduledJobs(new BaseListRequest { Page = 0, PageSize = 20 });
 
         // Assert
@@ -269,7 +269,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobQueryService<TestContext>(_fixture.CreateContext());
+        var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var result = await svc.GetAwaitingJobs(new BaseListRequest { Page = 0, PageSize = 20 });
 
         // Assert
@@ -321,7 +321,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobQueryService<TestContext>(_fixture.CreateContext());
+        var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var result = await svc.GetSiblingJobs(child1Id, new BaseListRequest { Page = 0, PageSize = 20 });
 
         // Assert
@@ -361,7 +361,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobQueryService<TestContext>(_fixture.CreateContext());
+        var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var result = await svc.GetChildJobs(parentId, new BaseListRequest { Page = 0, PageSize = 20 });
 
         // Assert
@@ -404,7 +404,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobQueryService<TestContext>(_fixture.CreateContext());
+        var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var result = await svc.GetTraceJobs(job1Id, new BaseListRequest { Page = 0, PageSize = 20 });
 
         // Assert

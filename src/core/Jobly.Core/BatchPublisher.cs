@@ -25,11 +25,13 @@ public class BatchPublisher<TContext> : IBatchPublisher
 {
     private readonly TContext _context;
     private readonly JoblyConfiguration _joblyConfiguration;
+    private readonly TimeProvider _timeProvider;
 
-    public BatchPublisher(TContext context, IOptions<JoblyConfiguration> configuration)
+    public BatchPublisher(TContext context, IOptions<JoblyConfiguration> configuration, TimeProvider timeProvider)
     {
         _context = context;
         _joblyConfiguration = configuration.Value;
+        _timeProvider = timeProvider;
     }
 
     public async Task<Guid> StartNew<T>(List<T> batchJobMessages, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded)
@@ -52,12 +54,14 @@ public class BatchPublisher<TContext> : IBatchPublisher
             throw new ArgumentException("List cannot be empty", nameof(batchJobMessages));
         }
 
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
         // Create the batch job (replaces both the old Batch entity and placeholder job)
         var batchJob = new Job
         {
             Kind = JobKind.Batch,
             Type = name,
-            CreateTime = DateTime.UtcNow,
+            CreateTime = now,
             CurrentState = State.Awaiting,
             Queue = _joblyConfiguration.DefaultQueue ?? "default",
             ParentJobId = parentId,
@@ -65,7 +69,7 @@ public class BatchPublisher<TContext> : IBatchPublisher
             ContinuationOptions = options,
         };
 
-        var batchChildJobs = batchJobMessages.ConvertAll(x => JobHelper.CreateJob(x, 0, null, null, _joblyConfiguration.DefaultQueue, batchJob.Id, batchJobsState));
+        var batchChildJobs = batchJobMessages.ConvertAll(x => JobHelper.CreateJob(x, 0, null, null, _joblyConfiguration.DefaultQueue, batchJob.Id, batchJobsState, now));
 
         // Propagate trace from execution context
         var executionContext = JobExecutionContext.Current;
@@ -101,7 +105,7 @@ public class BatchPublisher<TContext> : IBatchPublisher
                 JobId = job.Id,
                 EventType = "Created",
                 Level = "Information",
-                Timestamp = DateTime.UtcNow,
+                Timestamp = now,
                 Message = $"Job created in queue \"{job.Queue}\"",
             });
         }
@@ -111,7 +115,7 @@ public class BatchPublisher<TContext> : IBatchPublisher
             JobId = batchJob.Id,
             EventType = "Created",
             Level = "Information",
-            Timestamp = DateTime.UtcNow,
+            Timestamp = now,
             Message = $"Batch job created in queue \"{batchJob.Queue}\"",
         });
 

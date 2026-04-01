@@ -46,7 +46,7 @@ public abstract class ServerMonitoringTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var servers = await svc.GetServers();
 
         // Assert
@@ -80,7 +80,7 @@ public abstract class ServerMonitoringTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var server = await svc.GetServerById(serverId);
 
         // Assert
@@ -95,7 +95,7 @@ public abstract class ServerMonitoringTestsBase : IAsyncLifetime
     public async Task GetServerById_NonExistent_ReturnsNull()
     {
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var server = await svc.GetServerById(Guid.NewGuid());
 
         // Assert

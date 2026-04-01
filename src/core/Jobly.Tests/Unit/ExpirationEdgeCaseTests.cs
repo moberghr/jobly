@@ -65,7 +65,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx);
+        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -86,7 +86,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx);
+        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -126,7 +126,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx);
+        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -165,7 +165,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx);
+        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -195,7 +195,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx);
+        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
 
         // Assert
         var readCtx = _fixture.CreateContext();

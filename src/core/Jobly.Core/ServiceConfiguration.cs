@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.SqlServer.Infrastructure.Internal;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.Internal;
 
@@ -53,17 +54,20 @@ public static class ServiceConfiguration
     {
         ConfigureDbContextOptions<TContext>(services);
 
+        services.TryAddSingleton(TimeProvider.System);
+
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(
             x.GetRequiredService<TContext>(),
-            x.GetRequiredService<IOptions<JoblyConfiguration>>()));
+            x.GetRequiredService<IOptions<JoblyConfiguration>>(),
+            x.GetRequiredService<TimeProvider>()));
 
         services.AddScoped<IRecurringJobPublisher>(x =>
-            new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>()));
-        services.AddScoped<IJobQueryService>(x => new JobQueryService<TContext>(x.GetRequiredService<TContext>()));
-        services.AddScoped<IJobCommandService>(x => new JobCommandService<TContext>(x.GetRequiredService<TContext>()));
+            new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
+        services.AddScoped<IJobQueryService>(x => new JobQueryService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
+        services.AddScoped<IJobCommandService>(x => new JobCommandService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
         services.AddScoped<IJobGroupQueryService>(x => new JobGroupQueryService<TContext>(x.GetRequiredService<TContext>()));
-        services.AddScoped<IRecurringJobService>(x => new RecurringJobService<TContext>(x.GetRequiredService<TContext>()));
-        services.AddScoped<IDashboardStatsService>(x => new DashboardStatsService<TContext>(x.GetRequiredService<TContext>()));
+        services.AddScoped<IRecurringJobService>(x => new RecurringJobService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
+        services.AddScoped<IDashboardStatsService>(x => new DashboardStatsService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
         services.AddTransient<IBatchPublisher, BatchPublisher<TContext>>();
 
         return services;
@@ -179,6 +183,8 @@ public static class ServiceConfiguration
 
         job.HasIndex(p => p.ExpireAt);
         job.HasIndex(p => p.TraceId);
+
+        job.Property(p => p.CancellationMode);
     }
 
     private static void AddRecurringJobEntity(ModelBuilder modelBuilder)
@@ -252,6 +258,7 @@ public static class ServiceConfiguration
         jobLog.Property(p => p.Message);
         jobLog.Property(p => p.Exception);
         jobLog.Property(p => p.DurationMs);
+        jobLog.Property(p => p.WorkerId);
 
         jobLog.HasIndex(p => p.JobId);
     }

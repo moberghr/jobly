@@ -7,16 +7,14 @@ namespace Jobly.Core.Helper;
 
 public static class JobHelper
 {
-    private static Job CreateJobInternal(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, State? state, int? recurringJobId)
+    private static Job CreateJobInternal(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, State? state, int? recurringJobId, DateTime now)
     {
-        var createdTime = DateTime.UtcNow;
-
         var job = new Job
         {
-            CreateTime = createdTime,
+            CreateTime = now,
             Message = message,
             Type = type,
-            ScheduleTime = scheduleTime ?? createdTime,
+            ScheduleTime = scheduleTime ?? now,
             CurrentState = state ?? (parentId == null ? State.Enqueued : State.Awaiting),
             MaxRetries = maxRetries ?? retries,
             Queue = queue ?? "default",
@@ -34,21 +32,22 @@ public static class JobHelper
         int? maxRetries,
         string? queue,
         Guid? parentId,
-        State? state)
+        State? state,
+        DateTime now)
         where T : class, IJob
     {
         var serializedMessage = JsonSerializer.Serialize(message);
         var type = message!.GetType().AssemblyQualifiedName!;
-        return CreateJobInternal(serializedMessage, type, retries, scheduleTime, maxRetries, queue, parentId, state, null);
+        return CreateJobInternal(serializedMessage, type, retries, scheduleTime, maxRetries, queue, parentId, state, null, now);
     }
 
-    public static Job CreateJob(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, State? state)
+    public static Job CreateJob(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, State? state, DateTime now)
     {
-        return CreateJobInternal(message, type, retries, scheduleTime, maxRetries, queue, parentId, state, null);
+        return CreateJobInternal(message, type, retries, scheduleTime, maxRetries, queue, parentId, state, null, now);
     }
 
-    public static Job CreateJob(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, int recurringJobId, State? state)
+    public static Job CreateJob(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, int recurringJobId, State? state, DateTime now)
     {
-        return CreateJobInternal(message, type, retries, scheduleTime, maxRetries, queue, parentId, state, recurringJobId);
+        return CreateJobInternal(message, type, retries, scheduleTime, maxRetries, queue, parentId, state, recurringJobId, now);
     }
 }

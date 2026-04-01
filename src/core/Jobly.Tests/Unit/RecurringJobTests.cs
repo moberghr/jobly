@@ -27,7 +27,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
 
         // Act
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "test-recurring", "* * * * *");
@@ -49,12 +49,12 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         // Arrange
         for (var i = 0; i < 3; i++)
         {
-            var publisher = new RecurringJobPublisher<TestContext>(_fixture.CreateContext());
+            var publisher = new RecurringJobPublisher<TestContext>(_fixture.CreateContext(), TimeProvider.System);
             await publisher.AddOrUpdateRecurringJob(new UnitRequest(), $"recurring-{i}", "* * * * *");
         }
 
         // Act
-        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext());
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var result = await svc.GetRecurringJobs(new BaseListRequest { Page = 0, PageSize = 20 });
 
         // Assert
@@ -66,14 +66,14 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "detail-test", "*/5 * * * *");
 
         var readCtx = _fixture.CreateContext();
         var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "detail-test");
 
         // Act
-        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext());
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var detail = await svc.GetRecurringJobById(rj.Id);
 
         // Assert
@@ -88,7 +88,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "to-delete", "* * * * *");
 
         var readCtx = _fixture.CreateContext();
@@ -109,7 +109,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
                 .SetProperty(r => r.LastJobId, (Guid?)null));
 
         // Act
-        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext());
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.DeleteRecurringJob(rjId);
 
         // Assert
@@ -123,7 +123,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "trigger-test", "* * * * *");
 
         var readCtx = _fixture.CreateContext();
@@ -134,7 +134,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
             .CountAsync();
 
         // Act
-        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext());
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.TriggerRecurringJob(rj.Id);
 
         // Assert
@@ -180,7 +180,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs<TestContext>(schedCtx);
+        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs<TestContext>(schedCtx, TimeProvider.System);
 
         // Assert
         count.ShouldBeGreaterThanOrEqualTo(1);

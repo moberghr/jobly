@@ -83,7 +83,8 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
             scopeFactory,
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
-            groupConfig);
+            groupConfig,
+            TimeProvider.System);
     }
 
     [Fact]
@@ -207,7 +208,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext());
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var status = await svc.GetJoblyStatus();
 
         // Assert

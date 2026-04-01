@@ -15,4 +15,6 @@ public class JobLogModel
     public string? Exception { get; set; }
 
     public double? DurationMs { get; set; }
+
+    public Guid? WorkerId { get; set; }
 }

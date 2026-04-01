@@ -84,7 +84,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx);
+        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -112,7 +112,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx);
+        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -140,7 +140,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx);
+        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -169,7 +169,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var recoveryCtx = _fixture.CreateContext();
-        var count = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(recoveryCtx, TimeSpan.FromMinutes(5));
+        var count = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
         count.ShouldBe(1);
@@ -199,7 +199,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var recoveryCtx = _fixture.CreateContext();
-        var count = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(recoveryCtx, TimeSpan.FromMinutes(5));
+        var count = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
         count.ShouldBe(0);
@@ -227,7 +227,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        var count = await ServerCleanupTask<TestContext>.CleanUpServers(cleanCtx, TimeSpan.FromMinutes(5));
+        var count = await ServerCleanupTask<TestContext>.CleanUpServers(cleanCtx, TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
         count.ShouldBe(1);

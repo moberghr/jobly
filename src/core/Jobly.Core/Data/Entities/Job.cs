@@ -50,4 +50,6 @@ public class Job
     public int JobCount { get; set; }
 
     public ContinuationOptions? ContinuationOptions { get; set; }
+
+    public CancellationMode CancellationMode { get; set; }
 }

@@ -36,7 +36,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.RequeueJob(jobId);
 
         // Assert — state should remain Enqueued, and no Requeued log should exist
@@ -68,7 +68,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.RequeueJob(jobId);
 
         // Assert
@@ -111,7 +111,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act — requeue should succeed even though parent exists (and handle it gracefully)
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.RequeueJob(childId);
 
         // Assert
@@ -125,7 +125,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
     public async Task RequeueJob_NonExistentJob_Throws()
     {
         // Act & Assert
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var ex = await Should.ThrowAsync<ArgumentException>(async () =>
             await svc.RequeueJob(Guid.NewGuid()));
 
@@ -136,7 +136,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
     public async Task DeleteJob_NonExistentJob_Throws()
     {
         // Act & Assert
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         var ex = await Should.ThrowAsync<ArgumentException>(async () =>
             await svc.DeleteJob(Guid.NewGuid()));
 

@@ -8,6 +8,12 @@ export const State = {
 } as const;
 export type State = (typeof State)[keyof typeof State];
 
+export const CancellationMode = {
+  None: 0,
+  Graceful: 1,
+} as const;
+export type CancellationMode = (typeof CancellationMode)[keyof typeof CancellationMode];
+
 export interface DashboardStatistics {
   total: number;
   pending: number;
@@ -43,6 +49,7 @@ export interface JobModel {
   scheduleTime: string | null;
   processedTime: string | null;
   currentState: State;
+  cancellationMode: CancellationMode;
 }
 
 export interface JobDetailModel extends JobModel {
@@ -67,6 +74,7 @@ export interface JobLogModel {
   message: string;
   exception: string | null;
   durationMs: number | null;
+  workerId: string | null;
 }
 
 export interface JobGroupModel {
@@ -153,6 +161,33 @@ export interface PagedList<T> {
 export interface BulkResult {
   succeeded: number;
   skipped: number;
+}
+
+export interface WorkerDetailModel {
+  workerId: string;
+  startedTime: string;
+  lastHeartbeatTime: string | null;
+  currentJobId: string | null;
+  currentJobType: string | null;
+  serverId: string;
+  serverName: string;
+}
+
+export interface WorkerJobLogModel {
+  id: string;
+  jobId: string;
+  jobType: string | null;
+  eventType: string;
+  timestamp: string;
+  level: string;
+  message: string;
+  exception: string | null;
+  durationMs: number | null;
+}
+
+export interface TypeCountModel {
+  type: string;
+  count: number;
 }
 
 export interface StatsHistoryPoint {

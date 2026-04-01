@@ -23,6 +23,14 @@ public static class JoblyEndpoints
 
         apiGroup.MapGet("jobs/failed", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobsList(request, State.Failed));
 
+        apiGroup.MapGet("jobs/failed/types", async ([FromServices] IJobQueryService jobQueryService) => await jobQueryService.GetFailedJobTypeCounts());
+
+        apiGroup.MapGet("jobs/failed/by-type", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request, [FromQuery] string type) => await jobQueryService.GetFailedJobsByType(request, type));
+
+        apiGroup.MapPost("jobs/failed/delete-by-type", async ([FromServices] IJobCommandService jobCommandService, [FromQuery] string type) => await jobCommandService.DeleteFailedJobsByType(type));
+
+        apiGroup.MapPost("jobs/failed/requeue-by-type", async ([FromServices] IJobCommandService jobCommandService, [FromQuery] string type) => await jobCommandService.RequeueFailedJobsByType(type));
+
         apiGroup.MapGet("jobs/processing", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobStatesInProcess(request));
 
         apiGroup.MapGet("jobs/scheduled", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetScheduledJobs(request));
@@ -108,6 +116,14 @@ public static class JoblyEndpoints
         apiGroup.MapGet("servers/{serverId}/tasks", async ([FromServices] IDashboardStatsService statsService, Guid serverId) => await statsService.GetServerTaskSummaries(serverId));
 
         apiGroup.MapGet("servers/{serverId}/logs", async ([FromServices] IDashboardStatsService statsService, Guid serverId, [AsParameters] BaseListRequest request, [FromQuery] string? taskName) => await statsService.GetServerLogs(serverId, request, taskName));
+
+        apiGroup.MapGet("workers/{workerId}", async ([FromServices] IDashboardStatsService statsService, Guid workerId) =>
+        {
+            var model = await statsService.GetWorkerById(workerId);
+            return model is null ? Results.NotFound() : Results.Ok(model);
+        });
+
+        apiGroup.MapGet("workers/{workerId}/logs", async ([FromServices] IDashboardStatsService statsService, Guid workerId, [AsParameters] BaseListRequest request) => await statsService.GetWorkerJobLogs(workerId, request));
 
         apiGroup.MapGet("created", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobsList(request, State.Enqueued));
 

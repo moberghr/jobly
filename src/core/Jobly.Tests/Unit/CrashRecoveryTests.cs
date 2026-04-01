@@ -44,7 +44,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Act
         var count = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(
-            _fixture.CreateContext(), TimeSpan.FromMinutes(5));
+            _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
         count.ShouldBe(5);
@@ -102,7 +102,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Act
         var count = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(
-            _fixture.CreateContext(), TimeSpan.FromMinutes(5));
+            _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
         count.ShouldBe(0);
@@ -135,7 +135,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Act
         await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(
-            _fixture.CreateContext(), TimeSpan.FromMinutes(5));
+            _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -165,7 +165,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         // Act — run 5 concurrent requeue attempts
         var tasks = Enumerable.Range(0, 5)
             .Select(_ => StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(
-                _fixture.CreateContext(), TimeSpan.FromMinutes(5)))
+                _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5)))
             .ToList();
 
         var results = await Task.WhenAll(tasks);
@@ -218,7 +218,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Act — cleanup only removes server/workers, not jobs
         await ServerCleanupTask<TestContext>.CleanUpServers(
-            _fixture.CreateContext(), TimeSpan.FromMinutes(5));
+            _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -265,9 +265,9 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Act — run both cleanup + recovery (as health manager would)
         var requeued = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(
-            _fixture.CreateContext(), TimeSpan.FromMinutes(5));
+            _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
         var removed = await ServerCleanupTask<TestContext>.CleanUpServers(
-            _fixture.CreateContext(), TimeSpan.FromMinutes(5));
+            _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
         requeued.ShouldBe(1);

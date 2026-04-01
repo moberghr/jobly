@@ -23,8 +23,9 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
         IServiceScopeFactory scopeFactory,
         ILogger<RecurringJobSchedulerTask<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
-        IDistributedLockProvider lockProvider)
-        : base(scopeFactory, logger, configuration, "jobly:recurring-scheduler", lockProvider)
+        IDistributedLockProvider lockProvider,
+        TimeProvider timeProvider)
+        : base(scopeFactory, logger, configuration, timeProvider, "jobly:recurring-scheduler", lockProvider)
     {
     }
 
@@ -34,14 +35,14 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
-        var count = await ScheduleRecurringJobs(context);
+        var count = await ScheduleRecurringJobs(context, TimeProvider);
         return count > 0 ? $"Scheduled {count} recurring jobs" : null;
     }
 
-    public static async Task<int> ScheduleRecurringJobs<TCtx>(TCtx context)
+    public static async Task<int> ScheduleRecurringJobs<TCtx>(TCtx context, TimeProvider timeProvider)
         where TCtx : DbContext
     {
-        var now = DateTime.UtcNow;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         var count = 0;
 
         var recurringJobs = await context.Set<RecurringJob>()
@@ -77,7 +78,8 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
                 queue: recurringJob.Queue,
                 parentId: null,
                 recurringJobId: recurringJob.Id,
-                state: State.Enqueued);
+                state: State.Enqueued,
+                now: now);
 
             context.Set<Job>().Add(newJob);
             context.Set<JobLog>().Add(new JobLog

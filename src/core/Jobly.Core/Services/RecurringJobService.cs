@@ -23,10 +23,12 @@ public class RecurringJobService<TContext> : IRecurringJobService
     where TContext : DbContext
 {
     private readonly TContext _context;
+    private readonly TimeProvider _timeProvider;
 
-    public RecurringJobService(TContext context)
+    public RecurringJobService(TContext context, TimeProvider timeProvider)
     {
         _context = context;
+        _timeProvider = timeProvider;
     }
 
     public async Task<PagedList<RecurringJobModel>> GetRecurringJobs(BaseListRequest request)
@@ -81,6 +83,7 @@ public class RecurringJobService<TContext> : IRecurringJobService
                 CreateTime = j.CreateTime,
                 ScheduleTime = j.ScheduleTime,
                 CurrentState = j.CurrentState,
+                CancellationMode = j.CancellationMode,
             })
             .ToPagedListAsync(request);
     }
@@ -89,13 +92,15 @@ public class RecurringJobService<TContext> : IRecurringJobService
     {
         var recurringJob = await _context.Set<RecurringJob>().FindAsync(id) ?? throw new ArgumentException("Recurring job not found.", nameof(id));
 
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
         // Create a new job from the recurring job definition
         var job = new Job
         {
             Type = recurringJob.Type,
             Message = recurringJob.Message,
-            CreateTime = DateTime.UtcNow,
-            ScheduleTime = DateTime.UtcNow,
+            CreateTime = now,
+            ScheduleTime = now,
             CurrentState = State.Enqueued,
             MaxRetries = 0,
             Queue = "default",
@@ -107,7 +112,7 @@ public class RecurringJobService<TContext> : IRecurringJobService
         {
             JobId = job.Id,
             EventType = "Created",
-            Timestamp = DateTime.UtcNow,
+            Timestamp = now,
             Level = "Information",
             Message = $"Job {job.Id} was created from recurring job {recurringJob.Id}",
         });

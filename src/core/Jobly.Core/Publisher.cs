@@ -79,11 +79,13 @@ public class Publisher<TContext> : IPublisher
 {
     private readonly TContext _context;
     private readonly JoblyConfiguration _configuration;
+    private readonly TimeProvider _timeProvider;
 
-    public Publisher(TContext context, IOptions<JoblyConfiguration> configuration)
+    public Publisher(TContext context, IOptions<JoblyConfiguration> configuration, TimeProvider timeProvider)
     {
         _context = context;
         _configuration = configuration.Value;
+        _timeProvider = timeProvider;
     }
 
     // --- IMessage: create Message-kind Job ---
@@ -102,7 +104,7 @@ public class Publisher<TContext> : IPublisher
     private async Task<Guid> CreateMessage<T>(T message, string? queue = null)
         where T : class, IMessage
     {
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var msg = new Job
         {
             Kind = JobKind.Message,
@@ -199,6 +201,7 @@ public class Publisher<TContext> : IPublisher
         Guid? parentId)
         where T : class, IJob
     {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var newJob = JobHelper.CreateJob(
             job,
             _configuration.RetryCount,
@@ -206,7 +209,8 @@ public class Publisher<TContext> : IPublisher
             maxRetries,
             queue,
             parentId,
-            null);
+            null,
+            now);
 
         // Automatic trace propagation: if called from within a job handler, inherit trace
         var executionContext = JobExecutionContext.Current;
@@ -226,7 +230,7 @@ public class Publisher<TContext> : IPublisher
             JobId = newJob.Id,
             EventType = "Created",
             Level = "Information",
-            Timestamp = DateTime.UtcNow,
+            Timestamp = now,
             Message = $"Job created in queue \"{newJob.Queue}\"",
         });
 

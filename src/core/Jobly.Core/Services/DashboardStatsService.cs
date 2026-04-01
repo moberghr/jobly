@@ -22,16 +22,22 @@ public interface IDashboardStatsService
     Task<PagedList<ServerLogModel>> GetServerLogs(Guid serverId, BaseListRequest request, string? taskName = null);
 
     Task<List<ServerTaskSummary>> GetServerTaskSummaries(Guid serverId);
+
+    Task<PagedList<WorkerJobLogModel>> GetWorkerJobLogs(Guid workerId, BaseListRequest request);
+
+    Task<WorkerDetailModel?> GetWorkerById(Guid workerId);
 }
 
 public class DashboardStatsService<TContext> : IDashboardStatsService
     where TContext : DbContext
 {
     private readonly TContext _context;
+    private readonly TimeProvider _timeProvider;
 
-    public DashboardStatsService(TContext context)
+    public DashboardStatsService(TContext context, TimeProvider timeProvider)
     {
         _context = context;
+        _timeProvider = timeProvider;
     }
 
     public async Task<DashboardStatistics> GetJoblyStatus()
@@ -262,7 +268,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
 
     public async Task<List<StatsHistoryPoint>> GetStatsHistory(int hours = 24)
     {
-        var since = DateTime.UtcNow.AddHours(-hours);
+        var since = _timeProvider.GetUtcNow().UtcDateTime.AddHours(-hours);
 
         var aggregated = await _context.Set<Statistic>()
             .Where(x => x.Key.StartsWith("stats:succeeded:") || x.Key.StartsWith("stats:failed:"))
@@ -358,15 +364,17 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
 
     private async Task<int> GetPendingJobsCount()
     {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         return await Jobs()
-            .Where(x => x.ScheduleTime < DateTime.UtcNow)
+            .Where(x => x.ScheduleTime < now)
             .CountAsync();
     }
 
     private async Task<int> GetScheduledJobsCount()
     {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         return await Jobs()
-            .Where(x => x.ScheduleTime > DateTime.UtcNow)
+            .Where(x => x.ScheduleTime > now)
             .CountAsync();
     }
 
@@ -377,7 +385,8 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
 
         if (state == State.Enqueued)
         {
-            query = query.Where(x => x.ScheduleTime <= DateTime.UtcNow);
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            query = query.Where(x => x.ScheduleTime <= now);
         }
 
         return await query.CountAsync();
@@ -405,6 +414,61 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
         var db = parts.GetValueOrDefault("Database") ?? parts.GetValueOrDefault("Initial Catalog") ?? string.Empty;
 
         return $"{provider}: Host: {host}, DB: {db}";
+    }
+
+    public async Task<WorkerDetailModel?> GetWorkerById(Guid workerId)
+    {
+        var worker = await _context.Set<Worker>()
+            .Where(w => w.Id == workerId)
+            .FirstOrDefaultAsync();
+
+        if (worker == null)
+        {
+            return null;
+        }
+
+        var server = await _context.Set<Server>()
+            .Where(s => s.Id == worker.ServerId)
+            .FirstOrDefaultAsync();
+
+        var activeJob = await _context.Set<Job>()
+            .Where(j => j.CurrentWorkerId == workerId)
+            .Select(j => new { j.Id, j.Type })
+            .FirstOrDefaultAsync();
+
+        return new WorkerDetailModel
+        {
+            WorkerId = worker.Id,
+            StartedTime = worker.StartedTime,
+            LastHeartbeatTime = worker.LastHeartbeatTime,
+            CurrentJobId = activeJob?.Id,
+            CurrentJobType = activeJob?.Type,
+            ServerId = worker.ServerId,
+            ServerName = server?.ServerName ?? "Unknown",
+        };
+    }
+
+    public async Task<PagedList<WorkerJobLogModel>> GetWorkerJobLogs(Guid workerId, BaseListRequest request)
+    {
+        return await _context.Set<JobLog>()
+            .Where(x => x.WorkerId == workerId)
+            .OrderByDescending(x => x.Timestamp)
+            .Select(x => new WorkerJobLogModel
+            {
+                Id = x.Id,
+                JobId = x.JobId,
+                JobType = _context.Set<Job>()
+                    .Where(j => j.Id == x.JobId)
+                    .Select(j => j.Type)
+                    .FirstOrDefault(),
+                EventType = x.EventType,
+                Timestamp = x.Timestamp,
+                Level = x.Level,
+                Message = x.Message,
+                Exception = x.Exception,
+                DurationMs = x.DurationMs,
+            })
+            .ToPagedListAsync(request);
     }
 
     private async Task<int> GetProcessingJobsCount()

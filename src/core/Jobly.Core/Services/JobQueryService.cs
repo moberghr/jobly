@@ -25,16 +25,22 @@ public interface IJobQueryService
     Task<PagedList<JobModel>> GetTraceJobs(Guid jobId, BaseListRequest request);
 
     Task<int> CountProcessingJobs();
+
+    Task<List<TypeCountModel>> GetFailedJobTypeCounts();
+
+    Task<PagedList<JobModel>> GetFailedJobsByType(BaseListRequest request, string type);
 }
 
 public class JobQueryService<TContext> : IJobQueryService
     where TContext : DbContext
 {
     private readonly TContext _context;
+    private readonly TimeProvider _timeProvider;
 
-    public JobQueryService(TContext context)
+    public JobQueryService(TContext context, TimeProvider timeProvider)
     {
         _context = context;
+        _timeProvider = timeProvider;
     }
 
     public async Task<PagedList<JobModel>> GetJobsList(BaseListRequest request, State state)
@@ -66,6 +72,7 @@ public class JobQueryService<TContext> : IJobQueryService
             {
                 Id = x.Id,
                 CurrentState = x.CurrentState,
+                CancellationMode = x.CancellationMode,
                 CreateTime = x.CreateTime,
                 Message = x.Message,
                 ScheduleTime = x.ScheduleTime,
@@ -92,6 +99,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 CreateTime = x.CreateTime,
                 ScheduleTime = x.ScheduleTime,
                 CurrentState = x.CurrentState,
+                CancellationMode = x.CancellationMode,
                 HandlerType = x.HandlerType,
                 Kind = x.Kind,
                 ParentJobId = x.ParentJobId,
@@ -119,6 +127,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 Message = x.Message,
                 Exception = x.Exception,
                 DurationMs = x.DurationMs,
+                WorkerId = x.WorkerId,
             })
             .ToListAsync();
 
@@ -167,6 +176,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 CreateTime = x.CreateTime,
                 ScheduleTime = x.ScheduleTime,
                 CurrentState = x.CurrentState,
+                CancellationMode = x.CancellationMode,
             })
             .ToPagedListAsync(request);
     }
@@ -184,6 +194,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 CreateTime = x.CreateTime,
                 ScheduleTime = x.ScheduleTime,
                 CurrentState = x.CurrentState,
+                CancellationMode = x.CancellationMode,
             })
             .ToPagedListAsync(request);
     }
@@ -211,6 +222,35 @@ public class JobQueryService<TContext> : IJobQueryService
                 CreateTime = x.CreateTime,
                 ScheduleTime = x.ScheduleTime,
                 CurrentState = x.CurrentState,
+                CancellationMode = x.CancellationMode,
+            })
+            .ToPagedListAsync(request);
+    }
+
+    public async Task<List<TypeCountModel>> GetFailedJobTypeCounts()
+    {
+        return await Jobs()
+            .Where(x => x.CurrentState == State.Failed)
+            .GroupBy(x => x.Type)
+            .Select(g => new TypeCountModel { Type = g.Key!, Count = g.Count() })
+            .OrderByDescending(x => x.Count)
+            .ToListAsync();
+    }
+
+    public async Task<PagedList<JobModel>> GetFailedJobsByType(BaseListRequest request, string type)
+    {
+        return await Jobs()
+            .Where(x => x.CurrentState == State.Failed && x.Type == type)
+            .OrderByDescending(x => x.CreateTime)
+            .Select(x => new JobModel
+            {
+                Id = x.Id,
+                Type = x.Type,
+                Message = x.Message,
+                CreateTime = x.CreateTime,
+                ScheduleTime = x.ScheduleTime,
+                CurrentState = x.CurrentState,
+                CancellationMode = x.CancellationMode,
             })
             .ToPagedListAsync(request);
     }
@@ -225,13 +265,15 @@ public class JobQueryService<TContext> : IJobQueryService
 
     private IQueryable<JobModel> GetScheduledJobsQuery()
     {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var query = Jobs()
-            .Where(x => x.ScheduleTime > DateTime.UtcNow)
+            .Where(x => x.ScheduleTime > now)
             .Select(x =>
                 new JobModel
                 {
                     Id = x.Id,
                     CurrentState = x.CurrentState,
+                CancellationMode = x.CancellationMode,
                     CreateTime = x.CreateTime,
                     Message = x.Message,
                     ScheduleTime = x.ScheduleTime,
@@ -250,7 +292,8 @@ public class JobQueryService<TContext> : IJobQueryService
         // Enqueued: exclude future-scheduled jobs (those show under Scheduled)
         if (state == State.Enqueued)
         {
-            jobs = jobs.Where(x => x.ScheduleTime <= DateTime.UtcNow);
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            jobs = jobs.Where(x => x.ScheduleTime <= now);
         }
 
         return jobs
@@ -259,6 +302,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 {
                     Id = x.Id,
                     CurrentState = x.CurrentState,
+                CancellationMode = x.CancellationMode,
                     CreateTime = x.CreateTime,
                     Message = x.Message,
                     ScheduleTime = x.ScheduleTime,

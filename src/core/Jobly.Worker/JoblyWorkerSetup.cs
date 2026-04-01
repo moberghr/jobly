@@ -16,16 +16,19 @@ public class JoblyWorkerSetup<TContext> : IHostedService
     private readonly JoblyWorkerConfiguration _configuration;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IServiceProvider _serviceProvider;
+    private readonly TimeProvider _timeProvider;
     private readonly List<BackgroundService> _workers = [];
 
     public JoblyWorkerSetup(
         IOptions<JoblyWorkerConfiguration> configuration,
         IServiceScopeFactory serviceScopeFactory,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        TimeProvider timeProvider)
     {
         _serviceProvider = serviceProvider;
         _serviceScopeFactory = serviceScopeFactory;
         _configuration = configuration.Value;
+        _timeProvider = timeProvider;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -43,7 +46,7 @@ public class JoblyWorkerSetup<TContext> : IHostedService
         using (var scope = _serviceScopeFactory.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<TContext>();
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
 
             var server = new Server
             {
@@ -81,7 +84,8 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                     _serviceScopeFactory,
                     _serviceProvider.GetRequiredService<ILogger<JoblyDispatcher<TContext>>>(),
                     _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>(),
-                    group);
+                    group,
+                    _timeProvider);
 
                 await dispatcher.StartAsync(cancellationToken);
                 _workers.Add(dispatcher);
@@ -93,7 +97,8 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                         dispatcher.JobReader,
                         _serviceScopeFactory,
                         _serviceProvider.GetRequiredService<ILogger<JoblyDispatcherWorker<TContext>>>(),
-                        _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>());
+                        _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>(),
+                        _timeProvider);
 
                     await worker.StartAsync(cancellationToken);
                     _workers.Add(worker);
@@ -109,7 +114,8 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                         _serviceScopeFactory,
                         _serviceProvider.GetRequiredService<ILogger<JoblyWorkerService<TContext>>>(),
                         _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>(),
-                        group);
+                        group,
+                        _timeProvider);
 
                     var worker = new JoblyWorker<TContext>(
                         workerService,

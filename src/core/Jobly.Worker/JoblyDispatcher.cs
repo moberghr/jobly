@@ -21,6 +21,7 @@ public class JoblyDispatcher<TContext> : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<JoblyDispatcher<TContext>> _logger;
     private readonly WorkerGroupConfiguration _groupConfiguration;
+    private readonly TimeProvider _timeProvider;
     private readonly Channel<Job> _jobChannel;
     private readonly int _workerCount;
 
@@ -28,11 +29,13 @@ public class JoblyDispatcher<TContext> : BackgroundService
         IServiceScopeFactory scopeFactory,
         ILogger<JoblyDispatcher<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
-        WorkerGroupConfiguration groupConfiguration)
+        WorkerGroupConfiguration groupConfiguration,
+        TimeProvider timeProvider)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _groupConfiguration = groupConfiguration;
+        _timeProvider = timeProvider;
         _workerCount = groupConfiguration.WorkerCount;
 
         _jobChannel = Channel.CreateBounded<Job>(new BoundedChannelOptions(_workerCount)
@@ -84,9 +87,11 @@ public class JoblyDispatcher<TContext> : BackgroundService
 
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
 
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
         // Fetch only Kind=Job (messages are routed by MessageRoutingTask)
         var jobs = await context.Set<Job>()
-            .Where(x => x.Kind == JobKind.Job && x.CurrentState == State.Enqueued && x.ScheduleTime < DateTime.UtcNow)
+            .Where(x => x.Kind == JobKind.Job && x.CurrentState == State.Enqueued && x.ScheduleTime < now)
             .Where(x => _groupConfiguration.Queues.Contains(x.Queue))
             .OrderBy(x => x.Queue)
             .ThenBy(x => x.ScheduleTime)
@@ -101,7 +106,6 @@ public class JoblyDispatcher<TContext> : BackgroundService
         }
 
         // Batch mark all fetched jobs as Processing
-        var now = DateTime.UtcNow;
         foreach (var job in jobs)
         {
             job.CurrentState = State.Processing;

@@ -14,8 +14,9 @@ public class CounterAggregatorTask<TContext> : ServerTaskBase<TContext>
         IServiceScopeFactory scopeFactory,
         ILogger<CounterAggregatorTask<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
-        IDistributedLockProvider lockProvider)
-        : base(scopeFactory, logger, configuration, "jobly:counter-aggregation", lockProvider)
+        IDistributedLockProvider lockProvider,
+        TimeProvider timeProvider)
+        : base(scopeFactory, logger, configuration, timeProvider, "jobly:counter-aggregation", lockProvider)
     {
     }
 

@@ -9,7 +9,7 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import { useRefreshKey } from '@/hooks/useRefreshKey';
-import type { JobModel, PagedList } from '@/types';
+import type { JobModel, PagedList, TypeCountModel } from '@/types';
 import * as api from '@/api';
 
 const stateEndpoints: Record<string, (page: number, pageSize: number) => Promise<PagedList<JobModel>>> = {
@@ -31,26 +31,50 @@ export default function JobListPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const refreshKey = useRefreshKey();
 
+  // Failed type filtering
+  const [typeCounts, setTypeCounts] = useState<TypeCountModel[]>([]);
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+
+  const isFailed = state === 'failed';
+
   const fetchData = useCallback(async () => {
-    const fetcher = stateEndpoints[state ?? 'enqueued'];
-    if (!fetcher) return;
     try {
-      const result = await fetcher(page, pageSize);
-      setData(result);
+      if (isFailed && selectedType) {
+        const result = await api.getFailedJobsByType(selectedType, page, pageSize);
+        setData(result);
+      } else {
+        const fetcher = stateEndpoints[state ?? 'enqueued'];
+        if (!fetcher) return;
+        const result = await fetcher(page, pageSize);
+        setData(result);
+      }
       setError(null);
     } catch {
       setError('Unable to load jobs');
     }
-  }, [state, page, pageSize]);
+  }, [state, page, pageSize, isFailed, selectedType]);
+
+  const fetchTypeCounts = useCallback(async () => {
+    if (!isFailed) return;
+    try {
+      const counts = await api.getFailedJobTypes();
+      setTypeCounts(counts);
+    } catch {
+      // ignore
+    }
+  }, [isFailed]);
 
   useEffect(() => {
     setPage(0);
     setSelectedIds(new Set());
+    setSelectedType(null);
+    setTypeCounts([]);
   }, [state]);
 
   useEffect(() => {
     fetchData();
-  }, [fetchData, refreshKey]);
+    fetchTypeCounts();
+  }, [fetchData, fetchTypeCounts, refreshKey]);
 
   const handlePageSizeChange = (size: number) => {
     setPageSize(size);
@@ -69,6 +93,46 @@ export default function JobListPage() {
         <h1 className="text-2xl font-bold">{title} Jobs</h1>
         <span className="text-sm text-muted-foreground">{data.totalCount} total</span>
       </div>
+
+      {/* Failed type filter bar */}
+      {isFailed && typeCounts.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <Button
+            variant={selectedType === null ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => { setSelectedType(null); setPage(0); setSelectedIds(new Set()); }}
+          >
+            All
+          </Button>
+          {typeCounts.map(tc => (
+            <Button
+              key={tc.type}
+              variant={selectedType === tc.type ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => { setSelectedType(tc.type); setPage(0); setSelectedIds(new Set()); }}
+            >
+              {shortType(tc.type)} ({tc.count})
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {/* Bulk actions for type filter */}
+      {isFailed && selectedType && (
+        <div className="flex items-center gap-3 mb-3 p-3 bg-muted rounded-md">
+          <span className="text-sm font-medium">Filtered: {shortType(selectedType)}</span>
+          <Button variant="outline" size="sm" onClick={async () => {
+            await api.requeueFailedJobsByType(selectedType);
+            fetchData();
+            fetchTypeCounts();
+          }}>Requeue All</Button>
+          <Button variant="outline" size="sm" className="text-destructive" onClick={async () => {
+            await api.deleteFailedJobsByType(selectedType);
+            fetchData();
+            fetchTypeCounts();
+          }}>Delete All</Button>
+        </div>
+      )}
 
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 mb-3 p-3 bg-muted rounded-md">
@@ -137,7 +201,7 @@ export default function JobListPage() {
                     </Link>
                   </TableCell>
                   <TableCell>{shortType(job.type)}</TableCell>
-                  <TableCell><StateBadge state={job.currentState} /></TableCell>
+                  <TableCell><StateBadge state={job.currentState} cancellationMode={job.cancellationMode} /></TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     <RelativeTime date={job.createTime} />
                   </TableCell>

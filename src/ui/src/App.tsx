@@ -11,6 +11,7 @@ import RecurringPage from '@/pages/recurring/RecurringPage';
 import RecurringDetailPage from '@/pages/recurring/RecurringDetailPage';
 import ServersPage from '@/pages/servers/ServersPage';
 import ServerDetailPage from '@/pages/servers/ServerDetailPage';
+import WorkerDetailPage from '@/pages/workers/WorkerDetailPage';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Route path="/batches/:state" element={<BatchesPage />} />
           <Route path="/recurring/:id" element={<RecurringDetailPage />} />
           <Route path="/recurring" element={<RecurringPage />} />
+          <Route path="/workers/:id" element={<WorkerDetailPage />} />
           <Route path="/servers/:id" element={<ServerDetailPage />} />
           <Route path="/servers" element={<ServersPage />} />
         </Route>

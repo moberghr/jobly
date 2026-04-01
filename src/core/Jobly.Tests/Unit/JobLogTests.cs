@@ -83,7 +83,8 @@ public abstract class JobLogTestsBase : IAsyncLifetime
             scopeFactory,
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
-            groupConfig);
+            groupConfig,
+            TimeProvider.System);
     }
 
     [Fact]
@@ -91,7 +92,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()));
+        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
         var jobId = await publisher.Enqueue(new UnitRequest());
         await ctx.SaveChangesAsync();
 
@@ -114,7 +115,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()));
+        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
         var jobId = await publisher.Enqueue(new UnitRequest());
         await ctx.SaveChangesAsync();
 
@@ -194,7 +195,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.RequeueJob(jobId);
 
         // Assert

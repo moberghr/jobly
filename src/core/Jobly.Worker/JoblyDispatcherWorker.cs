@@ -28,19 +28,22 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<JoblyDispatcherWorker<TContext>> _logger;
     private readonly JoblyWorkerConfiguration _configuration;
+    private readonly TimeProvider _timeProvider;
 
     public JoblyDispatcherWorker(
         Guid workerId,
         ChannelReader<Job> jobReader,
         IServiceScopeFactory scopeFactory,
         ILogger<JoblyDispatcherWorker<TContext>> logger,
-        IOptions<JoblyWorkerConfiguration> configuration)
+        IOptions<JoblyWorkerConfiguration> configuration,
+        TimeProvider timeProvider)
     {
         _workerId = workerId;
         _jobReader = jobReader;
         _scopeFactory = scopeFactory;
         _logger = logger;
         _configuration = configuration.Value;
+        _timeProvider = timeProvider;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -76,7 +79,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         await context.SaveChangesAsync(cancellationToken);
         job = trackedJob;
 
-        var logCollector = new JobLogCollector { JobId = job.Id };
+        var logCollector = new JobLogCollector { JobId = job.Id, TimeProvider = _timeProvider, WorkerId = _workerId };
 
         using var jobCts = new CancellationTokenSource();
         var monitorTask = RunJobMonitor(job.Id, jobCts, cancellationToken);
@@ -126,17 +129,23 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             _logger.LogInformation("Job {id} was cancelled", job.Id);
             await monitorTask;
 
+            var cancelNow = _timeProvider.GetUtcNow().UtcDateTime;
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
+            job.CurrentState = State.Deleted;
+            job.ExpireAt = cancelNow.AddDays(1);
+            job.CancellationMode = CancellationMode.None;
             job.CurrentWorkerId = null;
             job.LastKeepAlive = null;
+            context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
             context.Set<JobLog>().Add(new JobLog
             {
                 JobId = job.Id,
                 EventType = "Cancelled",
-                Timestamp = DateTime.UtcNow,
+                Timestamp = cancelNow,
                 Level = "Information",
                 Message = "Job was cancelled by user",
                 DurationMs = handlerStopwatch?.Elapsed.TotalMilliseconds,
+                WorkerId = _workerId,
             });
             await SaveJobLogs(context, logCollector);
             await context.SaveChangesAsync(default);
@@ -200,21 +209,22 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
                 using var s = _scopeFactory.CreateScope();
                 var ctx = s.ServiceProvider.GetRequiredService<TContext>();
 
-                var state = await ctx.Set<Job>()
+                var cancellationMode = await ctx.Set<Job>()
                     .Where(x => x.Id == jobId)
-                    .Select(x => x.CurrentState)
+                    .Select(x => x.CancellationMode)
                     .FirstOrDefaultAsync(stoppingToken);
 
-                if (state != State.Processing)
+                if (cancellationMode != CancellationMode.None)
                 {
-                    _logger.LogInformation("Job {jobId} state changed to {state}, cancelling handler", jobId, state);
+                    _logger.LogInformation("Job {jobId} cancellation requested ({mode}), cancelling handler", jobId, cancellationMode);
                     await jobCts.CancelAsync();
                     return;
                 }
 
+                var now = _timeProvider.GetUtcNow().UtcDateTime;
                 await ctx.Set<Job>()
                     .Where(x => x.Id == jobId)
-                    .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastKeepAlive, DateTime.UtcNow), stoppingToken);
+                    .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastKeepAlive, now), stoppingToken);
             }
             catch (OperationCanceledException) { return; }
             catch (Exception e)
@@ -224,7 +234,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         }
     }
 
-    private static void UpdateJobState(TContext context, Job job, Exception? error, double? durationMs)
+    private void UpdateJobState(TContext context, Job job, Exception? error, double? durationMs)
     {
         var failed = error != null;
         var state = failed ? State.Failed : State.Completed;
@@ -236,13 +246,15 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         }
 
         job.CurrentState = state;
+        job.CancellationMode = CancellationMode.None;
         job.CurrentWorkerId = null;
         job.LastKeepAlive = null;
 
-        var hourSuffix = DateTime.UtcNow.ToString("yyyy-MM-dd-HH");
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var hourSuffix = now.ToString("yyyy-MM-dd-HH");
         if (state == State.Completed)
         {
-            job.ExpireAt = DateTime.UtcNow.AddDays(1);
+            job.ExpireAt = now.AddDays(1);
             AddCounters(context, "stats:succeeded", $"stats:succeeded:{hourSuffix}");
         }
         else if (state == State.Failed && job.RetriedTimes >= job.MaxRetries)
@@ -265,11 +277,12 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         {
             JobId = job.Id,
             EventType = eventType,
-            Timestamp = DateTime.UtcNow,
+            Timestamp = now,
             Level = state == State.Failed ? "Error" : "Information",
             Message = logMessage,
             Exception = logException,
             DurationMs = durationMs,
+            WorkerId = _workerId,
         });
     }
 

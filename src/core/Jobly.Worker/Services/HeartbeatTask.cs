@@ -19,12 +19,13 @@ public class HeartbeatTask<TContext> : ServerTaskBase<TContext>
     public HeartbeatTask(
         IServiceScopeFactory scopeFactory,
         ILogger<HeartbeatTask<TContext>> logger,
-        IOptions<JoblyWorkerConfiguration> configuration)
-        : base(scopeFactory, logger, configuration)
+        IOptions<JoblyWorkerConfiguration> configuration,
+        TimeProvider timeProvider)
+        : base(scopeFactory, logger, configuration, timeProvider)
     {
         var process = System.Diagnostics.Process.GetCurrentProcess();
         _previousCpuTime = process.TotalProcessorTime;
-        _previousWallTime = DateTime.UtcNow;
+        _previousWallTime = timeProvider.GetUtcNow().UtcDateTime;
     }
 
     protected override string TaskName => "Heartbeat";
@@ -37,13 +38,13 @@ public class HeartbeatTask<TContext> : ServerTaskBase<TContext>
     {
         var server = await context.Set<Server>()
             .FindAsync([ServerId], ct) ?? throw new InvalidOperationException("Server not found in the database.");
-        server.LastHeartbeatTime = DateTime.UtcNow;
+        server.LastHeartbeatTime = TimeProvider.GetUtcNow().UtcDateTime;
 
         var process = System.Diagnostics.Process.GetCurrentProcess();
         server.MemoryWorkingSetBytes = process.WorkingSet64;
 
         var currentCpuTime = process.TotalProcessorTime;
-        var currentWallTime = DateTime.UtcNow;
+        var currentWallTime = TimeProvider.GetUtcNow().UtcDateTime;
         var wallElapsed = (currentWallTime - _previousWallTime).TotalMilliseconds;
 
         if (wallElapsed > 0)

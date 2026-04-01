@@ -6,6 +6,10 @@ public class JobLogCollector
 {
     public Guid JobId { get; set; }
 
+    public TimeProvider TimeProvider { get; set; } = TimeProvider.System;
+
+    public Guid? WorkerId { get; set; }
+
     public List<JobLog> Entries { get; } = [];
 
     public void Add(string level, string message, string? exception = null)
@@ -13,10 +17,11 @@ public class JobLogCollector
         Entries.Add(new JobLog
         {
             JobId = JobId,
-            Timestamp = DateTime.UtcNow,
+            Timestamp = TimeProvider.GetUtcNow().UtcDateTime,
             Level = level,
             Message = message,
             Exception = exception,
+            WorkerId = WorkerId,
         });
     }
 }

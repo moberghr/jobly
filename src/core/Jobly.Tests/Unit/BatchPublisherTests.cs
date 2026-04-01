@@ -21,7 +21,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
 
     private static BatchPublisher<TestContext> CreateBatchPublisher(TestContext ctx)
     {
-        return new BatchPublisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()));
+        return new BatchPublisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
     }
 
     [Fact]

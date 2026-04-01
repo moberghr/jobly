@@ -16,16 +16,22 @@ public interface IJobCommandService
     Task<BulkResultModel> BulkDeleteJobs(Guid[] jobIds);
 
     Task<BulkResultModel> BulkRequeueJobs(Guid[] jobIds);
+
+    Task<BulkResultModel> DeleteFailedJobsByType(string type);
+
+    Task<BulkResultModel> RequeueFailedJobsByType(string type);
 }
 
 public class JobCommandService<TContext> : IJobCommandService
     where TContext : DbContext
 {
     private readonly TContext _context;
+    private readonly TimeProvider _timeProvider;
 
-    public JobCommandService(TContext context)
+    public JobCommandService(TContext context, TimeProvider timeProvider)
     {
         _context = context;
+        _timeProvider = timeProvider;
     }
 
     public async Task DeleteJob(Guid jobId)
@@ -49,10 +55,31 @@ public class JobCommandService<TContext> : IJobCommandService
             return;
         }
 
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        // Processing jobs: signal graceful cancellation instead of immediate state change.
+        // The worker will detect this via RunJobMonitor and set the final state.
+        if (job.CurrentState == State.Processing)
+        {
+            job.CancellationMode = CancellationMode.Graceful;
+
+            await _context.Set<JobLog>().AddAsync(new JobLog
+            {
+                JobId = job.Id,
+                EventType = "CancellationRequested",
+                Timestamp = now,
+                Level = "Information",
+                Message = $"Graceful cancellation requested for job {job.Id}",
+            });
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return;
+        }
+
         DecrementStatForState(job.CurrentState);
 
         job.CurrentState = State.Deleted;
-        job.ExpireAt = DateTime.UtcNow.AddDays(1);
+        job.ExpireAt = now.AddDays(1);
 
         _context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
 
@@ -60,7 +87,7 @@ public class JobCommandService<TContext> : IJobCommandService
         {
             JobId = job.Id,
             EventType = "Deleted",
-            Timestamp = DateTime.UtcNow,
+            Timestamp = now,
             Level = "Information",
             Message = $"Job {job.Id} was deleted",
         });
@@ -122,7 +149,7 @@ public class JobCommandService<TContext> : IJobCommandService
         {
             JobId = job.Id,
             EventType = "Requeued",
-            Timestamp = DateTime.UtcNow,
+            Timestamp = _timeProvider.GetUtcNow().UtcDateTime,
             Level = "Information",
             Message = $"Job {job.Id} was requeued",
         });
@@ -163,6 +190,54 @@ public class JobCommandService<TContext> : IJobCommandService
             {
                 result.Skipped++;
             }
+        }
+
+        return result;
+    }
+
+    public async Task<BulkResultModel> DeleteFailedJobsByType(string type)
+    {
+        var result = new BulkResultModel();
+        while (true)
+        {
+            var ids = await _context.Set<Job>()
+                .Where(x => x.Kind == JobKind.Job && x.CurrentState == State.Failed && x.Type == type)
+                .Select(x => x.Id)
+                .Take(1000)
+                .ToListAsync();
+
+            if (ids.Count == 0)
+            {
+                break;
+            }
+
+            var batchResult = await BulkDeleteJobs(ids.ToArray());
+            result.Succeeded += batchResult.Succeeded;
+            result.Skipped += batchResult.Skipped;
+        }
+
+        return result;
+    }
+
+    public async Task<BulkResultModel> RequeueFailedJobsByType(string type)
+    {
+        var result = new BulkResultModel();
+        while (true)
+        {
+            var ids = await _context.Set<Job>()
+                .Where(x => x.Kind == JobKind.Job && x.CurrentState == State.Failed && x.Type == type)
+                .Select(x => x.Id)
+                .Take(1000)
+                .ToListAsync();
+
+            if (ids.Count == 0)
+            {
+                break;
+            }
+
+            var batchResult = await BulkRequeueJobs(ids.ToArray());
+            result.Succeeded += batchResult.Succeeded;
+            result.Skipped += batchResult.Skipped;
         }
 
         return result;

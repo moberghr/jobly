@@ -1,10 +1,12 @@
-namespace Jobly.Core.Data.Entities;
+namespace Jobly.Core.Models;
 
-public class JobLog
+public class WorkerJobLogModel
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; }
 
     public Guid JobId { get; set; }
+
+    public string? JobType { get; set; }
 
     public string EventType { get; set; } = "Log";
 
@@ -17,6 +19,4 @@ public class JobLog
     public string? Exception { get; set; }
 
     public double? DurationMs { get; set; }
-
-    public Guid? WorkerId { get; set; }
 }

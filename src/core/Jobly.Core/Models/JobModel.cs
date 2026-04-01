@@ -17,4 +17,6 @@ public class JobModel
     public DateTime? ProcessedTime { get; set; }
 
     public State CurrentState { get; set; }
+
+    public CancellationMode CancellationMode { get; set; }
 }

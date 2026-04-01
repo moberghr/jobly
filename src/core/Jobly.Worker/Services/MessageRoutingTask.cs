@@ -21,8 +21,9 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
         IServiceScopeFactory scopeFactory,
         ILogger<MessageRoutingTask<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
-        IDistributedLockProvider lockProvider)
-        : base(scopeFactory, logger, configuration, "jobly:message-routing", lockProvider)
+        IDistributedLockProvider lockProvider,
+        TimeProvider timeProvider)
+        : base(scopeFactory, logger, configuration, timeProvider, "jobly:message-routing", lockProvider)
     {
         _scopeFactory = scopeFactory;
     }
@@ -33,7 +34,7 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
-        var routed = await RunMessageRouting(context, _scopeFactory, ct);
+        var routed = await RunMessageRouting(context, _scopeFactory, TimeProvider, ct);
         return routed > 0 ? $"Routed {routed} messages" : null;
     }
 
@@ -41,7 +42,7 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
     /// Routes all pending messages. Creates child jobs for each handler.
     /// Public static so tests can call it directly.
     /// </summary>
-    public static async Task<int> RunMessageRouting<TCtx>(TCtx context, IServiceScopeFactory scopeFactory, CancellationToken ct)
+    public static async Task<int> RunMessageRouting<TCtx>(TCtx context, IServiceScopeFactory scopeFactory, TimeProvider timeProvider, CancellationToken ct)
         where TCtx : DbContext
     {
         var totalRouted = 0;
@@ -78,6 +79,7 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
                 continue;
             }
 
+            var now = timeProvider.GetUtcNow().UtcDateTime;
             foreach (var handlerType in handlerTypes)
             {
                 var job = JobHelper.CreateJob(
@@ -88,7 +90,8 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
                     maxRetries: 0,
                     queue: message.Queue,
                     parentId: message.Id,
-                    state: State.Enqueued);
+                    state: State.Enqueued,
+                    now: now);
 
                 job.HandlerType = handlerType.AssemblyQualifiedName;
                 job.TraceId = message.TraceId;
@@ -98,7 +101,7 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
                 {
                     JobId = job.Id,
                     EventType = "Created",
-                    Timestamp = DateTime.UtcNow,
+                    Timestamp = now,
                     Level = "Information",
                     Message = $"Job {job.Id} created from message {message.Id}",
                 });

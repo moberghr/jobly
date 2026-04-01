@@ -28,14 +28,16 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     private readonly ILogger<JoblyWorkerService<TContext>> _logger;
     private readonly JoblyWorkerConfiguration _configuration;
     private readonly WorkerGroupConfiguration _groupConfiguration;
+    private readonly TimeProvider _timeProvider;
 
-    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration)
+    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration, TimeProvider timeProvider)
     {
         _workerId = workerId;
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
         _configuration = configuration.Value;
         _groupConfiguration = groupConfiguration;
+        _timeProvider = timeProvider;
     }
 
     public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
@@ -48,10 +50,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         PerfTrace.Mark(PerfTrace.BeginTransaction1);
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
         // Fetch only Kind=Job (messages are routed by MessageRoutingTask)
         PerfTrace.Mark(PerfTrace.FetchJob);
         var job = await context.Set<Job>()
-            .Where(x => x.Kind == JobKind.Job && x.CurrentState == State.Enqueued && x.ScheduleTime < DateTime.UtcNow)
+            .Where(x => x.Kind == JobKind.Job && x.CurrentState == State.Enqueued && x.ScheduleTime < now)
             .Where(x => _groupConfiguration.Queues.Contains(x.Queue))
             .OrderBy(x => x.Queue)
             .ThenBy(x => x.ScheduleTime)
@@ -68,15 +72,16 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         job.CurrentState = State.Processing;
         job.CurrentWorkerId = _workerId;
-        job.LastKeepAlive = DateTime.UtcNow;
+        job.LastKeepAlive = now;
 
         context.Set<JobLog>().Add(new JobLog
         {
             JobId = job.Id,
             EventType = "Processing",
-            Timestamp = DateTime.UtcNow,
+            Timestamp = now,
             Level = "Information",
             Message = $"The job {job.Id} is being processed",
+            WorkerId = _workerId,
         });
 
         PerfTrace.Mark(PerfTrace.SaveProcessing);
@@ -85,7 +90,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         PerfTrace.Mark(PerfTrace.CommitTransaction1);
         await transaction.CommitAsync(cancellationToken);
 
-        var logCollector = new JobLogCollector { JobId = job.Id };
+        var logCollector = new JobLogCollector { JobId = job.Id, TimeProvider = _timeProvider, WorkerId = _workerId };
         using var jobCts = new CancellationTokenSource();
         var monitorTask = RunJobMonitor(job.Id, jobCts, cancellationToken);
 
@@ -135,17 +140,23 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             _logger.LogInformation("Job {id} was cancelled", job.Id);
             await monitorTask;
 
+            var cancelNow = _timeProvider.GetUtcNow().UtcDateTime;
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
+            job.CurrentState = State.Deleted;
+            job.ExpireAt = cancelNow.AddDays(1);
+            job.CancellationMode = CancellationMode.None;
             job.CurrentWorkerId = null;
             job.LastKeepAlive = null;
+            context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
             context.Set<JobLog>().Add(new JobLog
             {
                 JobId = job.Id,
                 EventType = "Cancelled",
-                Timestamp = DateTime.UtcNow,
+                Timestamp = cancelNow,
                 Level = "Information",
                 Message = "Job was cancelled by user",
                 DurationMs = handlerStopwatch?.Elapsed.TotalMilliseconds,
+                WorkerId = _workerId,
             });
             await SaveJobLogs(context, logCollector);
             await context.SaveChangesAsync(default);
@@ -219,23 +230,24 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
                 using var scope = _serviceScopeFactory.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
-                // Check if job state changed (e.g., deleted/cancelled externally)
-                var state = await context.Set<Job>()
+                // Check if cancellation was requested
+                var cancellationMode = await context.Set<Job>()
                     .Where(x => x.Id == jobId)
-                    .Select(x => x.CurrentState)
+                    .Select(x => x.CancellationMode)
                     .FirstOrDefaultAsync(stoppingToken);
 
-                if (state != State.Processing)
+                if (cancellationMode != CancellationMode.None)
                 {
-                    _logger.LogInformation("Job {jobId} state changed to {state}, cancelling handler", jobId, state);
+                    _logger.LogInformation("Job {jobId} cancellation requested ({mode}), cancelling handler", jobId, cancellationMode);
                     await jobCts.CancelAsync();
                     return;
                 }
 
                 // Refresh keep-alive
+                var now = _timeProvider.GetUtcNow().UtcDateTime;
                 await context.Set<Job>()
                     .Where(x => x.Id == jobId)
-                    .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastKeepAlive, DateTime.UtcNow), stoppingToken);
+                    .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastKeepAlive, now), stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -252,7 +264,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     /// Updates job state, counters, and creates the completion log.
     /// Pure state update — no parent/child orchestration.
     /// </summary>
-    private static void UpdateJobState(TContext context, Job job, Exception? error, double? durationMs)
+    private void UpdateJobState(TContext context, Job job, Exception? error, double? durationMs)
     {
         var failed = error != null;
         var state = failed ? State.Failed : State.Completed;
@@ -264,13 +276,15 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         }
 
         job.CurrentState = state;
+        job.CancellationMode = CancellationMode.None;
         job.CurrentWorkerId = null;
         job.LastKeepAlive = null;
 
-        var hourSuffix = DateTime.UtcNow.ToString("yyyy-MM-dd-HH");
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var hourSuffix = now.ToString("yyyy-MM-dd-HH");
         if (state == State.Completed)
         {
-            job.ExpireAt = DateTime.UtcNow.AddDays(1);
+            job.ExpireAt = now.AddDays(1);
             AddCounters(context, "stats:succeeded", $"stats:succeeded:{hourSuffix}");
         }
         else if (state == State.Failed && job.RetriedTimes >= job.MaxRetries)
@@ -293,11 +307,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         {
             JobId = job.Id,
             EventType = eventType,
-            Timestamp = DateTime.UtcNow,
+            Timestamp = now,
             Level = state == State.Failed ? "Error" : "Information",
             Message = logMessage,
             Exception = logException,
             DurationMs = durationMs,
+            WorkerId = _workerId,
         });
     }
 

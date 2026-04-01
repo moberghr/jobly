@@ -23,7 +23,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
 
     private static Publisher<TestContext> CreatePublisher(TestContext ctx)
     {
-        return new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()));
+        return new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
     }
 
     [Fact]

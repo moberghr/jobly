@@ -52,7 +52,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        var routed = await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, CancellationToken.None);
+        var routed = await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, TimeProvider.System, CancellationToken.None);
 
         // Assert
         routed.ShouldBeGreaterThan(0);
@@ -86,7 +86,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, CancellationToken.None);
+        await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, TimeProvider.System, CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -118,7 +118,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, CancellationToken.None);
+        await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, TimeProvider.System, CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -136,7 +136,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
 
         // Act
         var ctx = _fixture.CreateContext();
-        var routed = await MessageRoutingTask<TestContext>.RunMessageRouting(ctx, scopeFactory, CancellationToken.None);
+        var routed = await MessageRoutingTask<TestContext>.RunMessageRouting(ctx, scopeFactory, TimeProvider.System, CancellationToken.None);
 
         // Assert
         routed.ShouldBe(0);
@@ -171,7 +171,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        var routed = await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, CancellationToken.None);
+        var routed = await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, TimeProvider.System, CancellationToken.None);
 
         // Assert
         routed.ShouldBe(3);

@@ -84,7 +84,8 @@ public abstract class WorkerTestsBase : IAsyncLifetime
             scopeFactory,
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
-            groupConfig);
+            groupConfig,
+            TimeProvider.System);
 
         return (worker, scopeFactory);
     }

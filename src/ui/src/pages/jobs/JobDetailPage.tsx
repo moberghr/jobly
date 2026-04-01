@@ -62,7 +62,7 @@ export default function JobDetailPage() {
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">Job {shortId(job.id)}</h1>
-        <StateBadge state={job.currentState} />
+        <StateBadge state={job.currentState} cancellationMode={job.cancellationMode} />
         <div className="flex-1" />
         {job.currentState === State.Processing ? (
           <Button variant="destructive" size="sm" onClick={() => api.deleteJob(job.id)}>Cancel</Button>

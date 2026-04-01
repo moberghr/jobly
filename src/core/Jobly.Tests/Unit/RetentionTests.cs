@@ -83,7 +83,8 @@ public abstract class RetentionTestsBase : IAsyncLifetime
             scopeFactory,
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
-            groupConfig);
+            groupConfig,
+            TimeProvider.System);
     }
 
     [Fact]
@@ -91,7 +92,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()));
+        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
         var jobId = await publisher.Enqueue(new UnitRequest());
         await ctx.SaveChangesAsync();
 
@@ -146,7 +147,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()));
+        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
 
         var statBefore = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
@@ -236,7 +237,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
             .FirstOrDefaultAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.DeleteJob(jobId);
 
         await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
@@ -255,7 +256,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
     {
         // Arrange — enqueue and process a job so stats:succeeded is incremented
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()));
+        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
         var jobId = await publisher.Enqueue(new UnitRequest());
         await ctx.SaveChangesAsync();
 
@@ -270,7 +271,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
             .FirstOrDefaultAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
         await svc.RequeueJob(jobId);
 
         await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
@@ -313,7 +314,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        var cleaned = await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx);
+        var cleaned = await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
 
         // Assert
         cleaned.ShouldBeGreaterThanOrEqualTo(1);

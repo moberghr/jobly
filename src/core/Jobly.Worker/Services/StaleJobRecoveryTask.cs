@@ -17,8 +17,9 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
         IServiceScopeFactory scopeFactory,
         ILogger<StaleJobRecoveryTask<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
-        IDistributedLockProvider lockProvider)
-        : base(scopeFactory, logger, configuration, "jobly:stale-job-recovery", lockProvider)
+        IDistributedLockProvider lockProvider,
+        TimeProvider timeProvider)
+        : base(scopeFactory, logger, configuration, timeProvider, "jobly:stale-job-recovery", lockProvider)
     {
     }
 
@@ -28,7 +29,7 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
-        var count = await RequeueStaleJobs(context, Configuration.InvisibilityTimeout);
+        var count = await RequeueStaleJobs(context, TimeProvider, Configuration.InvisibilityTimeout);
         return count > 0 ? $"Requeued {count} stale jobs" : null;
     }
 
@@ -36,10 +37,11 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
     /// Finds jobs stuck in Processing with stale LastKeepAlive and requeues them.
     /// Public static so tests can call it directly.
     /// </summary>
-    public static async Task<int> RequeueStaleJobs<TCtx>(TCtx context, TimeSpan invisibilityTimeout)
+    public static async Task<int> RequeueStaleJobs<TCtx>(TCtx context, TimeProvider timeProvider, TimeSpan invisibilityTimeout)
         where TCtx : DbContext
     {
-        var cutoff = DateTime.UtcNow - invisibilityTimeout;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var cutoff = now - invisibilityTimeout;
 
         await using var transaction = await context.Database.BeginTransactionAsync();
         var staleJobs = await context.Set<Job>()
@@ -58,7 +60,7 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
             {
                 JobId = job.Id,
                 EventType = "Requeued",
-                Timestamp = DateTime.UtcNow,
+                Timestamp = now,
                 Level = "Warning",
                 Message = "Requeued by crash recovery — worker stopped responding",
             });
