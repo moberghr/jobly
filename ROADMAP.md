@@ -38,3 +38,16 @@ Arbitrary key-value pairs on jobs. Filterable in dashboard. Useful for grouping 
 
 ### Webhook on Completion
 Configure a URL to POST to when a job reaches a terminal state. Useful for async API patterns.
+
+## Performance & Compilation
+
+### Native AOT Support
+Make Jobly compatible with Native AOT compilation. Replace reflection-based handler discovery (JobDispatcher) with source generators. Eliminates startup cost and enables trimming.
+
+### Source Generators
+Generate handler registration, type mappings, and serialization code at compile time. Replaces runtime reflection in JobDispatcher (DiscoverJobHandler, DiscoverMessageHandlers, ExecuteHandler). Enables AOT and improves startup performance.
+
+## In-Process Messaging
+
+### In-Memory Mediator
+Use Jobly's handler interfaces (IJobHandler, IMessageHandler, IPipelineBehavior) for in-process request/response and pub/sub without database persistence. Same handler code works for both in-memory (immediate) and background (persisted) execution. Lets you use Jobly as the single processing abstraction in your app — like MediatR but with the option to go async/persisted when needed.
