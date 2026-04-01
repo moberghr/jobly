@@ -17,6 +17,12 @@ public static class TestUtils
 
     public static async Task RegisterTestServer(TestContext context, int workerCount = 1)
     {
+        var existing = await context.Set<Server>().FindAsync(TestServerId);
+        if (existing != null)
+        {
+            return;
+        }
+
         var now = DateTime.UtcNow;
         var server = new Server
         {

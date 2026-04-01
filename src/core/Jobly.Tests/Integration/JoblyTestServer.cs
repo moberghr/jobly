@@ -90,6 +90,48 @@ public class JoblyTestServer : IAsyncDisposable
         return new JoblyTestServer(host, fixture);
     }
 
+    /// <summary>
+    /// Re-registers the server and workers in the DB after Respawn clears all tables.
+    /// The host's background services expect these rows to exist.
+    /// </summary>
+    public async Task ReRegisterServer()
+    {
+        using var scope = _host.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TestContext>();
+
+        // Check if server still exists (Respawn may have deleted it)
+        var config = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<JoblyWorkerConfiguration>>().Value;
+        var serverExists = await context.Set<Server>().AnyAsync(s => s.Id == config.ServerId);
+        if (serverExists)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        context.Set<Server>().Add(new Server
+        {
+            Id = config.ServerId,
+            ServerName = config.ServerName ?? "test-server",
+            StartedTime = now,
+            LastHeartbeatTime = now,
+            ServiceCount = config.WorkerCount,
+        });
+
+        // Re-register workers — get IDs from existing Worker entities if any, otherwise create new ones
+        for (var i = 0; i < config.WorkerCount; i++)
+        {
+            context.Set<Jobly.Core.Data.Entities.Worker>().Add(new Jobly.Core.Data.Entities.Worker
+            {
+                Id = Guid.NewGuid(),
+                ServerId = config.ServerId,
+                StartedTime = now,
+                LastHeartbeatTime = now,
+            });
+        }
+
+        await context.SaveChangesAsync();
+    }
+
     public async Task WaitForJobState(Guid jobId, State state, TimeSpan? timeout = null)
     {
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));

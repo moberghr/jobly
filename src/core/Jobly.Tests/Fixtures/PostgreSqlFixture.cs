@@ -37,6 +37,7 @@ public class PostgreSqlFixture : IAsyncLifetime, IDatabaseFixture
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
+            TablesToIgnore = [new Respawn.Graph.Table("Server"), new Respawn.Graph.Table("Worker"), new Respawn.Graph.Table("ServerTask"), new Respawn.Graph.Table("ServerLog")],
         });
     }
 
