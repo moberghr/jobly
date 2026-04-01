@@ -120,16 +120,17 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
     /// <summary>
     /// Signal the task to wake up and check for work immediately.
     /// </summary>
-    public void Signal() => _signal.Release();
+    public void Signal()
+    {
+        if (_signal.CurrentCount == 0)
+        {
+            _signal.Release();
+        }
+    }
 
     private async Task WaitForNextRun(TimeSpan interval, CancellationToken stoppingToken)
     {
         await _signal.WaitAsync(interval, stoppingToken);
-
-        // Drain extra signals
-        while (_signal.Wait(0))
-        {
-        }
     }
 
     private async Task<bool> RunAndLog(Stopwatch sw, CancellationToken ct)
