@@ -195,7 +195,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         await svc.RequeueJob(jobId);
 
         // Assert

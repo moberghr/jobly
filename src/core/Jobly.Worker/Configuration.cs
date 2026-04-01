@@ -69,16 +69,14 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     /// </summary>
     public string? ServerName { get; set; }
 
-    public TimeSpan JobExpirationTimeout { get; set; } = TimeSpan.FromDays(1);
-
     public int ExpirationBatchSize { get; set; } = 1000;
 
     /// <summary>
     /// Maximum number of jobs with a non-null ExpireAt to retain.
     /// When exceeded, the oldest by ExpireAt are deleted first until at threshold.
-    /// Failed jobs are excluded (they have null ExpireAt). Set to 0 to disable.
+    /// Failed jobs are excluded (they have null ExpireAt). Null to disable (default).
     /// </summary>
-    public int MaxExpirableJobCount { get; set; } = 20_000;
+    public int? MaxExpirableJobCount { get; set; }
 
     /// <summary>
     /// When true, uses a single dispatcher per worker group that batch-fetches jobs

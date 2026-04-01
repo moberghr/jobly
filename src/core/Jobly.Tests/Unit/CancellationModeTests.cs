@@ -1,9 +1,11 @@
+using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Services;
 using Jobly.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Shouldly;
 
 namespace Jobly.Tests.Unit;
@@ -36,7 +38,7 @@ public abstract class CancellationModeTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         await svc.DeleteJob(jobId);
 
         // Assert
@@ -69,7 +71,7 @@ public abstract class CancellationModeTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         await svc.DeleteJob(jobId);
 
         // Assert
@@ -99,7 +101,7 @@ public abstract class CancellationModeTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         await svc.DeleteJob(jobId);
 
         // Assert

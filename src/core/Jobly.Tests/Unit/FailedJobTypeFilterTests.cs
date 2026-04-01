@@ -6,6 +6,7 @@ using Jobly.Core.Models;
 using Jobly.Core.Services;
 using Jobly.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Shouldly;
 
 namespace Jobly.Tests.Unit;
@@ -211,7 +212,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         var result = await svc.DeleteFailedJobsByType("TypeA");
 
         // Assert
@@ -254,7 +255,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         var result = await svc.RequeueFailedJobsByType("TypeA");
 
         // Assert

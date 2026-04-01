@@ -4,6 +4,7 @@ using Jobly.Core.Enums;
 using Jobly.Core.Interceptors;
 using Jobly.Core.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Jobly.Core.Services;
 
@@ -27,11 +28,13 @@ public class JobCommandService<TContext> : IJobCommandService
 {
     private readonly TContext _context;
     private readonly TimeProvider _timeProvider;
+    private readonly JoblyConfiguration _configuration;
 
-    public JobCommandService(TContext context, TimeProvider timeProvider)
+    public JobCommandService(TContext context, TimeProvider timeProvider, IOptions<JoblyConfiguration> configuration)
     {
         _context = context;
         _timeProvider = timeProvider;
+        _configuration = configuration.Value;
     }
 
     public async Task DeleteJob(Guid jobId)
@@ -79,7 +82,7 @@ public class JobCommandService<TContext> : IJobCommandService
         DecrementStatForState(job.CurrentState);
 
         job.CurrentState = State.Deleted;
-        job.ExpireAt = now.AddDays(1);
+        job.ExpireAt = now.Add(_configuration.JobExpirationTimeout);
 
         _context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
 

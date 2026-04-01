@@ -8,6 +8,7 @@ using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Shouldly;
 
 namespace Jobly.Tests.Unit;
@@ -87,7 +88,7 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         await svc.RequeueJob(jobId);
 
         // Assert: ScheduleTime should be reset to now (not stay in the future)

@@ -52,7 +52,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, CancellationToken.None);
+        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -102,7 +102,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, CancellationToken.None);
+        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -153,7 +153,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, CancellationToken.None);
+        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -204,7 +204,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, CancellationToken.None);
+        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -247,7 +247,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, CancellationToken.None);
+        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -324,9 +324,9 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act — run orchestration multiple times to finalize parent and then activate continuation
         var orchCtx1 = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx1, TimeProvider.System, CancellationToken.None);
+        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx1, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
         var orchCtx2 = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx2, TimeProvider.System, CancellationToken.None);
+        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx2, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -385,11 +385,11 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act — finalize parent
         var orchCtx1 = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx1, TimeProvider.System, CancellationToken.None);
+        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx1, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
 
         // Run again to see if continuation activates
         var orchCtx2 = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx2, TimeProvider.System, CancellationToken.None);
+        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx2, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -434,7 +434,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        var workDone = await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, CancellationToken.None);
+        var workDone = await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
 
         // Assert
         workDone.ShouldBeFalse();

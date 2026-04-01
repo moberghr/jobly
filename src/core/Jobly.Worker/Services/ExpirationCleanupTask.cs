@@ -28,8 +28,8 @@ public class ExpirationCleanupTask<TContext> : ServerTaskBase<TContext>
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
         var timeExpired = await RunCleanup(context, TimeProvider, Configuration.ExpirationBatchSize);
-        var countCleaned = Configuration.MaxExpirableJobCount > 0
-            ? await RunCountBasedCleanup(context, Configuration.MaxExpirableJobCount, Configuration.ExpirationBatchSize)
+        var countCleaned = Configuration.MaxExpirableJobCount.HasValue
+            ? await RunCountBasedCleanup(context, Configuration.MaxExpirableJobCount.Value, Configuration.ExpirationBatchSize)
             : 0;
 
         await CleanupRecurringJobLogs(context);

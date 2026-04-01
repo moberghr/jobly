@@ -143,7 +143,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             var cancelNow = _timeProvider.GetUtcNow().UtcDateTime;
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
             job.CurrentState = State.Deleted;
-            job.ExpireAt = cancelNow.AddDays(1);
+            job.ExpireAt = cancelNow.Add(_configuration.JobExpirationTimeout);
             job.CancellationMode = CancellationMode.None;
             job.CurrentWorkerId = null;
             job.LastKeepAlive = null;
@@ -284,7 +284,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         var hourSuffix = now.ToString("yyyy-MM-dd-HH");
         if (state == State.Completed)
         {
-            job.ExpireAt = now.AddDays(1);
+            job.ExpireAt = now.Add(_configuration.JobExpirationTimeout);
             AddCounters(context, "stats:succeeded", $"stats:succeeded:{hourSuffix}");
         }
         else if (state == State.Failed && job.RetriedTimes >= job.MaxRetries)

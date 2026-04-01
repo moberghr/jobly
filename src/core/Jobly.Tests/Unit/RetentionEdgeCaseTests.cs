@@ -181,7 +181,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             .FirstOrDefaultAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         await svc.DeleteJob(jobId);
 
         await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
@@ -231,7 +231,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             .FirstOrDefaultAsync();
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         await svc.RequeueJob(jobId);
 
         await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());

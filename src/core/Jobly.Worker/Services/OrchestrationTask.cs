@@ -68,7 +68,7 @@ public class OrchestrationTask<TContext> : BackgroundService
                     using var scope = _scopeFactory.CreateScope();
                     var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
-                    var workDone = await RunOrchestration(context, _timeProvider, stoppingToken);
+                    var workDone = await RunOrchestration(context, _timeProvider, _configuration.JobExpirationTimeout, stoppingToken);
                     if (!workDone)
                     {
                         break;
@@ -92,11 +92,11 @@ public class OrchestrationTask<TContext> : BackgroundService
     /// Returns true if any work was done (caller should loop).
     /// Public static so tests can call it directly.
     /// </summary>
-    public static async Task<bool> RunOrchestration<TCtx>(TCtx context, TimeProvider timeProvider, CancellationToken ct)
+    public static async Task<bool> RunOrchestration<TCtx>(TCtx context, TimeProvider timeProvider, TimeSpan jobExpirationTimeout, CancellationToken ct)
         where TCtx : DbContext
     {
         // Clear change tracker between steps to avoid stale tracked entities
-        var finalized = await FinalizeParents(context, timeProvider, ct);
+        var finalized = await FinalizeParents(context, timeProvider, jobExpirationTimeout, ct);
         context.ChangeTracker.Clear();
         var activated = await ActivateContinuations(context, ct);
         context.ChangeTracker.Clear();
@@ -109,7 +109,7 @@ public class OrchestrationTask<TContext> : BackgroundService
     /// A parent must have at least one child in terminal state to be finalized (prevents premature finalization
     /// of continuation batches whose children are all still Awaiting).
     /// </summary>
-    private static async Task<int> FinalizeParents<TCtx>(TCtx context, TimeProvider timeProvider, CancellationToken ct)
+    private static async Task<int> FinalizeParents<TCtx>(TCtx context, TimeProvider timeProvider, TimeSpan jobExpirationTimeout, CancellationToken ct)
         where TCtx : DbContext
     {
         // Find parents where:
@@ -150,7 +150,7 @@ public class OrchestrationTask<TContext> : BackgroundService
                 parent.CurrentState = State.Completed;
             }
 
-            parent.ExpireAt = now.AddDays(1);
+            parent.ExpireAt = now.Add(jobExpirationTimeout);
         }
 
         await context.SaveChangesAsync(ct);
