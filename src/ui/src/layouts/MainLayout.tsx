@@ -13,6 +13,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
+import { config } from '@/config';
 import type { DashboardStatistics } from '@/types';
 
 const navItems = [
@@ -100,12 +101,17 @@ export default function MainLayout() {
           <button onClick={toggle} className="p-2 rounded-md hover:bg-accent text-muted-foreground">
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
-          {Boolean((window as unknown as Record<string, unknown>).hasBuiltInLogin) && (
-            <form method="POST" action={`${(window as unknown as Record<string, string>).basePath}/logout`}>
-              <button type="submit" className="p-2 rounded-md hover:bg-accent text-muted-foreground ml-1" title="Logout">
-                <LogOut className="h-4 w-4" />
-              </button>
-            </form>
+          {config.hasBuiltInLogin && (
+            <button
+              onClick={async () => {
+                await fetch(`${config.apiPath}auth/logout`, { method: 'POST' });
+                window.location.reload();
+              }}
+              className="p-2 rounded-md hover:bg-accent text-muted-foreground ml-1"
+              title="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           )}
         </div>
       </header>

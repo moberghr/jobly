@@ -43,31 +43,22 @@ public class JoblyUIMiddleware
     {
         var path = httpContext.Request.Path.Value!;
 
-        // Handle built-in login page (always available when CredentialValidator is set)
+        // Handle built-in login/logout endpoints
         if (_options.CredentialValidatorType != null)
         {
-            var loginPath = $"{_options.RoutePrefix}/login";
-            var logoutPath = $"{_options.RoutePrefix}/logout";
+            var loginPath = $"{_options.RoutePrefix}/api/auth/login";
+            var logoutPath = $"{_options.RoutePrefix}/api/auth/logout";
 
-            if (path.Equals(loginPath, StringComparison.OrdinalIgnoreCase))
+            if (path.Equals(loginPath, StringComparison.OrdinalIgnoreCase) && httpContext.Request.Method == "POST")
             {
-                if (httpContext.Request.Method == "GET")
-                {
-                    await ServeLoginPage(httpContext);
-                    return;
-                }
-
-                if (httpContext.Request.Method == "POST")
-                {
-                    await HandleLogin(httpContext);
-                    return;
-                }
+                await HandleLogin(httpContext);
+                return;
             }
 
             if (path.Equals(logoutPath, StringComparison.OrdinalIgnoreCase) && httpContext.Request.Method == "POST")
             {
                 httpContext.Response.Cookies.Delete(CookieName);
-                httpContext.Response.Redirect(loginPath);
+                httpContext.Response.StatusCode = 200;
                 return;
             }
         }
@@ -77,21 +68,29 @@ public class JoblyUIMiddleware
         {
             if (_options.Authorization != null && !_options.Authorization.Authorize(httpContext))
             {
-                if (!path.Contains("/api/", StringComparison.Ordinal))
+                // API requests always get 401 (SPA handles it)
+                if (path.Contains("/api/", StringComparison.Ordinal))
                 {
-                    var returnUrl = Uri.EscapeDataString(path);
-                    var redirectTo = _options.UnauthorizedRedirectUrl
-                        ?? (_options.CredentialValidatorType != null ? $"{_options.RoutePrefix}/login" : null);
-
-                    if (redirectTo != null)
-                    {
-                        httpContext.Response.Redirect($"{redirectTo}?returnUrl={returnUrl}");
-                        return;
-                    }
+                    httpContext.Response.StatusCode = 401;
+                    return;
                 }
 
-                httpContext.Response.StatusCode = 401;
-                return;
+                // Built-in login: let the SPA through so it can show its own login page
+                if (_options.CredentialValidatorType != null)
+                {
+                    // Fall through to serve SPA — React app will detect 401 from API and show login
+                }
+                else if (_options.UnauthorizedRedirectUrl != null)
+                {
+                    var returnUrl = Uri.EscapeDataString(path);
+                    httpContext.Response.Redirect($"{_options.UnauthorizedRedirectUrl}?returnUrl={returnUrl}");
+                    return;
+                }
+                else
+                {
+                    httpContext.Response.StatusCode = 401;
+                    return;
+                }
             }
         }
 
@@ -112,51 +111,11 @@ public class JoblyUIMiddleware
         await _next(httpContext);
     }
 
-    private async Task ServeLoginPage(HttpContext httpContext)
-    {
-        var returnUrl = httpContext.Request.Query["returnUrl"].FirstOrDefault() ?? _options.RoutePrefix;
-        var error = httpContext.Request.Query["error"].FirstOrDefault();
-        var errorHtml = error != null ? "<div class=\"error\">Invalid credentials</div>" : "";
-        var actionUrl = $"{_options.RoutePrefix}/login?returnUrl={Uri.EscapeDataString(returnUrl)}";
-
-        httpContext.Response.StatusCode = 200;
-        httpContext.Response.ContentType = "text/html;charset=utf-8";
-        await httpContext.Response.WriteAsync(
-$@"<!DOCTYPE html>
-<html>
-<head><title>Jobly Login</title>
-<style>
-body {{ font-family: system-ui, -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f5f5f5; }}
-@media (prefers-color-scheme: dark) {{ body {{ background: #09090b; }} .card {{ background: #18181b; color: #fafafa; }} input {{ background: #27272a; border-color: #3f3f46; color: #fafafa; }} .error {{ color: #f87171; }} }}
-.card {{ background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); width: 320px; }}
-h1 {{ font-size: 1.25rem; margin: 0 0 1.5rem; }}
-label {{ font-size: 0.875rem; display: block; margin-bottom: 0.25rem; }}
-input {{ width: 100%; padding: 0.5rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 0.875rem; }}
-button {{ width: 100%; padding: 0.5rem; background: #18181b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; }}
-button:hover {{ background: #27272a; }}
-.error {{ color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; }}
-</style></head>
-<body>
-<div class=""card"">
-<h1>Jobly Dashboard</h1>
-{errorHtml}
-<form method=""POST"" action=""{actionUrl}"">
-<label>Username</label>
-<input type=""text"" name=""username"" autofocus />
-<label>Password</label>
-<input type=""password"" name=""password"" />
-<button type=""submit"">Sign in</button>
-</form>
-</div>
-</body></html>");
-    }
-
     private async Task HandleLogin(HttpContext httpContext)
     {
         var form = await httpContext.Request.ReadFormAsync();
         var username = form["username"].FirstOrDefault() ?? "";
         var password = form["password"].FirstOrDefault() ?? "";
-        var returnUrl = httpContext.Request.Query["returnUrl"].FirstOrDefault() ?? _options.RoutePrefix;
 
         using var scope = _scopeFactory!.CreateScope();
         var validator = scope.ServiceProvider.GetRequiredService<IJoblyCredentialValidator>();
@@ -172,11 +131,11 @@ button:hover {{ background: #27272a; }}
                 Path = _options.RoutePrefix,
                 Expires = DateTimeOffset.UtcNow.AddDays(7),
             });
-            httpContext.Response.Redirect(returnUrl);
+            httpContext.Response.StatusCode = 200;
             return;
         }
 
-        httpContext.Response.Redirect($"{_options.RoutePrefix}/login?returnUrl={Uri.EscapeDataString(returnUrl)}&error=1");
+        httpContext.Response.StatusCode = 401;
     }
 
     public static StaticFileMiddleware CreateStaticFileMiddleware(RequestDelegate next, IWebHostEnvironment hostingEnv, ILoggerFactory loggerFactory, JoblyUIOptions options)

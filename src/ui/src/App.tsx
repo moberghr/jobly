@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import MainLayout from '@/layouts/MainLayout';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
@@ -12,10 +13,25 @@ import RecurringDetailPage from '@/pages/recurring/RecurringDetailPage';
 import ServersPage from '@/pages/servers/ServersPage';
 import ServerDetailPage from '@/pages/servers/ServerDetailPage';
 import WorkerDetailPage from '@/pages/workers/WorkerDetailPage';
+import LoginPage from '@/pages/auth/LoginPage';
+import { setOnUnauthorized } from '@/api/client';
+import { config } from '@/config';
 
 function App() {
+  const [needsLogin, setNeedsLogin] = useState(false);
+
+  useEffect(() => {
+    if (config.hasBuiltInLogin) {
+      setOnUnauthorized(() => setNeedsLogin(true));
+    }
+  }, []);
+
+  if (needsLogin) {
+    return <LoginPage onLogin={() => setNeedsLogin(false)} />;
+  }
+
   return (
-    <BrowserRouter basename={(window as unknown as Record<string, string>).basePath || '/'}>
+    <BrowserRouter basename={config.basePath}>
       <Routes>
         <Route element={<MainLayout />}>
           <Route index element={<DashboardPage />} />
