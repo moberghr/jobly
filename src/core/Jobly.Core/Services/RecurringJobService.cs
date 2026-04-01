@@ -69,18 +69,31 @@ public class RecurringJobService<TContext> : IRecurringJobService
 
     public async Task<PagedList<RecurringJobHistoryModel>> GetRecurringJobHistory(int id, BaseListRequest request)
     {
-        return await _context.Set<RecurringJobLog>()
+        var logs = await _context.Set<RecurringJobLog>()
             .Where(l => l.RecurringJobId == id)
             .OrderByDescending(l => l.CreatedAt)
-            .Select(l => new RecurringJobHistoryModel
+            .ToPagedListAsync(request);
+
+        var jobIds = logs.Items.Select(l => l.JobId).ToList();
+        var jobs = await _context.Set<Job>()
+            .Where(j => jobIds.Contains(j.Id))
+            .Select(j => new { j.Id, j.Type, j.CurrentState })
+            .ToDictionaryAsync(j => j.Id);
+
+        var items = logs.Items.Select(l =>
+        {
+            jobs.TryGetValue(l.JobId, out var job);
+            return new RecurringJobHistoryModel
             {
                 JobId = l.JobId,
                 CreatedAt = l.CreatedAt,
-                JobExists = _context.Set<Job>().Any(j => j.Id == l.JobId),
-                Type = _context.Set<Job>().Where(j => j.Id == l.JobId).Select(j => j.Type).FirstOrDefault(),
-                CurrentState = _context.Set<Job>().Where(j => j.Id == l.JobId).Select(j => (State?)j.CurrentState).FirstOrDefault(),
-            })
-            .ToPagedListAsync(request);
+                JobExists = job != null,
+                Type = job?.Type,
+                CurrentState = job != null ? job.CurrentState : null,
+            };
+        }).ToList();
+
+        return new PagedList<RecurringJobHistoryModel>(logs.TotalCount, items, logs.PageCount);
     }
 
     public async Task TriggerRecurringJob(int id)

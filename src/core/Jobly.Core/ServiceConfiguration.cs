@@ -222,7 +222,6 @@ public static class ServiceConfiguration
 
         log.HasIndex(p => p.RecurringJobId);
 
-        // Explicitly no FK — this is an audit trail, jobs and recurring jobs may be deleted independently
         log.HasIndex(p => p.JobId);
 
     }
