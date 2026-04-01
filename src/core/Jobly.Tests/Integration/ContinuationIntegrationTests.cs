@@ -15,14 +15,14 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenParentJob_WhenCompletes_ThenChildActivatesAndCompletes()
     {
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var parentId = await publisher.Enqueue(new UnitRequest());
         var childId = await publisher.Enqueue(new UnitRequest(), parentId);
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         var parent = await ctx.Set<Job>().FirstAsync(j => j.Id == parentId);
         parent.CurrentState.ShouldBe(State.Completed);
@@ -35,16 +35,16 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenParentJobThatFails_WhenDefaultOnlyOnSucceeded_ThenChildStaysAwaiting()
     {
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var parentId = await publisher.Enqueue(new ThrowExceptionRequest());
         var childId = await publisher.Enqueue(new UnitRequest(), parentId);
         await publisher.SaveChangesAsync();
 
         // Wait for parent to fail — orchestrator runs every 100ms, so by the time this
         // returns the orchestrator has already processed this parent's children
-        await _server.WaitForJobState(parentId, State.Failed, timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobState(parentId, State.Failed, timeout: TimeSpan.FromSeconds(15));
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         var parent = await ctx.Set<Job>().FirstAsync(j => j.Id == parentId);
         parent.CurrentState.ShouldBe(State.Failed);
@@ -60,7 +60,7 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
         // Use batch publisher to create a batch with OnAnyFinishedState continuation,
         // since individual job continuations don't have ContinuationOptions on the child.
         // Batch is the mechanism for continuation options.
-        var batchPublisher = _server.CreateBatchPublisher();
+        var batchPublisher = Server.CreateBatchPublisher();
 
         var batchJobs = new List<ThrowExceptionRequest> { new() };
         var batchId = await batchPublisher.StartNew(batchJobs, options: ContinuationOptions.OnAnyFinishedState);
@@ -70,9 +70,9 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
 
         await batchPublisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         // Batch with OnAnyFinishedState completes even when children fail
         var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId);
@@ -91,15 +91,15 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenThreeLevelContinuationChain_WhenProcessed_ThenAllComplete()
     {
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var grandparentId = await publisher.Enqueue(new UnitRequest());
         var parentId = await publisher.Enqueue(new UnitRequest(), grandparentId);
         var childId = await publisher.Enqueue(new UnitRequest(), parentId);
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         var grandparent = await ctx.Set<Job>().FirstAsync(j => j.Id == grandparentId);
         grandparent.CurrentState.ShouldBe(State.Completed);

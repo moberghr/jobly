@@ -16,8 +16,8 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenComplexWorkload_WhenProcessedByRealWorkers_ThenAllJobsReachTerminalState()
     {
-        var publisher = _server.CreatePublisher();
-        var batchPublisher = _server.CreateBatchPublisher();
+        var publisher = Server.CreatePublisher();
+        var batchPublisher = Server.CreateBatchPublisher();
 
         // 1. Simple jobs (50)
         for (var i = 0; i < 50; i++)
@@ -77,13 +77,13 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
         await publisher.SaveChangesAsync();
 
         // Wait for everything to complete
-        await _server.WaitForCompletion(timeout: TimeSpan.FromSeconds(60));
+        await Server.WaitForCompletion(timeout: TimeSpan.FromSeconds(60));
 
         // Aggregate counters
-        await CounterAggregatorTask<TestContext>.AggregateCounters(_server.CreateContext());
+        await CounterAggregatorTask<TestContext>.AggregateCounters(Server.CreateContext());
 
         // Assert
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
         var jobs = ctx.Set<Job>().Where(j => j.Kind == JobKind.Job);
 
         // No stuck jobs

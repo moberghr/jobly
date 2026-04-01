@@ -4,19 +4,19 @@ namespace Jobly.Tests.Integration;
 
 public abstract class IntegrationTestBase : IAsyncLifetime
 {
-    private readonly IDatabaseFixture _fixture;
-    protected JoblyTestServer _server = null!;
+    protected readonly IDatabaseFixture _fixture;
 
     protected IntegrationTestBase(IDatabaseFixture fixture)
     {
         _fixture = fixture;
     }
 
+    protected JoblyTestServer Server => _fixture.TestServer!;
+
     public async Task InitializeAsync()
     {
         _fixture.TestServer ??= await JoblyTestServer.StartAsync(_fixture);
         await _fixture.ResetAsync();
-        _server = _fixture.TestServer;
     }
 
     public Task DisposeAsync() => Task.CompletedTask;

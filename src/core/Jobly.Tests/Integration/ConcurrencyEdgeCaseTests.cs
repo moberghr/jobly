@@ -16,11 +16,11 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
     public async Task GivenConcurrentDeleteOnSameJob_ThenOnlyOneDeleteRecorded()
     {
         // Arrange — enqueue a job and wait for it to complete
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForJobState(jobId, State.Completed);
+        await Server.WaitForJobState(jobId, State.Completed);
 
         // Act — delete from 2 threads concurrently
         // One will succeed, the other will throw (row-lock SKIP LOCKED returns null for locked row)
@@ -32,7 +32,7 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
             {
                 try
                 {
-                    var svc = _server.CreateCommandService();
+                    var svc = Server.CreateCommandService();
                     await svc.DeleteJob(jobId);
                 }
                 catch (Exception ex)
@@ -48,7 +48,7 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
         await Task.WhenAll(tasks);
 
         // Assert — job should be Deleted, with exactly 1 Deleted log entry
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
         var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId);
         job.CurrentState.ShouldBe(State.Deleted);
 
@@ -64,11 +64,11 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
     public async Task GivenConcurrentRequeueOnSameJob_ThenStateConsistent()
     {
         // Arrange — enqueue a job and wait for it to complete
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForJobState(jobId, State.Completed);
+        await Server.WaitForJobState(jobId, State.Completed);
 
         // Act — requeue from 2 threads concurrently
         var successCount = 0;
@@ -79,7 +79,7 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
             {
                 try
                 {
-                    var svc = _server.CreateCommandService();
+                    var svc = Server.CreateCommandService();
                     await svc.RequeueJob(jobId);
                     Interlocked.Increment(ref successCount);
                 }
@@ -93,7 +93,7 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
         await Task.WhenAll(tasks);
 
         // Assert — state should be consistent (Enqueued), exactly 1 successful requeue
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
         var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId);
         job.CurrentState.ShouldBe(State.Enqueued);
 

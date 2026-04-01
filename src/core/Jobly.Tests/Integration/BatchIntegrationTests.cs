@@ -15,14 +15,14 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenBatchOfFive_WhenAllComplete_ThenBatchFinalizes()
     {
-        var batchPublisher = _server.CreateBatchPublisher();
+        var batchPublisher = Server.CreateBatchPublisher();
         var jobs = Enumerable.Range(0, 5).Select(_ => new UnitRequest()).ToList();
         var batchId = await batchPublisher.StartNew(jobs);
         await batchPublisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         // Batch job should be completed
         var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId);
@@ -41,7 +41,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenBatchWithContinuation_WhenFirstBatchCompletes_ThenContinuationActivatesAndCompletes()
     {
-        var batchPublisher = _server.CreateBatchPublisher();
+        var batchPublisher = Server.CreateBatchPublisher();
 
         var batchJobs = Enumerable.Range(0, 3).Select(_ => new UnitRequest()).ToList();
         var batchId = await batchPublisher.StartNew(batchJobs);
@@ -51,9 +51,9 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
 
         await batchPublisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         // First batch completed
         var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId);
@@ -75,7 +75,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenThreeChainedBatches_WhenProcessed_ThenAllComplete()
     {
-        var batchPublisher = _server.CreateBatchPublisher();
+        var batchPublisher = Server.CreateBatchPublisher();
 
         // Batch 1
         var batch1Jobs = Enumerable.Range(0, 2).Select(_ => new UnitRequest()).ToList();
@@ -91,9 +91,9 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
 
         await batchPublisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         var batch1 = await ctx.Set<Job>().FirstAsync(j => j.Id == batch1Id);
         var batch2 = await ctx.Set<Job>().FirstAsync(j => j.Id == batch2Id);
@@ -107,7 +107,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenBatchWithOnAnyFinishedState_WhenSomeJobsFail_ThenContinuationStillFires()
     {
-        var batchPublisher = _server.CreateBatchPublisher();
+        var batchPublisher = Server.CreateBatchPublisher();
 
         // Batch with mix of succeeding and failing jobs, using OnAnyFinishedState
         var batchJobs = new List<ThrowExceptionRequest>
@@ -123,9 +123,9 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
 
         await batchPublisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         // Batch with OnAnyFinishedState completes even when children fail
         var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId);
@@ -144,7 +144,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenBatchWithOnlyOnSucceeded_WhenJobFails_ThenContinuationDoesNotFire()
     {
-        var batchPublisher = _server.CreateBatchPublisher();
+        var batchPublisher = Server.CreateBatchPublisher();
 
         // Batch with failing jobs, using default OnlyOnSucceeded
         var batchJobs = new List<ThrowExceptionRequest>
@@ -160,9 +160,9 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         await batchPublisher.SaveChangesAsync();
 
         // Wait for batch to fail — orchestrator has already processed continuation by this point
-        await _server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(15));
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         // Batch should be failed
         var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId);
@@ -182,16 +182,16 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenBatchWithRetryJobs_WhenRetriesExhausted_ThenBatchReflectsOutcome()
     {
-        var batchPublisher = _server.CreateBatchPublisher();
+        var batchPublisher = Server.CreateBatchPublisher();
 
         // Batch with OnlyOnSucceeded (default) and all-failing children should fail
         var failingJobs = new List<ThrowExceptionRequest> { new(), new() };
         var batchId = await batchPublisher.StartNew(failingJobs);
         await batchPublisher.SaveChangesAsync();
 
-        await _server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(15));
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId);
         batch.CurrentState.ShouldBe(State.Failed);

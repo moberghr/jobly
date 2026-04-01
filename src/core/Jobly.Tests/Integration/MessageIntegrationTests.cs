@@ -15,13 +15,13 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenSingleHandlerMessage_WhenPublished_ThenMessageCompletesAndHandlerExecutes()
     {
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var messageId = await publisher.Publish(new SingleHandlerMessage());
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         // Message should be completed
         var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId);
@@ -39,13 +39,13 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenMultiHandlerMessage_WhenPublished_ThenBothHandlersExecuteAndMessageCompletes()
     {
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var messageId = await publisher.Publish(new MultiRequest());
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         // Message should be completed
         var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId);
@@ -62,13 +62,13 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenMessageWithQueue_WhenPublished_ThenChildrenInheritQueue()
     {
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var messageId = await publisher.Publish(new SingleHandlerMessage(), "a-critical");
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId);
         message.Queue.ShouldBe("a-critical");
@@ -83,7 +83,7 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenMultipleMessages_WhenPublished_ThenAllRouteAndComplete()
     {
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var messageIds = new List<Guid>();
         for (var i = 0; i < 5; i++)
         {
@@ -92,9 +92,9 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
 
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         foreach (var messageId in messageIds)
         {
@@ -123,7 +123,7 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
         // but ThrowExceptionRequest is an IJob, not IMessage.
         // Let's test the general case: publish multiple messages including multi-handler,
         // verify all reach terminal state.
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
 
         // Publish several multi-handler messages
         var messageIds = new List<Guid>();
@@ -134,9 +134,9 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
 
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         // All messages should be in a terminal state
         var messages = await ctx.Set<Job>()

@@ -15,13 +15,13 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenFailingJobWithThreeRetries_WhenProcessed_ThenRetriesThreeTimesThenFails()
     {
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 3);
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(30));
+        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(30));
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId);
         job.CurrentState.ShouldBe(State.Failed);
@@ -47,13 +47,13 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenFailingJobWithZeroRetries_WhenProcessed_ThenFailsImmediately()
     {
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 0);
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(15));
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId);
         job.CurrentState.ShouldBe(State.Failed);

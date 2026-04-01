@@ -15,13 +15,13 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenSpawnChildJobRequest_WhenProcessed_ThenChildInheritsParentTraceId()
     {
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var parentId = await publisher.Enqueue(new SpawnChildJobRequest());
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         var parent = await ctx.Set<Job>().FirstAsync(j => j.Id == parentId);
         parent.CurrentState.ShouldBe(State.Completed);
@@ -37,13 +37,13 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenSpawnGrandchildJobRequest_WhenProcessed_ThenThreeLevelChainSharesTraceId()
     {
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var grandparentId = await publisher.Enqueue(new SpawnGrandchildJobRequest());
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         var grandparent = await ctx.Set<Job>().FirstAsync(j => j.Id == grandparentId);
         grandparent.TraceId.ShouldNotBeNull();
@@ -68,13 +68,13 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenMultiHandlerMessage_WhenRouted_ThenAllHandlerJobsShareSameTraceId()
     {
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var messageId = await publisher.Publish(new MultiRequest());
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId);
         message.TraceId.ShouldNotBeNull();
@@ -90,14 +90,14 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
     [Fact]
     public async Task GivenTwoSeparateJobs_WhenPublished_ThenEachHasDifferentTraceId()
     {
-        var publisher = _server.CreatePublisher();
+        var publisher = Server.CreatePublisher();
         var jobId1 = await publisher.Enqueue(new UnitRequest());
         var jobId2 = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync();
 
-        await _server.WaitForCompletion();
+        await Server.WaitForCompletion();
 
-        var ctx = _server.CreateContext();
+        var ctx = Server.CreateContext();
 
         var job1 = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId1);
         var job2 = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId2);
