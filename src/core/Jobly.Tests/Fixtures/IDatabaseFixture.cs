@@ -8,5 +8,5 @@ public interface IDatabaseFixture
 
     Task ResetAsync();
 
-    JoblyTestServer? TestServer { get; set; }
+    JoblyTestServer TestServer { get; }
 }

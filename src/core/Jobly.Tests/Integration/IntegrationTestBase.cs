@@ -11,11 +11,10 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         _fixture = fixture;
     }
 
-    protected JoblyTestServer Server => _fixture.TestServer!;
+    protected JoblyTestServer Server => _fixture.TestServer;
 
     public async Task InitializeAsync()
     {
-        _fixture.TestServer ??= await JoblyTestServer.StartAsync(_fixture);
         await _fixture.ResetAsync();
     }
 

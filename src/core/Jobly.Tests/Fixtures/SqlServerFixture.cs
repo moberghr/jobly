@@ -1,4 +1,5 @@
 using Jobly.Core.Interceptors;
+using Jobly.Tests.Integration;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Respawn;
@@ -15,7 +16,7 @@ public class SqlServerFixture : IAsyncLifetime, IDatabaseFixture
     private Respawner _respawner = null!;
     private string _connectionString = null!;
 
-    public Integration.JoblyTestServer? TestServer { get; set; }
+    public JoblyTestServer TestServer { get; private set; } = null!;
 
     public SqlServerRowLockInterceptor Interceptor { get; } = new();
 
@@ -25,8 +26,10 @@ public class SqlServerFixture : IAsyncLifetime, IDatabaseFixture
     {
         await _container.StartAsync();
         _connectionString = _container.GetConnectionString() + ";Encrypt=False;";
+
         await using var context = CreateContext();
         await context.Database.EnsureCreatedAsync();
+
         await using var conn = new SqlConnection(_connectionString);
         await conn.OpenAsync();
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
@@ -34,6 +37,8 @@ public class SqlServerFixture : IAsyncLifetime, IDatabaseFixture
             DbAdapter = DbAdapter.SqlServer,
             TablesToIgnore = [new Respawn.Graph.Table("Server"), new Respawn.Graph.Table("Worker"), new Respawn.Graph.Table("ServerTask"), new Respawn.Graph.Table("ServerLog")],
         });
+
+        TestServer = await JoblyTestServer.StartAsync(this);
     }
 
     public async Task ResetAsync()
@@ -53,6 +58,7 @@ public class SqlServerFixture : IAsyncLifetime, IDatabaseFixture
 
     public async Task DisposeAsync()
     {
+        await TestServer.DisposeAsync();
         await _container.DisposeAsync();
     }
 }
