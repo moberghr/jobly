@@ -57,7 +57,7 @@ public class JoblyUIMiddleware
 
             if (path.Equals(logoutPath, StringComparison.OrdinalIgnoreCase) && httpContext.Request.Method == "POST")
             {
-                httpContext.Response.Cookies.Delete(CookieName);
+                httpContext.Response.Cookies.Delete(CookieName, new CookieOptions { Path = _options.RoutePrefix });
                 httpContext.Response.StatusCode = 200;
                 return;
             }
