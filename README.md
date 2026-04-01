@@ -8,14 +8,18 @@ A distributed job processing and message queue library for .NET 10. Supports pub
 - **Background Jobs** — Schedule and orchestrate jobs with retries, continuations, and batch processing.
 - **Named Queues** — Assign jobs to queues. Workers subscribe to specific queues. Alphabetical order = priority.
 - **Pipeline Behaviors** — Middleware chain wraps all handler executions (logging, validation, error handling).
-- **Execution Logs** — ILogger output automatically captured during handler execution, viewable in dashboard.
-- **Unified Activity Log** — Single audit trail per job: lifecycle events (Created, Processing, Completed, Failed) + handler logs.
+- **Execution Logs** — ILogger output automatically captured during handler execution, viewable in dashboard. Each log entry tracks which worker produced it.
+- **Unified Activity Log** — Single audit trail per job: lifecycle events (Created, Processing, Completed, Failed, Cancelled) + handler logs.
 - **Multi-Database** — PostgreSQL and SQL Server with row-level locking for concurrent worker safety.
-- **Server Monitoring** — Worker registration, heartbeat tracking, orphaned job recovery.
-- **Job Retention** — Auto-expiration for completed jobs. Failed jobs persist forever. Statistics survive deletion.
+- **Server Monitoring** — Worker registration, heartbeat tracking, orphaned job recovery. Worker detail page shows job activity.
+- **Job Retention** — Configurable `JobExpirationTimeout` (default 1 day). Optional `MaxExpirableJobCount` threshold. Failed jobs persist forever.
 - **Time-Series Stats** — Hourly succeeded/failed counts for historical graphs.
-- **Recurring Jobs** — Cron-based scheduled job execution.
-- **Dashboard** — React-based web UI with realtime graph (jobs/sec), historical graph (24h), dark mode, bulk actions, per-page selector, Hangfire-style job detail with colored state cards.
+- **Recurring Jobs** — Cron-based scheduled job execution. Immutable execution history via RecurringJobLog.
+- **Graceful Cancellation** — CancellationMode enum signals handlers to stop. Job stays in Processing with "Cancelling..." badge until handler exits. Handlers that complete despite cancellation are marked Completed.
+- **Failed Job Type Filter** — Group failed jobs by type, filter, and bulk delete/requeue all of a specific type.
+- **Dashboard Auth** — Pluggable `IJoblyAuthorizationFilter` with optional redirect URL. Ships with `LocalRequestsOnlyAuthorizationFilter`.
+- **Dashboard** — React-based web UI with realtime graph, historical graph, dark mode, clickable metric cards, bulk actions, batch progress bars, worker detail page.
+- **TimeProvider** — All production code uses injectable `TimeProvider` for testability.
 
 ## Integration Guide
 
@@ -188,13 +192,68 @@ await recurringPublisher.AddOrUpdateRecurringJob(
     new CleanupSessions(), name: "session-cleanup", cron: "0 * * * *");
 ```
 
+`AddOrUpdateRecurringJob` registers the definition. The `RecurringJobSchedulerTask` creates jobs when the cron time arrives. Execution history is tracked in `RecurringJobLog` and survives job cleanup.
+
+### 7. Dashboard Authorization
+
+```csharp
+app.UseJoblyUI(options =>
+{
+    options.Authorization = new MyAuthFilter();
+    options.UnauthorizedRedirectUrl = "/login"; // optional, redirects browser requests
+});
+
+public class MyAuthFilter : IJoblyAuthorizationFilter
+{
+    public bool Authorize(HttpContext httpContext)
+    {
+        return httpContext.User.Identity?.IsAuthenticated == true
+            && httpContext.User.IsInRole("Admin");
+    }
+}
+```
+
+Built-in filter for localhost-only access:
+
+```csharp
+options.Authorization = new LocalRequestsOnlyAuthorizationFilter();
+```
+
+### 8. Configuration
+
+```csharp
+builder.Services.AddJoblyWorker<AppDbContext>(options =>
+{
+    // Worker
+    options.WorkerCount = 10;
+    options.Queues = ["default"];
+    options.PollingInterval = TimeSpan.FromSeconds(1);
+    options.UseDispatcher = false; // true = batch-fetch mode
+
+    // Cancellation
+    options.CancellationCheckInterval = TimeSpan.FromSeconds(5);
+    options.InvisibilityTimeout = TimeSpan.FromMinutes(5);
+
+    // Retention
+    options.JobExpirationTimeout = TimeSpan.FromDays(1);
+    options.MaxExpirableJobCount = 20_000; // null to disable
+    options.ExpirationBatchSize = 1000;
+
+    // Background tasks
+    options.OrchestrationInterval = TimeSpan.FromSeconds(10);
+    options.MessageRoutingInterval = TimeSpan.FromSeconds(1);
+    options.HealthCheckInterval = TimeSpan.FromSeconds(10);
+    options.CounterAggregationInterval = TimeSpan.FromSeconds(5);
+});
+```
+
 ## How It Works
 
 ### Message Flow
 ```
 Publish(OrderCreated) → Message (Enqueued)
-  ↓ Worker routes
-  → Job 1 (SendEmail)     → Completed → stats:succeeded +1
+  ↓ MessageRoutingTask routes
+  → Job 1 (SendEmail)       → Completed → stats:succeeded +1
   → Job 2 (UpdateInventory) → Completed → stats:succeeded +1
   → Message Completed → ExpireAt set
 ```
@@ -208,6 +267,16 @@ Enqueue(GenerateReport) → Job (Enqueued, queue="reports")
   → ExpireAt set → eventually cleaned up
 ```
 
+### Cancellation Flow
+```
+DeleteJob(processingJobId)
+  → CancellationMode = Graceful (state stays Processing)
+  → RunJobMonitor detects CancellationMode
+  → Handler's CancellationToken cancelled
+  → If handler stops: state → Deleted
+  → If handler completes anyway: state → Completed
+```
+
 ### Concurrency Safety
 - **Job pickup**: `FOR UPDATE SKIP LOCKED` — one worker per job
 - **State changes**: Transaction + row lock — stats and state atomic
@@ -215,22 +284,28 @@ Enqueue(GenerateReport) → Job (Enqueued, queue="reports")
 - **Message routing**: Row lock prevents duplicate fan-out
 
 ### Job Retention
-- Completed/Deleted: auto-expire (configurable TTL)
+- Completed/Deleted: auto-expire (configurable via `JobExpirationTimeout`)
 - Failed: never expire (manual intervention required)
+- Count-based: optional `MaxExpirableJobCount` deletes oldest by ExpireAt
 - Statistics survive deletion (persistent counters)
 - Hourly stats cleaned up after 7 days
+- Recurring job logs: last 100 per recurring job retained
 
 ## Dashboard
 
 - **Realtime graph** — jobs/second, polling every 2s, rolling 5 minutes
-- **Historical graph** — succeeded/failed per hour, last 24 hours
-- **Metric cards** — current (enqueued, processing, failed, etc.) + historical totals
+- **Historical graph** — succeeded/failed per hour, 24h or 7d view
+- **Metric cards** — clickable, navigate to corresponding pages
 - **Job list** — by state, bulk actions (requeue/delete), per-page selector
-- **Job detail** — Hangfire-style colored state cards with duration, handler output, flow visualization
-- **Messages** — list + detail with spawned jobs
-- **Recurring jobs** — cron schedules, trigger/remove
-- **Servers** — health, workers, current jobs
+- **Failed jobs** — type filter bar, bulk delete/requeue by type
+- **Job detail** — colored state cards with duration, handler output, "Cancelling..." badge
+- **Messages** — list with job count, detail with spawned jobs
+- **Batches** — stacked green/red progress bar (completed/failed)
+- **Recurring jobs** — cron schedules, trigger/delete, execution history
+- **Servers** — health, CPU, memory, clickable workers
+- **Worker detail** — job activity log, server link, status indicator
 - **Dark mode** — system preference + toggle
+- **Auth** — pluggable filter with optional login redirect
 
 ## Project Structure
 
@@ -238,22 +313,23 @@ Enqueue(GenerateReport) → Job (Enqueued, queue="reports")
 src/
 ├── core/
 │   ├── Jobly.Core/          # Entities, handlers, publisher, services, logging
-│   ├── Jobly.Worker/        # Worker service, health manager, worker setup
-│   ├── Jobly.UI/            # Dashboard API endpoints
-│   └── Jobly.Tests/         # 120 integration tests (Respawn + Testcontainers)
+│   ├── Jobly.Worker/        # Worker service, background tasks, dispatcher
+│   ├── Jobly.UI/            # Dashboard API endpoints + embedded SPA
+│   └── Jobly.Tests/         # 220 tests (xUnit + Shouldly + Testcontainers + Respawn)
 ├── tests/
 │   ├── Jobly.Test.Shared/   # Shared test handlers
-│   ├── Jobly.TestApp/       # Test web application
+│   ├── Jobly.TestApp/       # Test web application with login page
 │   └── Jobly.TestWorker/    # Test worker service
-└── ui/                      # Vite + React + Tailwind + shadcn/ui + Recharts
+└── ui/                      # Vite + React + TypeScript + Tailwind + shadcn/ui
 ```
 
 ## Development
 
 ```bash
-cd src && dotnet build Jobly.sln
-dotnet test Jobly.sln --filter "Category!=SqlServer"  # ~10 seconds
-cd src/ui && npm run dev                               # Dashboard on :5173
+dotnet build Jobly.sln
+dotnet test Jobly.sln --filter "Category!=SqlServer"  # PostgreSQL only (~15s)
+dotnet test Jobly.sln                                   # Both databases (~30s)
+cd src/ui && npm run dev                                # Dashboard on :5173
 ```
 
 Requires Docker for tests (Testcontainers + Respawn).
