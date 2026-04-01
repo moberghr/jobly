@@ -15,6 +15,8 @@ public class SqlServerFixture : IAsyncLifetime, IDatabaseFixture
     private Respawner _respawner = null!;
     private string _connectionString = null!;
 
+    public Integration.JoblyTestServer? TestServer { get; set; }
+
     public SqlServerRowLockInterceptor Interceptor { get; } = new();
 
     public SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();

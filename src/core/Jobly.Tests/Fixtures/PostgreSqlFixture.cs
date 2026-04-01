@@ -17,6 +17,8 @@ public class PostgreSqlFixture : IAsyncLifetime, IDatabaseFixture
 
     public string ConnectionString => _connectionString;
 
+    public Integration.JoblyTestServer? TestServer { get; set; }
+
     public PostgresRowLockInterceptor Interceptor { get; } = new();
 
     public SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();
