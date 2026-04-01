@@ -80,7 +80,6 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         detail.ShouldNotBeNull();
         detail.Name.ShouldBe("detail-test");
         detail.Cron.ShouldBe("*/5 * * * *");
-        detail.NextJobId.ShouldNotBeNull();
     }
 
     [Fact]
@@ -95,18 +94,11 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "to-delete");
         var rjId = rj.Id;
 
-        // Detach child jobs from recurring job so FK won't block delete
+        // Remove RecurringJobLog entries so FK won't block delete
         var detachCtx = _fixture.CreateContext();
-        await detachCtx.Set<Job>()
-            .Where(j => j.RecurringJobId == rjId)
-            .ExecuteUpdateAsync(s => s.SetProperty(j => j.RecurringJobId, (int?)null));
-
-        // Also clear NextJobId/LastJobId on the recurring job itself
-        await detachCtx.Set<RecurringJob>()
-            .Where(r => r.Id == rjId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(r => r.NextJobId, (Guid?)null)
-                .SetProperty(r => r.LastJobId, (Guid?)null));
+        await detachCtx.Set<RecurringJobLog>()
+            .Where(l => l.RecurringJobId == rjId)
+            .ExecuteDeleteAsync();
 
         // Act
         var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -129,8 +121,8 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "trigger-test");
 
-        var jobCountBefore = await _fixture.CreateContext().Set<Job>()
-            .Where(j => j.RecurringJobId == rj.Id)
+        var jobCountBefore = await _fixture.CreateContext().Set<RecurringJobLog>()
+            .Where(l => l.RecurringJobId == rj.Id)
             .CountAsync();
 
         // Act
@@ -138,8 +130,8 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         await svc.TriggerRecurringJob(rj.Id);
 
         // Assert
-        var jobCountAfter = await _fixture.CreateContext().Set<Job>()
-            .Where(j => j.RecurringJobId == rj.Id)
+        var jobCountAfter = await _fixture.CreateContext().Set<RecurringJobLog>()
+            .Where(l => l.RecurringJobId == rj.Id)
             .CountAsync();
 
         jobCountAfter.ShouldBe(jobCountBefore + 1);
@@ -164,7 +156,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
             ScheduleTime = pastTime,
             Queue = "default",
         });
-        ctx.Set<RecurringJob>().Add(new RecurringJob
+        var recurringJob = new RecurringJob
         {
             Name = "scheduler-test",
             Type = typeof(UnitRequest).AssemblyQualifiedName,
@@ -172,7 +164,15 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
             Cron = "* * * * *",
             CreatedAt = DateTime.UtcNow.AddMinutes(-10),
             NextExecution = pastTime,
-            NextJobId = nextJobId,
+        };
+        ctx.Set<RecurringJob>().Add(recurringJob);
+        await ctx.SaveChangesAsync();
+
+        ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
+        {
+            RecurringJobId = recurringJob.Id,
+            JobId = nextJobId,
+            CreatedAt = DateTime.UtcNow,
         });
         await ctx.SaveChangesAsync();
 

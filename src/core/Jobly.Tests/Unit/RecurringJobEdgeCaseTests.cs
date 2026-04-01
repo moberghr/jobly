@@ -39,7 +39,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             ScheduleTime = pastTime,
             Queue = "default",
         });
-        ctx.Set<RecurringJob>().Add(new RecurringJob
+        var recurringJob = new RecurringJob
         {
             Name = "skip-test",
             Type = typeof(UnitRequest).AssemblyQualifiedName,
@@ -47,7 +47,15 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             Cron = "* * * * *",
             CreatedAt = DateTime.UtcNow.AddMinutes(-10),
             NextExecution = pastTime,
-            NextJobId = nextJobId,
+        };
+        ctx.Set<RecurringJob>().Add(recurringJob);
+        await ctx.SaveChangesAsync();
+
+        ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
+        {
+            RecurringJobId = recurringJob.Id,
+            JobId = nextJobId,
+            CreatedAt = DateTime.UtcNow,
         });
         await ctx.SaveChangesAsync();
 
@@ -85,7 +93,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
                 ScheduleTime = pastTime,
                 Queue = "default",
             });
-            ctx.Set<RecurringJob>().Add(new RecurringJob
+            var recurringJob = new RecurringJob
             {
                 Name = $"multi-test-{i}",
                 Type = typeof(UnitRequest).AssemblyQualifiedName,
@@ -93,7 +101,15 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
                 Cron = "* * * * *",
                 CreatedAt = DateTime.UtcNow.AddMinutes(-10),
                 NextExecution = pastTime,
-                NextJobId = nextJobId,
+            };
+            ctx.Set<RecurringJob>().Add(recurringJob);
+            await ctx.SaveChangesAsync();
+
+            ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
+            {
+                RecurringJobId = recurringJob.Id,
+                JobId = nextJobId,
+                CreatedAt = DateTime.UtcNow,
             });
         }
 
@@ -126,7 +142,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             ScheduleTime = pastTime,
             Queue = "default",
         });
-        ctx.Set<RecurringJob>().Add(new RecurringJob
+        var recurringJob = new RecurringJob
         {
             Name = "next-exec-test",
             Type = typeof(UnitRequest).AssemblyQualifiedName,
@@ -134,7 +150,15 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             Cron = "* * * * *",
             CreatedAt = DateTime.UtcNow.AddMinutes(-10),
             NextExecution = pastTime,
-            NextJobId = nextJobId,
+        };
+        ctx.Set<RecurringJob>().Add(recurringJob);
+        await ctx.SaveChangesAsync();
+
+        ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
+        {
+            RecurringJobId = recurringJob.Id,
+            JobId = nextJobId,
+            CreatedAt = DateTime.UtcNow,
         });
         await ctx.SaveChangesAsync();
 
@@ -168,7 +192,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             ScheduleTime = pastTime,
             Queue = "default",
         });
-        ctx.Set<RecurringJob>().Add(new RecurringJob
+        var recurringJob = new RecurringJob
         {
             Name = "last-exec-test",
             Type = typeof(UnitRequest).AssemblyQualifiedName,
@@ -176,7 +200,15 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             Cron = "* * * * *",
             CreatedAt = DateTime.UtcNow.AddMinutes(-10),
             NextExecution = pastTime,
-            NextJobId = nextJobId,
+        };
+        ctx.Set<RecurringJob>().Add(recurringJob);
+        await ctx.SaveChangesAsync();
+
+        ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
+        {
+            RecurringJobId = recurringJob.Id,
+            JobId = nextJobId,
+            CreatedAt = DateTime.UtcNow,
         });
         await ctx.SaveChangesAsync();
 

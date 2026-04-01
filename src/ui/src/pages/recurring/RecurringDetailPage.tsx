@@ -9,14 +9,14 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
-import type { RecurringJobDetailModel, JobModel, PagedList } from '@/types';
+import type { RecurringJobDetailModel, RecurringJobHistoryModel, PagedList } from '@/types';
 import * as api from '@/api';
 
 export default function RecurringDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [detail, setDetail] = useState<RecurringJobDetailModel | null>(null);
-  const [jobs, setJobs] = useState<PagedList<JobModel> | null>(null);
+  const [jobs, setJobs] = useState<PagedList<RecurringJobHistoryModel> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
@@ -88,28 +88,6 @@ export default function RecurringDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Flow */}
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Flow</CardTitle></CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {detail.nextJobId && (
-                <div>
-                  <span className="text-muted-foreground">Next Job:</span>{' '}
-                  <Link to={`/jobs/detail/${detail.nextJobId}`} className="text-primary hover:underline font-mono text-xs">{shortId(detail.nextJobId)}</Link>
-                </div>
-              )}
-              {detail.lastJobId && (
-                <div>
-                  <span className="text-muted-foreground">Last Job:</span>{' '}
-                  <Link to={`/jobs/detail/${detail.lastJobId}`} className="text-primary hover:underline font-mono text-xs">{shortId(detail.lastJobId)}</Link>
-                </div>
-              )}
-              {!detail.nextJobId && !detail.lastJobId && (
-                <div className="text-muted-foreground">No jobs linked</div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Payload */}
           {detail.message && (
             <Card>
@@ -121,11 +99,11 @@ export default function RecurringDetailPage() {
           )}
         </div>
 
-        {/* Right column: Job History */}
+        {/* Right column: Execution History */}
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Job History ({detail.totalJobCount})</CardTitle>
+              <CardTitle className="text-sm">Execution History</CardTitle>
             </CardHeader>
             <CardContent>
               {jobs && jobs.items.length > 0 ? (
@@ -133,21 +111,29 @@ export default function RecurringDetailPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Type</TableHead>
+                        <TableHead>Job</TableHead>
                         <TableHead>State</TableHead>
-                        <TableHead>Created</TableHead>
+                        <TableHead>Executed</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {jobs.items.map((job) => (
-                        <TableRow key={job.id}>
+                      {jobs.items.map((entry) => (
+                        <TableRow key={entry.jobId + entry.createdAt}>
                           <TableCell className="font-mono text-xs">
-                            <Link to={`/jobs/detail/${job.id}`} className="text-primary hover:underline">{shortId(job.id)}</Link>
+                            {entry.jobExists ? (
+                              <Link to={`/jobs/detail/${entry.jobId}`} className="text-primary hover:underline">{shortId(entry.jobId)}</Link>
+                            ) : (
+                              <span className="text-muted-foreground">{shortId(entry.jobId)}</span>
+                            )}
                           </TableCell>
-                          <TableCell>{shortType(job.type)}</TableCell>
-                          <TableCell><StateBadge state={job.currentState} /></TableCell>
-                          <TableCell className="text-sm"><RelativeTime date={job.createTime} /></TableCell>
+                          <TableCell>
+                            {entry.jobExists && entry.currentState != null ? (
+                              <StateBadge state={entry.currentState} />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Cleaned up</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm"><RelativeTime date={entry.createdAt} /></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -161,7 +147,7 @@ export default function RecurringDetailPage() {
                   />
                 </>
               ) : (
-                <p className="text-muted-foreground text-sm py-4 text-center">No jobs have been created yet</p>
+                <p className="text-muted-foreground text-sm py-4 text-center">No executions yet</p>
               )}
             </CardContent>
           </Card>

@@ -22,10 +22,4 @@ public class RecurringJobDetailModel : RecurringJobModel
     public string? Message { get; set; }
 
     public DateTime? UpdatedAt { get; set; }
-
-    public Guid? NextJobId { get; set; }
-
-    public Guid? LastJobId { get; set; }
-
-    public int TotalJobCount { get; set; }
 }

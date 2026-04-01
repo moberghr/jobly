@@ -32,6 +32,8 @@ public class ExpirationCleanupTask<TContext> : ServerTaskBase<TContext>
             ? await RunCountBasedCleanup(context, Configuration.MaxExpirableJobCount, Configuration.ExpirationBatchSize)
             : 0;
 
+        await CleanupRecurringJobLogs(context);
+
         var total = timeExpired + countCleaned;
         if (total == 0)
         {
@@ -150,5 +152,43 @@ public class ExpirationCleanupTask<TContext> : ServerTaskBase<TContext>
         }
 
         return totalDeleted;
+    }
+
+    /// <summary>
+    /// Keeps only the last 100 RecurringJobLog entries per recurring job.
+    /// </summary>
+    private static async Task CleanupRecurringJobLogs<TCtx>(TCtx context)
+        where TCtx : DbContext
+    {
+        var recurringJobIds = await context.Set<RecurringJobLog>()
+            .Select(l => l.RecurringJobId)
+            .Distinct()
+            .ToListAsync();
+
+        foreach (var recurringJobId in recurringJobIds)
+        {
+            var count = await context.Set<RecurringJobLog>()
+                .Where(l => l.RecurringJobId == recurringJobId)
+                .CountAsync();
+
+            if (count <= 100)
+            {
+                continue;
+            }
+
+            var cutoffId = await context.Set<RecurringJobLog>()
+                .Where(l => l.RecurringJobId == recurringJobId)
+                .OrderByDescending(l => l.CreatedAt)
+                .Skip(100)
+                .Select(l => l.Id)
+                .FirstOrDefaultAsync();
+
+            if (cutoffId > 0)
+            {
+                await context.Set<RecurringJobLog>()
+                    .Where(l => l.RecurringJobId == recurringJobId && l.Id <= cutoffId)
+                    .ExecuteDeleteAsync();
+            }
+        }
     }
 }

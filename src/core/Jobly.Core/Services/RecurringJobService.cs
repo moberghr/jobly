@@ -12,7 +12,7 @@ public interface IRecurringJobService
 
     Task<RecurringJobDetailModel?> GetRecurringJobById(int id);
 
-    Task<PagedList<JobModel>> GetRecurringJobHistory(int id, BaseListRequest request);
+    Task<PagedList<RecurringJobHistoryModel>> GetRecurringJobHistory(int id, BaseListRequest request);
 
     Task TriggerRecurringJob(int id);
 
@@ -63,27 +63,22 @@ public class RecurringJobService<TContext> : IRecurringJobService
                 LastExecution = x.LastExecution,
                 CreatedAt = x.CreatedAt,
                 UpdatedAt = x.UpdatedAt,
-                NextJobId = x.NextJobId,
-                LastJobId = x.LastJobId,
-                TotalJobCount = _context.Set<Job>().Count(j => j.RecurringJobId == x.Id),
             })
             .FirstOrDefaultAsync();
     }
 
-    public async Task<PagedList<JobModel>> GetRecurringJobHistory(int id, BaseListRequest request)
+    public async Task<PagedList<RecurringJobHistoryModel>> GetRecurringJobHistory(int id, BaseListRequest request)
     {
-        return await _context.Set<Job>()
-            .Where(j => j.RecurringJobId == id)
-            .OrderByDescending(j => j.CreateTime)
-            .Select(j => new JobModel
+        return await _context.Set<RecurringJobLog>()
+            .Where(l => l.RecurringJobId == id)
+            .OrderByDescending(l => l.CreatedAt)
+            .Select(l => new RecurringJobHistoryModel
             {
-                Id = j.Id,
-                Type = j.Type,
-                Message = j.Message,
-                CreateTime = j.CreateTime,
-                ScheduleTime = j.ScheduleTime,
-                CurrentState = j.CurrentState,
-                CancellationMode = j.CancellationMode,
+                JobId = l.JobId,
+                CreatedAt = l.CreatedAt,
+                JobExists = _context.Set<Job>().Any(j => j.Id == l.JobId),
+                Type = _context.Set<Job>().Where(j => j.Id == l.JobId).Select(j => j.Type).FirstOrDefault(),
+                CurrentState = _context.Set<Job>().Where(j => j.Id == l.JobId).Select(j => (State?)j.CurrentState).FirstOrDefault(),
             })
             .ToPagedListAsync(request);
     }
@@ -94,7 +89,6 @@ public class RecurringJobService<TContext> : IRecurringJobService
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
-        // Create a new job from the recurring job definition
         var job = new Job
         {
             Type = recurringJob.Type,
@@ -103,8 +97,7 @@ public class RecurringJobService<TContext> : IRecurringJobService
             ScheduleTime = now,
             CurrentState = State.Enqueued,
             MaxRetries = 0,
-            Queue = "default",
-            RecurringJobId = recurringJob.Id,
+            Queue = recurringJob.Queue,
         };
 
         await _context.Set<Job>().AddAsync(job);
@@ -115,6 +108,12 @@ public class RecurringJobService<TContext> : IRecurringJobService
             Timestamp = now,
             Level = "Information",
             Message = $"Job {job.Id} was created from recurring job {recurringJob.Id}",
+        });
+        _context.Set<RecurringJobLog>().Add(new RecurringJobLog
+        {
+            RecurringJobId = recurringJob.Id,
+            JobId = job.Id,
+            CreatedAt = now,
         });
         await _context.SaveChangesAsync();
     }

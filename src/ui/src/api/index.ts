@@ -1,5 +1,5 @@
 import api from './client';
-import type { DashboardStatistics, JobModel, JobDetailModel, JobGroupModel, JobGroupDetailModel, RecurringJobModel, RecurringJobDetailModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint, TypeCountModel, WorkerDetailModel, WorkerJobLogModel } from '@/types';
+import type { DashboardStatistics, JobModel, JobDetailModel, JobGroupModel, JobGroupDetailModel, RecurringJobModel, RecurringJobDetailModel, RecurringJobHistoryModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint, TypeCountModel, WorkerDetailModel, WorkerJobLogModel } from '@/types';
 
 // Dashboard
 export const getStatus = () => api.get<DashboardStatistics>('/status').then(r => r.data);
@@ -75,7 +75,7 @@ export const getRecurringJobById = (id: number) =>
   api.get<RecurringJobDetailModel>(`/recurring/${id}`).then(r => r.data);
 
 export const getRecurringJobJobs = (id: number, page = 0, pageSize = 20) =>
-  api.get<PagedList<JobModel>>(`/recurring/${id}/jobs`, { params: { page, pageSize } }).then(r => r.data);
+  api.get<PagedList<RecurringJobHistoryModel>>(`/recurring/${id}/jobs`, { params: { page, pageSize } }).then(r => r.data);
 
 export const triggerRecurringJob = (id: number) => api.post(`/recurring/${id}/trigger`);
 export const deleteRecurringJob = (id: number) => api.delete(`/recurring/${id}`);

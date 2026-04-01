@@ -51,16 +51,21 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
 
         foreach (var recurringJob in recurringJobs)
         {
-            // Check if the next job already exists and is still pending
-            if (recurringJob.NextJobId != null)
+            // Check if the most recent job for this recurring definition is still active
+            var latestLog = await context.Set<RecurringJobLog>()
+                .Where(l => l.RecurringJobId == recurringJob.Id)
+                .OrderByDescending(l => l.CreatedAt)
+                .Select(l => l.JobId)
+                .FirstOrDefaultAsync();
+
+            if (latestLog != Guid.Empty)
             {
-                var nextJob = await context.Set<Job>()
-                    .Where(x => x.Id == recurringJob.NextJobId)
-                    .Select(x => new { x.CurrentState })
+                var latestJobState = await context.Set<Job>()
+                    .Where(j => j.Id == latestLog)
+                    .Select(j => j.CurrentState)
                     .FirstOrDefaultAsync();
 
-                // Job still enqueued or processing — don't create another
-                if (nextJob != null && (nextJob.CurrentState == State.Enqueued || nextJob.CurrentState == State.Processing))
+                if (latestJobState == State.Enqueued || latestJobState == State.Processing)
                 {
                     continue;
                 }
@@ -73,11 +78,10 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
                 message: recurringJob.Message,
                 type: recurringJob.Type,
                 retries: 0,
-                scheduleTime: nextExecution,
+                scheduleTime: now,
                 maxRetries: 0,
                 queue: recurringJob.Queue,
                 parentId: null,
-                recurringJobId: recurringJob.Id,
                 state: State.Enqueued,
                 now: now);
 
@@ -90,11 +94,15 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
                 Level = "Information",
                 Message = $"Job {newJob.Id} created for recurring job {recurringJob.Id}",
             });
+            context.Set<RecurringJobLog>().Add(new RecurringJobLog
+            {
+                RecurringJobId = recurringJob.Id,
+                JobId = newJob.Id,
+                CreatedAt = now,
+            });
 
             recurringJob.LastExecution = recurringJob.NextExecution;
-            recurringJob.LastJobId = recurringJob.NextJobId;
             recurringJob.NextExecution = nextExecution;
-            recurringJob.NextJobId = newJob.Id;
 
             count++;
         }

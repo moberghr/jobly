@@ -66,7 +66,9 @@ public class JobGroupQueryService<TContext> : IJobGroupQueryService
                 JobCount = x.JobCount,
                 CreateTime = x.CreateTime,
                 ContinuationOptions = x.ContinuationOptions,
-                TotalJobs = _context.Set<Job>().Count(j => j.ParentJobId == x.Id && j.Kind == JobKind.Job),
+                TotalJobs = x.ChildJobs.Count(c => c.Kind == JobKind.Job),
+                CompletedJobs = x.ChildJobs.Count(c => c.Kind == JobKind.Job && c.CurrentState == State.Completed),
+                FailedJobs = x.ChildJobs.Count(c => c.Kind == JobKind.Job && c.CurrentState == State.Failed),
             })
             .ToPagedListAsync(request);
     }

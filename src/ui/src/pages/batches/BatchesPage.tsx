@@ -62,8 +62,10 @@ export default function BatchesPage() {
               </TableRow>
             ) : (
               data.items.map((batch) => {
-                const completed = batch.totalJobs - batch.jobCount;
-                const pct = batch.totalJobs > 0 ? Math.round((completed / batch.totalJobs) * 100) : 0;
+                const done = batch.completedJobs + batch.failedJobs;
+                const pct = batch.totalJobs > 0 ? Math.round((done / batch.totalJobs) * 100) : 0;
+                const greenPct = batch.totalJobs > 0 ? (batch.completedJobs / batch.totalJobs) * 100 : 0;
+                const redPct = batch.totalJobs > 0 ? (batch.failedJobs / batch.totalJobs) * 100 : 0;
                 return (
                   <TableRow key={batch.id}>
                     <TableCell className="font-mono text-xs">
@@ -73,11 +75,12 @@ export default function BatchesPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden flex">
+                          {greenPct > 0 && <div className="h-full bg-green-500 transition-all" style={{ width: `${greenPct}%` }} />}
+                          {redPct > 0 && <div className="h-full bg-red-500 transition-all" style={{ width: `${redPct}%` }} />}
                         </div>
                         <span className="text-xs text-muted-foreground w-28 text-right shrink-0">
-                          {completed}/{batch.totalJobs} ({pct}%)
+                          {done}/{batch.totalJobs} ({pct}%)
                         </span>
                       </div>
                     </TableCell>

@@ -1,4 +1,3 @@
-using Jobly.Core.Data.Entities;
 using Jobly.Core.Enums;
 
 namespace Jobly.Core.Entities;
@@ -19,7 +18,6 @@ public class Job
 
     public State CurrentState { get; set; }
 
-    public int? RecurringJobId { get; set; }
 
     public int RetriedTimes { get; set; }
 
@@ -28,8 +26,6 @@ public class Job
     public string Queue { get; set; } = "default";
 
     public Guid? ParentJobId { get; set; }
-
-    public RecurringJob? RecurringJob { get; set; }
 
     public Job? ParentJob { get; set; }
 

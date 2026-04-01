@@ -7,7 +7,7 @@ namespace Jobly.Core.Helper;
 
 public static class JobHelper
 {
-    private static Job CreateJobInternal(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, State? state, int? recurringJobId, DateTime now)
+    private static Job CreateJobInternal(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, State? state, DateTime now)
     {
         var job = new Job
         {
@@ -19,7 +19,6 @@ public static class JobHelper
             MaxRetries = maxRetries ?? retries,
             Queue = queue ?? "default",
             ParentJobId = parentId,
-            RecurringJobId = recurringJobId,
         };
 
         return job;
@@ -38,16 +37,11 @@ public static class JobHelper
     {
         var serializedMessage = JsonSerializer.Serialize(message);
         var type = message!.GetType().AssemblyQualifiedName!;
-        return CreateJobInternal(serializedMessage, type, retries, scheduleTime, maxRetries, queue, parentId, state, null, now);
+        return CreateJobInternal(serializedMessage, type, retries, scheduleTime, maxRetries, queue, parentId, state, now);
     }
 
     public static Job CreateJob(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, State? state, DateTime now)
     {
-        return CreateJobInternal(message, type, retries, scheduleTime, maxRetries, queue, parentId, state, null, now);
-    }
-
-    public static Job CreateJob(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, int recurringJobId, State? state, DateTime now)
-    {
-        return CreateJobInternal(message, type, retries, scheduleTime, maxRetries, queue, parentId, state, recurringJobId, now);
+        return CreateJobInternal(message, type, retries, scheduleTime, maxRetries, queue, parentId, state, now);
     }
 }

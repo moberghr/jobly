@@ -25,6 +25,10 @@ public class JobGroupModel
     public int TotalJobs { get; set; }
 
     public ContinuationOptions? ContinuationOptions { get; set; }
+
+    public int CompletedJobs { get; set; }
+
+    public int FailedJobs { get; set; }
 }
 
 public class JobGroupDetailModel : JobGroupModel

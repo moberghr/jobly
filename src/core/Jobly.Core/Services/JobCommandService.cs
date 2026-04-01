@@ -119,6 +119,7 @@ public class JobCommandService<TContext> : IJobCommandService
         DecrementStatForState(job.CurrentState);
 
         job.CurrentState = State.Enqueued;
+        job.ScheduleTime = _timeProvider.GetUtcNow().UtcDateTime;
         job.ExpireAt = null;
 
         // Restore parent counters so they wait for this job again

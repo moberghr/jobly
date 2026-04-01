@@ -133,6 +133,7 @@ public static class ServiceConfiguration
     {
         AddJobEntity(modelBuilder);
         AddRecurringJobEntity(modelBuilder);
+        AddRecurringJobLogEntity(modelBuilder);
         AddServerEntity(modelBuilder);
         AddWorkerEntity(modelBuilder);
         AddJobLogEntity(modelBuilder);
@@ -204,11 +205,26 @@ public static class ServiceConfiguration
         recurringJob.Property(p => p.NextExecution);
         recurringJob.Property(p => p.LastExecution);
 
-        recurringJob.HasMany(p => p.Jobs).WithOne(p => p.RecurringJob).HasForeignKey(p => p.RecurringJobId);
-        recurringJob.HasOne(p => p.NextJob);
-        recurringJob.HasOne(p => p.LastJob);
-
         recurringJob.Property(p => p.Version).IsConcurrencyToken();
+    }
+
+    private static void AddRecurringJobLogEntity(ModelBuilder modelBuilder)
+    {
+        var log = modelBuilder.Entity<RecurringJobLog>();
+        log.ToTable(nameof(RecurringJobLog));
+
+        log.Property(p => p.Id);
+        log.HasKey(p => p.Id);
+
+        log.Property(p => p.RecurringJobId);
+        log.Property(p => p.JobId);
+        log.Property(p => p.CreatedAt);
+
+        log.HasIndex(p => p.RecurringJobId);
+
+        // Explicitly no FK — this is an audit trail, jobs and recurring jobs may be deleted independently
+        log.HasIndex(p => p.JobId);
+
     }
 
     private static void AddServerEntity(ModelBuilder modelBuilder)

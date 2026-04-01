@@ -33,7 +33,7 @@ export default function MessageDetailPage() {
         <CardContent className="space-y-2 text-sm">
           <div><span className="text-muted-foreground">Type:</span> {message.type ? shortType(message.type) : '—'}</div>
           <div><span className="text-muted-foreground">Created:</span> {formatDateTime(message.createTime)}</div>
-          <div><span className="text-muted-foreground">Jobs remaining:</span> {message.jobCount}</div>
+          <div><span className="text-muted-foreground">Total jobs:</span> {message.spawnedJobsCount}</div>
           <div><span className="text-muted-foreground">ID:</span> <span className="font-mono text-xs">{message.id}</span></div>
         </CardContent>
       </Card>

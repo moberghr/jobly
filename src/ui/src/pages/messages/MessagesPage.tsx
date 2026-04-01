@@ -73,7 +73,7 @@ export default function MessagesPage() {
                   <TableCell>{msg.type ? shortType(msg.type) : '—'}</TableCell>
                   <TableCell>{msg.queue ?? '—'}</TableCell>
                   <TableCell><StateBadge state={msg.currentState} /></TableCell>
-                  <TableCell>{msg.jobCount}</TableCell>
+                  <TableCell>{msg.totalJobs}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     <RelativeTime date={msg.createTime} />
                   </TableCell>

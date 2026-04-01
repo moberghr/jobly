@@ -87,6 +87,8 @@ export interface JobGroupModel {
   payload: string | null;
   queue: string | null;
   totalJobs: number;
+  completedJobs: number;
+  failedJobs: number;
   continuationOptions: number | null;
 }
 
@@ -108,9 +110,14 @@ export interface RecurringJobModel {
 export interface RecurringJobDetailModel extends RecurringJobModel {
   message: string | null;
   updatedAt: string | null;
-  nextJobId: string | null;
-  lastJobId: string | null;
-  totalJobCount: number;
+}
+
+export interface RecurringJobHistoryModel {
+  jobId: string;
+  createdAt: string;
+  jobExists: boolean;
+  type: string | null;
+  currentState: State | null;
 }
 
 export interface ServerModel {

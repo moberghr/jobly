@@ -18,7 +18,5 @@ public class JobParameters
 
     public Guid? ParentId { get; set; }
 
-    public int? RecurringJobId { get; set; }
-
     public State? State { get; set; }
 }
