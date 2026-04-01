@@ -248,16 +248,12 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             query = query.Where(x => x.ServerTaskId == taskId);
         }
 
-        var tasks = _context.Set<ServerTask>();
-
         return await query
             .OrderByDescending(x => x.Timestamp)
             .Select(x => new ServerLogModel
             {
                 Id = x.Id,
-                TaskName = x.ServerTaskId != null
-                    ? tasks.Where(t => t.Id == x.ServerTaskId).Select(t => t.TaskName).FirstOrDefault() ?? "Server"
-                    : "Server",
+                TaskName = x.ServerTask != null ? x.ServerTask.TaskName : "Server",
                 Status = x.Status,
                 Message = x.Message,
                 Timestamp = x.Timestamp,

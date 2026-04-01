@@ -55,20 +55,12 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
             var latestLog = await context.Set<RecurringJobLog>()
                 .Where(l => l.RecurringJobId == recurringJob.Id)
                 .OrderByDescending(l => l.CreatedAt)
-                .Select(l => l.JobId)
+                .Select(l => new { l.JobId, JobState = l.Job != null ? l.Job.CurrentState : (State?)null })
                 .FirstOrDefaultAsync();
 
-            if (latestLog != Guid.Empty)
+            if (latestLog?.JobState is State.Enqueued or State.Processing)
             {
-                var latestJobState = await context.Set<Job>()
-                    .Where(j => j.Id == latestLog)
-                    .Select(j => j.CurrentState)
-                    .FirstOrDefaultAsync();
-
-                if (latestJobState == State.Enqueued || latestJobState == State.Processing)
-                {
-                    continue;
-                }
+                continue;
             }
 
             var nextExecution = CronExpression.Parse(recurringJob.Cron)

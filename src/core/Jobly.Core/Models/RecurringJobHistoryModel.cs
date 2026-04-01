@@ -4,7 +4,7 @@ namespace Jobly.Core.Models;
 
 public class RecurringJobHistoryModel
 {
-    public Guid JobId { get; set; }
+    public Guid? JobId { get; set; }
 
     public DateTime CreatedAt { get; set; }
 

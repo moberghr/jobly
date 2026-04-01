@@ -113,7 +113,7 @@ export interface RecurringJobDetailModel extends RecurringJobModel {
 }
 
 export interface RecurringJobHistoryModel {
-  jobId: string;
+  jobId: string | null;
   createdAt: string;
   jobExists: boolean;
   type: string | null;

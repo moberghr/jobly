@@ -69,31 +69,18 @@ public class RecurringJobService<TContext> : IRecurringJobService
 
     public async Task<PagedList<RecurringJobHistoryModel>> GetRecurringJobHistory(int id, BaseListRequest request)
     {
-        var logs = await _context.Set<RecurringJobLog>()
+        return await _context.Set<RecurringJobLog>()
             .Where(l => l.RecurringJobId == id)
             .OrderByDescending(l => l.CreatedAt)
-            .ToPagedListAsync(request);
-
-        var jobIds = logs.Items.Select(l => l.JobId).ToList();
-        var jobs = await _context.Set<Job>()
-            .Where(j => jobIds.Contains(j.Id))
-            .Select(j => new { j.Id, j.Type, j.CurrentState })
-            .ToDictionaryAsync(j => j.Id);
-
-        var items = logs.Items.Select(l =>
-        {
-            jobs.TryGetValue(l.JobId, out var job);
-            return new RecurringJobHistoryModel
+            .Select(l => new RecurringJobHistoryModel
             {
                 JobId = l.JobId,
                 CreatedAt = l.CreatedAt,
-                JobExists = job != null,
-                Type = job?.Type,
-                CurrentState = job != null ? job.CurrentState : null,
-            };
-        }).ToList();
-
-        return new PagedList<RecurringJobHistoryModel>(logs.TotalCount, items, logs.PageCount);
+                JobExists = l.Job != null,
+                Type = l.Job != null ? l.Job.Type : null,
+                CurrentState = l.Job != null ? l.Job.CurrentState : null,
+            })
+            .ToPagedListAsync(request);
     }
 
     public async Task TriggerRecurringJob(int id)

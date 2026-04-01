@@ -223,6 +223,7 @@ public static class ServiceConfiguration
         log.HasIndex(p => p.RecurringJobId);
 
         log.HasIndex(p => p.JobId);
+        log.HasOne(p => p.Job).WithMany().HasForeignKey(p => p.JobId).OnDelete(DeleteBehavior.SetNull);
 
     }
 

@@ -117,13 +117,15 @@ export default function RecurringDetailPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {jobs.items.map((entry) => (
-                        <TableRow key={entry.jobId + entry.createdAt}>
+                      {jobs.items.map((entry, idx) => (
+                        <TableRow key={entry.jobId ?? `log-${idx}`}>
                           <TableCell className="font-mono text-xs">
-                            {entry.jobExists ? (
+                            {entry.jobExists && entry.jobId ? (
                               <Link to={`/jobs/detail/${entry.jobId}`} className="text-primary hover:underline">{shortId(entry.jobId)}</Link>
-                            ) : (
+                            ) : entry.jobId ? (
                               <span className="text-muted-foreground">{shortId(entry.jobId)}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
                             )}
                           </TableCell>
                           <TableCell>
