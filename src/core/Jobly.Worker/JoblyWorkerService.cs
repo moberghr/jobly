@@ -185,7 +185,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         // Signal orchestrator — this job may have a parent that needs finalization,
         // or children that need activation
-        OrchestrationTask<TContext>.Signal();
+        OrchestrationTask<TContext>.SignalOrchestrator();
 
         PerfTrace.Mark(PerfTrace.Done);
         PerfTrace.End();

@@ -21,6 +21,7 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
     private readonly JoblyWorkerConfiguration _configuration;
     private readonly IDistributedLock? _distributedLock;
     private readonly TimeProvider _timeProvider;
+    private readonly SemaphoreSlim _signal = new(0);
     private int? _serverTaskId;
 
     protected ServerTaskBase(
@@ -84,7 +85,7 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
                     if (handle == null)
                     {
                         await UpdateServerTask("Skipped", "Lock held by another server", sw.Elapsed.TotalMilliseconds);
-                        await Task.Delay(interval.Value, stoppingToken);
+                        await WaitForNextRun(interval.Value, stoppingToken);
                         continue;
                     }
 
@@ -112,7 +113,22 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
                 continue;
             }
 
-            await Task.Delay(interval.Value, stoppingToken);
+            await WaitForNextRun(interval.Value, stoppingToken);
+        }
+    }
+
+    /// <summary>
+    /// Signal the task to wake up and check for work immediately.
+    /// </summary>
+    public void Signal() => _signal.Release();
+
+    private async Task WaitForNextRun(TimeSpan interval, CancellationToken stoppingToken)
+    {
+        await _signal.WaitAsync(interval, stoppingToken);
+
+        // Drain extra signals
+        while (_signal.Wait(0))
+        {
         }
     }
 

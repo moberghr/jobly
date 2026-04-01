@@ -172,7 +172,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             JobExecutionContext.Current = null;
         }
 
-        OrchestrationTask<TContext>.Signal();
+        OrchestrationTask<TContext>.SignalOrchestrator();
 
         PerfTrace.Mark(PerfTrace.Done);
         PerfTrace.End();

@@ -4,22 +4,15 @@ using Jobly.Core.Enums;
 using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Jobly.Worker.Services;
 
-public class OrchestrationTask<TContext> : BackgroundService
+public class OrchestrationTask<TContext> : ServerTaskBase<TContext>
     where TContext : DbContext
 {
-    private static readonly SemaphoreSlim _signal = new(0);
-
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<OrchestrationTask<TContext>> _logger;
-    private readonly JoblyWorkerConfiguration _configuration;
-    private readonly IDistributedLockProvider _lockProvider;
-    private readonly TimeProvider _timeProvider;
+    private static OrchestrationTask<TContext>? _instance;
 
     public OrchestrationTask(
         IServiceScopeFactory scopeFactory,
@@ -27,64 +20,25 @@ public class OrchestrationTask<TContext> : BackgroundService
         IOptions<JoblyWorkerConfiguration> configuration,
         IDistributedLockProvider lockProvider,
         TimeProvider timeProvider)
+        : base(scopeFactory, logger, configuration, timeProvider, "jobly:orchestration", lockProvider)
     {
-        _scopeFactory = scopeFactory;
-        _logger = logger;
-        _configuration = configuration.Value;
-        _lockProvider = lockProvider;
-        _timeProvider = timeProvider;
+        _instance = this;
     }
+
+    protected override string TaskName => "Orchestration";
+
+    protected override TimeSpan DefaultInterval => Configuration.OrchestrationInterval;
 
     /// <summary>
     /// Signal the orchestrator to wake up and check for work.
     /// Called by workers after job completion.
     /// </summary>
-    public static void Signal() => _signal.Release();
+    public static void SignalOrchestrator() => _instance?.Signal();
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                // Wait for signal or timeout (safety-net sweep)
-                await _signal.WaitAsync(_configuration.OrchestrationInterval, stoppingToken);
-
-                // Drain extra signals
-                while (_signal.Wait(0))
-                {
-                }
-
-                var distributedLock = _lockProvider.CreateLock("jobly:orchestration");
-                await using var handle = await distributedLock.TryAcquireAsync(timeout: TimeSpan.Zero, stoppingToken);
-                if (handle == null)
-                {
-                    continue; // Another server is handling orchestration
-                }
-
-                // Run orchestration until no more work is found
-                while (!stoppingToken.IsCancellationRequested)
-                {
-                    using var scope = _scopeFactory.CreateScope();
-                    var context = scope.ServiceProvider.GetRequiredService<TContext>();
-
-                    var workDone = await RunOrchestration(context, _timeProvider, _configuration.JobExpirationTimeout, stoppingToken);
-                    if (!workDone)
-                    {
-                        break;
-                    }
-                }
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Orchestration task failed");
-                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
-            }
-        }
+        var workDone = await RunOrchestration(context, TimeProvider, Configuration.JobExpirationTimeout, ct);
+        return workDone ? "Orchestration pass completed" : null;
     }
 
     /// <summary>
