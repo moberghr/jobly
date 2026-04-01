@@ -10,6 +10,7 @@ import {
   Server,
   Moon,
   Sun,
+  LogOut,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import type { DashboardStatistics } from '@/types';
@@ -99,6 +100,13 @@ export default function MainLayout() {
           <button onClick={toggle} className="p-2 rounded-md hover:bg-accent text-muted-foreground">
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
+          {Boolean((window as unknown as Record<string, unknown>).hasBuiltInLogin) && (
+            <form method="POST" action={`${(window as unknown as Record<string, string>).basePath}/logout`}>
+              <button type="submit" className="p-2 rounded-md hover:bg-accent text-muted-foreground ml-1" title="Logout">
+                <LogOut className="h-4 w-4" />
+              </button>
+            </form>
+          )}
         </div>
       </header>
 

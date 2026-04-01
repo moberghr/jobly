@@ -116,38 +116,39 @@ public class JoblyUIMiddleware
     {
         var returnUrl = httpContext.Request.Query["returnUrl"].FirstOrDefault() ?? _options.RoutePrefix;
         var error = httpContext.Request.Query["error"].FirstOrDefault();
+        var errorHtml = error != null ? "<div class=\"error\">Invalid credentials</div>" : "";
+        var actionUrl = $"{_options.RoutePrefix}/login?returnUrl={Uri.EscapeDataString(returnUrl)}";
 
         httpContext.Response.StatusCode = 200;
         httpContext.Response.ContentType = "text/html;charset=utf-8";
-        await httpContext.Response.WriteAsync($$"""
-            <!DOCTYPE html>
-            <html>
-            <head><title>Jobly Login</title>
-            <style>
-                body { font-family: system-ui, -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f5f5f5; }
-                @media (prefers-color-scheme: dark) { body { background: #09090b; } .card { background: #18181b; color: #fafafa; } input { background: #27272a; border-color: #3f3f46; color: #fafafa; } .error { color: #f87171; } }
-                .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); width: 320px; }
-                h1 { font-size: 1.25rem; margin: 0 0 1.5rem; }
-                label { font-size: 0.875rem; display: block; margin-bottom: 0.25rem; }
-                input { width: 100%; padding: 0.5rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 0.875rem; }
-                button { width: 100%; padding: 0.5rem; background: #18181b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; }
-                button:hover { background: #27272a; }
-                .error { color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; }
-            </style></head>
-            <body>
-            <div class="card">
-                <h1>Jobly Dashboard</h1>
-                {{(error != null ? "<div class=\"error\">Invalid credentials</div>" : "")}}
-                <form method="POST" action="{{_options.RoutePrefix}}/login?returnUrl={{Uri.EscapeDataString(returnUrl)}}">
-                    <label>Username</label>
-                    <input type="text" name="username" autofocus />
-                    <label>Password</label>
-                    <input type="password" name="password" />
-                    <button type="submit">Sign in</button>
-                </form>
-            </div>
-            </body></html>
-            """);
+        await httpContext.Response.WriteAsync(
+$@"<!DOCTYPE html>
+<html>
+<head><title>Jobly Login</title>
+<style>
+body {{ font-family: system-ui, -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f5f5f5; }}
+@media (prefers-color-scheme: dark) {{ body {{ background: #09090b; }} .card {{ background: #18181b; color: #fafafa; }} input {{ background: #27272a; border-color: #3f3f46; color: #fafafa; }} .error {{ color: #f87171; }} }}
+.card {{ background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); width: 320px; }}
+h1 {{ font-size: 1.25rem; margin: 0 0 1.5rem; }}
+label {{ font-size: 0.875rem; display: block; margin-bottom: 0.25rem; }}
+input {{ width: 100%; padding: 0.5rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 0.875rem; }}
+button {{ width: 100%; padding: 0.5rem; background: #18181b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem; }}
+button:hover {{ background: #27272a; }}
+.error {{ color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; }}
+</style></head>
+<body>
+<div class=""card"">
+<h1>Jobly Dashboard</h1>
+{errorHtml}
+<form method=""POST"" action=""{actionUrl}"">
+<label>Username</label>
+<input type=""text"" name=""username"" autofocus />
+<label>Password</label>
+<input type=""password"" name=""password"" />
+<button type=""submit"">Sign in</button>
+</form>
+</div>
+</body></html>");
     }
 
     private async Task HandleLogin(HttpContext httpContext)
@@ -203,7 +204,8 @@ public class JoblyUIMiddleware
         htmlString = htmlString.Replace("src=\"./", $"src=\"{_options.RoutePrefix}/", StringComparison.Ordinal);
 
         var headEndIndex = htmlString.IndexOf("</head>", StringComparison.Ordinal);
-        var appSettingsString = $"<script> window.apiPath = \"{_options.RoutePrefix}/api/\"; window.basePath = \"{_options.RoutePrefix}\";</script>";
+        var hasLogin = _options.CredentialValidatorType != null ? "true" : "false";
+        var appSettingsString = $"<script> window.apiPath = \"{_options.RoutePrefix}/api/\"; window.basePath = \"{_options.RoutePrefix}\"; window.hasBuiltInLogin = {hasLogin};</script>";
         htmlString = htmlString.Insert(headEndIndex, appSettingsString);
 
         await response.WriteAsync(htmlString, Encoding.UTF8, response.HttpContext.RequestAborted);
