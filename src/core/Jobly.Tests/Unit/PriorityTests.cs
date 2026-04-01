@@ -15,14 +15,13 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class PriorityTests : IAsyncLifetime
+public abstract class PriorityTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
     private static readonly Guid ServerId = Guid.NewGuid();
     private static readonly Guid WorkerId = Guid.NewGuid();
 
-    public PriorityTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected PriorityTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync()
     {
@@ -53,8 +52,8 @@ public class PriorityTests : IAsyncLifetime
         var effectiveQueues = queues ?? ["a-critical", "b-default", "default"];
 
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(PriorityTests).Assembly);
-        services.AddPipelineBehaviors(typeof(PriorityTests).Assembly);
+        services.AddJobHandlers(typeof(PriorityTestsBase).Assembly);
+        services.AddPipelineBehaviors(typeof(PriorityTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();
@@ -243,4 +242,17 @@ public class PriorityTests : IAsyncLifetime
         var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
         job.CurrentState.ShouldBe(State.Completed);
     }
+}
+
+[Collection("PostgreSql")]
+public class PriorityTests_PostgreSql : PriorityTestsBase
+{
+    public PriorityTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class PriorityTests_SqlServer : PriorityTestsBase
+{
+    public PriorityTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

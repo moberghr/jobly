@@ -8,13 +8,12 @@ using Shouldly;
 
 namespace Jobly.Tests.Integration;
 
-[Collection("PostgreSql")]
-public class TraceIntegrationTests : IAsyncLifetime
+public abstract class TraceIntegrationTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
-    private JoblyTestServer _server = null!;
+    private readonly IDatabaseFixture _fixture;
+    protected JoblyTestServer _server = null!;
 
-    public TraceIntegrationTests(PostgreSqlFixture fixture)
+    protected TraceIntegrationTestsBase(IDatabaseFixture fixture)
     {
         _fixture = fixture;
     }
@@ -22,7 +21,7 @@ public class TraceIntegrationTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.ResetAsync();
-        _server = await JoblyTestServer.StartAsync(_fixture.CreateContext);
+        _server = await JoblyTestServer.StartAsync(_fixture);
     }
 
     public async Task DisposeAsync()
@@ -126,4 +125,17 @@ public class TraceIntegrationTests : IAsyncLifetime
         // Independent jobs should have different TraceIds (each is its own trace root)
         job1.TraceId.ShouldNotBe(job2.TraceId);
     }
+}
+
+[Collection("PostgreSql")]
+public class TraceIntegrationTests_PostgreSql : TraceIntegrationTestsBase
+{
+    public TraceIntegrationTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class TraceIntegrationTests_SqlServer : TraceIntegrationTestsBase
+{
+    public TraceIntegrationTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

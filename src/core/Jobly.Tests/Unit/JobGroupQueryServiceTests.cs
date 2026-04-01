@@ -8,12 +8,11 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class JobGroupQueryServiceTests : IAsyncLifetime
+public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
 
-    public JobGroupQueryServiceTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected JobGroupQueryServiceTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync() => await _fixture.ResetAsync();
 
@@ -269,4 +268,17 @@ public class JobGroupQueryServiceTests : IAsyncLifetime
         result["completed"].ShouldBe(2);
         result["failed"].ShouldBe(1);
     }
+}
+
+[Collection("PostgreSql")]
+public class JobGroupQueryServiceTests_PostgreSql : JobGroupQueryServiceTestsBase
+{
+    public JobGroupQueryServiceTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class JobGroupQueryServiceTests_SqlServer : JobGroupQueryServiceTestsBase
+{
+    public JobGroupQueryServiceTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

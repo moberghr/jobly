@@ -6,7 +6,7 @@ using Testcontainers.MsSql;
 
 namespace Jobly.Tests.Fixtures;
 
-public class SqlServerFixture : IAsyncLifetime
+public class SqlServerFixture : IAsyncLifetime, IDatabaseFixture
 {
     private readonly MsSqlContainer _container = new MsSqlBuilder()
         .WithImage("mcr.microsoft.com/mssql/server:2022-latest")

@@ -8,13 +8,12 @@ using Shouldly;
 
 namespace Jobly.Tests.Integration;
 
-[Collection("PostgreSql")]
-public class ConcurrencyIntegrationTests : IAsyncLifetime
+public abstract class ConcurrencyIntegrationTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
-    private JoblyTestServer _server = null!;
+    private readonly IDatabaseFixture _fixture;
+    protected JoblyTestServer _server = null!;
 
-    public ConcurrencyIntegrationTests(PostgreSqlFixture fixture)
+    protected ConcurrencyIntegrationTestsBase(IDatabaseFixture fixture)
     {
         _fixture = fixture;
     }
@@ -22,7 +21,7 @@ public class ConcurrencyIntegrationTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.ResetAsync();
-        _server = await JoblyTestServer.StartAsync(_fixture.CreateContext);
+        _server = await JoblyTestServer.StartAsync(_fixture);
     }
 
     public async Task DisposeAsync()
@@ -124,4 +123,17 @@ public class ConcurrencyIntegrationTests : IAsyncLifetime
             handlerJobs[0].CurrentState.ShouldBe(State.Completed);
         }
     }
+}
+
+[Collection("PostgreSql")]
+public class ConcurrencyIntegrationTests_PostgreSql : ConcurrencyIntegrationTestsBase
+{
+    public ConcurrencyIntegrationTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class ConcurrencyIntegrationTests_SqlServer : ConcurrencyIntegrationTestsBase
+{
+    public ConcurrencyIntegrationTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

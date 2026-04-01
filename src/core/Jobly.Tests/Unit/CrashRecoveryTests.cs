@@ -8,12 +8,11 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class CrashRecoveryTests : IAsyncLifetime
+public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
 
-    public CrashRecoveryTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected CrashRecoveryTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync() => await _fixture.ResetAsync();
 
@@ -281,4 +280,17 @@ public class CrashRecoveryTests : IAsyncLifetime
         var servers = await readCtx.Set<Server>().CountAsync();
         servers.ShouldBe(0);
     }
+}
+
+[Collection("PostgreSql")]
+public class CrashRecoveryTests_PostgreSql : CrashRecoveryTestsBase
+{
+    public CrashRecoveryTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class CrashRecoveryTests_SqlServer : CrashRecoveryTestsBase
+{
+    public CrashRecoveryTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

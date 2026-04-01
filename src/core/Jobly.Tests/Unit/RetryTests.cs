@@ -16,15 +16,14 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class RetryTests : IAsyncLifetime
+public abstract class RetryTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
     private static readonly Guid ServerId = Guid.NewGuid();
     private static readonly Guid WorkerId = Guid.NewGuid();
     private static readonly string[] DefaultQueues = ["default"];
 
-    public RetryTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected RetryTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync()
     {
@@ -53,8 +52,8 @@ public class RetryTests : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(RetryTests).Assembly);
-        services.AddPipelineBehaviors(typeof(RetryTests).Assembly);
+        services.AddJobHandlers(typeof(RetryTestsBase).Assembly);
+        services.AddPipelineBehaviors(typeof(RetryTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();
@@ -239,4 +238,17 @@ public class RetryTests : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Completed);
         job.RetriedTimes.ShouldBe(1);
     }
+}
+
+[Collection("PostgreSql")]
+public class RetryTests_PostgreSql : RetryTestsBase
+{
+    public RetryTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class RetryTests_SqlServer : RetryTestsBase
+{
+    public RetryTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

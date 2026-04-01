@@ -9,12 +9,11 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class BatchPublisherUnitTests : IAsyncLifetime
+public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
 
-    public BatchPublisherUnitTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected BatchPublisherUnitTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync() => await _fixture.ResetAsync();
 
@@ -153,4 +152,17 @@ public class BatchPublisherUnitTests : IAsyncLifetime
         batch.ShouldNotBeNull();
         batch.Type.ShouldBe("MyBatchName");
     }
+}
+
+[Collection("PostgreSql")]
+public class BatchPublisherUnitTests_PostgreSql : BatchPublisherUnitTestsBase
+{
+    public BatchPublisherUnitTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class BatchPublisherUnitTests_SqlServer : BatchPublisherUnitTestsBase
+{
+    public BatchPublisherUnitTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

@@ -17,15 +17,14 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class HandlerLogTests : IAsyncLifetime
+public abstract class HandlerLogTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
     private static readonly Guid ServerId = Guid.NewGuid();
     private static readonly Guid WorkerId = Guid.NewGuid();
     private static readonly string[] DefaultQueues = ["default"];
 
-    public HandlerLogTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected HandlerLogTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync()
     {
@@ -54,8 +53,8 @@ public class HandlerLogTests : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(HandlerLogTests).Assembly);
-        services.AddPipelineBehaviors(typeof(HandlerLogTests).Assembly);
+        services.AddJobHandlers(typeof(HandlerLogTestsBase).Assembly);
+        services.AddPipelineBehaviors(typeof(HandlerLogTestsBase).Assembly);
         services.AddLogging(builder => builder.AddProvider(new JobLoggerProvider()));
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();
@@ -254,4 +253,17 @@ public class HandlerLogTests : IAsyncLifetime
         logs1.ShouldContain(l => l.Message.Contains("Processing logging request", StringComparison.Ordinal));
         logs2.ShouldContain(l => l.Message.Contains("About to fail", StringComparison.Ordinal));
     }
+}
+
+[Collection("PostgreSql")]
+public class HandlerLogTests_PostgreSql : HandlerLogTestsBase
+{
+    public HandlerLogTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class HandlerLogTests_SqlServer : HandlerLogTestsBase
+{
+    public HandlerLogTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

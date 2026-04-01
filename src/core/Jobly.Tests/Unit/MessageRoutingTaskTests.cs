@@ -10,12 +10,11 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class MessageRoutingTaskTests : IAsyncLifetime
+public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
 
-    public MessageRoutingTaskTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected MessageRoutingTaskTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync() => await _fixture.ResetAsync();
 
@@ -24,7 +23,7 @@ public class MessageRoutingTaskTests : IAsyncLifetime
     private static IServiceScopeFactory BuildScopeFactory()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(MessageRoutingTaskTests).Assembly);
+        services.AddJobHandlers(typeof(MessageRoutingTaskTestsBase).Assembly);
         services.AddSingleton<MultiHandlerCounter>();
         var provider = services.BuildServiceProvider();
         return provider.GetRequiredService<IServiceScopeFactory>();
@@ -184,4 +183,17 @@ public class MessageRoutingTaskTests : IAsyncLifetime
             msg.CurrentState.ShouldBe(State.Processing);
         }
     }
+}
+
+[Collection("PostgreSql")]
+public class MessageRoutingTaskTests_PostgreSql : MessageRoutingTaskTestsBase
+{
+    public MessageRoutingTaskTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class MessageRoutingTaskTests_SqlServer : MessageRoutingTaskTestsBase
+{
+    public MessageRoutingTaskTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

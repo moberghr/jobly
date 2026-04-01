@@ -5,13 +5,12 @@ using Shouldly;
 
 namespace Jobly.Tests.Integration;
 
-[Collection("PostgreSql")]
-public class CancellationIntegrationTests : IAsyncLifetime
+public abstract class CancellationIntegrationTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
-    private JoblyTestServer _server = null!;
+    private readonly IDatabaseFixture _fixture;
+    protected JoblyTestServer _server = null!;
 
-    public CancellationIntegrationTests(PostgreSqlFixture fixture)
+    protected CancellationIntegrationTestsBase(IDatabaseFixture fixture)
     {
         _fixture = fixture;
     }
@@ -19,7 +18,7 @@ public class CancellationIntegrationTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.ResetAsync();
-        _server = await JoblyTestServer.StartAsync(_fixture.CreateContext);
+        _server = await JoblyTestServer.StartAsync(_fixture);
     }
 
     public async Task DisposeAsync()
@@ -69,4 +68,17 @@ public class CancellationIntegrationTests : IAsyncLifetime
         // NOT the full 30s of CancellableRequest
         sw.Elapsed.TotalSeconds.ShouldBeLessThan(10);
     }
+}
+
+[Collection("PostgreSql")]
+public class CancellationIntegrationTests_PostgreSql : CancellationIntegrationTestsBase
+{
+    public CancellationIntegrationTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class CancellationIntegrationTests_SqlServer : CancellationIntegrationTestsBase
+{
+    public CancellationIntegrationTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

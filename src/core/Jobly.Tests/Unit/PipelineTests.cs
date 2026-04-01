@@ -17,15 +17,14 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class PipelineTests : IAsyncLifetime
+public abstract class PipelineTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
     private static readonly Guid ServerId = Guid.NewGuid();
     private static readonly Guid WorkerId = Guid.NewGuid();
     private static readonly string[] DefaultQueues = ["default"];
 
-    public PipelineTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected PipelineTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync()
     {
@@ -54,8 +53,8 @@ public class PipelineTests : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(PipelineTests).Assembly);
-        services.AddPipelineBehaviors(typeof(PipelineTests).Assembly);
+        services.AddJobHandlers(typeof(PipelineTestsBase).Assembly);
+        services.AddPipelineBehaviors(typeof(PipelineTestsBase).Assembly);
         services.AddLogging(builder => builder.AddProvider(new JobLoggerProvider()));
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();
@@ -126,4 +125,17 @@ public class PipelineTests : IAsyncLifetime
         handlerLogs.ShouldContain(l => l.Message.Contains("Pipeline before handler"));
         handlerLogs.ShouldContain(l => l.Message.Contains("Pipeline after handler"));
     }
+}
+
+[Collection("PostgreSql")]
+public class PipelineTests_PostgreSql : PipelineTestsBase
+{
+    public PipelineTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class PipelineTests_SqlServer : PipelineTestsBase
+{
+    public PipelineTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

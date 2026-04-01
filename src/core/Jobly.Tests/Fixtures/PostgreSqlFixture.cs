@@ -6,7 +6,7 @@ using Testcontainers.PostgreSql;
 
 namespace Jobly.Tests.Fixtures;
 
-public class PostgreSqlFixture : IAsyncLifetime
+public class PostgreSqlFixture : IAsyncLifetime, IDatabaseFixture
 {
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
         .WithImage("postgres:latest")

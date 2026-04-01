@@ -8,13 +8,12 @@ using Shouldly;
 
 namespace Jobly.Tests.Integration;
 
-[Collection("PostgreSql")]
-public class ContinuationIntegrationTests : IAsyncLifetime
+public abstract class ContinuationIntegrationTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
-    private JoblyTestServer _server = null!;
+    private readonly IDatabaseFixture _fixture;
+    protected JoblyTestServer _server = null!;
 
-    public ContinuationIntegrationTests(PostgreSqlFixture fixture)
+    protected ContinuationIntegrationTestsBase(IDatabaseFixture fixture)
     {
         _fixture = fixture;
     }
@@ -22,7 +21,7 @@ public class ContinuationIntegrationTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.ResetAsync();
-        _server = await JoblyTestServer.StartAsync(_fixture.CreateContext);
+        _server = await JoblyTestServer.StartAsync(_fixture);
     }
 
     public async Task DisposeAsync()
@@ -128,4 +127,17 @@ public class ContinuationIntegrationTests : IAsyncLifetime
         var child = await ctx.Set<Job>().FirstAsync(j => j.Id == childId);
         child.CurrentState.ShouldBe(State.Completed);
     }
+}
+
+[Collection("PostgreSql")]
+public class ContinuationIntegrationTests_PostgreSql : ContinuationIntegrationTestsBase
+{
+    public ContinuationIntegrationTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class ContinuationIntegrationTests_SqlServer : ContinuationIntegrationTestsBase
+{
+    public ContinuationIntegrationTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

@@ -17,15 +17,14 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class JobLogTests : IAsyncLifetime
+public abstract class JobLogTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
     private static readonly Guid ServerId = Guid.NewGuid();
     private static readonly Guid WorkerId = Guid.NewGuid();
     private static readonly string[] DefaultQueues = ["default"];
 
-    public JobLogTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected JobLogTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync()
     {
@@ -54,8 +53,8 @@ public class JobLogTests : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(JobLogTests).Assembly);
-        services.AddPipelineBehaviors(typeof(JobLogTests).Assembly);
+        services.AddJobHandlers(typeof(JobLogTestsBase).Assembly);
+        services.AddPipelineBehaviors(typeof(JobLogTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();
@@ -206,4 +205,17 @@ public class JobLogTests : IAsyncLifetime
 
         logs.ShouldContain(l => l.EventType == "Requeued");
     }
+}
+
+[Collection("PostgreSql")]
+public class JobLogTests_PostgreSql : JobLogTestsBase
+{
+    public JobLogTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class JobLogTests_SqlServer : JobLogTestsBase
+{
+    public JobLogTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

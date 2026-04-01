@@ -9,13 +9,12 @@ using Shouldly;
 
 namespace Jobly.Tests.Integration;
 
-[Collection("PostgreSql")]
-public class EndToEndIntegrationTests : IAsyncLifetime
+public abstract class EndToEndIntegrationTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
-    private JoblyTestServer _server = null!;
+    private readonly IDatabaseFixture _fixture;
+    protected JoblyTestServer _server = null!;
 
-    public EndToEndIntegrationTests(PostgreSqlFixture fixture)
+    protected EndToEndIntegrationTestsBase(IDatabaseFixture fixture)
     {
         _fixture = fixture;
     }
@@ -23,7 +22,7 @@ public class EndToEndIntegrationTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.ResetAsync();
-        _server = await JoblyTestServer.StartAsync(_fixture.CreateContext);
+        _server = await JoblyTestServer.StartAsync(_fixture);
     }
 
     public async Task DisposeAsync()
@@ -151,4 +150,17 @@ public class EndToEndIntegrationTests : IAsyncLifetime
         statsSucceeded.ShouldBe(completedJobs, "stats:succeeded should match completed job count");
         statsFailed.ShouldBe(failedJobs, "stats:failed should match failed job count");
     }
+}
+
+[Collection("PostgreSql")]
+public class EndToEndIntegrationTests_PostgreSql : EndToEndIntegrationTestsBase
+{
+    public EndToEndIntegrationTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class EndToEndIntegrationTests_SqlServer : EndToEndIntegrationTestsBase
+{
+    public EndToEndIntegrationTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

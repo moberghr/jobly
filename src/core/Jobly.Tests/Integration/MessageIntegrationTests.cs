@@ -8,13 +8,12 @@ using Shouldly;
 
 namespace Jobly.Tests.Integration;
 
-[Collection("PostgreSql")]
-public class MessageIntegrationTests : IAsyncLifetime
+public abstract class MessageIntegrationTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
-    private JoblyTestServer _server = null!;
+    private readonly IDatabaseFixture _fixture;
+    protected JoblyTestServer _server = null!;
 
-    public MessageIntegrationTests(PostgreSqlFixture fixture)
+    protected MessageIntegrationTestsBase(IDatabaseFixture fixture)
     {
         _fixture = fixture;
     }
@@ -22,7 +21,7 @@ public class MessageIntegrationTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.ResetAsync();
-        _server = await JoblyTestServer.StartAsync(_fixture.CreateContext);
+        _server = await JoblyTestServer.StartAsync(_fixture);
     }
 
     public async Task DisposeAsync()
@@ -169,4 +168,17 @@ public class MessageIntegrationTests : IAsyncLifetime
             .CountAsync(j => j.Kind == JobKind.Job && j.ParentJobId != null && messageIds.Contains(j.ParentJobId.Value));
         totalHandlerJobs.ShouldBe(6);
     }
+}
+
+[Collection("PostgreSql")]
+public class MessageIntegrationTests_PostgreSql : MessageIntegrationTestsBase
+{
+    public MessageIntegrationTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class MessageIntegrationTests_SqlServer : MessageIntegrationTestsBase
+{
+    public MessageIntegrationTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

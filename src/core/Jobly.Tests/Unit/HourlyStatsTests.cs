@@ -17,15 +17,14 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class HourlyStatsTests : IAsyncLifetime
+public abstract class HourlyStatsTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
     private static readonly Guid ServerId = Guid.NewGuid();
     private static readonly Guid WorkerId = Guid.NewGuid();
     private static readonly string[] DefaultQueues = ["default"];
 
-    public HourlyStatsTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected HourlyStatsTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync()
     {
@@ -54,8 +53,8 @@ public class HourlyStatsTests : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(HourlyStatsTests).Assembly);
-        services.AddPipelineBehaviors(typeof(HourlyStatsTests).Assembly);
+        services.AddJobHandlers(typeof(HourlyStatsTestsBase).Assembly);
+        services.AddPipelineBehaviors(typeof(HourlyStatsTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();
@@ -216,4 +215,17 @@ public class HourlyStatsTests : IAsyncLifetime
         status.TotalFailed.ShouldBe(7);
         status.TotalDeleted.ShouldBe(3);
     }
+}
+
+[Collection("PostgreSql")]
+public class HourlyStatsTests_PostgreSql : HourlyStatsTestsBase
+{
+    public HourlyStatsTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class HourlyStatsTests_SqlServer : HourlyStatsTestsBase
+{
+    public HourlyStatsTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

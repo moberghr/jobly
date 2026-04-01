@@ -17,15 +17,14 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class RetentionTests : IAsyncLifetime
+public abstract class RetentionTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
     private static readonly Guid ServerId = Guid.NewGuid();
     private static readonly Guid WorkerId = Guid.NewGuid();
     private static readonly string[] DefaultQueues = ["default"];
 
-    public RetentionTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected RetentionTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync()
     {
@@ -54,8 +53,8 @@ public class RetentionTests : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(RetentionTests).Assembly);
-        services.AddPipelineBehaviors(typeof(RetentionTests).Assembly);
+        services.AddJobHandlers(typeof(RetentionTestsBase).Assembly);
+        services.AddPipelineBehaviors(typeof(RetentionTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();
@@ -326,4 +325,17 @@ public class RetentionTests : IAsyncLifetime
         var logs = await readCtx.Set<JobLog>().Where(l => l.JobId == jobId).ToListAsync();
         logs.ShouldBeEmpty();
     }
+}
+
+[Collection("PostgreSql")]
+public class RetentionTests_PostgreSql : RetentionTestsBase
+{
+    public RetentionTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class RetentionTests_SqlServer : RetentionTestsBase
+{
+    public RetentionTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

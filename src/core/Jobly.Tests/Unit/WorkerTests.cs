@@ -17,15 +17,14 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class WorkerTests : IAsyncLifetime
+public abstract class WorkerTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
     private static readonly Guid ServerId = Guid.NewGuid();
     private static readonly Guid WorkerId = Guid.NewGuid();
     private static readonly string[] DefaultQueues = ["default"];
 
-    public WorkerTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected WorkerTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync()
     {
@@ -55,8 +54,8 @@ public class WorkerTests : IAsyncLifetime
     private (JoblyWorkerService<TestContext> Worker, IServiceScopeFactory ScopeFactory) CreateWorker(string[]? queues = null)
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(WorkerTests).Assembly);
-        services.AddPipelineBehaviors(typeof(WorkerTests).Assembly);
+        services.AddJobHandlers(typeof(WorkerTestsBase).Assembly);
+        services.AddPipelineBehaviors(typeof(WorkerTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();
@@ -270,4 +269,17 @@ public class WorkerTests : IAsyncLifetime
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Completed);
     }
+}
+
+[Collection("PostgreSql")]
+public class WorkerTests_PostgreSql : WorkerTestsBase
+{
+    public WorkerTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class WorkerTests_SqlServer : WorkerTestsBase
+{
+    public WorkerTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

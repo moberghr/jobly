@@ -12,12 +12,11 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class RecurringJobTests : IAsyncLifetime
+public abstract class RecurringJobTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
 
-    public RecurringJobTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected RecurringJobTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync() => await _fixture.ResetAsync();
 
@@ -189,4 +188,17 @@ public class RecurringJobTests : IAsyncLifetime
         var jobCountAfter = await _fixture.CreateContext().Set<Job>().CountAsync();
         jobCountAfter.ShouldBeGreaterThan(jobCountBefore);
     }
+}
+
+[Collection("PostgreSql")]
+public class RecurringJobTests_PostgreSql : RecurringJobTestsBase
+{
+    public RecurringJobTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class RecurringJobTests_SqlServer : RecurringJobTestsBase
+{
+    public RecurringJobTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

@@ -8,13 +8,12 @@ using Shouldly;
 
 namespace Jobly.Tests.Integration;
 
-[Collection("PostgreSql")]
-public class RetryIntegrationTests : IAsyncLifetime
+public abstract class RetryIntegrationTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
-    private JoblyTestServer _server = null!;
+    private readonly IDatabaseFixture _fixture;
+    protected JoblyTestServer _server = null!;
 
-    public RetryIntegrationTests(PostgreSqlFixture fixture)
+    protected RetryIntegrationTestsBase(IDatabaseFixture fixture)
     {
         _fixture = fixture;
     }
@@ -22,7 +21,7 @@ public class RetryIntegrationTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.ResetAsync();
-        _server = await JoblyTestServer.StartAsync(_fixture.CreateContext);
+        _server = await JoblyTestServer.StartAsync(_fixture);
     }
 
     public async Task DisposeAsync()
@@ -93,4 +92,17 @@ public class RetryIntegrationTests : IAsyncLifetime
             .CountAsync(l => l.JobId == jobId && l.EventType == "Failed");
         failedLogs.ShouldBe(1);
     }
+}
+
+[Collection("PostgreSql")]
+public class RetryIntegrationTests_PostgreSql : RetryIntegrationTestsBase
+{
+    public RetryIntegrationTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class RetryIntegrationTests_SqlServer : RetryIntegrationTestsBase
+{
+    public RetryIntegrationTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

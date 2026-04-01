@@ -4,6 +4,7 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Services;
+using Jobly.Tests.Fixtures;
 using Jobly.Worker;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,12 +19,12 @@ namespace Jobly.Tests.Integration;
 public class JoblyTestServer : IAsyncDisposable
 {
     private readonly IHost _host;
-    private readonly Func<TestContext> _createContext;
+    private readonly IDatabaseFixture _fixture;
 
-    private JoblyTestServer(IHost host, Func<TestContext> createContext)
+    private JoblyTestServer(IHost host, IDatabaseFixture fixture)
     {
         _host = host;
-        _createContext = createContext;
+        _fixture = fixture;
     }
 
     public IPublisher CreatePublisher()
@@ -38,7 +39,7 @@ public class JoblyTestServer : IAsyncDisposable
         return scope.ServiceProvider.GetRequiredService<IBatchPublisher>();
     }
 
-    public TestContext CreateContext() => _createContext();
+    public TestContext CreateContext() => _fixture.CreateContext();
 
     public IJobCommandService CreateCommandService()
     {
@@ -46,18 +47,23 @@ public class JoblyTestServer : IAsyncDisposable
         return scope.ServiceProvider.GetRequiredService<IJobCommandService>();
     }
 
-    public static async Task<JoblyTestServer> StartAsync(Func<TestContext> createContext)
+    public static async Task<JoblyTestServer> StartAsync(IDatabaseFixture fixture)
     {
-        var tempCtx = createContext();
+        var tempCtx = fixture.CreateContext();
         var connectionString = tempCtx.Database.GetConnectionString()!;
+        var isPostgres = tempCtx.Database.ProviderName?.Contains("Npgsql") == true;
         tempCtx.Dispose();
 
         var host = Host.CreateDefaultBuilder()
             .ConfigureServices(services =>
             {
                 services.AddDbContext<TestContext>(options =>
-                    options.UseNpgsql(connectionString)
-                        .UseSnakeCaseNamingConvention());
+                {
+                    if (isPostgres)
+                        options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention();
+                    else
+                        options.UseSqlServer(connectionString);
+                });
 
                 services.AddJobHandlers(typeof(JoblyTestServer).Assembly);
                 services.AddPipelineBehaviors(typeof(JoblyTestServer).Assembly);
@@ -81,7 +87,7 @@ public class JoblyTestServer : IAsyncDisposable
 
         await host.StartAsync();
 
-        return new JoblyTestServer(host, createContext);
+        return new JoblyTestServer(host, fixture);
     }
 
     public async Task WaitForJobState(Guid jobId, State state, TimeSpan? timeout = null)

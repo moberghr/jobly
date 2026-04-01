@@ -8,13 +8,12 @@ using Shouldly;
 
 namespace Jobly.Tests.Integration;
 
-[Collection("PostgreSql")]
-public class BatchIntegrationTests : IAsyncLifetime
+public abstract class BatchIntegrationTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
-    private JoblyTestServer _server = null!;
+    private readonly IDatabaseFixture _fixture;
+    protected JoblyTestServer _server = null!;
 
-    public BatchIntegrationTests(PostgreSqlFixture fixture)
+    protected BatchIntegrationTestsBase(IDatabaseFixture fixture)
     {
         _fixture = fixture;
     }
@@ -22,7 +21,7 @@ public class BatchIntegrationTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.ResetAsync();
-        _server = await JoblyTestServer.StartAsync(_fixture.CreateContext);
+        _server = await JoblyTestServer.StartAsync(_fixture);
     }
 
     public async Task DisposeAsync()
@@ -219,4 +218,17 @@ public class BatchIntegrationTests : IAsyncLifetime
             .ToListAsync();
         childJobs.ShouldAllBe(j => j.CurrentState == State.Failed);
     }
+}
+
+[Collection("PostgreSql")]
+public class BatchIntegrationTests_PostgreSql : BatchIntegrationTestsBase
+{
+    public BatchIntegrationTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class BatchIntegrationTests_SqlServer : BatchIntegrationTestsBase
+{
+    public BatchIntegrationTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

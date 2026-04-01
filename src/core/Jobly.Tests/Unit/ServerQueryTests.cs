@@ -6,12 +6,11 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class ServerQueryTests : IAsyncLifetime
+public abstract class ServerQueryTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
 
-    public ServerQueryTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected ServerQueryTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync() => await _fixture.ResetAsync();
 
@@ -188,4 +187,17 @@ public class ServerQueryTests : IAsyncLifetime
         recovery.LastMessage.ShouldBe("Requeued 2 stale jobs");
         recovery.LastDurationMs.ShouldBe(42.5);
     }
+}
+
+[Collection("PostgreSql")]
+public class ServerQueryTests_PostgreSql : ServerQueryTestsBase
+{
+    public ServerQueryTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class ServerQueryTests_SqlServer : ServerQueryTestsBase
+{
+    public ServerQueryTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

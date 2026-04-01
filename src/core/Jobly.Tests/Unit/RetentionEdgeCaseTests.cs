@@ -17,15 +17,14 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class RetentionEdgeCaseTests : IAsyncLifetime
+public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
     private static readonly Guid ServerId = Guid.NewGuid();
     private static readonly Guid WorkerId = Guid.NewGuid();
     private static readonly string[] DefaultQueues = ["default"];
 
-    public RetentionEdgeCaseTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected RetentionEdgeCaseTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync()
     {
@@ -54,8 +53,8 @@ public class RetentionEdgeCaseTests : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(RetentionEdgeCaseTests).Assembly);
-        services.AddPipelineBehaviors(typeof(RetentionEdgeCaseTests).Assembly);
+        services.AddJobHandlers(typeof(RetentionEdgeCaseTestsBase).Assembly);
+        services.AddPipelineBehaviors(typeof(RetentionEdgeCaseTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();
@@ -244,4 +243,17 @@ public class RetentionEdgeCaseTests : IAsyncLifetime
 
         failedAfter.ShouldBe(failedBefore - 1);
     }
+}
+
+[Collection("PostgreSql")]
+public class RetentionEdgeCaseTests_PostgreSql : RetentionEdgeCaseTestsBase
+{
+    public RetentionEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class RetentionEdgeCaseTests_SqlServer : RetentionEdgeCaseTestsBase
+{
+    public RetentionEdgeCaseTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }

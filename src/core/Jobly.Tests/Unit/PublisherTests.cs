@@ -11,12 +11,11 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
-[Collection("PostgreSql")]
-public class PublisherTests : IAsyncLifetime
+public abstract class PublisherTestsBase : IAsyncLifetime
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
 
-    public PublisherTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    protected PublisherTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
     public async Task InitializeAsync() => await _fixture.ResetAsync();
 
@@ -169,4 +168,17 @@ public class PublisherTests : IAsyncLifetime
         job.ShouldNotBeNull();
         job.ScheduleTime.ShouldBeGreaterThan(DateTime.UtcNow.AddHours(1));
     }
+}
+
+[Collection("PostgreSql")]
+public class PublisherTests_PostgreSql : PublisherTestsBase
+{
+    public PublisherTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class PublisherTests_SqlServer : PublisherTestsBase
+{
+    public PublisherTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
 }
