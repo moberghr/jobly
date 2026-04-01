@@ -56,6 +56,21 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 app.UseJoblyUI(); // Serves at /jobly
 ```
 
+To protect the dashboard with authentication:
+
+```csharp
+// Dashboard with auth (optional)
+app.UseJoblyUI(options =>
+{
+    options.Authorization = new MyAuthFilter();
+    options.UnauthorizedRedirectUrl = "/login";
+});
+```
+
+:::tip TimeProvider
+Jobly automatically registers a `TimeProvider` in the DI container if one is not already registered. You do not need to add it yourself.
+:::
+
 ### 5. Define handlers
 
 ```csharp

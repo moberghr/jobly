@@ -13,6 +13,7 @@ builder.Services.AddJobly<AppDbContext>(options =>
 {
     options.RetryCount = 3;        // Default max retries for new jobs (default: 0)
     options.DefaultQueue = "default"; // Queue name when none specified (default: "default")
+    options.JobExpirationTimeout = TimeSpan.FromDays(1); // How long completed/deleted jobs kept (default: 1 day)
 });
 ```
 
@@ -20,6 +21,7 @@ builder.Services.AddJobly<AppDbContext>(options =>
 |--------|------|---------|-------------|
 | `RetryCount` | `int` | `0` | Default max retries for jobs that don't specify their own |
 | `DefaultQueue` | `string` | `"default"` | Queue used when no queue is specified at publish time |
+| `JobExpirationTimeout` | `TimeSpan` | `1 day` | How long completed/deleted jobs are kept before cleanup. Failed jobs never expire. |
 
 ## Worker Configuration (`JoblyWorkerConfiguration`)
 
@@ -33,6 +35,12 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     options.PollingInterval = TimeSpan.FromSeconds(1);
     options.Queues = ["a-critical", "b-default", "c-low"];
 
+    // Dispatcher mode (batch-fetch instead of per-worker polling)
+    options.UseDispatcher = false;
+
+    // Cancellation
+    options.CancellationCheckInterval = TimeSpan.FromSeconds(5);
+
     // Server identity
     options.ServerName = "my-api-server";
     options.ServerId = Guid.NewGuid(); // Auto-generated, rarely needs override
@@ -45,6 +53,15 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     // Job retention
     options.JobExpirationTimeout = TimeSpan.FromDays(1);
     options.ExpirationBatchSize = 1000;
+    options.MaxExpirableJobCount = null; // Null = unlimited
+
+    // Background task intervals
+    options.OrchestrationInterval = TimeSpan.FromSeconds(10);
+    options.MessageRoutingInterval = TimeSpan.FromSeconds(1);
+    options.CounterAggregationInterval = TimeSpan.FromSeconds(5);
+    options.ServerCleanupInterval = TimeSpan.FromSeconds(30);
+    options.StaleJobRecoveryInterval = TimeSpan.FromSeconds(30);
+    options.ExpirationCleanupInterval = TimeSpan.FromSeconds(60);
 
     // Inherited from JoblyConfiguration
     options.RetryCount = 3;
@@ -59,6 +76,18 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 | `WorkerCount` | `int` | `min(CPU * 5, 20)` | Number of concurrent worker threads |
 | `PollingInterval` | `TimeSpan` | `1 second` | Delay between polls when no jobs are available |
 | `Queues` | `string[]` | `["default"]` | Queues this worker subscribes to. Processed in alphabetical order |
+
+### Cancellation
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `CancellationCheckInterval` | `TimeSpan` | `5 seconds` | How often the worker checks if a running job has been cancelled. Also refreshes the keep-alive timestamp. |
+
+### Dispatcher Mode
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `UseDispatcher` | `bool` | `false` | When true, uses a batch-fetch dispatcher instead of per-worker polling |
 
 ### Worker Groups
 
@@ -109,12 +138,24 @@ This creates 7 workers total: 5 polling `critical` every 100ms, and 2 polling `r
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `JobExpirationTimeout` | `TimeSpan` | `1 day` | How long completed/deleted jobs are kept before cleanup |
-| `ExpirationBatchSize` | `int` | `1000` | Max number of expired jobs to clean up per health check cycle |
+| `JobExpirationTimeout` | `TimeSpan` | `1 day` | How long completed/deleted jobs are kept before cleanup (inherited from `JoblyConfiguration`) |
+| `ExpirationBatchSize` | `int` | `1000` | Batch size for cleanup operations |
+| `MaxExpirableJobCount` | `int?` | `null` | Max jobs with `ExpireAt` to retain. Oldest deleted first. `null` = disabled (no cap). |
 
 :::info Failed jobs never expire
 Failed jobs have `ExpireAt = null` and are never automatically deleted. They must be manually deleted or requeued from the dashboard.
 :::
+
+### Background Task Intervals
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `OrchestrationInterval` | `TimeSpan` | `10 seconds` | Fallback sweep interval for parent finalization |
+| `MessageRoutingInterval` | `TimeSpan` | `1 second` | Message routing poll interval |
+| `CounterAggregationInterval` | `TimeSpan` | `5 seconds` | Counter aggregation interval |
+| `ServerCleanupInterval` | `TimeSpan` | `30 seconds` | Dead server cleanup interval |
+| `StaleJobRecoveryInterval` | `TimeSpan` | `30 seconds` | Stale job recovery interval |
+| `ExpirationCleanupInterval` | `TimeSpan` | `60 seconds` | Expiration cleanup interval |
 
 ## Queue Ordering
 

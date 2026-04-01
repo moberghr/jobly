@@ -8,6 +8,16 @@ Browse jobs by state using the left sidebar: Enqueued, Scheduled, Processing, Co
 
 Each state shows a count. Bulk requeue or delete with checkboxes.
 
+Processing jobs that are being gracefully cancelled display a **"Cancelling..."** badge instead of the normal Processing badge. This indicates the worker has received the cancellation signal (`CancellationMode = Graceful`) and the handler's `CancellationToken` has been triggered, but the handler has not yet completed.
+
+### Failed Jobs Type Filter
+
+The Failed state includes a type count bar at the top of the job list. Each bar segment represents a job type with its failure count. Click a type to filter the list to only that type. When a type filter is active, **"Delete All"** and **"Requeue All"** buttons appear, allowing bulk operations on all failed jobs of that specific type.
+
+### Requeue Behavior
+
+Requeueing a job resets its `ScheduleTime` to now, so the job executes immediately rather than retaining its original schedule time.
+
 ![Failed Jobs](/img/screenshots/02-jobs-failed.png)
 
 ## Job Detail

@@ -113,6 +113,27 @@ await batchPublisher.StartNew(jobs, BatchContinuationOptions.OnlyOnSucceeded);
 await batchPublisher.StartNew(jobs, BatchContinuationOptions.OnAnyFinishedState);
 ```
 
+### Recurring Jobs
+
+Register a cron-based recurring job:
+
+```csharp
+await recurringPublisher.AddOrUpdateRecurringJob(
+    new CleanupSessions(), name: "session-cleanup", cron: "0 * * * *");
+```
+
+This only registers the definition. The `RecurringJobSchedulerTask` creates jobs when the cron time arrives. See [Recurring Jobs](./recurring-jobs.md) for full details.
+
+### Cancellation
+
+Cancel a running job gracefully:
+
+```csharp
+await jobCommandService.DeleteJob(jobId);
+```
+
+If the job is processing, this sets `CancellationMode = Graceful` instead of immediately changing state. The worker detects it and cancels the handler's `CancellationToken`. See [Job Cancellation](./cancellation.md) for the full flow.
+
 ## Pipeline Behaviors
 
 Pipeline behaviors wrap all handler invocations (both messages and jobs):

@@ -9,7 +9,7 @@ Jobly uses a **sliding invisibility timeout** (inspired by Hangfire) to detect a
 ## How It Works
 
 1. When a worker picks up a job, it sets `LastKeepAlive = now` on the job row.
-2. During execution, a background loop refreshes `LastKeepAlive` every minute.
+2. During execution, the `RunJobMonitor` refreshes `LastKeepAlive` every `CancellationCheckInterval` (default 5 seconds).
 3. If the worker crashes, the keep-alive stops. After 5 minutes, the job's `LastKeepAlive` becomes stale.
 4. The health manager detects stale jobs and requeues them automatically.
 
@@ -40,9 +40,10 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 
 ```
 T=0:00  Worker picks up Job, sets LastKeepAlive
-T=1:00  Keep-alive refreshes LastKeepAlive
-T=1:30  Server crashes. Keep-alive stops.
-T=5:00  Health manager: job has no keep-alive for >5 min
+T=0:05  RunJobMonitor refreshes LastKeepAlive
+T=0:10  RunJobMonitor refreshes LastKeepAlive
+T=0:12  Server crashes. Keep-alive stops.
+T=5:12  Health manager: job has no keep-alive for >5 min
         → Job requeued (State = Enqueued, RetriedTimes unchanged)
         → Another worker picks it up and completes it
 ```
