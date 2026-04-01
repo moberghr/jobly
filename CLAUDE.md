@@ -17,10 +17,11 @@ Ships as NuGet packages (Jobly.Core, Jobly.UI, Jobly.Worker). Supports PostgreSQ
 # Backend (from src/)
 dotnet build Jobly.sln
 dotnet test Jobly.sln --filter "Category!=SqlServer"   # PostgreSQL only
-dotnet test Jobly.sln                                    # All databases (295 tests, ~27s)
+dotnet test Jobly.sln                                    # All databases (386 tests, ~28s)
 
-# Run a specific test
-dotnet test Jobly.sln --filter "FullyQualifiedName~ConcurrencyTests"
+# Run specific test suites
+dotnet test Jobly.sln --filter "FullyQualifiedName~Jobly.Tests.Unit"         # Unit tests only
+dotnet test Jobly.sln --filter "FullyQualifiedName~Jobly.Tests.Integration"  # Integration tests only
 
 # Frontend (from src/ui/)
 npm install
@@ -30,14 +31,17 @@ npm run build    # Production build
 
 ## Architecture
 
-### Publishing
+### Unified Data Model
+
+Everything is a **Job** with a `Kind` discriminator enum (`Job=1, Message=2, Batch=3`). Messages and Batches are Jobs that spawn/group child jobs. The `ParentJobId` chain handles all relationships — no separate Message or Batch tables.
 
 ```csharp
-publisher.Publish(new OrderCreated());                    // IMessage → fan-out to N handlers
-publisher.Enqueue(new SendReport());                      // IJob → single handler
+publisher.Publish(new OrderCreated());                    // IMessage → Kind=Message job, routed to N handlers
+publisher.Enqueue(new SendReport());                      // IJob → Kind=Job, single handler
 publisher.Schedule(new SendReport(), tomorrow);           // IJob → scheduled
 publisher.Enqueue(new Task(), queue: "critical");         // Named queue
 publisher.Enqueue(new FollowUp(), parentJobId: id);       // Continuation
+batchPublisher.StartNew(jobs);                            // Kind=Batch job, children linked via ParentJobId
 ```
 
 ### Handler Interfaces
@@ -48,64 +52,174 @@ public interface IJobHandler<in T> where T : IJob { Task HandleAsync(T message, 
 public interface IPipelineBehavior<in T> where T : class { Task HandleAsync(T message, JobHandlerDelegate next, CancellationToken ct); }
 ```
 
-### Data Model
+### Job Entity
 
-- **Message** — Published intent (Type, Payload, Queue, State, JobCount, ExpireAt).
-- **Job** — Execution unit (Type, Message, HandlerType, MessageId, Queue, State, ScheduleTime, MaxRetries, RetriedTimes, ParentJobId, BatchId, CurrentWorkerId, TraceId, SpawnedByJobId, ExpireAt).
-- **JobLog** — Unified audit trail. EventType: Created, Processing, Completed, Failed, Requeued, Deleted, Log (ILogger output).
-- **Statistic** — Persistent counters (totals + hourly time-series). Seeded via HasData. Atomic ExecuteUpdateAsync increments.
-- **Batch** — Groups Jobs with counter for batch completion.
-- **RecurringJob** — Cron-based scheduled Jobs.
-- **Server** / **Worker** — Health monitoring, heartbeat, orphaned job recovery.
+Single table with `Kind` enum. Key fields:
+- **Shared**: Id, Kind, Type, Message (payload), CreateTime, CurrentState, Queue, ExpireAt, ParentJobId, TraceId, SpawnedByJobId
+- **Job-specific**: ScheduleTime, HandlerType, MaxRetries, RetriedTimes, CurrentWorkerId, LastKeepAlive, RecurringJobId
+- **Batch-specific**: ContinuationOptions (generalized to all kinds — controls child activation on parent failure)
+- **JobLog** — Unified audit trail. EventType: Created, Processing, Completed, Failed, Requeued, Deleted, Cancelled, Log (ILogger output).
 
-### Worker Flow
+### Worker Architecture
+
+Workers are **pure executors** — they only fetch and execute `Kind=Job` jobs. All orchestration is handled by dedicated background tasks:
 
 ```
-GetAndProcessJob():
-  1. TryExecuteJob() — pick up Job (WHERE Enqueued AND Queue IN worker_queues AND ScheduleTime < now)
-  2. TryRouteMessage() — pick up Message (WHERE Enqueued AND Queue IN worker_queues), discover handlers, create N Jobs
+Worker (pure executor):
+  1. Fetch Job (Kind=Job, Enqueued, ScheduleTime < now)
+  2. Execute handler
+  3. Update state, counters, logs
+  4. Signal orchestrator
+
+MessageRoutingTask (polls every 1s):
+  - Routes Kind=Message jobs → discovers handlers, creates N child jobs
+
+OrchestrationTask (signal + 10s sweep):
+  - Finalizes parents when all children reach terminal state
+  - Activates continuations (Awaiting children of completed parents)
 ```
 
-Queue order is alphabetical. Row locking (`FOR UPDATE SKIP LOCKED`) prevents duplicate processing. All state-changing operations use transaction + row lock for atomicity.
+### Job Cancellation
 
-### Job Retention
+Follows Hangfire's pattern: **Delete = Cancel**. When a processing job is deleted, the worker's `RunJobMonitor` detects the state change (polls every `CancellationCheckInterval`, default 5s) and cancels the handler's `CancellationToken`. Uses linked `CancellationTokenSource` so the monitor wakes instantly when the handler completes normally.
 
-- Completed/Deleted: ExpireAt = UtcNow + configurable TTL (default 1 day)
-- Failed: ExpireAt = null (never auto-deleted)
-- HealthManager cleans up expired jobs/messages + hourly stats older than 7 days
-- Statistics persist after deletion
+### Key Design Decisions
+
+- Raw SQL acceptable for internal ops (stats, cleanup). EF integration matters for publishing (outbox pattern).
+- **DbContext must be registered as Scoped** (not Transient). The outbox pattern requires the publisher and application code to share the same DbContext instance within a scope.
+- Everything is a Job. `ParentJobId` replaces both the old MessageId and BatchId foreign keys.
+- Workers never touch parent/child orchestration — that's the OrchestrationTask's job.
+- `ContinuationOptions` is generalized: any job with children can control whether children activate on failure.
+- Failed jobs never auto-deleted.
+- Statistics use Counter rows (write-optimized) aggregated into Statistic rows by CounterAggregatorTask.
+- All background tasks re-run immediately if work was found (ServerTaskBase pattern).
 
 ### Backend (.NET 10)
 
-- **Jobly.Core** — Entities, handlers, JobDispatcher, Publisher, logging (JobLogContext/JobLoggerProvider). Services split into 6 focused classes in `Services/`: `JobQueryService`, `JobCommandService`, `MessageQueryService`, `RecurringJobService`, `BatchQueryService`, `DashboardStatsService`.
-- **Jobly.Worker** — JoblyWorkerService, JoblyWorkerSetup, worker groups (WorkerGroupConfiguration). Background tasks in `Services/`: HeartbeatTask, CounterAggregatorTask, ServerCleanupTask, StaleJobRecoveryTask, ExpirationCleanupTask. Crash recovery via LastKeepAlive + RequeueStaleJobs.
+- **Jobly.Core** — Entities, handlers, JobDispatcher (cached reflection), Publisher, BatchPublisher, logging (JobLogContext/JobLoggerProvider). Services: `JobQueryService`, `JobCommandService`, `JobGroupQueryService`, `RecurringJobService`, `DashboardStatsService`.
+- **Jobly.Worker** — JoblyWorkerService (pure executor), JoblyDispatcher/JoblyDispatcherWorker (batch-fetch mode), worker groups. Background tasks: HeartbeatTask, CounterAggregatorTask, ServerCleanupTask, StaleJobRecoveryTask, ExpirationCleanupTask, RecurringJobSchedulerTask, MessageRoutingTask, OrchestrationTask.
 - **Jobly.UI** — Minimal API endpoints + embedded SPA served at `/jobly`.
 - **Static analyzers** — StyleCop, Roslynator, SonarAnalyzer, Meziantou.
 
 ### Frontend (Vite + React 18 + TypeScript)
 
-`src/ui/`. Tailwind + shadcn/ui, Zustand, Axios. Chart.js with chartjs-plugin-streaming for realtime graph, Recharts for historical (24h) chart. Features: dashboard with realtime (jobs/sec) + historical graphs, job list by state with bulk actions, per-page selector, dark mode, Hangfire-style job detail (colored state cards + handler output), messages, recurring jobs, servers.
+`src/ui/`. Tailwind + shadcn/ui, Zustand, Axios. Dashboard with realtime + historical graphs, job list by state with bulk actions, dark mode, job detail with colored state cards + handler output, messages, batches, recurring jobs, servers. Cancel button for processing jobs.
 
-### Testing
+## Testing
 
-295 integration tests (148 PostgreSQL + 147 SQL Server) using xUnit, Shouldly, Testcontainers + Respawn (~27s). Covers: lifecycle logs, concurrency (row locking), queue ordering, scheduling, retries, continuations, batches, recurring jobs, server monitoring, log capture, retention, statistics, bulk operations, time-series stats, crash recovery (keep-alive + stale job requeue), job tracing (TraceId/SpawnedByJobId), pipeline behavior logging, batch continuation options.
+386 tests (193 PostgreSQL + 193 SQL Server) using xUnit, Shouldly, Testcontainers + Respawn (~28s).
+
+### Test Structure
+
+Two categories with **separate databases** (no interference):
+
+**Unit tests** (`src/core/Jobly.Tests/Unit/`) — 322 tests, ~12s:
+- Each test calls exactly ONE public method on ONE class
+- State set up via direct DB inserts, not via other services
+- Fresh `CreateContext()` for setup, act, and assert (no shared tracking)
+- Use `[Collection("PostgreSql")]` / `[Collection("SqlServer")]` fixtures (no server running)
+
+**Integration tests** (`src/core/Jobly.Tests/Integration/`) — 64 tests, ~16s:
+- Use `JoblyTestServer` — boots full worker + all background tasks against a real database
+- Tests publish jobs, wait for results via `Server.WaitForCompletion()` / `Server.WaitForJobState()`
+- Use `[Collection("PostgreSql-Integration")]` / `[Collection("SqlServer-Integration")]` fixtures (server running)
+- Server shared per collection fixture (boots once, Respawn between tests)
+
+### Writing Unit Tests
+
+```csharp
+public abstract class MyTestsBase : IAsyncLifetime
+{
+    private readonly IDatabaseFixture _fixture;
+    protected MyTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
+    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task MethodName_Scenario_ExpectedResult()
+    {
+        // Arrange: insert state directly into DB
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job { Id = jobId, Kind = JobKind.Job, CurrentState = State.Completed,
+            CreateTime = DateTime.UtcNow, ScheduleTime = DateTime.UtcNow, Queue = "default" });
+        await ctx.SaveChangesAsync();
+
+        // Act: call ONE method on ONE class
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext());
+        await svc.DeleteJob(jobId);
+
+        // Assert: query DB for result
+        var job = await _fixture.CreateContext().Set<Job>().FindAsync(jobId);
+        job.CurrentState.ShouldBe(State.Deleted);
+    }
+}
+
+// Concrete subclasses for dual-database
+[Collection("PostgreSql")]
+public class MyTests_PostgreSql : MyTestsBase
+{
+    public MyTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer")]
+[Trait("Category", "SqlServer")]
+public class MyTests_SqlServer : MyTestsBase
+{
+    public MyTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+}
+```
+
+### Writing Integration Tests
+
+```csharp
+public abstract class MyIntegrationTestsBase : IntegrationTestBase
+{
+    protected MyIntegrationTestsBase(IDatabaseFixture fixture) : base(fixture) { }
+
+    [Fact]
+    public async Task GivenWorkload_WhenProcessed_ThenExpectedResult()
+    {
+        var publisher = Server.CreatePublisher();
+        await publisher.Enqueue(new MyRequest());
+        await publisher.SaveChangesAsync();
+
+        await Server.WaitForCompletion();
+
+        var job = await Server.GetJob(jobId);
+        job.CurrentState.ShouldBe(State.Completed);
+    }
+}
+
+[Collection("PostgreSql-Integration")]
+public class MyIntegrationTests_PostgreSql : MyIntegrationTestsBase
+{
+    public MyIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
+}
+
+[Collection("SqlServer-Integration")]
+[Trait("Category", "SqlServer")]
+public class MyIntegrationTests_SqlServer : MyIntegrationTestsBase
+{
+    public MyIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
+}
+```
+
+### Test Principles
+
+- Each test tests ONE public method. No chaining multiple calls to simulate flows.
+- If testing a multi-step flow (worker + orchestration + routing), use integration tests with `JoblyTestServer`.
+- No `Task.Delay` in tests except for handlers meant to be cancelled (`CancellableCommand`).
+- No unnecessary abstractions — test handlers are simple (empty, throw, increment counter).
+- Tests run on both PostgreSQL and SQL Server via abstract base + concrete subclasses.
 
 ### Registration
 
 `AddJobly<TContext>()` / `AddJoblyWorker<TContext>()` automatically configures the user's DbContext:
 - Wraps the existing `DbContextOptions<TContext>` service descriptor to add row-lock interceptors
 - Replaces `IModelCustomizer` with `JoblyModelCustomizer` to auto-apply entity configurations
-- Users just register their DbContext normally — no manual `AddJoblyInterceptors()` or `AddOutboxStateEntity()` needed
+- Users just register their DbContext normally — no manual configuration needed
 
 ### Worker Groups
 
 Workers can be split into groups with independent queues and polling intervals. Top-level `WorkerCount`/`Queues`/`PollingInterval` become the first implicit group. `AddWorkerGroup()` adds additional groups. Default `WorkerCount = Math.Min(Environment.ProcessorCount * 5, 20)`.
-
-### Key Design Decisions
-
-- Raw SQL acceptable for internal ops (stats, cleanup). EF integration matters for publishing (outbox pattern).
-- **DbContext must be registered as Scoped** (not Transient). The outbox pattern requires the publisher and application code to share the same DbContext instance within a scope, so jobs/messages are committed atomically with business data. The worker also relies on scoped context so that jobs spawned by handlers during execution are saved in the same transaction.
-- If something can go wrong, assume it will. All state changes use transaction + row lock.
-- Tests must call actual production code, never duplicate logic.
-- Failed jobs never auto-deleted.
-- Statistics use atomic ExecuteUpdateAsync with upsert for hourly keys.
