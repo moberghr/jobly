@@ -29,6 +29,23 @@ public class JoblyUIMiddleware
         var httpMethod = httpContext.Request.Method;
         var path = httpContext.Request.Path.Value!;
 
+        // Only check auth for requests under the route prefix
+        if (path.StartsWith(_options.RoutePrefix, StringComparison.Ordinal))
+        {
+            if (_options.Authorization != null && !_options.Authorization.Authorize(httpContext))
+            {
+                if (_options.UnauthorizedRedirectUrl != null && !path.Contains("/api/", StringComparison.Ordinal))
+                {
+                    var returnUrl = Uri.EscapeDataString(path);
+                    httpContext.Response.Redirect($"{_options.UnauthorizedRedirectUrl}?returnUrl={returnUrl}");
+                    return;
+                }
+
+                httpContext.Response.StatusCode = 401;
+                return;
+            }
+        }
+
         var extension = Path.GetExtension(path);
 
         if (!string.IsNullOrWhiteSpace(extension))

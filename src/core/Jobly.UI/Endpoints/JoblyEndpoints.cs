@@ -15,6 +15,20 @@ public static class JoblyEndpoints
     {
         var apiGroup = app.MapGroup($"{options.RoutePrefix}/api");
 
+        if (options.Authorization != null)
+        {
+            var filter = options.Authorization;
+            apiGroup.AddEndpointFilter(async (context, next) =>
+            {
+                if (!filter.Authorize(context.HttpContext))
+                {
+                    return Results.Unauthorized();
+                }
+
+                return await next(context);
+            });
+        }
+
         apiGroup.MapGet("status", async ([FromServices] IDashboardStatsService statsService) => await statsService.GetJoblyStatus());
 
         apiGroup.MapGet("jobs/enqueued", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobsList(request, State.Enqueued));
