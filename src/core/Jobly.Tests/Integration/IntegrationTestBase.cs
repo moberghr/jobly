@@ -15,8 +15,15 @@ public abstract class IntegrationTestBase : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await _fixture.ResetAsync();
-        await Server.ReRegisterServer();
+        try
+        {
+            await _fixture.ResetAsync();
+        }
+        catch
+        {
+            await Task.Delay(100);
+            await _fixture.ResetAsync();
+        }
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
