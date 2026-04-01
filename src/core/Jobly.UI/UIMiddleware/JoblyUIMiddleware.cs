@@ -29,7 +29,7 @@ public class JoblyUIMiddleware
         _options = options ?? new JoblyUIOptions();
         _staticFileMiddleware = CreateStaticFileMiddleware(next, hostingEnv, loggerFactory, _options);
 
-        if (_options.UseBuiltInLogin)
+        if (_options.CredentialValidatorType != null)
         {
             _protector = serviceProvider.GetRequiredService<IDataProtectionProvider>()
                 .CreateProtector("Jobly.Auth");
@@ -44,7 +44,7 @@ public class JoblyUIMiddleware
         var path = httpContext.Request.Path.Value!;
 
         // Handle built-in login page (always available when CredentialValidator is set)
-        if (_options.UseBuiltInLogin)
+        if (_options.CredentialValidatorType != null)
         {
             var loginPath = $"{_options.RoutePrefix}/login";
             var logoutPath = $"{_options.RoutePrefix}/logout";
@@ -81,7 +81,7 @@ public class JoblyUIMiddleware
                 {
                     var returnUrl = Uri.EscapeDataString(path);
                     var redirectTo = _options.UnauthorizedRedirectUrl
-                        ?? (_options.UseBuiltInLogin ? $"{_options.RoutePrefix}/login" : null);
+                        ?? (_options.CredentialValidatorType != null ? $"{_options.RoutePrefix}/login" : null);
 
                     if (redirectTo != null)
                     {

@@ -54,7 +54,7 @@ app.UseCors();
 app.UseAuthorization();
 app.UseJoblyUI(options =>
 {
-    options.UseBuiltInLogin = true;
+    options.UseBuiltInLogin<DemoCredentialValidator>();
 });
 app.MapControllers();
 

@@ -21,8 +21,17 @@ public class JoblyUIOptions
     public string? UnauthorizedRedirectUrl { get; set; }
 
     /// <summary>
-    /// When true, enables the built-in login page at {RoutePrefix}/login with HTTP-only cookie auth.
-    /// Register IJoblyCredentialValidator in DI to validate credentials.
+    /// Type of the IJoblyCredentialValidator implementation for the built-in login page.
+    /// Set via UseBuiltInLogin&lt;T&gt;(). Null = no built-in login.
     /// </summary>
-    public bool UseBuiltInLogin { get; set; }
+    internal Type? CredentialValidatorType { get; set; }
+
+    /// <summary>
+    /// Enables the built-in login page with the specified credential validator.
+    /// The validator is registered in DI as scoped, so it can inject DbContext, etc.
+    /// </summary>
+    public void UseBuiltInLogin<TValidator>() where TValidator : class, IJoblyCredentialValidator
+    {
+        CredentialValidatorType = typeof(TValidator);
+    }
 }
