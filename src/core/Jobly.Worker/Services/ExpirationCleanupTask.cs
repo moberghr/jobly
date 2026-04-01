@@ -161,8 +161,9 @@ public class ExpirationCleanupTask<TContext> : ServerTaskBase<TContext>
         where TCtx : DbContext
     {
         var recurringJobIds = await context.Set<RecurringJobLog>()
-            .Select(l => l.RecurringJobId)
-            .Distinct()
+            .GroupBy(l => l.RecurringJobId)
+            .Where(g => g.Count() > 100)
+            .Select(g => g.Key)
             .ToListAsync();
 
         foreach (var recurringJobId in recurringJobIds)
