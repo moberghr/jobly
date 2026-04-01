@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface MetricCardProps {
@@ -5,11 +6,17 @@ interface MetricCardProps {
   value: number;
   icon?: React.ReactNode;
   color?: string;
+  href?: string;
 }
 
-export function MetricCard({ label, value, icon, color }: MetricCardProps) {
+export function MetricCard({ label, value, icon, color, href }: MetricCardProps) {
+  const navigate = useNavigate();
+
   return (
-    <Card>
+    <Card
+      className={href ? 'cursor-pointer hover:bg-accent/50 transition-colors' : ''}
+      onClick={href ? () => navigate(href) : undefined}
+    >
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div>
