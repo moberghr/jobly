@@ -25,7 +25,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
     }
 
     [Fact]
-    public async Task StartNew_CreatesBatchKindJobWithAwaitingState()
+    public async Task StartNew_CreatesBatchKindJobWithProcessingState()
     {
         // Arrange
         var ctx = _fixture.CreateContext();
@@ -41,7 +41,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
         var batch = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == batchId);
         batch.ShouldNotBeNull();
         batch.Kind.ShouldBe(JobKind.Batch);
-        batch.CurrentState.ShouldBe(State.Awaiting);
+        batch.CurrentState.ShouldBe(State.Processing);
     }
 
     [Fact]

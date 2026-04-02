@@ -57,12 +57,13 @@ public class BatchPublisher<TContext> : IBatchPublisher
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         // Create the batch job (replaces both the old Batch entity and placeholder job)
+        // StartNew (no parent) → Processing immediately; continuation → Awaiting until parent finishes
         var batchJob = new Job
         {
             Kind = JobKind.Batch,
             Type = name,
             CreateTime = now,
-            CurrentState = State.Awaiting,
+            CurrentState = parentId != null ? State.Awaiting : State.Processing,
             Queue = _joblyConfiguration.DefaultQueue ?? "default",
             ParentJobId = parentId,
             JobCount = batchJobMessages.Count,

@@ -224,6 +224,47 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     });
 });
 
+// Seed endpoint — creates flow scenarios to test FlowCard UI
+app.MapPost("/seed-flow", async (IPublisher publisher, IBatchPublisher batchPublisher) =>
+{
+    // 1. Job → 3 continuation jobs (fan-out)
+    var parentId = await publisher.Enqueue(new RegisterRequest { Email = "flow-parent@test.com" });
+    await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, parentId);
+    await publisher.Enqueue(new SendEmailRequest { EmailLogId = 2 }, parentId);
+    await publisher.Enqueue(new RegisterRequest { Email = "flow-child@test.com" }, parentId);
+
+    // 2. Job → Batch(5) → Batch(3) chain
+    var chainJobId = await publisher.Enqueue(new RegisterRequest { Email = "chain-start@test.com" });
+    var batch1Jobs = Enumerable.Range(0, 5).Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
+    var batch1Id = await batchPublisher.ContinueBatchWith(batch1Jobs, chainJobId, "chain-phase-1");
+    var batch2Jobs = Enumerable.Range(0, 3).Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
+    await batchPublisher.ContinueBatchWith(batch2Jobs, batch1Id, "chain-phase-2");
+
+    // 3. Batch(8) → continuation Batch(4)
+    var batchJobs = Enumerable.Range(0, 8).Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
+    var batchId = await batchPublisher.StartNew(batchJobs, "flow-batch");
+    var contJobs = Enumerable.Range(0, 4).Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
+    await batchPublisher.ContinueBatchWith(contJobs, batchId, "flow-batch-cont");
+
+    // 4. Message (pub/sub — spawns multiple child jobs with trace)
+    await publisher.Publish(new OrderNotification());
+
+    // 5. ProcessOrder flow (complex: job → batch → job → message)
+    await publisher.Enqueue(new ProcessOrderRequest { OrderId = "FLOW-001" });
+
+    await publisher.SaveChangesAsync();
+
+    return Results.Ok(new
+    {
+        fanOutParent = parentId,
+        chainStart = chainJobId,
+        batch = batchId,
+        batch1 = batch1Id,
+        message = 1,
+        orderFlow = 1,
+    });
+});
+
 app.MapPost("/seed-perf", async (IPublisher publisher, int? count) =>
 {
     var total = count ?? 10000;

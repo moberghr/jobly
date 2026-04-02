@@ -339,7 +339,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RunOrchestration_DeletesChildrenOfFailedParentOnlyOnSucceeded()
+    public async Task RunOrchestration_FailedParentOnlyOnSucceeded_ContinuationStaysAwaiting()
     {
         // Arrange: failed batch parent (OnlyOnSucceeded) -> awaiting continuation child
         var ctx = _fixture.CreateContext();
@@ -383,19 +383,18 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
         });
         await ctx.SaveChangesAsync();
 
-        // Act — finalize parent
+        // Act — finalize parent, then run again
         var orchCtx1 = _fixture.CreateContext();
         await OrchestrationTask<TestContext>.RunOrchestration(orchCtx1, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
 
-        // Run again to see if continuation activates
         var orchCtx2 = _fixture.CreateContext();
         await OrchestrationTask<TestContext>.RunOrchestration(orchCtx2, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
 
-        // Assert
+        // Assert: continuation stays Awaiting (condition not met, but parent could be requeued)
         var readCtx = _fixture.CreateContext();
         var continuation = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == continuationId);
         continuation.ShouldNotBeNull();
-        continuation.CurrentState.ShouldBe(State.Deleted);
+        continuation.CurrentState.ShouldBe(State.Awaiting);
     }
 
     [Fact]

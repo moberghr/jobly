@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { StateBadge } from '@/components/StateBadge';
 import { Pagination } from '@/components/Pagination';
 import { shortType, shortId } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
+import { State } from '@/types';
 import type { JobModel, PagedList } from '@/types';
+import * as api from '@/api';
 
 const stateItems = [
   { key: 'enqueued', label: 'Enqueued', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
@@ -122,8 +125,10 @@ export function FilteredJobsTable({ title, fetchJobs, fetchCounts, onCountsUpdat
                     <TableRow>
                       <TableHead className="w-[80px]">ID</TableHead>
                       <TableHead>Type</TableHead>
+                      <TableHead>Handler</TableHead>
                       <TableHead className="w-[100px] text-right">State</TableHead>
                       <TableHead className="w-[120px] text-right">Created</TableHead>
+                      <TableHead className="w-[80px]" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -132,9 +137,17 @@ export function FilteredJobsTable({ title, fetchJobs, fetchCounts, onCountsUpdat
                         <TableCell className="font-mono text-xs">
                           <Link to={`/jobs/detail/${job.id}`} className="text-primary hover:underline">{shortId(job.id)}</Link>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground truncate max-w-[300px]">{shortType(job.type)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground truncate max-w-[200px]">{shortType(job.type)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground truncate max-w-[200px]">{job.handlerType ? shortType(job.handlerType) : '—'}</TableCell>
                         <TableCell className="text-right"><StateBadge state={job.currentState} /></TableCell>
                         <TableCell className="text-sm text-muted-foreground text-right"><RelativeTime date={job.createTime} /></TableCell>
+                        <TableCell className="text-right">
+                          {job.currentState === State.Failed && (
+                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={async () => { await api.requeueJob(job.id); setRefreshKey(k => k + 1); }}>
+                              Requeue
+                            </Button>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

@@ -96,7 +96,7 @@ export default function DashboardPage() {
         <MetricCard label="Scheduled" value={stats.scheduled} icon={<Clock className="h-5 w-5" />} href="/jobs/scheduled" />
         <MetricCard label="Failed" value={stats.failed} icon={<XCircle className="h-5 w-5" />} color={stats.failed > 0 ? "text-red-600" : undefined} href="/jobs/failed" />
         <MetricCard label="Messages" value={stats.messages} icon={<Mail className="h-5 w-5" />} href="/messages" />
-        <MetricCard label="Batches" value={stats.batchesActive} icon={<Layers className="h-5 w-5" />} href="/batches/active" />
+        <MetricCard label="Batches" value={stats.batchesProcessing} icon={<Layers className="h-5 w-5" />} href="/batches/processing" />
       </div>
 
       {/* Realtime Graph */}

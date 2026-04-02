@@ -69,7 +69,10 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         // Arrange
         var ctx = _fixture.CreateContext();
 
-        // 1 Awaiting (active) batch
+        // 1 Processing batch (children running)
+        ctx.Set<Job>().Add(CreateJob(JobKind.Batch, State.Processing));
+
+        // 1 Awaiting batch (continuation waiting for parent)
         ctx.Set<Job>().Add(CreateJob(JobKind.Batch, State.Awaiting));
 
         // 1 Completed batch
@@ -78,6 +81,9 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         // 1 Failed batch
         ctx.Set<Job>().Add(CreateJob(JobKind.Batch, State.Failed));
 
+        // 1 Deleted batch
+        ctx.Set<Job>().Add(CreateJob(JobKind.Batch, State.Deleted));
+
         await ctx.SaveChangesAsync();
 
         // Act
@@ -85,9 +91,12 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         var status = await svc.GetJoblyStatus();
 
         // Assert
-        status.BatchesActive.ShouldBe(1);
+        status.BatchesProcessing.ShouldBe(1);
+        status.BatchesAwaiting.ShouldBe(1);
         status.BatchesCompleted.ShouldBe(1);
         status.BatchesFailed.ShouldBe(1);
+        status.BatchesDeleted.ShouldBe(1);
+        status.Batches.ShouldBe(4); // excludes deleted
     }
 
     [Fact]

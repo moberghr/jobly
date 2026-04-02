@@ -57,7 +57,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             .Where(x => x.Kind == JobKind.Message && x.CurrentState != State.Completed)
             .CountAsync();
         var batches = await _context.Set<Job>()
-            .Where(x => x.Kind == JobKind.Batch && x.JobCount > 0)
+            .Where(x => x.Kind == JobKind.Batch && x.CurrentState != State.Deleted)
             .CountAsync();
 
         // Per-state batch counts
@@ -67,9 +67,12 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             .Select(g => new { State = g.Key, Count = g.Count() })
             .ToListAsync();
 
-        var batchesActive = batchStateCounts.Where(x => x.State == State.Awaiting).Sum(x => x.Count);
         var batchesCompleted = batchStateCounts.Where(x => x.State == State.Completed).Sum(x => x.Count);
         var batchesFailed = batchStateCounts.Where(x => x.State == State.Failed).Sum(x => x.Count);
+        var batchesDeleted = batchStateCounts.Where(x => x.State == State.Deleted).Sum(x => x.Count);
+
+        var batchesProcessing = batchStateCounts.Where(x => x.State == State.Processing).Sum(x => x.Count);
+        var batchesAwaiting = batchStateCounts.Where(x => x.State == State.Awaiting).Sum(x => x.Count);
 
         // Per-state message counts
         var messageStateCounts = await _context.Set<Job>()
@@ -100,9 +103,11 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             Deleted = deleted,
             Messages = messages,
             Batches = batches,
-            BatchesActive = batchesActive,
+            BatchesProcessing = batchesProcessing,
             BatchesCompleted = batchesCompleted,
             BatchesFailed = batchesFailed,
+            BatchesAwaiting = batchesAwaiting,
+            BatchesDeleted = batchesDeleted,
             MessagesEnqueued = messagesEnqueued,
             MessagesProcessing = messagesProcessing,
             MessagesCompleted = messagesCompleted,

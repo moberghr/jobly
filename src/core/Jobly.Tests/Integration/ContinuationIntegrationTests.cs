@@ -33,25 +33,27 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GivenParentJobThatFails_WhenDefaultOnlyOnSucceeded_ThenChildIsDeleted()
+    public async Task GivenParentJobThatFails_WhenDefaultOnlyOnSucceeded_ThenChildStaysAwaiting()
     {
         var publisher = Server.CreatePublisher();
         var parentId = await publisher.Enqueue(new ThrowExceptionRequest());
         var childId = await publisher.Enqueue(new UnitRequest(), parentId);
         await publisher.SaveChangesAsync();
 
-        // Wait for parent to fail, then wait for orphan cleanup to delete the child
+        // Wait for parent to fail
         await Server.WaitForJobState(parentId, State.Failed, timeout: TimeSpan.FromSeconds(15));
-        await Server.WaitForJobState(childId, State.Deleted, timeout: TimeSpan.FromSeconds(15));
+
+        // Give orchestration time to run, then verify child stays Awaiting
+        await Task.Delay(2000);
 
         var ctx = Server.CreateContext();
 
         var parent = await ctx.Set<Job>().FirstAsync(j => j.Id == parentId);
         parent.CurrentState.ShouldBe(State.Failed);
 
-        // Child should be deleted — default continuation is OnlyOnSucceeded, orphaned children are cleaned up
+        // Child stays Awaiting — condition not met, but parent could be requeued
         var child = await ctx.Set<Job>().FirstAsync(j => j.Id == childId);
-        child.CurrentState.ShouldBe(State.Deleted);
+        child.CurrentState.ShouldBe(State.Awaiting);
     }
 
     [Fact]

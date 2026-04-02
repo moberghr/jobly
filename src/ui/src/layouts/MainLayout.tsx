@@ -20,7 +20,7 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/jobs/enqueued', label: 'Jobs', icon: Briefcase },
   { to: '/messages/enqueued', label: 'Messages', icon: Mail },
-  { to: '/batches/active', label: 'Batches', icon: Layers },
+  { to: '/batches/processing', label: 'Batches', icon: Layers },
   { to: '/recurring', label: 'Recurring', icon: RefreshCw },
   { to: '/servers', label: 'Servers', icon: Server },
 ];
@@ -71,27 +71,37 @@ export default function MainLayout() {
                   <Icon className="h-4 w-4" />
                   {item.label}
                   {item.label === 'Jobs' && stats && stats.created > 0 && (
-                    <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                    <span className="ml-1 text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
                       {stats.created}
                     </span>
                   )}
                   {item.label === 'Jobs' && stats && stats.failed > 0 && (
-                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
+                    <span className="text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
                       {stats.failed}
                     </span>
                   )}
                   {item.label === 'Messages' && stats && stats.messages > 0 && (
-                    <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                    <span className="ml-1 text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
                       {stats.messages}
                     </span>
                   )}
-                  {item.label === 'Batches' && stats && stats.batches > 0 && (
-                    <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                      {stats.batches}
+                  {item.label === 'Messages' && stats && stats.messagesFailed > 0 && (
+                    <span className="text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
+                      {stats.messagesFailed}
+                    </span>
+                  )}
+                  {item.label === 'Batches' && stats && stats.batchesProcessing > 0 && (
+                    <span className="ml-1 text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                      {stats.batchesProcessing}
+                    </span>
+                  )}
+                  {item.label === 'Batches' && stats && stats.batchesFailed > 0 && (
+                    <span className="text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
+                      {stats.batchesFailed}
                     </span>
                   )}
                   {item.label === 'Servers' && stats && (
-                    <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{stats.servers}</span>
+                    <span className="ml-1 text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{stats.servers}</span>
                   )}
                 </Link>
               );
@@ -238,9 +248,11 @@ function SidebarNav({ title, items }: { title: string; items: { to: string; labe
 function BatchesSidebar({ stats }: { stats: DashboardStatistics | null }) {
   return (
     <SidebarNav title="Batches" items={[
-      { to: '/batches/active', label: 'Active', count: stats?.batchesActive ?? 0, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
+      { to: '/batches/processing', label: 'Processing', count: stats?.batchesProcessing ?? 0, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
+      { to: '/batches/awaiting', label: 'Awaiting', count: stats?.batchesAwaiting ?? 0, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' },
       { to: '/batches/completed', label: 'Completed', count: stats?.batchesCompleted ?? 0, color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
       { to: '/batches/failed', label: 'Failed', count: stats?.batchesFailed ?? 0, color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
+      { to: '/batches/deleted', label: 'Deleted', count: stats?.batchesDeleted ?? 0, color: 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300' },
     ]} />
   );
 }

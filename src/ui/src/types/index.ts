@@ -25,7 +25,9 @@ export interface DashboardStatistics {
   servers: number;
   awaiting: number;
   deleted: number;
-  batchesActive: number;
+  batchesProcessing: number;
+  batchesAwaiting: number;
+  batchesDeleted: number;
   batchesCompleted: number;
   batchesFailed: number;
   messagesEnqueued: number;
@@ -105,8 +107,10 @@ export interface ContinuationInfo {
 export interface JobGroupDetailModel extends JobGroupModel {
   parentJobId: string | null;
   parentJobKind: number | null;
+  traceId: string | null;
   spawnedJobsCount: number;
   continuations: ContinuationInfo[];
+  logs: JobLogModel[];
 }
 
 export interface RecurringJobModel {

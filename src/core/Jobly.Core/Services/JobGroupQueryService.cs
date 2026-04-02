@@ -1,3 +1,4 @@
+using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Models;
@@ -35,9 +36,11 @@ public class JobGroupQueryService<TContext> : IJobGroupQueryService
         {
             query = state switch
             {
-                "active" => query.Where(x => x.CurrentState == State.Awaiting && x.JobCount > 0),
+                "processing" => query.Where(x => x.CurrentState == State.Processing),
+                "awaiting" => query.Where(x => x.CurrentState == State.Awaiting),
                 "completed" => query.Where(x => x.CurrentState == State.Completed),
                 "failed" => query.Where(x => x.CurrentState == State.Failed),
+                "deleted" => query.Where(x => x.CurrentState == State.Deleted),
                 _ => query,
             };
         }
@@ -90,6 +93,7 @@ public class JobGroupQueryService<TContext> : IJobGroupQueryService
                 ContinuationOptions = x.ContinuationOptions,
                 ParentJobId = x.ParentJobId,
                 ParentJobKind = x.ParentJob != null ? x.ParentJob.Kind : null,
+                TraceId = x.TraceId,
             })
             .FirstOrDefaultAsync();
 
@@ -103,6 +107,22 @@ public class JobGroupQueryService<TContext> : IJobGroupQueryService
             .CountAsync();
 
         jobGroup.TotalJobs = jobGroup.SpawnedJobsCount;
+
+        jobGroup.Logs = await _context.Set<JobLog>()
+            .Where(x => x.JobId == id)
+            .OrderBy(x => x.Timestamp)
+            .Select(x => new JobLogModel
+            {
+                Id = x.Id,
+                EventType = x.EventType,
+                Timestamp = x.Timestamp,
+                Level = x.Level,
+                Message = x.Message,
+                Exception = x.Exception,
+                DurationMs = x.DurationMs,
+                WorkerId = x.WorkerId,
+            })
+            .ToListAsync();
 
         // Find continuation batches (child batches linked via ParentJobId)
         jobGroup.Continuations = await _context.Set<Job>()

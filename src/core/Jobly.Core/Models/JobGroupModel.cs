@@ -37,9 +37,13 @@ public class JobGroupDetailModel : JobGroupModel
 
     public JobKind? ParentJobKind { get; set; }
 
+    public Guid? TraceId { get; set; }
+
     public int SpawnedJobsCount { get; set; }
 
     public List<ContinuationInfo> Continuations { get; set; } = [];
+
+    public List<JobLogModel> Logs { get; set; } = [];
 }
 
 public class ContinuationInfo

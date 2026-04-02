@@ -57,10 +57,10 @@ public abstract class AuditFixRound2TestsBase : IAsyncLifetime
 
     /// <summary>
     /// When a parent is Deleted, its Awaiting children should be cleaned up (Deleted).
-    /// Otherwise they sit in Awaiting state forever.
+    /// Otherwise they can never run.
     /// </summary>
     [Fact]
-    public async Task Orchestration_WhenParentDeleted_AwaitingChildrenAreDeleted()
+    public async Task Orchestration_WhenParentDeleted_AwaitingChildrenAreFailed()
     {
         var ctx = _fixture.CreateContext();
         var parentId = Guid.NewGuid();
@@ -95,12 +95,12 @@ public abstract class AuditFixRound2TestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var child = await readCtx.Set<Job>().FindAsync(childId);
         child.ShouldNotBeNull();
-        child.CurrentState.ShouldBe(State.Deleted, "Awaiting child of a Deleted parent should be cleaned up");
+        child.CurrentState.ShouldBe(State.Failed, "Awaiting child of a Deleted parent should be Failed");
     }
 
     /// <summary>
-    /// When a parent fails with OnlyOnSucceeded, Awaiting continuations should be Deleted.
-    /// Otherwise they sit in Awaiting state forever.
+    /// When a parent fails with OnlyOnSucceeded, Awaiting continuations stay Awaiting.
+    /// The parent could be requeued and succeed later.
     /// </summary>
     [Fact]
     public async Task Orchestration_WhenParentFailedOnlyOnSucceeded_AwaitingContinuationsAreDeleted()
@@ -168,14 +168,14 @@ public abstract class AuditFixRound2TestsBase : IAsyncLifetime
         parent.ShouldNotBeNull();
         parent.CurrentState.ShouldBe(State.Failed);
 
-        // Continuation batch and its child should be Deleted (not stuck in Awaiting)
+        // Continuation batch and its child should stay Awaiting (condition not met, but parent could be requeued)
         var contBatch = await readCtx.Set<Job>().FindAsync(continuationBatchId);
         contBatch.ShouldNotBeNull();
-        contBatch.CurrentState.ShouldBe(State.Deleted, "Continuation of failed OnlyOnSucceeded parent should be Deleted");
+        contBatch.CurrentState.ShouldBe(State.Awaiting, "Continuation of failed OnlyOnSucceeded parent should stay Awaiting");
 
         var contChild = await readCtx.Set<Job>().FindAsync(continuationChildId);
         contChild.ShouldNotBeNull();
-        contChild.CurrentState.ShouldBe(State.Deleted, "Children of deleted continuation should also be Deleted");
+        contChild.CurrentState.ShouldBe(State.Awaiting, "Children of awaiting continuation should also stay Awaiting");
     }
 }
 
