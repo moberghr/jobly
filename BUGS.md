@@ -23,8 +23,8 @@ Batch detail page only shows the batch's children. Should also show the continua
 
 ## Enhancements
 
-### Show handler type more prominently in job detail
-Handler type is shown but could be more visible. Also show it in the job list table.
+### Show handler type in all job lists
+Handler type is only on `JobDetailModel`, not `JobModel`. Add it to `JobModel` and all Select projections so it shows in job list, batch detail jobs, message detail jobs, recurring job history, etc.
 
 ### JobDispatcher reflection caching
 `DiscoverJobHandler` and `DiscoverMessageHandlers` use reflection on every call. Cache the results per type for better performance at scale.
