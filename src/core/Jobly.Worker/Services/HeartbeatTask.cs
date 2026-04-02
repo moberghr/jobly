@@ -13,7 +13,7 @@ namespace Jobly.Worker.Services;
 public class HeartbeatTask<TContext> : ServerTaskBase<TContext>
     where TContext : DbContext
 {
-    private TimeSpan _previousCpuTime;
+    private TimeSpan? _previousCpuTime;
     private DateTime _previousWallTime;
 
     public HeartbeatTask(
@@ -23,8 +23,16 @@ public class HeartbeatTask<TContext> : ServerTaskBase<TContext>
         TimeProvider timeProvider)
         : base(scopeFactory, logger, configuration, timeProvider)
     {
-        var process = System.Diagnostics.Process.GetCurrentProcess();
-        _previousCpuTime = process.TotalProcessorTime;
+        try
+        {
+            var process = System.Diagnostics.Process.GetCurrentProcess();
+            _previousCpuTime = process.TotalProcessorTime;
+        }
+        catch
+        {
+            // Process metrics not available in this environment
+        }
+
         _previousWallTime = timeProvider.GetUtcNow().UtcDateTime;
     }
 
@@ -36,28 +44,36 @@ public class HeartbeatTask<TContext> : ServerTaskBase<TContext>
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
-
         var server = await context.Set<Server>()
             .FindAsync([ServerId], ct) ?? throw new InvalidOperationException("Server not found in the database.");
         server.LastHeartbeatTime = TimeProvider.GetUtcNow().UtcDateTime;
 
-        var process = System.Diagnostics.Process.GetCurrentProcess();
-        server.MemoryWorkingSetBytes = process.WorkingSet64;
-
-        var currentCpuTime = process.TotalProcessorTime;
-        var currentWallTime = TimeProvider.GetUtcNow().UtcDateTime;
-        var wallElapsed = (currentWallTime - _previousWallTime).TotalMilliseconds;
-
-        if (wallElapsed > 0)
+        try
         {
-            var cpuElapsed = (currentCpuTime - _previousCpuTime).TotalMilliseconds;
-            server.CpuUsagePercent = Math.Round(cpuElapsed / wallElapsed / Environment.ProcessorCount * 100, 1);
+            var process = System.Diagnostics.Process.GetCurrentProcess();
+            server.MemoryWorkingSetBytes = process.WorkingSet64;
+
+            if (_previousCpuTime.HasValue)
+            {
+                var currentCpuTime = process.TotalProcessorTime;
+                var currentWallTime = TimeProvider.GetUtcNow().UtcDateTime;
+                var wallElapsed = (currentWallTime - _previousWallTime).TotalMilliseconds;
+
+                if (wallElapsed > 0)
+                {
+                    var cpuElapsed = (currentCpuTime - _previousCpuTime.Value).TotalMilliseconds;
+                    server.CpuUsagePercent = Math.Round(cpuElapsed / wallElapsed / Environment.ProcessorCount * 100, 1);
+                }
+
+                _previousCpuTime = currentCpuTime;
+                _previousWallTime = currentWallTime;
+            }
+        }
+        catch
+        {
+            // Process metrics not available — heartbeat still updates LastHeartbeatTime
         }
 
-        _previousCpuTime = currentCpuTime;
-        _previousWallTime = currentWallTime;
-
-        // Heartbeat saves its own changes (no ServerLog write from base — too noisy)
         await context.SaveChangesAsync(ct);
         return null;
     }
