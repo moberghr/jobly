@@ -52,18 +52,37 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
 
         foreach (var job in staleJobs)
         {
-            job.CurrentState = State.Enqueued;
             job.CurrentWorkerId = null;
             job.LastKeepAlive = null;
 
-            context.Set<JobLog>().Add(new JobLog
+            if (job.CancellationMode != CancellationMode.None)
             {
-                JobId = job.Id,
-                EventType = "Requeued",
-                Timestamp = now,
-                Level = "Warning",
-                Message = "Requeued by crash recovery — worker stopped responding",
-            });
+                // User intended to cancel this job — honor the intent
+                job.CurrentState = State.Deleted;
+                job.CancellationMode = CancellationMode.None;
+                job.ExpireAt = now.AddDays(1);
+                context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
+                context.Set<JobLog>().Add(new JobLog
+                {
+                    JobId = job.Id,
+                    EventType = "Deleted",
+                    Timestamp = now,
+                    Level = "Warning",
+                    Message = "Cancelled by crash recovery — cancellation was pending when worker stopped",
+                });
+            }
+            else
+            {
+                job.CurrentState = State.Enqueued;
+                context.Set<JobLog>().Add(new JobLog
+                {
+                    JobId = job.Id,
+                    EventType = "Requeued",
+                    Timestamp = now,
+                    Level = "Warning",
+                    Message = "Requeued by crash recovery — worker stopped responding",
+                });
+            }
         }
 
         await context.SaveChangesAsync();

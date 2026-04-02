@@ -65,6 +65,14 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
             if (messageType == null)
             {
                 message.CurrentState = State.Failed;
+                context.Set<JobLog>().Add(new JobLog
+                {
+                    JobId = message.Id,
+                    EventType = "Failed",
+                    Timestamp = timeProvider.GetUtcNow().UtcDateTime,
+                    Level = "Error",
+                    Message = $"Unknown message type: {message.Type}",
+                });
                 await context.SaveChangesAsync(ct);
                 continue;
             }
@@ -75,6 +83,14 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
             if (handlerTypes.Count == 0)
             {
                 message.CurrentState = State.Failed;
+                context.Set<JobLog>().Add(new JobLog
+                {
+                    JobId = message.Id,
+                    EventType = "Failed",
+                    Timestamp = timeProvider.GetUtcNow().UtcDateTime,
+                    Level = "Error",
+                    Message = $"No handlers registered for message type {messageType.Name}",
+                });
                 await context.SaveChangesAsync(ct);
                 continue;
             }

@@ -87,13 +87,16 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         PerfTrace.Mark(PerfTrace.SaveProcessing);
         await context.SaveChangesAsync(cancellationToken);
 
-        // Mutex check: if another job with the same ConcurrencyKey is already Processing, cancel this one
+        // Mutex check: if another job with the same ConcurrencyKey is already Processing, cancel this one.
+        // Uses FOR UPDATE (blocking) so concurrent workers serialize on the same key.
         if (job.ConcurrencyKey != null)
         {
             var concurrencyHeld = await context.Set<Job>()
-                .AnyAsync(j => j.ConcurrencyKey == job.ConcurrencyKey
+                .Where(j => j.ConcurrencyKey == job.ConcurrencyKey
                     && j.CurrentState == State.Processing
-                    && j.Id != job.Id, cancellationToken);
+                    && j.Id != job.Id)
+                .TagWith(InterceptorConstants.RowLockTableJobWait)
+                .AnyAsync(cancellationToken);
 
             if (concurrencyHeld)
             {

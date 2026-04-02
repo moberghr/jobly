@@ -132,9 +132,11 @@ public class JoblyDispatcher<TContext> : BackgroundService
             if (job.ConcurrencyKey != null)
             {
                 var concurrencyHeld = await context.Set<Job>()
-                    .AnyAsync(j => j.ConcurrencyKey == job.ConcurrencyKey
+                    .Where(j => j.ConcurrencyKey == job.ConcurrencyKey
                         && j.CurrentState == State.Processing
-                        && j.Id != job.Id, ct);
+                        && j.Id != job.Id)
+                    .TagWith(InterceptorConstants.RowLockTableJobWait)
+                    .AnyAsync(ct);
 
                 if (concurrencyHeld)
                 {
