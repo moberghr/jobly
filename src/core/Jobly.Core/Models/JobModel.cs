@@ -19,4 +19,6 @@ public class JobModel
     public State CurrentState { get; set; }
 
     public CancellationMode CancellationMode { get; set; }
+
+    public string? HandlerType { get; set; }
 }

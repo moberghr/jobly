@@ -4,8 +4,6 @@ namespace Jobly.Core.Models;
 
 public class JobDetailModel : JobModel
 {
-    public string? HandlerType { get; set; }
-
     public JobKind Kind { get; set; }
 
     public Guid? ParentJobId { get; set; }
