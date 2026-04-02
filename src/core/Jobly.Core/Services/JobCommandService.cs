@@ -119,6 +119,14 @@ public class JobCommandService<TContext> : IJobCommandService
             return;
         }
 
+        // Can't requeue a Processing job — worker is still executing it.
+        // Use DeleteJob to cancel it instead.
+        if (job.CurrentState == State.Processing)
+        {
+            await transaction.RollbackAsync();
+            return;
+        }
+
         DecrementStatForState(job.CurrentState);
 
         job.CurrentState = State.Enqueued;

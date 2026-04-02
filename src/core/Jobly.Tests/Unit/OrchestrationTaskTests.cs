@@ -339,7 +339,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RunOrchestration_DoesNotActivateChildrenOfFailedParent()
+    public async Task RunOrchestration_DeletesChildrenOfFailedParentOnlyOnSucceeded()
     {
         // Arrange: failed batch parent (OnlyOnSucceeded) -> awaiting continuation child
         var ctx = _fixture.CreateContext();
@@ -395,7 +395,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var continuation = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == continuationId);
         continuation.ShouldNotBeNull();
-        continuation.CurrentState.ShouldBe(State.Awaiting);
+        continuation.CurrentState.ShouldBe(State.Deleted);
     }
 
     [Fact]

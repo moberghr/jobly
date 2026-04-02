@@ -54,7 +54,9 @@ public class OrchestrationTask<TContext> : ServerTaskBase<TContext>
         context.ChangeTracker.Clear();
         var activated = await ActivateContinuations(context, ct);
         context.ChangeTracker.Clear();
-        return finalized > 0 || activated > 0;
+        var cleaned = await CleanupOrphanedChildren(context, timeProvider, jobExpirationTimeout, ct);
+        context.ChangeTracker.Clear();
+        return finalized > 0 || activated > 0 || cleaned > 0;
     }
 
     /// <summary>
@@ -154,5 +156,51 @@ public class OrchestrationTask<TContext> : ServerTaskBase<TContext>
         }
 
         return activated;
+    }
+
+    /// <summary>
+    /// Clean up Awaiting children whose parent is in a state that will never activate them:
+    /// - Parent is Deleted
+    /// - Parent is Failed with ContinuationOptions = OnlyOnSucceeded (default)
+    /// These children would otherwise be stuck in Awaiting state forever.
+    /// </summary>
+    private static async Task<int> CleanupOrphanedChildren<TCtx>(TCtx context, TimeProvider timeProvider, TimeSpan jobExpirationTimeout, CancellationToken ct)
+        where TCtx : DbContext
+    {
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+
+        // Find Awaiting children whose parent will never activate them
+        var orphaned = await context.Set<Job>()
+            .Where(c => c.CurrentState == State.Awaiting && c.ParentJobId != null)
+            .Where(c => context.Set<Job>().Any(p =>
+                p.Id == c.ParentJobId
+                && (p.CurrentState == State.Deleted
+                    || (p.CurrentState == State.Failed
+                        && (p.ContinuationOptions == null || p.ContinuationOptions == ContinuationOptions.OnlyOnSucceeded)))))
+            .ToListAsync(ct);
+
+        if (orphaned.Count == 0)
+        {
+            return 0;
+        }
+
+        foreach (var child in orphaned)
+        {
+            child.CurrentState = State.Deleted;
+            child.ExpireAt = now.Add(jobExpirationTimeout);
+
+            // If this is a batch, also delete its children
+            if (child.Kind == JobKind.Batch)
+            {
+                await context.Set<Job>()
+                    .Where(x => x.ParentJobId == child.Id && x.CurrentState == State.Awaiting)
+                    .ExecuteUpdateAsync(x => x
+                        .SetProperty(p => p.CurrentState, State.Deleted)
+                        .SetProperty(p => p.ExpireAt, now.Add(jobExpirationTimeout)), ct);
+            }
+        }
+
+        await context.SaveChangesAsync(ct);
+        return orphaned.Count;
     }
 }

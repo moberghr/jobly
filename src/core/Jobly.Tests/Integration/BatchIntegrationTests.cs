@@ -142,7 +142,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GivenBatchWithOnlyOnSucceeded_WhenJobFails_ThenContinuationDoesNotFire()
+    public async Task GivenBatchWithOnlyOnSucceeded_WhenJobFails_ThenContinuationIsDeleted()
     {
         var batchPublisher = Server.CreateBatchPublisher();
 
@@ -159,8 +159,9 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
 
         await batchPublisher.SaveChangesAsync();
 
-        // Wait for batch to fail — orchestrator has already processed continuation by this point
+        // Wait for batch to fail, then wait for orphan cleanup to delete the continuation
         await Server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobState(continuationBatchId, State.Deleted, timeout: TimeSpan.FromSeconds(15));
 
         var ctx = Server.CreateContext();
 
@@ -168,15 +169,15 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId);
         batch.CurrentState.ShouldBe(State.Failed);
 
-        // Continuation should still be awaiting (never activated)
+        // Continuation should be deleted — orphaned children of failed parent with OnlyOnSucceeded are cleaned up
         var continuation = await ctx.Set<Job>().FirstAsync(j => j.Id == continuationBatchId);
-        continuation.CurrentState.ShouldBe(State.Awaiting);
+        continuation.CurrentState.ShouldBe(State.Deleted);
 
-        // Continuation children should still be awaiting
+        // Continuation children should also be deleted
         var continuationChildren = await ctx.Set<Job>()
             .Where(j => j.ParentJobId == continuationBatchId && j.Kind == JobKind.Job)
             .ToListAsync();
-        continuationChildren.ShouldAllBe(j => j.CurrentState == State.Awaiting);
+        continuationChildren.ShouldAllBe(j => j.CurrentState == State.Deleted);
     }
 
     [Fact]
