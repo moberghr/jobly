@@ -154,8 +154,10 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
         await publisher.Enqueue(new ProcessOrderRequest { OrderId = $"ORD-{1000 + i}" });
     }
 
-    // === Mutex jobs (same key — only first executes, rest cancelled) ===
-    for (var i = 0; i < 5; i++)
+    // === Mutex jobs (same key — first holds mutex with slow handler, rest get cancelled) ===
+    await publisher.Enqueue(new SlowRequest(),
+        new JobParameters { Queue = "b-default", Mutex = "payment:customer-42" });
+    for (var i = 0; i < 4; i++)
     {
         await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 },
             new JobParameters { Queue = "b-default", Mutex = "payment:customer-42" });
