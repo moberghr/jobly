@@ -8,13 +8,17 @@ public static class JobDispatcher
 {
     private static readonly ConcurrentDictionary<Type, Type> _handlerInterfaceCache = new();
     private static readonly ConcurrentDictionary<(Type HandlerType, Type MessageType), MethodInfo> _handleMethodCache = new();
+    private static readonly ConcurrentDictionary<Type, Type> _jobHandlerTypeCache = new();
+    private static readonly ConcurrentDictionary<Type, Type> _messageHandlerTypeCache = new();
+    private static readonly ConcurrentDictionary<Type, Type> _pipelineBehaviorTypeCache = new();
 
     /// <summary>
     /// Discovers all registered IMessageHandler&lt;T&gt; implementation types for a message type.
     /// </summary>
     public static List<Type> DiscoverMessageHandlers(Type messageType, IServiceProvider provider)
     {
-        var handlerInterfaceType = typeof(IMessageHandler<>).MakeGenericType(messageType);
+        var handlerInterfaceType = _messageHandlerTypeCache.GetOrAdd(messageType,
+            t => typeof(IMessageHandler<>).MakeGenericType(t));
         var handlers = provider.GetServices(handlerInterfaceType);
         return [.. handlers.Select(h => h!.GetType()).Distinct()];
     }
@@ -24,7 +28,8 @@ public static class JobDispatcher
     /// </summary>
     public static Type? DiscoverJobHandler(Type jobType, IServiceProvider provider)
     {
-        var handlerInterfaceType = typeof(IJobHandler<>).MakeGenericType(jobType);
+        var handlerInterfaceType = _jobHandlerTypeCache.GetOrAdd(jobType,
+            t => typeof(IJobHandler<>).MakeGenericType(t));
         var handler = provider.GetService(handlerInterfaceType);
         return handler?.GetType();
     }
@@ -84,7 +89,8 @@ public static class JobDispatcher
             (Task)handleMethod.Invoke(handler, [message, cancellationToken])!;
 
         // Resolve pipeline behaviors
-        var behaviorInterfaceType = typeof(IPipelineBehavior<>).MakeGenericType(messageType);
+        var behaviorInterfaceType = _pipelineBehaviorTypeCache.GetOrAdd(messageType,
+            t => typeof(IPipelineBehavior<>).MakeGenericType(t));
         var behaviors = provider.GetServices(behaviorInterfaceType).ToList();
 
         // Build the chain from innermost to outermost
@@ -92,9 +98,11 @@ public static class JobDispatcher
         for (var i = behaviors.Count - 1; i >= 0; i--)
         {
             var behavior = behaviors[i]!;
-            var behaviorHandleMethod = behavior.GetType().GetMethod(
-                "HandleAsync",
-                [messageType, typeof(JobHandlerDelegate), typeof(CancellationToken)])!;
+            var behaviorHandleMethod = _handleMethodCache.GetOrAdd(
+                (behavior.GetType(), messageType),
+                key => key.HandlerType.GetMethod(
+                    "HandleAsync",
+                    [key.MessageType, typeof(JobHandlerDelegate), typeof(CancellationToken)])!);
 
             var next = chain;
             chain = () => (Task)behaviorHandleMethod.Invoke(behavior, [message, next, cancellationToken])!;
@@ -113,7 +121,8 @@ public static class JobDispatcher
         IServiceProvider provider,
         CancellationToken ct)
     {
-        var handlerInterfaceType = typeof(IMessageHandler<>).MakeGenericType(messageType);
+        var handlerInterfaceType = _messageHandlerTypeCache.GetOrAdd(messageType,
+            t => typeof(IMessageHandler<>).MakeGenericType(t));
         return ExecuteHandlerCore(message, messageType, handlerType, handlerInterfaceType, provider, ct);
     }
 
@@ -127,7 +136,8 @@ public static class JobDispatcher
         IServiceProvider provider,
         CancellationToken ct)
     {
-        var handlerInterfaceType = typeof(IJobHandler<>).MakeGenericType(messageType);
+        var handlerInterfaceType = _jobHandlerTypeCache.GetOrAdd(messageType,
+            t => typeof(IJobHandler<>).MakeGenericType(t));
         return ExecuteHandlerCore(message, messageType, handlerType, handlerInterfaceType, provider, ct);
     }
 }

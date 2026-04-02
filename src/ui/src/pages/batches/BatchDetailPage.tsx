@@ -52,7 +52,7 @@ export default function BatchDetailPage() {
             <div>ID: <span className="font-mono text-xs">{batch.id}</span></div>
             {batch.continuationJobId && (
               <div>
-                Continuation: <Link to={`/jobs/detail/${batch.continuationJobId}`} className="text-primary hover:underline font-mono text-xs">{shortId(batch.continuationJobId)}</Link>
+                Continuation: <Link to={`/batches/detail/${batch.continuationJobId}`} className="text-primary hover:underline font-mono text-xs">{shortId(batch.continuationJobId)}</Link>
               </div>
             )}
           </div>
