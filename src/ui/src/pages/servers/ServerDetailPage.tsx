@@ -7,7 +7,7 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { shortId, formatBytes } from '@/utils/format';
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
-import type { ServerModel, ServerTaskSummary, ServerLogModel, PagedList } from '@/types';
+import type { ServerModel, WorkerModel, ServerTaskSummary, ServerLogModel, PagedList } from '@/types';
 import * as api from '@/api';
 
 const statusColors: Record<string, string> = {
@@ -58,67 +58,34 @@ export default function ServerDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Worker Groups */}
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Workers ({server.workers.length})</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            {server.workers.length > 0 ? (
-              (() => {
-                // Group workers by queues+polling to show worker groups
-                const groups = new Map<string, typeof server.workers>();
-                for (const w of server.workers) {
-                  const key = `${w.queues ?? 'default'}|${w.pollingIntervalMs ?? 1000}`;
-                  if (!groups.has(key)) groups.set(key, []);
-                  groups.get(key)!.push(w);
-                }
-                return Array.from(groups.entries()).map(([key, workers]) => {
-                  const queues = workers[0].queues ?? 'default';
-                  const pollingMs = workers[0].pollingIntervalMs ?? 1000;
-                  return (
-                    <div key={key}>
-                      <div className="text-xs text-muted-foreground mb-2">
-                        <span className="font-medium">{workers.length} workers</span>
-                        {' · '}Queues: <span className="font-mono">{queues}</span>
-                        {' · '}Polling: {pollingMs >= 1000 ? `${(pollingMs / 1000).toFixed(pollingMs % 1000 === 0 ? 0 : 1)}s` : `${pollingMs}ms`}
-                      </div>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Worker ID</TableHead>
-                            <TableHead>Current Job</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {workers.map((w) => (
-                            <TableRow key={w.workerId}>
-                              <TableCell className="font-mono text-xs">
-                                <Link to={`/workers/${w.workerId}`} className="text-primary hover:underline">
-                                  {shortId(w.workerId)}
-                                </Link>
-                              </TableCell>
-                              <TableCell>
-                                {w.currentJobId ? (
-                                  <Link to={`/jobs/detail/${w.currentJobId}`} className="text-primary hover:underline text-xs font-mono">
-                                    {shortId(w.currentJobId)}
-                                  </Link>
-                                ) : (
-                                  <span className="text-muted-foreground text-sm">Idle</span>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  );
-                });
-              })()
-            ) : (
-              <p className="text-sm text-muted-foreground">No workers registered</p>
-            )}
-          </CardContent>
-        </Card>
       </div>
+
+      {/* Worker Groups */}
+      <h2 className="text-lg font-semibold mb-3">Worker Groups</h2>
+      {(() => {
+        const groups = new Map<string, typeof server.workers>();
+        for (const w of server.workers) {
+          const key = `${w.queues ?? 'default'}|${w.pollingIntervalMs ?? 1000}`;
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key)!.push(w);
+        }
+        return groups.size > 0 ? (
+          <div className="space-y-2 mb-6">
+            {Array.from(groups.entries()).map(([key, workers]) => {
+              const queues = workers[0].queues ?? 'default';
+              const pollingMs = workers[0].pollingIntervalMs ?? 1000;
+              const active = workers.filter(w => w.currentJobId).length;
+              return (
+                <WorkerGroupSection key={key} queues={queues} pollingMs={pollingMs} workers={workers} activeCount={active} />
+              );
+            })}
+          </div>
+        ) : (
+          <Card className="mb-6">
+            <CardContent className="py-6 text-center text-muted-foreground text-sm">No workers registered</CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Task Sections */}
       <h2 className="text-lg font-semibold mb-3">Server Tasks</h2>
@@ -134,6 +101,66 @@ export default function ServerDetailPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function WorkerGroupSection({ queues, pollingMs, workers, activeCount }: { queues: string; pollingMs: number; workers: WorkerModel[]; activeCount: number }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card>
+      <button
+        className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-accent/50 rounded-t-lg transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-3">
+          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          <span className="font-medium text-sm">{workers.length} workers</span>
+          {activeCount > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+              {activeCount} active
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span>Queues: <span className="font-mono">{queues}</span></span>
+          <span>Polling: {pollingMs >= 1000 ? `${(pollingMs / 1000).toFixed(pollingMs % 1000 === 0 ? 0 : 1)}s` : `${pollingMs}ms`}</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <CardContent className="pt-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Worker ID</TableHead>
+                <TableHead>Current Job</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {workers.map((w) => (
+                <TableRow key={w.workerId}>
+                  <TableCell className="font-mono text-xs">
+                    <Link to={`/workers/${w.workerId}`} className="text-primary hover:underline">
+                      {shortId(w.workerId)}
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    {w.currentJobId ? (
+                      <Link to={`/jobs/detail/${w.currentJobId}`} className="text-primary hover:underline text-xs font-mono">
+                        {shortId(w.currentJobId)}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">Idle</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      )}
+    </Card>
   );
 }
 
