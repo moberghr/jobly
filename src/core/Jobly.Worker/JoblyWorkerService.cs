@@ -8,6 +8,7 @@ using Jobly.Core.Handlers;
 using Jobly.Core.Interceptors;
 using Jobly.Core.Logging;
 using Jobly.Worker.Services;
+using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -29,8 +30,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     private readonly JoblyWorkerConfiguration _configuration;
     private readonly WorkerGroupConfiguration _groupConfiguration;
     private readonly TimeProvider _timeProvider;
+    private readonly IDistributedLockProvider _lockProvider;
 
-    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration, TimeProvider timeProvider)
+    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration, TimeProvider timeProvider, IDistributedLockProvider lockProvider)
     {
         _workerId = workerId;
         _serviceScopeFactory = serviceScopeFactory;
@@ -38,6 +40,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         _configuration = configuration.Value;
         _groupConfiguration = groupConfiguration;
         _timeProvider = timeProvider;
+        _lockProvider = lockProvider;
     }
 
     public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
@@ -87,21 +90,26 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         PerfTrace.Mark(PerfTrace.SaveProcessing);
         await context.SaveChangesAsync(cancellationToken);
 
-        // Mutex check: if another job with the same ConcurrencyKey is already Processing, cancel this one.
-        // Uses FOR UPDATE (blocking) so concurrent workers serialize on the same key.
+        PerfTrace.Mark(PerfTrace.CommitTransaction1);
+        await transaction.CommitAsync(cancellationToken);
+
+        IAsyncDisposable? mutexHandleToRelease = null;
+
+        // Mutex check: use distributed lock to ensure only one job per ConcurrencyKey is Processing.
+        // Acquired AFTER commit so the Processing state is visible to other workers.
         if (job.ConcurrencyKey != null)
         {
-            var concurrencyHeld = await context.Set<Job>()
-                .Where(j => j.ConcurrencyKey == job.ConcurrencyKey
-                    && j.CurrentState == State.Processing
-                    && j.Id != job.Id)
-                .TagWith(InterceptorConstants.RowLockTableJobWait)
-                .AnyAsync(cancellationToken);
+            var mutexLock = _lockProvider.CreateLock($"jobly:mutex:{job.ConcurrencyKey}");
+            var mutexHandle = await mutexLock.TryAcquireAsync(timeout: TimeSpan.Zero, cancellationToken);
 
-            if (concurrencyHeld)
+            if (mutexHandle == null)
             {
+                // Another worker holds this mutex — cancel this job
+                await using var cancelTx = await context.Database.BeginTransactionAsync(cancellationToken);
                 job.CurrentState = State.Deleted;
                 job.ExpireAt = now.Add(_configuration.JobExpirationTimeout);
+                job.CurrentWorkerId = null;
+                job.LastKeepAlive = null;
                 context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
                 context.Set<JobLog>().Add(new JobLog
                 {
@@ -113,13 +121,14 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
                     WorkerId = _workerId,
                 });
                 await context.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
+                await cancelTx.CommitAsync(cancellationToken);
                 return true;
             }
-        }
 
-        PerfTrace.Mark(PerfTrace.CommitTransaction1);
-        await transaction.CommitAsync(cancellationToken);
+            // Lock acquired — will be held until handler completes (released in finally below)
+            // Store handle to release after execution
+            mutexHandleToRelease = mutexHandle;
+        }
 
         var logCollector = new JobLogCollector { JobId = job.Id, TimeProvider = _timeProvider, WorkerId = _workerId };
         using var jobCts = new CancellationTokenSource();
@@ -212,6 +221,11 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         {
             JobLogContext.Current = null;
             JobExecutionContext.Current = null;
+
+            if (mutexHandleToRelease != null)
+            {
+                await mutexHandleToRelease.DisposeAsync();
+            }
         }
 
         // Signal orchestrator — this job may have a parent that needs finalization,

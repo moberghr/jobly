@@ -155,12 +155,13 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     }
 
     // === Mutex jobs (same key — first holds mutex with slow handler, rest get cancelled) ===
+    // Uses a-critical queue so these are picked up before the 300+ other jobs
     await publisher.Enqueue(new SlowRequest(),
-        new JobParameters { Queue = "b-default", Mutex = "payment:customer-42" });
+        new JobParameters { Queue = "a-critical", Mutex = "payment:customer-42" });
     for (var i = 0; i < 4; i++)
     {
         await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 },
-            new JobParameters { Queue = "b-default", Mutex = "payment:customer-42" });
+            new JobParameters { Queue = "a-critical", Mutex = "payment:customer-42" });
     }
 
     // === Multiple continuation fan-out (parent → 3 continuations) ===

@@ -6,6 +6,7 @@ using Jobly.Core.Handlers;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
+using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -61,9 +62,17 @@ public abstract class MutexTestsBase : IAsyncLifetime
         });
         await ctx.SaveChangesAsync();
 
-        // Act: worker processes job2
-        var worker = CreateWorker();
+        // Pre-hold the lock (simulating job1 is being processed by another worker)
+        var lockProvider = new FakeLockProvider();
+        var heldLock = lockProvider.CreateLock("jobly:mutex:payment:123");
+        var heldHandle = await heldLock.AcquireAsync();
+
+        // Act: worker processes job2 — should fail to acquire lock
+        var worker = CreateWorker(lockProvider);
         await worker.GetAndProcessJob(CancellationToken.None);
+
+        // Cleanup
+        await heldHandle.DisposeAsync();
 
         // Assert: job2 should be cancelled (Deleted)
         var readCtx = _fixture.CreateContext();
@@ -181,8 +190,9 @@ public abstract class MutexTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Completed);
     }
 
-    private JoblyWorkerService<TestContext> CreateWorker()
+    private JoblyWorkerService<TestContext> CreateWorker(IDistributedLockProvider? lockProvider = null)
     {
+        lockProvider ??= new FakeLockProvider();
         var services = new ServiceCollection();
         services.AddJobHandlers(typeof(MutexTestsBase).Assembly);
         services.AddLogging();
@@ -212,7 +222,8 @@ public abstract class MutexTestsBase : IAsyncLifetime
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
             groupConfig,
-            TimeProvider.System);
+            TimeProvider.System,
+            lockProvider);
     }
 }
 

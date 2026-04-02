@@ -8,6 +8,7 @@ using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Logging;
 using Jobly.Worker.Services;
+using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -78,6 +79,38 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         trackedJob.HandlerType = job.HandlerType;
         await context.SaveChangesAsync(cancellationToken);
         job = trackedJob;
+
+        // Mutex check: distributed lock per ConcurrencyKey
+        IAsyncDisposable? mutexHandleToRelease = null;
+        if (job.ConcurrencyKey != null)
+        {
+            var lockProvider = scope.ServiceProvider.GetRequiredService<IDistributedLockProvider>();
+            var mutexLock = lockProvider.CreateLock($"jobly:mutex:{job.ConcurrencyKey}");
+            var mutexHandle = await mutexLock.TryAcquireAsync(timeout: TimeSpan.Zero, cancellationToken);
+
+            if (mutexHandle == null)
+            {
+                var now = _timeProvider.GetUtcNow().UtcDateTime;
+                job.CurrentState = State.Deleted;
+                job.ExpireAt = now.Add(_configuration.JobExpirationTimeout);
+                job.CurrentWorkerId = null;
+                job.LastKeepAlive = null;
+                context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
+                context.Set<JobLog>().Add(new JobLog
+                {
+                    JobId = job.Id,
+                    EventType = "Deleted",
+                    Timestamp = now,
+                    Level = "Information",
+                    Message = $"Cancelled — mutex '{job.ConcurrencyKey}' held by another job",
+                    WorkerId = _workerId,
+                });
+                await context.SaveChangesAsync(cancellationToken);
+                return;
+            }
+
+            mutexHandleToRelease = mutexHandle;
+        }
 
         var logCollector = new JobLogCollector { JobId = job.Id, TimeProvider = _timeProvider, WorkerId = _workerId };
 
@@ -170,6 +203,11 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         {
             JobLogContext.Current = null;
             JobExecutionContext.Current = null;
+
+            if (mutexHandleToRelease != null)
+            {
+                await mutexHandleToRelease.DisposeAsync();
+            }
         }
 
         OrchestrationTask<TContext>.SignalOrchestrator();

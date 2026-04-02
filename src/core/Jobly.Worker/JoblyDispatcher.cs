@@ -125,43 +125,13 @@ public class JoblyDispatcher<TContext> : BackgroundService
 
         await context.SaveChangesAsync(ct);
 
-        // Mutex check: cancel jobs whose ConcurrencyKey is already held
-        var jobsToDistribute = new List<Job>();
-        foreach (var job in jobs)
-        {
-            if (job.ConcurrencyKey != null)
-            {
-                var concurrencyHeld = await context.Set<Job>()
-                    .Where(j => j.ConcurrencyKey == job.ConcurrencyKey
-                        && j.CurrentState == State.Processing
-                        && j.Id != job.Id)
-                    .TagWith(InterceptorConstants.RowLockTableJobWait)
-                    .AnyAsync(ct);
-
-                if (concurrencyHeld)
-                {
-                    job.CurrentState = State.Deleted;
-                    job.ExpireAt = now.Add(_configuration.JobExpirationTimeout);
-                    context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
-                    context.Set<JobLog>().Add(new JobLog
-                    {
-                        JobId = job.Id,
-                        EventType = "Deleted",
-                        Timestamp = now,
-                        Level = "Information",
-                        Message = $"Cancelled — mutex '{job.ConcurrencyKey}' held by another job",
-                    });
-                    continue;
-                }
-            }
-
-            jobsToDistribute.Add(job);
-        }
+        // Note: mutex check for dispatcher mode happens in JoblyDispatcherWorker.ProcessJob
+        // via distributed lock, not here in the batch fetch.
 
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 
-        foreach (var job in jobsToDistribute)
+        foreach (var job in jobs)
         {
             await _jobChannel.Writer.WriteAsync(job, ct);
         }
