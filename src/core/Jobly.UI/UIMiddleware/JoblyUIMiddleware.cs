@@ -57,7 +57,13 @@ public class JoblyUIMiddleware
 
             if (path.Equals(logoutPath, StringComparison.OrdinalIgnoreCase) && httpContext.Request.Method == "POST")
             {
-                httpContext.Response.Cookies.Delete(CookieName, new CookieOptions { Path = _options.RoutePrefix });
+                httpContext.Response.Cookies.Delete(CookieName, new CookieOptions
+                {
+                    HttpOnly = true,
+                    SameSite = SameSiteMode.Strict,
+                    Secure = httpContext.Request.IsHttps,
+                    Path = _options.RoutePrefix,
+                });
                 httpContext.Response.StatusCode = 200;
                 return;
             }
@@ -120,7 +126,7 @@ public class JoblyUIMiddleware
         using var scope = _scopeFactory!.CreateScope();
         var validator = scope.ServiceProvider.GetRequiredService<IJoblyCredentialValidator>();
 
-        if (validator.Validate(username, password))
+        if (await validator.ValidateAsync(username, password))
         {
             var token = _protector!.Protect($"jobly|{username}|{DateTime.UtcNow:O}");
             httpContext.Response.Cookies.Append(CookieName, token, new CookieOptions
@@ -129,7 +135,7 @@ public class JoblyUIMiddleware
                 SameSite = SameSiteMode.Strict,
                 Secure = httpContext.Request.IsHttps,
                 Path = _options.RoutePrefix,
-                Expires = DateTimeOffset.UtcNow.AddDays(7),
+                Expires = DateTimeOffset.UtcNow.AddDays(1),
             });
             httpContext.Response.StatusCode = 200;
             return;

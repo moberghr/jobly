@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
@@ -9,8 +8,6 @@ using Jobly.Test.Shared;
 using Jobly.UI;
 using Jobly.UI.UIMiddleware;
 using Jobly.Worker;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,13 +19,8 @@ builder.Services.AddServices(builder.Configuration);
 builder.Services.AddJobHandlers(typeof(Program).Assembly);
 builder.Services.AddJobHandlers(typeof(Jobly.Test.Shared.ServiceConfiguration).Assembly);
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
-    {
-        options.LoginPath = "/login";
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Strict;
-    });
+builder.Services.AddDataProtection();
+builder.Services.AddScoped<IJoblyCredentialValidator, DemoCredentialValidator>();
 
 builder.Services.AddCors(options =>
 {
@@ -69,60 +61,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
-app.UseAuthentication();
 app.UseAuthorization();
 app.UseJoblyUI(options =>
 {
-    options.Authorization = new CookieAuthFilter();
-    options.UnauthorizedRedirectUrl = "/login";
+    options.UseBuiltInLogin<DemoCredentialValidator>();
 });
 app.MapControllers();
-
-// Custom login page
-app.MapGet("/login", (HttpContext ctx) =>
-{
-    var returnUrl = ctx.Request.Query["returnUrl"].FirstOrDefault() ?? "/jobly";
-    return Results.Content($@"<!DOCTYPE html>
-<html><head><title>Custom Login</title>
-<style>
-body {{ font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f0fdf4; }}
-.card {{ background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); width: 320px; }}
-h1 {{ font-size: 1.25rem; margin: 0 0 0.5rem; }}
-p {{ color: #666; font-size: 0.875rem; margin: 0 0 1.5rem; }}
-input {{ width: 100%; padding: 0.5rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }}
-button {{ width: 100%; padding: 0.5rem; background: #16a34a; color: white; border: none; border-radius: 4px; cursor: pointer; }}
-</style></head>
-<body><div class=""card"">
-<h1>My App Login</h1>
-<p>This is a custom login page (not Jobly's built-in)</p>
-<form method=""POST"" action=""/login?returnUrl={Uri.EscapeDataString(returnUrl)}"">
-<input type=""password"" name=""password"" placeholder=""Password (admin)"" autofocus />
-<button type=""submit"">Sign in</button>
-</form></div></body></html>", "text/html");
-});
-
-app.MapPost("/login", async (HttpContext ctx) =>
-{
-    var form = await ctx.Request.ReadFormAsync();
-    var password = form["password"].FirstOrDefault();
-    var returnUrl = ctx.Request.Query["returnUrl"].FirstOrDefault() ?? "/jobly";
-
-    if (password == "admin")
-    {
-        var claims = new List<Claim> { new(ClaimTypes.Name, "admin") };
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        await ctx.SignInAsync(new ClaimsPrincipal(identity));
-        return Results.Redirect(returnUrl);
-    }
-
-    return Results.Redirect($"/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
-});
-
-app.MapPost("/logout", async (HttpContext ctx) =>
-{
-    await ctx.SignOutAsync();
-    return Results.Redirect("/login");
-});
 
 // Seed endpoint — creates a realistic demo workload
 var seedQueues = new[] { "a-critical", "b-default", "c-low" };
@@ -427,10 +371,10 @@ async Task Migrate()
     await ctx.Database.EnsureCreatedAsync();
 }
 
-internal class CookieAuthFilter : IJoblyAuthorizationFilter
+internal class DemoCredentialValidator : IJoblyCredentialValidator
 {
-    public bool Authorize(HttpContext httpContext)
+    public Task<bool> ValidateAsync(string username, string password)
     {
-        return httpContext.User.Identity?.IsAuthenticated == true;
+        return Task.FromResult(username == "admin" && password == "admin");
     }
 }

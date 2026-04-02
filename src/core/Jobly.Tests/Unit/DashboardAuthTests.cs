@@ -186,9 +186,9 @@ public class DashboardAuthTests
 
 internal class TestCredentialValidator : IJoblyCredentialValidator
 {
-    public bool Validate(string username, string password)
+    public Task<bool> ValidateAsync(string username, string password)
     {
-        return username == "admin" && password == "admin";
+        return Task.FromResult(username == "admin" && password == "admin");
     }
 }
 

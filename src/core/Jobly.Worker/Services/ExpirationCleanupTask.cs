@@ -132,6 +132,7 @@ public class ExpirationCleanupTask<TContext> : ServerTaskBase<TContext>
 
             var jobIds = await context.Set<Job>()
                 .Where(x => x.ExpireAt != null)
+                .Where(x => !x.ChildJobs.Any(c => c.ExpireAt == null || c.ExpireAt >= DateTime.UtcNow))
                 .OrderBy(x => x.ExpireAt)
                 .Select(x => x.Id)
                 .Take(toDelete)

@@ -139,6 +139,7 @@ public class JobCommandService<TContext> : IJobCommandService
         {
             parent = await _context.Set<Job>()
                 .Where(x => x.Id == job.ParentJobId)
+                .TagWith(InterceptorConstants.RowLockTableJobWait)
                 .FirstOrDefaultAsync();
             if (parent != null)
             {
