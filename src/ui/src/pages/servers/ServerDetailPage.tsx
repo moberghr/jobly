@@ -6,7 +6,7 @@ import { Pagination } from '@/components/Pagination';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { shortId, formatBytes } from '@/utils/format';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
 import type { ServerModel, ServerTaskSummary, ServerLogModel, PagedList } from '@/types';
 import * as api from '@/api';
 
@@ -31,12 +31,6 @@ export default function ServerDetailPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Auto-refresh every 5 seconds
-  useEffect(() => {
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
-
   if (error) return <ErrorState message={error} />;
   if (!server) return <LoadingState />;
 
@@ -45,6 +39,9 @@ export default function ServerDetailPage() {
       <div className="flex items-center gap-4 mb-6">
         <span className="inline-block w-3 h-3 rounded-full bg-green-500" />
         <h1 className="text-2xl font-bold">{server.serverName}</h1>
+        <button onClick={fetchData} className="p-2 rounded-md hover:bg-accent text-muted-foreground" title="Refresh">
+          <RefreshCw className="h-4 w-4" />
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
