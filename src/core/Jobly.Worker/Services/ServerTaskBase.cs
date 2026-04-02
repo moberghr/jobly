@@ -53,6 +53,12 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
     /// </summary>
     protected virtual bool LogOnSuccess => true;
 
+    /// <summary>
+    /// Whether to re-run immediately when work was found. Default true.
+    /// Override to false for tasks that should always wait for their interval.
+    /// </summary>
+    protected virtual bool RerunImmediately => true;
+
     protected Guid ServerId => _configuration.ServerId;
 
     protected JoblyWorkerConfiguration Configuration => _configuration;
@@ -107,8 +113,8 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
                 await TryWriteServerLog("Failed", ex.Message, sw.Elapsed.TotalMilliseconds);
             }
 
-            // If work was done, run again immediately instead of sleeping
-            if (didWork)
+            // If work was done and task supports re-run, run again immediately
+            if (didWork && RerunImmediately)
             {
                 continue;
             }

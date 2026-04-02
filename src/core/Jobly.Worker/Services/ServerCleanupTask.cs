@@ -23,6 +23,8 @@ public class ServerCleanupTask<TContext> : ServerTaskBase<TContext>
 
     protected override string TaskName => "ServerCleanup";
 
+    protected override bool RerunImmediately => false;
+
     protected override TimeSpan DefaultInterval => Configuration.ServerCleanupInterval;
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)

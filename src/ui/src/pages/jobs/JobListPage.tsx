@@ -200,7 +200,10 @@ export default function JobListPage() {
                       {shortId(job.id)}
                     </Link>
                   </TableCell>
-                  <TableCell>{shortType(job.type)}</TableCell>
+                  <TableCell>
+                    <div>{shortType(job.type)}</div>
+                    {job.handlerType && <div className="text-xs text-muted-foreground">{shortType(job.handlerType)}</div>}
+                  </TableCell>
                   <TableCell><StateBadge state={job.currentState} cancellationMode={job.cancellationMode} /></TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     <RelativeTime date={job.createTime} />

@@ -22,6 +22,8 @@ public class CounterAggregatorTask<TContext> : ServerTaskBase<TContext>
 
     protected override string TaskName => "AggregateCounters";
 
+    protected override bool RerunImmediately => false;
+
     protected override TimeSpan DefaultInterval => Configuration.CounterAggregationInterval;
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)

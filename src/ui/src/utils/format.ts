@@ -13,7 +13,8 @@ export function formatDateTimeExact(dateString: string): string {
   return format(new Date(dateString), 'yyyy-MM-dd HH:mm:ss.SSS');
 }
 
-export function shortType(fullType: string): string {
+export function shortType(fullType: string | null | undefined): string {
+  if (!fullType) return '—';
   const parts = fullType.split(',')[0].split('.');
   return parts[parts.length - 1];
 }

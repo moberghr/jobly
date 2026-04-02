@@ -50,10 +50,10 @@ export interface JobModel {
   processedTime: string | null;
   currentState: State;
   cancellationMode: CancellationMode;
+  handlerType: string | null;
 }
 
 export interface JobDetailModel extends JobModel {
-  handlerType: string | null;
   kind: number;
   parentJobId: string | null;
   retriedTimes: number;

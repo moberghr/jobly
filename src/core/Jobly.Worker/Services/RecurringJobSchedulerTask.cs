@@ -31,6 +31,8 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
 
     protected override string TaskName => "RecurringJobScheduler";
 
+    protected override bool RerunImmediately => false;
+
     protected override TimeSpan DefaultInterval => TimeSpan.FromSeconds(15);
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)

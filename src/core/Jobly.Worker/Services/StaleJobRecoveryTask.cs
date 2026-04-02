@@ -25,6 +25,8 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
 
     protected override string TaskName => "StaleJobRecovery";
 
+    protected override bool RerunImmediately => false;
+
     protected override TimeSpan DefaultInterval => Configuration.StaleJobRecoveryInterval;
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)

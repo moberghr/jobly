@@ -73,6 +73,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 Id = x.Id,
                 CurrentState = x.CurrentState,
                 CancellationMode = x.CancellationMode,
+                HandlerType = x.HandlerType,
                 CreateTime = x.CreateTime,
                 Message = x.Message,
                 ScheduleTime = x.ScheduleTime,
@@ -178,6 +179,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 ScheduleTime = x.ScheduleTime,
                 CurrentState = x.CurrentState,
                 CancellationMode = x.CancellationMode,
+                HandlerType = x.HandlerType,
             })
             .ToPagedListAsync(request);
     }
@@ -196,6 +198,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 ScheduleTime = x.ScheduleTime,
                 CurrentState = x.CurrentState,
                 CancellationMode = x.CancellationMode,
+                HandlerType = x.HandlerType,
             })
             .ToPagedListAsync(request);
     }
@@ -224,6 +227,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 ScheduleTime = x.ScheduleTime,
                 CurrentState = x.CurrentState,
                 CancellationMode = x.CancellationMode,
+                HandlerType = x.HandlerType,
             })
             .ToPagedListAsync(request);
     }
@@ -252,6 +256,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 ScheduleTime = x.ScheduleTime,
                 CurrentState = x.CurrentState,
                 CancellationMode = x.CancellationMode,
+                HandlerType = x.HandlerType,
             })
             .ToPagedListAsync(request);
     }
@@ -275,6 +280,7 @@ public class JobQueryService<TContext> : IJobQueryService
                     Id = x.Id,
                     CurrentState = x.CurrentState,
                 CancellationMode = x.CancellationMode,
+                HandlerType = x.HandlerType,
                     CreateTime = x.CreateTime,
                     Message = x.Message,
                     ScheduleTime = x.ScheduleTime,
@@ -304,6 +310,7 @@ public class JobQueryService<TContext> : IJobQueryService
                     Id = x.Id,
                     CurrentState = x.CurrentState,
                 CancellationMode = x.CancellationMode,
+                HandlerType = x.HandlerType,
                     CreateTime = x.CreateTime,
                     Message = x.Message,
                     ScheduleTime = x.ScheduleTime,

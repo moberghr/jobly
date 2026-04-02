@@ -54,8 +54,10 @@ public class ExpirationCleanupTask<TContext> : ServerTaskBase<TContext>
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
+        // Fetch expired jobs, excluding parents whose children haven't expired yet (FK safety)
         var expiredJobIds = await context.Set<Job>()
             .Where(x => x.ExpireAt != null && x.ExpireAt < now)
+            .Where(x => !x.ChildJobs.Any(c => c.ExpireAt == null || c.ExpireAt >= now))
             .Select(x => x.Id)
             .Take(batchSize)
             .ToListAsync();
