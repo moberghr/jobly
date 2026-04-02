@@ -15,7 +15,6 @@ public class HeartbeatTask<TContext> : ServerTaskBase<TContext>
 {
     private TimeSpan _previousCpuTime;
     private DateTime _previousWallTime;
-    private int _runCount;
 
     public HeartbeatTask(
         IServiceScopeFactory scopeFactory,
@@ -33,12 +32,10 @@ public class HeartbeatTask<TContext> : ServerTaskBase<TContext>
 
     protected override TimeSpan DefaultInterval => Configuration.HealthCheckInterval;
 
-    // Log every 30th run (~5 minutes at default 10s interval)
-    protected override bool LogOnSuccess => _runCount % 30 == 0;
+    protected override bool RerunImmediately => false;
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
-        _runCount++;
 
         var server = await context.Set<Server>()
             .FindAsync([ServerId], ct) ?? throw new InvalidOperationException("Server not found in the database.");
