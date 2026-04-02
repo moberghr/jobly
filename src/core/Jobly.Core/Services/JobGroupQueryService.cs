@@ -88,6 +88,8 @@ public class JobGroupQueryService<TContext> : IJobGroupQueryService
                 JobCount = x.JobCount,
                 CreateTime = x.CreateTime,
                 ContinuationOptions = x.ContinuationOptions,
+                ParentJobId = x.ParentJobId,
+                ParentJobKind = x.ParentJob != null ? x.ParentJob.Kind : null,
             })
             .FirstOrDefaultAsync();
 

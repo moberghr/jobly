@@ -33,6 +33,10 @@ public class JobGroupModel
 
 public class JobGroupDetailModel : JobGroupModel
 {
+    public Guid? ParentJobId { get; set; }
+
+    public JobKind? ParentJobKind { get; set; }
+
     public int SpawnedJobsCount { get; set; }
 
     public List<ContinuationInfo> Continuations { get; set; } = [];

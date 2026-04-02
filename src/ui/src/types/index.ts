@@ -103,6 +103,8 @@ export interface ContinuationInfo {
 }
 
 export interface JobGroupDetailModel extends JobGroupModel {
+  parentJobId: string | null;
+  parentJobKind: number | null;
   spawnedJobsCount: number;
   continuations: ContinuationInfo[];
 }

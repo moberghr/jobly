@@ -49,6 +49,9 @@ export default function BatchDetailPage() {
           </div>
           <div className="mt-3 text-sm text-muted-foreground space-y-1">
             <div>Created: {formatDateTime(batch.createTime)}</div>
+            {batch.parentJobId && (
+              <div>Parent: <Link to={batch.parentJobKind === 3 ? `/batches/detail/${batch.parentJobId}` : `/jobs/detail/${batch.parentJobId}`} className="text-primary hover:underline font-mono text-xs">{shortId(batch.parentJobId)}</Link></div>
+            )}
             <div>ID: <span className="font-mono text-xs">{batch.id}</span></div>
             {batch.continuations.length > 0 && (
               <div>
