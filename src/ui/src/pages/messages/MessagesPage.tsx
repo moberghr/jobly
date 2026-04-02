@@ -66,7 +66,7 @@ export default function MessagesPage() {
               data.items.map((msg) => (
                 <TableRow key={msg.id}>
                   <TableCell className="font-mono text-xs">
-                    <Link to={`/messages/detail/${msg.id}`} className="text-primary hover:underline">
+                    <Link to={`/detail/${msg.id}`} className="text-primary hover:underline">
                       {shortId(msg.id)}
                     </Link>
                   </TableCell>

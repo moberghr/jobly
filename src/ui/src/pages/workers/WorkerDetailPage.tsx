@@ -86,7 +86,7 @@ export default function WorkerDetailPage() {
               <span className="text-muted-foreground">Current Job:</span>{' '}
               {worker.currentJobId ? (
                 <>
-                  <Link to={`/jobs/detail/${worker.currentJobId}`} className="text-primary hover:underline font-mono text-xs">
+                  <Link to={`/detail/${worker.currentJobId}`} className="text-primary hover:underline font-mono text-xs">
                     {shortId(worker.currentJobId)}
                   </Link>
                   {worker.currentJobType && (
@@ -138,7 +138,7 @@ export default function WorkerDetailPage() {
                     </span>
                   </TableCell>
                   <TableCell className="font-mono text-xs">
-                    <Link to={`/jobs/detail/${log.jobId}`} className="text-primary hover:underline">
+                    <Link to={`/detail/${log.jobId}`} className="text-primary hover:underline">
                       {shortId(log.jobId)}
                     </Link>
                   </TableCell>

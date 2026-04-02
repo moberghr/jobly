@@ -196,7 +196,7 @@ export default function JobListPage() {
                     />
                   </TableCell>
                   <TableCell className="font-mono text-xs">
-                    <Link to={`/jobs/detail/${job.id}`} className="text-primary hover:underline">
+                    <Link to={`/detail/${job.id}`} className="text-primary hover:underline">
                       {shortId(job.id)}
                     </Link>
                   </TableCell>

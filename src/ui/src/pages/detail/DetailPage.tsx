@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StateBadge } from '@/components/StateBadge';
-import { RelatedJobsTable } from '@/components/RelatedJobsTable';
 import { FlowCard } from '@/components/FlowCard';
-import { shortType, formatDateTime, shortId } from '@/utils/format';
+import { FilteredJobsTable } from '@/components/FilteredJobsTable';
 import { RelativeTime } from '@/components/RelativeTime';
+import { shortType, formatDateTime, shortId } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { State } from '@/types';
-import type { JobDetailModel, JobLogModel } from '@/types';
+import type { UnifiedJobDetailModel, JobLogModel } from '@/types';
 import * as api from '@/api';
 
 const eventColors: Record<string, { border: string; bg: string; text: string }> = {
@@ -31,26 +31,33 @@ function formatDuration(ms: number): string {
 }
 
 function getDuration(logs: JobLogModel[], currentIndex: number): string | null {
-  // Use high-resolution Stopwatch duration if available
   const log = logs[currentIndex];
   if (log.durationMs != null) return formatDuration(log.durationMs);
-
-  // Fall back to timestamp diff
   if (currentIndex >= logs.length - 1) return null;
   const current = new Date(logs[currentIndex].timestamp).getTime();
   const previous = new Date(logs[currentIndex + 1].timestamp).getTime();
-  const ms = current - previous;
-  return formatDuration(ms);
+  return formatDuration(current - previous);
 }
 
-export default function JobDetailPage() {
+function kindLabel(kind: number) {
+  if (kind === 3) return 'Batch';
+  if (kind === 2) return 'Message';
+  return 'Job';
+}
+
+export default function DetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [job, setJob] = useState<JobDetailModel | null>(null);
+  const [job, setJob] = useState<UnifiedJobDetailModel | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [jobCounts, setJobCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    if (id) api.getJobById(id).then(setJob).catch(() => setError('Unable to load job details'));
+    if (id) api.getDetail(id).then(setJob).catch(() => setError('Unable to load details'));
   }, [id]);
+
+  const handleCountsUpdate = useCallback((counts: Record<string, number>) => {
+    setJobCounts(counts);
+  }, []);
 
   if (error) return <ErrorState message={error} />;
   if (!job) return <LoadingState />;
@@ -58,27 +65,59 @@ export default function JobDetailPage() {
   const systemEvents = job.logs.filter(l => l.eventType !== 'Log').reverse();
   const handlerLogs = job.logs.filter(l => l.eventType === 'Log');
 
+  // Batch progress
+  const totalJobs = Object.keys(jobCounts).length > 0
+    ? Object.values(jobCounts).reduce((a, b) => a + b, 0)
+    : job.totalJobs;
+  const completedJobs = jobCounts['completed'] ?? job.completedJobs;
+  const failedJobs = jobCounts['failed'] ?? job.failedJobs;
+  const done = completedJobs + failedJobs;
+  const pct = totalJobs > 0 ? Math.round((done / totalJobs) * 100) : 0;
+  const greenPct = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0;
+  const redPct = totalJobs > 0 ? (failedJobs / totalJobs) * 100 : 0;
+
+  // Is this a container (batch/message) with child jobs?
+  const hasChildJobs = job.kind === 2 || job.kind === 3;
+  const isJob = job.kind === 1;
+
   return (
     <div>
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold">Job {shortId(job.id)}</h1>
+        <h1 className="text-2xl font-bold">{kindLabel(job.kind)} {shortId(job.id)}</h1>
         <StateBadge state={job.currentState} cancellationMode={job.cancellationMode} />
+        {job.queue && <span className="text-sm text-muted-foreground">Queue: {job.queue}</span>}
         <div className="flex-1" />
-        {job.currentState === State.Processing ? (
+        {isJob && job.currentState === State.Processing ? (
           <Button variant="destructive" size="sm" onClick={() => api.deleteJob(job.id)}>Cancel</Button>
-        ) : (
+        ) : isJob ? (
           <>
             <Button variant="outline" size="sm" onClick={() => api.requeueJob(job.id)}>Requeue</Button>
             <Button variant="destructive" size="sm" onClick={() => api.deleteJob(job.id)}>Delete</Button>
           </>
-        )}
+        ) : null}
       </div>
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left column: Details */}
+        {/* Left column */}
         <div className="space-y-4">
+          {/* Progress bar (batches) */}
+          {totalJobs > 0 && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Progress</CardTitle></CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden flex">
+                    {greenPct > 0 && <div className="h-full bg-green-500 transition-all" style={{ width: `${greenPct}%` }} />}
+                    {redPct > 0 && <div className="h-full bg-red-500 transition-all" style={{ width: `${redPct}%` }} />}
+                  </div>
+                  <span className="text-sm font-medium">{done}/{totalJobs} ({pct}%)</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Payload */}
           {job.message && (
             <Card>
@@ -94,10 +133,10 @@ export default function JobDetailPage() {
             <CardHeader className="pb-2"><CardTitle className="text-sm">Details</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div><span className="text-muted-foreground">Type:</span> {shortType(job.type)}</div>
-              <div><span className="text-muted-foreground">Handler:</span> {job.handlerType ? shortType(job.handlerType) : 'N/A'}</div>
+              {job.handlerType && <div><span className="text-muted-foreground">Handler:</span> {shortType(job.handlerType)}</div>}
               <div><span className="text-muted-foreground">Created:</span> {formatDateTime(job.createTime)}</div>
               {job.scheduleTime && <div><span className="text-muted-foreground">Scheduled:</span> {formatDateTime(job.scheduleTime)}</div>}
-              <div><span className="text-muted-foreground">Retries:</span> {job.retriedTimes}/{job.maxRetries}</div>
+              {job.maxRetries > 0 && <div><span className="text-muted-foreground">Retries:</span> {job.retriedTimes}/{job.maxRetries}</div>}
               {job.concurrencyKey && <div><span className="text-muted-foreground">Mutex:</span> <span className="font-mono text-xs">{job.concurrencyKey}</span></div>}
               <div><span className="text-muted-foreground">ID:</span> <span className="font-mono text-xs">{job.id}</span></div>
             </CardContent>
@@ -105,47 +144,45 @@ export default function JobDetailPage() {
 
           {/* Flow */}
           <FlowCard
-            parentJobId={job.parentJobId}
             traceId={job.traceId}
+            parentJob={job.parentJob}
+            spawnedByJob={job.spawnedByJob}
             continuations={job.continuations}
+            spawnedJobs={job.spawnedJobs}
           />
-
-          {/* Sibling Jobs */}
-          <RelatedJobsTable title="Sibling Jobs" count={job.siblingJobCount} fetchJobs={(page, pageSize) => api.getSiblingJobs(job.id, page, pageSize)} />
-
-          {/* Trace Jobs */}
-          <RelatedJobsTable title="Trace" count={job.traceJobCount} fetchJobs={(page, pageSize) => api.getTraceJobs(job.id, page, pageSize)} />
         </div>
 
         {/* Right column: History + Logs */}
         <div className="space-y-4">
           {/* State History */}
-          <div>
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">History</h2>
-            <div className="space-y-3">
-              {systemEvents.map((event, index) => {
-                const colors = eventColors[event.eventType] ?? eventColors.Created;
-                const duration = getDuration(systemEvents, index);
-                return (
-                  <div key={event.id} className={`border-l-4 ${colors.border} ${colors.bg} rounded-r-md p-4`}>
-                    <div className="flex items-center justify-between">
-                      <span className={`font-semibold ${colors.text}`}>{event.eventType}</span>
-                      <span className="text-xs text-muted-foreground">
-                        <RelativeTime date={event.timestamp} />
-                        {duration && <span className="ml-2 opacity-60">({duration})</span>}
-                      </span>
+          {systemEvents.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">History</h2>
+              <div className="space-y-3">
+                {systemEvents.map((event, index) => {
+                  const colors = eventColors[event.eventType] ?? eventColors.Created;
+                  const duration = getDuration(systemEvents, index);
+                  return (
+                    <div key={event.id} className={`border-l-4 ${colors.border} ${colors.bg} rounded-r-md p-4`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`font-semibold ${colors.text}`}>{event.eventType}</span>
+                        <span className="text-xs text-muted-foreground">
+                          <RelativeTime date={event.timestamp} />
+                          {duration && <span className="ml-2 opacity-60">({duration})</span>}
+                        </span>
+                      </div>
+                      {event.message && <p className="text-sm text-muted-foreground mt-1">{event.message}</p>}
+                      {event.exception && (
+                        <pre className="text-xs bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-300 p-3 rounded-md overflow-auto mt-2 max-h-60">
+                          {event.exception}
+                        </pre>
+                      )}
                     </div>
-                    {event.message && <p className="text-sm text-muted-foreground mt-1">{event.message}</p>}
-                    {event.exception && (
-                      <pre className="text-xs bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-300 p-3 rounded-md overflow-auto mt-2 max-h-60">
-                        {event.exception}
-                      </pre>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Handler Logs */}
           {handlerLogs.length > 0 && (
@@ -170,6 +207,27 @@ export default function JobDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Child jobs table (batches and messages) */}
+      {hasChildJobs && (
+        <div className="mt-6">
+          <FilteredJobsTable
+            key={job.id}
+            title="Jobs"
+            fetchJobs={(page, pageSize, state) =>
+              job.kind === 3
+                ? api.getBatchJobs(job.id, page, pageSize, state)
+                : api.getMessageJobs(job.id, page, pageSize, state)
+            }
+            fetchCounts={() =>
+              job.kind === 3
+                ? api.getBatchJobCounts(job.id)
+                : api.getMessageJobCounts(job.id)
+            }
+            onCountsUpdate={handleCountsUpdate}
+          />
+        </div>
+      )}
     </div>
   );
 }

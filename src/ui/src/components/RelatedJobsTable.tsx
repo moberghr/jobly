@@ -53,7 +53,7 @@ export function RelatedJobsTable({ title, count, fetchJobs }: RelatedJobsTablePr
                 {data.items.map((job) => (
                   <TableRow key={job.id}>
                     <TableCell className="font-mono text-xs">
-                      <Link to={`/jobs/detail/${job.id}`} className="text-primary hover:underline">{shortId(job.id)}</Link>
+                      <Link to={`/detail/${job.id}`} className="text-primary hover:underline">{shortId(job.id)}</Link>
                     </TableCell>
                     <TableCell>{shortType(job.type)}</TableCell>
                     <TableCell><StateBadge state={job.currentState} /></TableCell>

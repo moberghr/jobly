@@ -1,5 +1,5 @@
 import api from './client';
-import type { DashboardStatistics, JobModel, JobDetailModel, JobGroupModel, JobGroupDetailModel, RecurringJobModel, RecurringJobDetailModel, RecurringJobHistoryModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint, TypeCountModel, WorkerDetailModel, WorkerJobLogModel } from '@/types';
+import type { DashboardStatistics, JobModel, JobDetailModel, JobGroupModel, JobGroupDetailModel, RecurringJobModel, RecurringJobDetailModel, RecurringJobHistoryModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint, TypeCountModel, WorkerDetailModel, WorkerJobLogModel, TraceJobModel, UnifiedJobDetailModel } from '@/types';
 
 // Dashboard
 export const getStatus = () => api.get<DashboardStatistics>('/status').then(r => r.data);
@@ -50,6 +50,12 @@ export const getChildJobs = (jobId: string, page = 0, pageSize = 20) =>
 
 export const getTraceJobs = (jobId: string, page = 0, pageSize = 20) =>
   api.get<PagedList<JobModel>>(`/jobs/${jobId}/trace`, { params: { page, pageSize } }).then(r => r.data);
+
+export const getTraceTree = (traceId: string) =>
+  api.get<TraceJobModel[]>(`/trace/${traceId}`).then(r => r.data);
+
+export const getDetail = (id: string) =>
+  api.get<UnifiedJobDetailModel>(`/detail/${id}`).then(r => r.data);
 
 export const requeueJob = (jobId: string) => api.post(`/jobs/${jobId}/requeue`);
 export const deleteJob = (jobId: string) => api.post(`/jobs/${jobId}/delete`);

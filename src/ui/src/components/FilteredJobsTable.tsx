@@ -11,6 +11,7 @@ import type { JobModel, PagedList } from '@/types';
 import * as api from '@/api';
 
 const stateItems = [
+  { key: 'awaiting', label: 'Awaiting', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' },
   { key: 'enqueued', label: 'Enqueued', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
   { key: 'processing', label: 'Processing', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
   { key: 'completed', label: 'Completed', color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
@@ -135,7 +136,7 @@ export function FilteredJobsTable({ title, fetchJobs, fetchCounts, onCountsUpdat
                     {data.items.map((job) => (
                       <TableRow key={job.id}>
                         <TableCell className="font-mono text-xs">
-                          <Link to={`/jobs/detail/${job.id}`} className="text-primary hover:underline">{shortId(job.id)}</Link>
+                          <Link to={`/detail/${job.id}`} className="text-primary hover:underline">{shortId(job.id)}</Link>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground truncate max-w-[200px]">{shortType(job.type)}</TableCell>
                         <TableCell className="text-sm text-muted-foreground truncate max-w-[200px]">{job.handlerType ? shortType(job.handlerType) : '—'}</TableCell>

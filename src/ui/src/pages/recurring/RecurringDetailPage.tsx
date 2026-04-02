@@ -121,7 +121,7 @@ export default function RecurringDetailPage() {
                         <TableRow key={entry.jobId ?? `log-${idx}`}>
                           <TableCell className="font-mono text-xs">
                             {entry.jobExists && entry.jobId ? (
-                              <Link to={`/jobs/detail/${entry.jobId}`} className="text-primary hover:underline">{shortId(entry.jobId)}</Link>
+                              <Link to={`/detail/${entry.jobId}`} className="text-primary hover:underline">{shortId(entry.jobId)}</Link>
                             ) : entry.jobId ? (
                               <span className="text-muted-foreground">{shortId(entry.jobId)}</span>
                             ) : (

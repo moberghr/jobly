@@ -65,6 +65,14 @@ public static class JoblyEndpoints
 
         apiGroup.MapGet("jobs/{jobId}/trace", async ([FromServices] IJobQueryService jobQueryService, Guid jobId, [AsParameters] BaseListRequest request) => await jobQueryService.GetTraceJobs(jobId, request));
 
+        apiGroup.MapGet("trace/{traceId}", async ([FromServices] IJobQueryService jobQueryService, Guid traceId) => await jobQueryService.GetTraceTree(traceId));
+
+        apiGroup.MapGet("detail/{id}", async ([FromServices] IJobQueryService jobQueryService, Guid id) =>
+        {
+            var result = await jobQueryService.GetJobDetailById(id);
+            return result is null ? Results.NotFound() : Results.Ok(result);
+        });
+
         apiGroup.MapPost("jobs/{jobId}/requeue", async ([FromServices] IJobCommandService jobCommandService, Guid jobId) => await jobCommandService.RequeueJob(jobId));
 
         apiGroup.MapPost("jobs/{jobId}/delete", async ([FromServices] IJobCommandService jobCommandService, Guid jobId) => await jobCommandService.DeleteJob(jobId));

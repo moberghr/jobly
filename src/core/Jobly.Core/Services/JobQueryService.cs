@@ -24,6 +24,10 @@ public interface IJobQueryService
 
     Task<PagedList<JobModel>> GetTraceJobs(Guid jobId, BaseListRequest request);
 
+    Task<List<TraceJobModel>> GetTraceTree(Guid traceId);
+
+    Task<UnifiedJobDetailModel?> GetJobDetailById(Guid id);
+
     Task<int> CountProcessingJobs();
 
     Task<List<TypeCountModel>> GetFailedJobTypeCounts();
@@ -244,6 +248,159 @@ public class JobQueryService<TContext> : IJobQueryService
                 HandlerType = x.HandlerType,
             })
             .ToPagedListAsync(request);
+    }
+
+    public async Task<List<TraceJobModel>> GetTraceTree(Guid traceId)
+    {
+        return await _context.Set<Job>()
+            .AsNoTracking()
+            .Where(x => x.TraceId == traceId)
+            .OrderBy(x => x.CreateTime)
+            .Select(x => new TraceJobModel
+            {
+                Id = x.Id,
+                Kind = x.Kind,
+                Type = x.Type,
+                HandlerType = x.HandlerType,
+                CurrentState = x.CurrentState,
+                ParentJobId = x.ParentJobId,
+                SpawnedByJobId = x.SpawnedByJobId,
+                CreateTime = x.CreateTime,
+            })
+            .ToListAsync();
+    }
+
+    public async Task<UnifiedJobDetailModel?> GetJobDetailById(Guid id)
+    {
+        var job = await _context.Set<Job>()
+            .Where(x => x.Id == id)
+            .Select(x => new UnifiedJobDetailModel
+            {
+                Id = x.Id,
+                Kind = x.Kind,
+                Type = x.Type,
+                CurrentState = x.CurrentState,
+                CreateTime = x.CreateTime,
+                CancellationMode = x.CancellationMode,
+                Message = x.Message,
+                HandlerType = x.HandlerType,
+                ScheduleTime = x.ScheduleTime,
+                RetriedTimes = x.RetriedTimes,
+                MaxRetries = x.MaxRetries,
+                ConcurrencyKey = x.ConcurrencyKey,
+                ContinuationOptions = x.ContinuationOptions,
+                Queue = x.Queue,
+                TraceId = x.TraceId,
+            })
+            .FirstOrDefaultAsync();
+
+        if (job == null)
+        {
+            return null;
+        }
+
+        // Logs
+        job.Logs = await _context.Set<JobLog>()
+            .Where(x => x.JobId == id)
+            .OrderBy(x => x.Timestamp)
+            .Select(x => new JobLogModel
+            {
+                Id = x.Id,
+                EventType = x.EventType,
+                Timestamp = x.Timestamp,
+                Level = x.Level,
+                Message = x.Message,
+                Exception = x.Exception,
+                DurationMs = x.DurationMs,
+                WorkerId = x.WorkerId,
+            })
+            .ToListAsync();
+
+        // Parent job details
+        var parentJobId = await _context.Set<Job>()
+            .Where(x => x.Id == id)
+            .Select(x => x.ParentJobId)
+            .FirstOrDefaultAsync();
+
+        if (parentJobId != null)
+        {
+            job.ParentJob = await _context.Set<Job>()
+                .Where(x => x.Id == parentJobId)
+                .Select(x => new ContinuationInfo
+                {
+                    Id = x.Id,
+                    Kind = x.Kind,
+                    CurrentState = x.CurrentState,
+                    Type = x.Type,
+                    HandlerType = x.HandlerType,
+                })
+                .FirstOrDefaultAsync();
+        }
+
+        // Spawned-by job details
+        var spawnedByJobId = await _context.Set<Job>()
+            .Where(x => x.Id == id)
+            .Select(x => x.SpawnedByJobId)
+            .FirstOrDefaultAsync();
+
+        if (spawnedByJobId != null)
+        {
+            job.SpawnedByJob = await _context.Set<Job>()
+                .Where(x => x.Id == spawnedByJobId)
+                .Select(x => new ContinuationInfo
+                {
+                    Id = x.Id,
+                    Kind = x.Kind,
+                    CurrentState = x.CurrentState,
+                    Type = x.Type,
+                    HandlerType = x.HandlerType,
+                })
+                .FirstOrDefaultAsync();
+        }
+
+        // Continuations (children linked via ParentJobId)
+        job.Continuations = await _context.Set<Job>()
+            .Where(x => x.ParentJobId == id)
+            .OrderBy(x => x.CreateTime)
+            .Select(x => new ContinuationInfo
+            {
+                Id = x.Id,
+                Kind = x.Kind,
+                CurrentState = x.CurrentState,
+                Type = x.Type,
+                HandlerType = x.HandlerType,
+            })
+            .ToListAsync();
+
+        // Spawned jobs (created by this job's handler)
+        job.SpawnedJobs = await _context.Set<Job>()
+            .Where(x => x.SpawnedByJobId == id)
+            .OrderBy(x => x.CreateTime)
+            .Select(x => new ContinuationInfo
+            {
+                Id = x.Id,
+                Kind = x.Kind,
+                CurrentState = x.CurrentState,
+                Type = x.Type,
+                HandlerType = x.HandlerType,
+            })
+            .ToListAsync();
+
+        // Batch: compute completed/failed from children
+        if (job.Kind == JobKind.Batch)
+        {
+            var childCounts = await _context.Set<Job>()
+                .Where(x => x.ParentJobId == id && x.Kind == JobKind.Job)
+                .GroupBy(x => x.CurrentState)
+                .Select(g => new { State = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            job.TotalJobs = childCounts.Sum(c => c.Count);
+            job.CompletedJobs = childCounts.Where(c => c.State == State.Completed).Sum(c => c.Count);
+            job.FailedJobs = childCounts.Where(c => c.State == State.Failed).Sum(c => c.Count);
+        }
+
+        return job;
     }
 
     public async Task<List<TypeCountModel>> GetFailedJobTypeCounts()

@@ -69,7 +69,7 @@ export default function BatchesPage() {
                 return (
                   <TableRow key={batch.id}>
                     <TableCell className="font-mono text-xs">
-                      <Link to={`/batches/detail/${batch.id}`} className="text-primary hover:underline">
+                      <Link to={`/detail/${batch.id}`} className="text-primary hover:underline">
                         {shortId(batch.id)}
                       </Link>
                     </TableCell>

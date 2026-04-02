@@ -3,16 +3,15 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import MainLayout from '@/layouts/MainLayout';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import JobListPage from '@/pages/jobs/JobListPage';
-import JobDetailPage from '@/pages/jobs/JobDetailPage';
 import MessagesPage from '@/pages/messages/MessagesPage';
-import MessageDetailPage from '@/pages/messages/MessageDetailPage';
 import BatchesPage from '@/pages/batches/BatchesPage';
-import BatchDetailPage from '@/pages/batches/BatchDetailPage';
 import RecurringPage from '@/pages/recurring/RecurringPage';
 import RecurringDetailPage from '@/pages/recurring/RecurringDetailPage';
 import ServersPage from '@/pages/servers/ServersPage';
 import ServerDetailPage from '@/pages/servers/ServerDetailPage';
 import WorkerDetailPage from '@/pages/workers/WorkerDetailPage';
+import TracePage from '@/pages/trace/TracePage';
+import DetailPage from '@/pages/detail/DetailPage';
 import LoginPage from '@/pages/auth/LoginPage';
 import { setOnUnauthorized } from '@/api/client';
 import { config } from '@/config';
@@ -35,14 +34,16 @@ function App() {
       <Routes>
         <Route element={<MainLayout />}>
           <Route index element={<DashboardPage />} />
-          <Route path="/jobs/detail/:id" element={<JobDetailPage />} />
+          <Route path="/detail/:id" element={<DetailPage />} />
+          <Route path="/jobs/detail/:id" element={<DetailPage />} />
           <Route path="/jobs/:state" element={<JobListPage />} />
-          <Route path="/messages/detail/:id" element={<MessageDetailPage />} />
+          <Route path="/messages/detail/:id" element={<DetailPage />} />
           <Route path="/messages/:state" element={<MessagesPage />} />
-          <Route path="/batches/detail/:id" element={<BatchDetailPage />} />
+          <Route path="/batches/detail/:id" element={<DetailPage />} />
           <Route path="/batches/:state" element={<BatchesPage />} />
           <Route path="/recurring/:id" element={<RecurringDetailPage />} />
           <Route path="/recurring" element={<RecurringPage />} />
+          <Route path="/trace/:traceId" element={<TracePage />} />
           <Route path="/workers/:id" element={<WorkerDetailPage />} />
           <Route path="/servers/:id" element={<ServerDetailPage />} />
           <Route path="/servers" element={<ServersPage />} />

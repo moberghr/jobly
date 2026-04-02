@@ -113,6 +113,43 @@ export interface JobGroupDetailModel extends JobGroupModel {
   logs: JobLogModel[];
 }
 
+export interface UnifiedJobDetailModel {
+  id: string;
+  kind: number;
+  type: string | null;
+  currentState: State;
+  createTime: string;
+  cancellationMode: CancellationMode;
+  message: string | null;
+  handlerType: string | null;
+  scheduleTime: string | null;
+  retriedTimes: number;
+  maxRetries: number;
+  concurrencyKey: string | null;
+  totalJobs: number;
+  completedJobs: number;
+  failedJobs: number;
+  continuationOptions: number | null;
+  queue: string | null;
+  traceId: string | null;
+  parentJob: ContinuationInfo | null;
+  spawnedByJob: ContinuationInfo | null;
+  continuations: ContinuationInfo[];
+  spawnedJobs: ContinuationInfo[];
+  logs: JobLogModel[];
+}
+
+export interface TraceJobModel {
+  id: string;
+  kind: number;
+  type: string | null;
+  handlerType: string | null;
+  currentState: State;
+  parentJobId: string | null;
+  spawnedByJobId: string | null;
+  createTime: string;
+}
+
 export interface RecurringJobModel {
   id: number;
   name: string;
