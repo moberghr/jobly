@@ -152,6 +152,20 @@ public class JobQueryService<TContext> : IJobQueryService
                 .CountAsync();
         }
 
+        // Continuations: all children linked to this job
+        job.Continuations = await _context.Set<Job>()
+            .Where(x => x.ParentJobId == jobId)
+            .OrderBy(x => x.CreateTime)
+            .Select(x => new ContinuationInfo
+            {
+                Id = x.Id,
+                Kind = x.Kind,
+                CurrentState = x.CurrentState,
+                Type = x.Type,
+                HandlerType = x.HandlerType,
+            })
+            .ToListAsync();
+
         return job;
     }
 

@@ -136,6 +136,29 @@ export default function JobDetailPage() {
           {/* Child Jobs */}
           <RelatedJobsTable title="Child Jobs" count={job.childJobCount} fetchJobs={(page, pageSize) => api.getChildJobs(job.id, page, pageSize)} />
 
+          {/* Continuations */}
+          {job.continuations.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Continuations ({job.continuations.length})</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {job.continuations.map(c => (
+                  <div key={c.id} className="flex items-center gap-2 text-sm">
+                    <StateBadge state={c.currentState} />
+                    <Link
+                      to={c.kind === 3 ? `/batches/detail/${c.id}` : `/jobs/detail/${c.id}`}
+                      className="text-primary hover:underline font-mono text-xs"
+                    >
+                      {shortId(c.id)}
+                    </Link>
+                    <span className="text-muted-foreground">{shortType(c.type)}</span>
+                    {c.handlerType && <span className="text-xs text-muted-foreground">({shortType(c.handlerType)})</span>}
+                    <span className="text-xs text-muted-foreground">{c.kind === 3 ? 'Batch' : 'Job'}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Trace Jobs */}
           <RelatedJobsTable title="Trace" count={job.traceJobCount} fetchJobs={(page, pageSize) => api.getTraceJobs(job.id, page, pageSize)} />
         </div>

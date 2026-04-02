@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StateBadge } from '@/components/StateBadge';
 import { FilteredJobsTable } from '@/components/FilteredJobsTable';
-import { shortId, formatDateTime } from '@/utils/format';
+import { shortId, shortType, formatDateTime } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import type { JobGroupDetailModel } from '@/types';
 import * as api from '@/api';
@@ -54,11 +54,12 @@ export default function BatchDetailPage() {
               <div>
                 Continuations:{' '}
                 {batch.continuations.map((c, i) => (
-                  <span key={c.id}>
+                  <span key={c.id} className="inline-flex items-center gap-1">
                     {i > 0 && ', '}
                     <Link to={`/batches/detail/${c.id}`} className="text-primary hover:underline font-mono text-xs">
                       {shortId(c.id)}
                     </Link>
+                    {c.handlerType && <span className="text-xs text-muted-foreground">({shortType(c.handlerType)})</span>}
                     <StateBadge state={c.currentState} />
                   </span>
                 ))}

@@ -47,4 +47,6 @@ public class ContinuationInfo
     public State CurrentState { get; set; }
 
     public string? Type { get; set; }
+
+    public string? HandlerType { get; set; }
 }

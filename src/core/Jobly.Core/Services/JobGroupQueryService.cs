@@ -112,6 +112,7 @@ public class JobGroupQueryService<TContext> : IJobGroupQueryService
                 Kind = x.Kind,
                 CurrentState = x.CurrentState,
                 Type = x.Type,
+                HandlerType = x.HandlerType,
             })
             .ToListAsync();
 

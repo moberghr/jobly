@@ -65,6 +65,7 @@ export interface JobDetailModel extends JobModel {
   spawnedByJobId: string | null;
   traceJobCount: number;
   concurrencyKey: string | null;
+  continuations: ContinuationInfo[];
 }
 
 export interface JobLogModel {
@@ -98,6 +99,7 @@ export interface ContinuationInfo {
   kind: number;
   currentState: State;
   type: string | null;
+  handlerType: string | null;
 }
 
 export interface JobGroupDetailModel extends JobGroupModel {

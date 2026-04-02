@@ -25,4 +25,6 @@ public class JobDetailModel : JobModel
     public int TraceJobCount { get; set; }
 
     public string? ConcurrencyKey { get; set; }
+
+    public List<ContinuationInfo> Continuations { get; set; } = [];
 }
