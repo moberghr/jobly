@@ -29,7 +29,3 @@ Cookie contains `DateTime.UtcNow` but the auth filter only checks `payload.Start
 ### Bulk Delete/Requeue Not Atomic
 **Severity:** LOW
 Each job in a bulk operation has its own transaction. If the process dies mid-bulk, some jobs are affected and some aren't. No way to rollback. This is by design (failures skip, don't propagate) but should be documented.
-
-### No Job Type Allowlist for Deserialization
-**Severity:** LOW
-Worker deserializes `Type.GetType(job.Type)` without validation. While JSON deserialization is generally safe, defense-in-depth could maintain an allowlist of types.
