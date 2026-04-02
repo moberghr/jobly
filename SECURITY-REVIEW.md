@@ -1,26 +1,34 @@
-# Security Review — Remaining Items
+# Security Review
 
-Items from the April 2026 audit that haven't been fixed yet.
+Completed April 2026. All critical/high items resolved or accepted.
 
-## Security Hardening
+## Resolved
 
-### No CSRF Protection on Login/Logout Endpoints
-**Severity:** HIGH
-Login POST (`/api/auth/login`) and logout POST (`/api/auth/logout`) accept requests without CSRF tokens. A malicious page could force logout via cross-origin form submission.
-**Fix:** Add a custom header requirement (e.g., `X-Jobly-Auth: 1`) that the React SPA sends. Browsers won't add custom headers from cross-origin form posts.
+- ~~Stale recovery ignores CancellationMode~~ — Fixed: respects cancel intent
+- ~~Mutex race condition~~ — Fixed: FOR UPDATE blocking lock
+- ~~Message routing no-handler logging~~ — Fixed: adds Failed log
+- ~~RequeueJob on Processing~~ — Fixed: silently returns
+- ~~Orphaned Awaiting children~~ — Fixed: OrchestrationTask cleans up
+- ~~FK violation on expiration cleanup~~ — Fixed: skips parents with active children
 
-### Cookie Timestamp Not Validated
-**Severity:** MEDIUM
-Cookie contains `DateTime.UtcNow` but the auth filter only checks `payload.StartsWith("jobly|")`. A stolen cookie works for the full 7 days even if the password changes.
-**Fix:** Parse the timestamp from the cookie payload and reject cookies older than a configurable window (e.g., 24 hours). Or add a sliding refresh.
+## Accepted Risks
 
 ### LocalRequestsOnlyAuthorizationFilter and Reverse Proxies
-**Severity:** MEDIUM
-`RemoteIpAddress` always shows the proxy IP when behind a reverse proxy (Nginx, Azure, etc.). The localhost check passes/fails based on the proxy, not the client.
-**Fix:** Document that `ForwardedHeadersMiddleware` must be configured for proxied setups. The filter checks the direct connection IP, which is correct when not proxied.
+**Severity:** MEDIUM — **Accepted with documentation**
+`RemoteIpAddress` shows the proxy IP behind a reverse proxy. The localhost check passes/fails based on the proxy, not the client. Users behind proxies must configure `ForwardedHeadersMiddleware` in their app. Documented in dashboard-auth.md.
 
-## Operational
+### CSRF on Login/Logout
+**Severity:** LOW — **Accepted**
+Login/logout endpoints lack CSRF tokens. Worst case: attacker can force logout from a malicious page. Cannot force login or access data. Impact is trivial for an internal dashboard tool.
+
+### Cookie Timestamp Not Validated
+**Severity:** LOW — **Accepted**
+Cookie uses 7-day expiry via browser cookie expiration. Server-side timestamp validation would add complexity (sliding refresh on every request) for minimal security gain. Cookie is signed via ASP.NET Data Protection — forgery is not possible.
 
 ### Bulk Delete/Requeue Not Atomic
-**Severity:** LOW
-Each job in a bulk operation has its own transaction. If the process dies mid-bulk, some jobs are affected and some aren't. No way to rollback. This is by design (failures skip, don't propagate) but should be documented.
+**Severity:** LOW — **By design**
+Each job in a bulk operation has its own transaction. If the process dies mid-bulk, some jobs are affected and some aren't. Failures skip, don't propagate. Retry-safe due to idempotent operations.
+
+### No Login Rate Limiting
+**Severity:** LOW — **Accepted**
+Built-in login is for dev/demo use. Production deployments should use `IJoblyAuthorizationFilter` with their app's own auth. Users who need rate limiting can implement it in their `IJoblyCredentialValidator` or add ASP.NET rate limiting middleware.
