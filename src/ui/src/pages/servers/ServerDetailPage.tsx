@@ -110,10 +110,10 @@ function WorkerGroupSection({ queues, pollingMs, workers, activeCount }: { queue
   return (
     <Card>
       <button
-        className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-accent/50 rounded-t-lg transition-colors"
+        className="w-full text-left px-4 py-3 hover:bg-accent/50 rounded-t-lg transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3">
           {expanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
           <span className="font-medium text-sm">{workers.length} workers</span>
           {activeCount > 0 && (
@@ -121,10 +121,11 @@ function WorkerGroupSection({ queues, pollingMs, workers, activeCount }: { queue
               {activeCount} active
             </span>
           )}
+          <span className="text-xs text-muted-foreground">·</span>
+          <span className="text-xs text-muted-foreground">Polling: {pollingMs >= 1000 ? `${(pollingMs / 1000).toFixed(pollingMs % 1000 === 0 ? 0 : 1)}s` : `${pollingMs}ms`}</span>
         </div>
-        <div className="flex items-center gap-4 text-xs text-muted-foreground shrink-0 whitespace-nowrap">
-          <span>Queues: <span className="font-mono">{queues}</span></span>
-          <span>Polling: {pollingMs >= 1000 ? `${(pollingMs / 1000).toFixed(pollingMs % 1000 === 0 ? 0 : 1)}s` : `${pollingMs}ms`}</span>
+        <div className="ml-7 mt-1 text-xs text-muted-foreground">
+          Queues: <span className="font-mono">{queues}</span>
         </div>
       </button>
 
