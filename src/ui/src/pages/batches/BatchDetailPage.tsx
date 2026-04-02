@@ -50,9 +50,18 @@ export default function BatchDetailPage() {
           <div className="mt-3 text-sm text-muted-foreground space-y-1">
             <div>Created: {formatDateTime(batch.createTime)}</div>
             <div>ID: <span className="font-mono text-xs">{batch.id}</span></div>
-            {batch.continuationJobId && (
+            {batch.continuations.length > 0 && (
               <div>
-                Continuation: <Link to={`/batches/detail/${batch.continuationJobId}`} className="text-primary hover:underline font-mono text-xs">{shortId(batch.continuationJobId)}</Link>
+                Continuations:{' '}
+                {batch.continuations.map((c, i) => (
+                  <span key={c.id}>
+                    {i > 0 && ', '}
+                    <Link to={`/batches/detail/${c.id}`} className="text-primary hover:underline font-mono text-xs">
+                      {shortId(c.id)}
+                    </Link>
+                    <StateBadge state={c.currentState} />
+                  </span>
+                ))}
               </div>
             )}
           </div>

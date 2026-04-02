@@ -102,16 +102,18 @@ public class JobGroupQueryService<TContext> : IJobGroupQueryService
 
         jobGroup.TotalJobs = jobGroup.SpawnedJobsCount;
 
-        // For batches, find continuation job
-        if (jobGroup.Kind == JobKind.Batch)
-        {
-            var continuationJobId = await _context.Set<Job>()
-                .Where(x => x.ParentJobId == id && x.Kind == JobKind.Batch)
-                .Select(x => x.Id)
-                .FirstOrDefaultAsync();
-
-            jobGroup.ContinuationJobId = continuationJobId == Guid.Empty ? null : continuationJobId;
-        }
+        // Find continuation batches (child batches linked via ParentJobId)
+        jobGroup.Continuations = await _context.Set<Job>()
+            .Where(x => x.ParentJobId == id && x.Kind == JobKind.Batch)
+            .OrderBy(x => x.CreateTime)
+            .Select(x => new ContinuationInfo
+            {
+                Id = x.Id,
+                Kind = x.Kind,
+                CurrentState = x.CurrentState,
+                Type = x.Type,
+            })
+            .ToListAsync();
 
         return jobGroup;
     }

@@ -93,9 +93,16 @@ export interface JobGroupModel {
   continuationOptions: number | null;
 }
 
+export interface ContinuationInfo {
+  id: string;
+  kind: number;
+  currentState: State;
+  type: string | null;
+}
+
 export interface JobGroupDetailModel extends JobGroupModel {
   spawnedJobsCount: number;
-  continuationJobId: string | null;
+  continuations: ContinuationInfo[];
 }
 
 export interface RecurringJobModel {

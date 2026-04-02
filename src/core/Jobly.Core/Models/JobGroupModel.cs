@@ -35,5 +35,16 @@ public class JobGroupDetailModel : JobGroupModel
 {
     public int SpawnedJobsCount { get; set; }
 
-    public Guid? ContinuationJobId { get; set; }
+    public List<ContinuationInfo> Continuations { get; set; } = [];
+}
+
+public class ContinuationInfo
+{
+    public Guid Id { get; set; }
+
+    public JobKind Kind { get; set; }
+
+    public State CurrentState { get; set; }
+
+    public string? Type { get; set; }
 }
