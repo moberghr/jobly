@@ -9,11 +9,6 @@ Items from the April 2026 audit that haven't been fixed yet.
 Login POST (`/api/auth/login`) and logout POST (`/api/auth/logout`) accept requests without CSRF tokens. A malicious page could force logout via cross-origin form submission.
 **Fix:** Add a custom header requirement (e.g., `X-Jobly-Auth: 1`) that the React SPA sends. Browsers won't add custom headers from cross-origin form posts.
 
-### No Rate Limiting on Login Endpoint
-**Severity:** HIGH
-Unlimited login attempts. With a weak password, brute force is trivial.
-**Fix:** In-memory rate limiting — max 5 failed attempts per IP per minute. Reset on success.
-
 ### Cookie Timestamp Not Validated
 **Severity:** MEDIUM
 Cookie contains `DateTime.UtcNow` but the auth filter only checks `payload.StartsWith("jobly|")`. A stolen cookie works for the full 7 days even if the password changes.
