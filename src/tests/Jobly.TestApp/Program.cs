@@ -4,6 +4,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Helper;
 using Jobly.Test.Shared;
 using Jobly.UI;
 using Jobly.UI.UIMiddleware;
@@ -201,11 +202,42 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
         await publisher.Enqueue(new ProcessOrderRequest { OrderId = $"ORD-{1000 + i}" });
     }
 
+    // === Mutex jobs (same key — only first executes, rest cancelled) ===
+    for (var i = 0; i < 5; i++)
+    {
+        await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 },
+            new JobParameters { Queue = "b-default", Mutex = "payment:customer-42" });
+    }
+
+    // === Multiple continuation fan-out (parent → 3 continuations) ===
+    var fanOutParentId = await publisher.Enqueue(new RegisterRequest { Email = "fanout-parent@test.com" });
+    await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, fanOutParentId);
+    await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, fanOutParentId);
+    await publisher.Enqueue(new RegisterRequest { Email = "fanout-child@test.com" }, fanOutParentId);
+
+    // === Batch with mixed success/failure (shows green/red progress bar) ===
+    var mixedBatchJobs = new List<SendEmailRequest>();
+    for (var i = 0; i < 10; i++)
+    {
+        mixedBatchJobs.Add(new SendEmailRequest { EmailLogId = 1 });
+    }
+    var mixedBatchId = await batchPublisher.StartNew(mixedBatchJobs, "mixed-result-batch");
+
+    // === Named batch (type column won't be null) ===
+    var namedBatchJobs = Enumerable.Range(0, 5)
+        .Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
+    await batchPublisher.StartNew(namedBatchJobs, "email-campaign-batch");
+
+    // === Cancellable job (long-running 30s, cancel from UI to see "Cancelling..." badge) ===
+    await publisher.Enqueue(new SlowRequest(), queue: "c-low");
+
     // === Recurring jobs ===
     await recurringPublisher.AddOrUpdateRecurringJob(
         new SendEmailRequest { EmailLogId = 1 }, "send-daily-report", "0 9 * * *");
     await recurringPublisher.AddOrUpdateRecurringJob(
         new SendEmailRequest { EmailLogId = 1 }, "cleanup-hourly", "0 * * * *");
+    await recurringPublisher.AddOrUpdateRecurringJob(
+        new SendEmailRequest { EmailLogId = 1 }, "every-minute", "* * * * *");
 
     await publisher.SaveChangesAsync();
 
@@ -217,11 +249,14 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
         failing = 30,
         failingWithRetries = 10,
         continuations = 10,
+        fanOutContinuations = 4,
         slowWithAwaiting = 6,
         messages = 10,
         orderFlows = 5,
-        batches = 2,
-        recurringJobs = 2,
+        batches = 4,
+        mutexJobs = 5,
+        cancellableJobs = 1,
+        recurringJobs = 3,
     });
 });
 
