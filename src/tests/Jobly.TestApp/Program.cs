@@ -170,13 +170,14 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, fanOutParentId);
     await publisher.Enqueue(new RegisterRequest { Email = "fanout-child@test.com" }, fanOutParentId);
 
-    // === Batch (7 jobs) → Continuation Batch (3 jobs) chain ===
-    var chainBatchJobs = Enumerable.Range(0, 7)
+    // === Job → Batch (7 jobs) → Batch (3 jobs) chain ===
+    var chainJobId = await publisher.Enqueue(new RegisterRequest { Email = "chain-start@test.com" });
+    var chainBatch1Jobs = Enumerable.Range(0, 7)
         .Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
-    var chainBatchId = await batchPublisher.StartNew(chainBatchJobs, "chain-batch-7");
-    var chainContJobs = Enumerable.Range(0, 3)
+    var chainBatch1Id = await batchPublisher.ContinueBatchWith(chainBatch1Jobs, chainJobId, "chain-batch-7");
+    var chainBatch2Jobs = Enumerable.Range(0, 3)
         .Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
-    await batchPublisher.ContinueBatchWith(chainContJobs, chainBatchId, "chain-continuation-3");
+    await batchPublisher.ContinueBatchWith(chainBatch2Jobs, chainBatch1Id, "chain-batch-3");
 
     // === Batch with mixed success/failure (shows green/red progress bar) ===
     var mixedBatchJobs = new List<SendEmailRequest>();
