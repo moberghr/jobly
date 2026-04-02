@@ -165,6 +165,8 @@ export interface WorkerModel {
   lastHeartbeatTime: string | null;
   currentJobId: string | null;
   currentJobType: string | null;
+  queues: string | null;
+  pollingIntervalMs: number | null;
 }
 
 export interface PagedList<T> {
@@ -188,6 +190,8 @@ export interface WorkerDetailModel {
   currentJobType: string | null;
   serverId: string;
   serverName: string;
+  queues: string | null;
+  pollingIntervalMs: number | null;
 }
 
 export interface WorkerJobLogModel {

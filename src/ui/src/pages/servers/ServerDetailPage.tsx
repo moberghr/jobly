@@ -22,12 +22,20 @@ export default function ServerDetailPage() {
   const [tasks, setTasks] = useState<ServerTaskSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
     if (id) {
       api.getServerById(id).then(setServer).catch(() => setError('Unable to load server'));
       api.getServerTaskSummaries(id).then(setTasks).catch(() => {});
     }
   }, [id]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Auto-refresh every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
 
   if (error) return <ErrorState message={error} />;
   if (!server) return <LoadingState />;
@@ -53,43 +61,61 @@ export default function ServerDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Workers */}
+        {/* Worker Groups */}
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Workers ({server.workers.length})</CardTitle></CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             {server.workers.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Worker ID</TableHead>
-                    <TableHead>Started</TableHead>
-                    <TableHead>Current Job</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {server.workers.map((w) => (
-                    <TableRow key={w.workerId}>
-                      <TableCell className="font-mono text-xs">
-                        <Link to={`/workers/${w.workerId}`} className="text-primary hover:underline">
-                          {shortId(w.workerId)}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        <RelativeTime date={w.startedTime} />
-                      </TableCell>
-                      <TableCell>
-                        {w.currentJobId ? (
-                          <Link to={`/jobs/detail/${w.currentJobId}`} className="text-primary hover:underline text-xs font-mono">
-                            {shortId(w.currentJobId)}
-                          </Link>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">Idle</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              (() => {
+                // Group workers by queues+polling to show worker groups
+                const groups = new Map<string, typeof server.workers>();
+                for (const w of server.workers) {
+                  const key = `${w.queues ?? 'default'}|${w.pollingIntervalMs ?? 1000}`;
+                  if (!groups.has(key)) groups.set(key, []);
+                  groups.get(key)!.push(w);
+                }
+                return Array.from(groups.entries()).map(([key, workers]) => {
+                  const queues = workers[0].queues ?? 'default';
+                  const pollingMs = workers[0].pollingIntervalMs ?? 1000;
+                  return (
+                    <div key={key}>
+                      <div className="text-xs text-muted-foreground mb-2">
+                        <span className="font-medium">{workers.length} workers</span>
+                        {' · '}Queues: <span className="font-mono">{queues}</span>
+                        {' · '}Polling: {pollingMs >= 1000 ? `${(pollingMs / 1000).toFixed(pollingMs % 1000 === 0 ? 0 : 1)}s` : `${pollingMs}ms`}
+                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Worker ID</TableHead>
+                            <TableHead>Current Job</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {workers.map((w) => (
+                            <TableRow key={w.workerId}>
+                              <TableCell className="font-mono text-xs">
+                                <Link to={`/workers/${w.workerId}`} className="text-primary hover:underline">
+                                  {shortId(w.workerId)}
+                                </Link>
+                              </TableCell>
+                              <TableCell>
+                                {w.currentJobId ? (
+                                  <Link to={`/jobs/detail/${w.currentJobId}`} className="text-primary hover:underline text-xs font-mono">
+                                    {shortId(w.currentJobId)}
+                                  </Link>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">Idle</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  );
+                });
+              })()
             ) : (
               <p className="text-sm text-muted-foreground">No workers registered</p>
             )}

@@ -15,4 +15,8 @@ public class WorkerDetailModel
     public Guid ServerId { get; set; }
 
     public string ServerName { get; set; } = string.Empty;
+
+    public string? Queues { get; set; }
+
+    public double? PollingIntervalMs { get; set; }
 }

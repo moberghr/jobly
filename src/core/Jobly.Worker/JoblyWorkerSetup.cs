@@ -36,11 +36,20 @@ public class JoblyWorkerSetup<TContext> : IHostedService
         var workerGroups = _configuration.GetEffectiveWorkerGroups();
         var totalWorkerCount = workerGroups.Sum(g => g.WorkerCount);
 
-        var allWorkerIds = new List<Guid>();
-        for (var i = 0; i < totalWorkerCount; i++)
+        // Build worker IDs per group
+        var workerIdsPerGroup = new List<(WorkerGroupConfiguration Group, List<Guid> Ids)>();
+        foreach (var group in workerGroups)
         {
-            allWorkerIds.Add(Guid.NewGuid());
+            var ids = new List<Guid>();
+            for (var i = 0; i < group.WorkerCount; i++)
+            {
+                ids.Add(Guid.NewGuid());
+            }
+
+            workerIdsPerGroup.Add((group, ids));
         }
+
+        var allWorkerIds = workerIdsPerGroup.SelectMany(g => g.Ids).ToList();
 
         // Register server and all workers in one transaction
         using (var scope = _serviceScopeFactory.CreateScope())
@@ -58,17 +67,30 @@ public class JoblyWorkerSetup<TContext> : IHostedService
             };
             await context.Set<Server>().AddAsync(server, cancellationToken);
 
-            foreach (var workerId in allWorkerIds)
+            foreach (var (group, ids) in workerIdsPerGroup)
             {
-                await context.Set<Jobly.Core.Data.Entities.Worker>().AddAsync(
-                    new Jobly.Core.Data.Entities.Worker
-                    {
-                        Id = workerId,
-                        ServerId = _configuration.ServerId,
-                        StartedTime = now,
-                        LastHeartbeatTime = now,
-                    },
-                    cancellationToken);
+                var workerGroup = new Jobly.Core.Data.Entities.WorkerGroup
+                {
+                    ServerId = _configuration.ServerId,
+                    WorkerCount = group.WorkerCount,
+                    Queues = string.Join(",", group.Queues),
+                    PollingIntervalMs = group.PollingInterval.TotalMilliseconds,
+                };
+                await context.Set<Jobly.Core.Data.Entities.WorkerGroup>().AddAsync(workerGroup, cancellationToken);
+
+                foreach (var workerId in ids)
+                {
+                    await context.Set<Jobly.Core.Data.Entities.Worker>().AddAsync(
+                        new Jobly.Core.Data.Entities.Worker
+                        {
+                            Id = workerId,
+                            ServerId = _configuration.ServerId,
+                            StartedTime = now,
+                            LastHeartbeatTime = now,
+                            WorkerGroupId = workerGroup.Id,
+                        },
+                        cancellationToken);
+                }
             }
 
             await context.SaveChangesAsync(cancellationToken);

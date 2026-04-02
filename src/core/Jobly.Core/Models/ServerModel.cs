@@ -30,4 +30,8 @@ public class WorkerModel
     public Guid? CurrentJobId { get; set; }
 
     public string? CurrentJobType { get; set; }
+
+    public string? Queues { get; set; }
+
+    public double? PollingIntervalMs { get; set; }
 }

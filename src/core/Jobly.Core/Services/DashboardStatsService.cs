@@ -126,7 +126,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
     {
         var servers = await _context.Set<Server>().ToListAsync();
 
-        var workers = await _context.Set<Worker>().ToListAsync();
+        var workers = await _context.Set<Worker>().Include(w => w.WorkerGroup).ToListAsync();
 
         var processingJobs = await _context.Set<Job>()
             .Where(x => x.CurrentState == State.Processing)
@@ -160,6 +160,8 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
                         LastHeartbeatTime = w.LastHeartbeatTime,
                         CurrentJobId = activeJob?.Id,
                         CurrentJobType = activeJob?.Type,
+                        Queues = w.WorkerGroup?.Queues,
+                        PollingIntervalMs = w.WorkerGroup?.PollingIntervalMs,
                     };
                 }),
         });
@@ -177,6 +179,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
         }
 
         var workers = await _context.Set<Worker>()
+            .Include(w => w.WorkerGroup)
             .Where(w => w.ServerId == serverId)
             .ToListAsync();
 
@@ -206,6 +209,8 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
                     LastHeartbeatTime = w.LastHeartbeatTime,
                     CurrentJobId = activeJob?.Id,
                     CurrentJobType = activeJob?.Type,
+                    Queues = w.WorkerGroup?.Queues,
+                    PollingIntervalMs = w.WorkerGroup?.PollingIntervalMs,
                 };
             }),
         };
@@ -415,6 +420,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
     public async Task<WorkerDetailModel?> GetWorkerById(Guid workerId)
     {
         var worker = await _context.Set<Worker>()
+            .Include(w => w.WorkerGroup)
             .Where(w => w.Id == workerId)
             .FirstOrDefaultAsync();
 
@@ -439,6 +445,8 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             LastHeartbeatTime = worker.LastHeartbeatTime,
             CurrentJobId = activeJob?.Id,
             CurrentJobType = activeJob?.Type,
+            Queues = worker.WorkerGroup?.Queues,
+            PollingIntervalMs = worker.WorkerGroup?.PollingIntervalMs,
             ServerId = worker.ServerId,
             ServerName = server?.ServerName ?? "Unknown",
         };

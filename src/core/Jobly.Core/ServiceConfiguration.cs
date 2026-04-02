@@ -136,6 +136,7 @@ public static class ServiceConfiguration
         AddRecurringJobLogEntity(modelBuilder);
         AddServerEntity(modelBuilder);
         AddWorkerEntity(modelBuilder);
+        AddWorkerGroupEntity(modelBuilder);
         AddJobLogEntity(modelBuilder);
         AddStatisticEntity(modelBuilder);
         AddCounterEntity(modelBuilder);
@@ -255,8 +256,31 @@ public static class ServiceConfiguration
         worker.Property(p => p.ServerId);
         worker.Property(p => p.StartedTime);
         worker.Property(p => p.LastHeartbeatTime);
+        worker.Property(p => p.WorkerGroupId);
 
         worker.HasOne(p => p.Server)
+            .WithMany()
+            .HasForeignKey(p => p.ServerId);
+
+        worker.HasOne(p => p.WorkerGroup)
+            .WithMany()
+            .HasForeignKey(p => p.WorkerGroupId);
+    }
+
+    private static void AddWorkerGroupEntity(ModelBuilder modelBuilder)
+    {
+        var wg = modelBuilder.Entity<WorkerGroup>();
+        wg.ToTable(nameof(WorkerGroup));
+
+        wg.Property(p => p.Id);
+        wg.HasKey(p => p.Id);
+
+        wg.Property(p => p.ServerId);
+        wg.Property(p => p.WorkerCount);
+        wg.Property(p => p.Queues);
+        wg.Property(p => p.PollingIntervalMs);
+
+        wg.HasOne(p => p.Server)
             .WithMany()
             .HasForeignKey(p => p.ServerId);
     }

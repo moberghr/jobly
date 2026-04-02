@@ -48,6 +48,14 @@ builder.Services.AddJoblyWorker<TestContext>(options =>
     options.HealthCheckTimeout = TimeSpan.FromSeconds(30);
     options.JobExpirationTimeout = TimeSpan.FromMinutes(30);
     options.UseDispatcher = false;
+
+    // Second worker group — different queues and polling
+    options.AddWorkerGroup(group =>
+    {
+        group.WorkerCount = 3;
+        group.Queues = ["reports", "analytics"];
+        group.PollingInterval = TimeSpan.FromSeconds(5);
+    });
 });
 
 var app = builder.Build();
