@@ -113,8 +113,8 @@ function WorkerGroupSection({ queues, pollingMs, workers, activeCount }: { queue
         className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-accent/50 rounded-t-lg transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
-        <div className="flex items-center gap-3">
-          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        <div className="flex items-center gap-3 min-w-0">
+          {expanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
           <span className="font-medium text-sm">{workers.length} workers</span>
           {activeCount > 0 && (
             <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
@@ -122,7 +122,7 @@ function WorkerGroupSection({ queues, pollingMs, workers, activeCount }: { queue
             </span>
           )}
         </div>
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground shrink-0 whitespace-nowrap">
           <span>Queues: <span className="font-mono">{queues}</span></span>
           <span>Polling: {pollingMs >= 1000 ? `${(pollingMs / 1000).toFixed(pollingMs % 1000 === 0 ? 0 : 1)}s` : `${pollingMs}ms`}</span>
         </div>
@@ -187,8 +187,8 @@ function TaskSection({ serverId, task }: { serverId: string; task: ServerTaskSum
         className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-accent/50 rounded-t-lg transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
-        <div className="flex items-center gap-3">
-          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        <div className="flex items-center gap-3 min-w-0">
+          {expanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
           <span className="font-medium text-sm">{task.taskName}</span>
           {task.lastStatus && (
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[task.lastStatus] ?? 'text-muted-foreground'}`}>
@@ -196,7 +196,7 @@ function TaskSection({ serverId, task }: { serverId: string; task: ServerTaskSum
             </span>
           )}
         </div>
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground shrink-0 whitespace-nowrap">
           {task.intervalSeconds != null ? (
             <span>every {task.intervalSeconds}s</span>
           ) : (
