@@ -18,6 +18,7 @@ import { StateBadge } from '@/components/StateBadge';
 import { shortType, shortId } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { Briefcase, Mail, Layers } from 'lucide-react';
+import type { State } from '@/types';
 import type { TraceJobModel } from '@/types';
 import * as api from '@/api';
 
@@ -72,15 +73,19 @@ function TraceNode({ data }: NodeProps) {
 }
 
 function GroupNode({ data }: NodeProps) {
-  const label = data.label as string;
+  const navigate = useNavigate();
+  const d = data as unknown as { label: string; id: string; kind: number; state: State; highlighted?: boolean };
   return (
     <div
-      className="border-2 border-dashed border-muted-foreground/30 rounded-xl"
+      className={`border-2 border-dashed border-muted-foreground/30 rounded-xl ${d.highlighted ? 'ring-2 ring-primary border-primary' : ''}`}
       style={{ width: '100%', height: '100%', position: 'relative' }}
     >
       <Handle type="target" position={Position.Left} className="!bg-transparent !border-0 !w-0 !h-0" />
-      <span className="absolute -top-3 left-3 bg-background px-2 text-xs text-muted-foreground font-medium">
-        {label}
+      <span
+        className="absolute -top-3 left-3 px-2 text-xs font-medium cursor-pointer text-primary hover:underline whitespace-nowrap flex items-center gap-1"
+        onClick={() => navigate(`/detail/${d.id}`)}
+      >
+        {kindIcon(d.kind)} {d.label} <StateBadge state={d.state} />
       </span>
       <Handle type="source" position={Position.Right} className="!bg-transparent !border-0 !w-0 !h-0" />
     </div>
@@ -106,14 +111,57 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
     }
   }
 
-  // Track which children are in a container (skip individual edges for them)
+  // Track containers and their children
   const childrenInContainer = new Set<string>();
   for (const children of containers.values()) {
     for (const c of children) childrenInContainer.add(c.id);
   }
+  // Container parents are replaced by group boxes — map their ID to group ID
+  const containerGroupId = new Map<string, string>();
+  for (const parentId of containers.keys()) {
+    containerGroupId.set(parentId, `group-${parentId}`);
+  }
 
-  // Create job nodes
+  // Resolve edge target/source: containers → group, container children → parent's group
+  const resolveId = (id: string) => {
+    if (containerGroupId.has(id)) return containerGroupId.get(id)!;
+    if (childrenInContainer.has(id)) {
+      const child = jobMap.get(id)!;
+      return containerGroupId.get(child.parentJobId!) ?? id;
+    }
+    return id;
+  };
+
+  // Create edges for container parents (targeting group box)
+  for (const [containerId, ] of containers) {
+    const container = jobMap.get(containerId)!;
+    const groupId = `group-${containerId}`;
+    if (container.parentJobId && jobMap.has(container.parentJobId)) {
+      edges.push({
+        id: `p-${containerId}`,
+        source: resolveId(container.parentJobId),
+        target: groupId,
+        type: 'smoothstep',
+        style: { strokeWidth: 2 },
+      });
+    }
+    if (container.spawnedByJobId && jobMap.has(container.spawnedByJobId)
+      && container.spawnedByJobId !== container.parentJobId
+      && !container.parentJobId) {
+      edges.push({
+        id: `s-${containerId}`,
+        source: resolveId(container.spawnedByJobId),
+        target: groupId,
+        type: 'smoothstep',
+        style: { strokeDasharray: '5,5', stroke: '#94a3b8', strokeWidth: 1 },
+      });
+    }
+  }
+
+  // Create job nodes (skip container parents — they become group boxes)
   for (const job of jobs) {
+    if (containers.has(job.id)) continue;
+
     nodes.push({
       id: job.id,
       type: 'traceNode',
@@ -122,11 +170,10 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
     });
 
     if (job.parentJobId && jobMap.has(job.parentJobId)) {
-      // Skip individual edges for batch/message children — one edge to the group instead
       if (!childrenInContainer.has(job.id)) {
         edges.push({
           id: `p-${job.id}`,
-          source: job.parentJobId,
+          source: resolveId(job.parentJobId),
           target: job.id,
           type: 'smoothstep',
           style: { strokeWidth: 2 },
@@ -134,14 +181,14 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
       }
     }
 
-    // SpawnedBy edge — only show if node has no parent edge and isn't in a container
+    // SpawnedBy edge
     if (job.spawnedByJobId && jobMap.has(job.spawnedByJobId)
       && job.spawnedByJobId !== job.parentJobId
       && !job.parentJobId
       && !childrenInContainer.has(job.id)) {
       edges.push({
         id: `s-${job.id}`,
-        source: job.spawnedByJobId,
+        source: resolveId(job.spawnedByJobId),
         target: job.id,
         type: 'smoothstep',
         style: { strokeDasharray: '5,5', stroke: '#94a3b8', strokeWidth: 1 },
@@ -149,74 +196,96 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
     }
   }
 
-  // Auto-layout with dagre (all nodes flat, then compute group bounds)
+  // Auto-layout with dagre — container children excluded (positioned manually inside group)
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: 'LR', nodesep: 40, ranksep: 120 });
 
-  for (const node of nodes) {
-    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
-  }
-  // Add all parent→child relationships to dagre for layout (including container children)
+  // Add jobs to dagre — container parents get height for their group, container children excluded
   for (const job of jobs) {
+    if (childrenInContainer.has(job.id)) continue; // positioned inside group, not by dagre
+    const childCount = containers.get(job.id)?.length ?? 0;
+    const CHILD_GAP = 16;
+    const height = childCount > 0
+      ? childCount * NODE_HEIGHT + (childCount - 1) * CHILD_GAP + GROUP_PADDING * 2 + 16
+      : NODE_HEIGHT;
+    g.setNode(job.id, { width: NODE_WIDTH, height });
+  }
+  // Add edges — skip edges from containers to their children (they're positioned manually)
+  for (const job of jobs) {
+    if (childrenInContainer.has(job.id)) continue;
     if (job.parentJobId && jobMap.has(job.parentJobId)) {
       g.setEdge(job.parentJobId, job.id);
     }
   }
-  // For nodes without a parent edge, use spawned-by edge for layout
-  const nodesWithParentEdge = new Set(jobs.filter(j => j.parentJobId && jobMap.has(j.parentJobId)).map(j => j.id));
-  for (const edge of edges) {
-    if (edge.id.startsWith('s-') && !nodesWithParentEdge.has(edge.target)) {
-      g.setEdge(edge.source, edge.target);
+  // For spawned-by edges — redirect if source is a container child
+  for (const job of jobs) {
+    if (childrenInContainer.has(job.id)) continue;
+    if (job.spawnedByJobId && jobMap.has(job.spawnedByJobId)
+      && job.spawnedByJobId !== job.parentJobId
+      && !job.parentJobId) {
+      // If spawner is inside a container, use the container parent instead
+      let source = job.spawnedByJobId;
+      if (childrenInContainer.has(source)) {
+        const spawner = jobMap.get(source)!;
+        source = spawner.parentJobId!;
+      }
+      if (g.hasNode(source) && g.hasNode(job.id)) {
+        g.setEdge(source, job.id);
+      }
     }
   }
 
   dagre.layout(g);
 
-  // Apply positions
+  // Apply dagre positions to rendered nodes (skip container children — positioned manually)
   for (const node of nodes) {
+    if (childrenInContainer.has(node.id)) continue;
     const pos = g.node(node.id);
     node.position = { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 };
   }
 
-  // Create group nodes around container children (dagre positions, no repacking)
+  // Create group nodes — position children inside group at container parent's dagre position
+  const CHILD_GAP = 8;
   for (const [parentId, children] of containers) {
     const parent = jobMap.get(parentId)!;
     const childIds = children.map(c => c.id);
-    const childNodes = childIds.map(id => nodes.find(n => n.id === id)!);
-    const positions = childNodes.map(n => n.position);
 
-    const minX = Math.min(...positions.map(p => p.x)) - GROUP_PADDING;
-    const maxX = Math.max(...positions.map(p => p.x)) + NODE_WIDTH + GROUP_PADDING;
-    const minY = Math.min(...positions.map(p => p.y)) - GROUP_PADDING - 10;
-    const maxY = Math.max(...positions.map(p => p.y)) + NODE_HEIGHT + GROUP_PADDING;
-    const groupWidth = maxX - minX;
-    const groupHeight = maxY - minY;
+    // Use container parent's dagre position as the group anchor
+    const parentPos = g.node(parentId);
+    const parentX = parentPos.x - NODE_WIDTH / 2;
+    const parentY = parentPos.y;
+
+    // Stack children vertically inside the group
+    const totalChildHeight = childIds.length * NODE_HEIGHT + (childIds.length - 1) * CHILD_GAP;
+    const startY = parentY - totalChildHeight / 2;
+
+    for (let i = 0; i < childIds.length; i++) {
+      const childNode = nodes.find(n => n.id === childIds[i])!;
+      childNode.position = { x: parentX, y: startY + i * (NODE_HEIGHT + CHILD_GAP) };
+    }
+
+    const minX = parentX - GROUP_PADDING;
+    const maxX = parentX + NODE_WIDTH + GROUP_PADDING;
+    const minY2 = startY - GROUP_PADDING - 16;
+    const maxY = startY + totalChildHeight + GROUP_PADDING;
 
     const groupId = `group-${parentId}`;
+    const label = `${shortId(parentId)} (${children.length} jobs)`;
     nodes.push({
       id: groupId,
       type: 'group',
-      data: { label: `${parent.kind === 3 ? 'Batch' : 'Message'} (${children.length} jobs)` },
-      position: { x: minX, y: minY },
-      style: { width: groupWidth, height: groupHeight, zIndex: -1 },
+      data: { label, id: parentId, kind: parent.kind, state: parent.currentState, highlighted: parentId === highlightId },
+      position: { x: minX, y: minY2 },
+      style: { width: maxX - minX, height: maxY - minY2, zIndex: -1 },
     });
 
     // Make child nodes relative to group
     for (const id of childIds) {
       const node = nodes.find(n => n.id === id)!;
       node.parentId = groupId;
-      node.position = { x: node.position.x - minX, y: node.position.y - minY };
+      node.position = { x: node.position.x - minX, y: node.position.y - minY2 };
     }
-
-    // Single edge from batch/message node to the group
-    edges.push({
-      id: `g-${parentId}`,
-      source: parentId,
-      target: groupId,
-      type: 'smoothstep',
-      style: { stroke: '#94a3b8', strokeWidth: 1 },
-    });
   }
 
   return { nodes, edges };
@@ -290,7 +359,7 @@ export default function TracePage() {
             </div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-4 border-2 border-dashed border-muted-foreground/30 rounded" />
-              <span>Batch/Message children</span>
+              <span>Batch or Message</span>
             </div>
           </div>
         </ReactFlow>
