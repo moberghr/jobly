@@ -58,7 +58,7 @@ export function FlowCard({ jobId, traceId, parentJob, spawnedByJob, continuation
         {traceId && (
           <div>
             <span className="text-muted-foreground">Trace:</span>{' '}
-            <Link to={`/trace/${traceId}${jobId ? `/${jobId}` : ''}`} className="text-primary hover:underline font-mono text-xs">{shortId(traceId)}</Link>
+            <Link to={`/trace/${traceId.replace(/-/g, '')}${jobId ? `/${jobId}` : ''}`} className="text-primary hover:underline font-mono text-xs">{traceId.replace(/-/g, '')}</Link>
           </div>
         )}
         {hasTable && (

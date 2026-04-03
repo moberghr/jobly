@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
@@ -92,6 +93,11 @@ public class BatchPublisher<TContext> : IBatchPublisher
                     .Where(x => x.Id == parentId)
                     .Select(x => x.TraceId)
                     .FirstOrDefaultAsync();
+        }
+
+        if (traceId == null && Activity.Current?.TraceId is { } batchActivityTrace)
+        {
+            traceId = new Guid(batchActivityTrace.ToHexString());
         }
 
         batchJob.TraceId = traceId ?? batchJob.Id;

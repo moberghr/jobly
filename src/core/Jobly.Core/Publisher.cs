@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
@@ -124,6 +125,10 @@ public class Publisher<TContext> : IPublisher
             msg.TraceId = executionContext.TraceId;
             msg.SpawnedByJobId = executionContext.JobId;
         }
+        else if (Activity.Current?.TraceId is { } msgActivityTrace)
+        {
+            msg.TraceId = new Guid(msgActivityTrace.ToHexString());
+        }
         else
         {
             msg.TraceId = msg.Id;
@@ -242,6 +247,10 @@ public class Publisher<TContext> : IPublisher
                     .Select(x => x.TraceId)
                     .FirstOrDefaultAsync()
                 ?? newJob.Id;
+        }
+        else if (Activity.Current?.TraceId is { } jobActivityTrace)
+        {
+            newJob.TraceId = new Guid(jobActivityTrace.ToHexString());
         }
         else
         {

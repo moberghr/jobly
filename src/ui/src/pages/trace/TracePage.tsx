@@ -223,9 +223,17 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
 }
 
 export default function TracePage() {
-  const { traceId, highlightId } = useParams<{ traceId: string; highlightId?: string }>();
+  const { traceId: rawTraceId, highlightId } = useParams<{ traceId: string; highlightId?: string }>();
   const [jobs, setJobs] = useState<TraceJobModel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Normalize: accept both "4bf92f3577b34da6a3ce929d0e0e4736" and "4bf92f35-77b3-4da6-a3ce-929d0e0e4736"
+  const traceId = rawTraceId && /^[0-9a-f]{32}$/i.test(rawTraceId)
+    ? `${rawTraceId.slice(0,8)}-${rawTraceId.slice(8,12)}-${rawTraceId.slice(12,16)}-${rawTraceId.slice(16,20)}-${rawTraceId.slice(20)}`
+    : rawTraceId;
+
+  // Display without dashes (W3C format)
+  const traceIdDisplay = traceId?.replace(/-/g, '') ?? '';
 
   useEffect(() => {
     if (traceId) {
@@ -244,7 +252,7 @@ export default function TracePage() {
   return (
     <div>
       <div className="flex items-center gap-4 mb-4">
-        <h1 className="text-2xl font-bold">Trace {shortId(traceId ?? '')}</h1>
+        <h1 className="text-2xl font-bold">Trace <span className="font-mono text-lg">{traceIdDisplay}</span></h1>
         <span className="text-sm text-muted-foreground">{jobs.length} jobs</span>
       </div>
       <div className="rounded-md border bg-card" style={{ height: 'calc(100vh - 12rem)' }}>
