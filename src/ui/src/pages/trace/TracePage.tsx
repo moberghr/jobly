@@ -179,19 +179,19 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
     node.position = { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 };
   }
 
-  // Create group nodes around container children (batch/message node stays outside)
+  // Create group nodes around container children (dagre positions, no repacking)
   for (const [parentId, children] of containers) {
     const parent = jobMap.get(parentId)!;
     const childIds = children.map(c => c.id);
-    const positions = childIds.map(id => {
-      const n = nodes.find(n => n.id === id)!;
-      return n.position;
-    });
+    const childNodes = childIds.map(id => nodes.find(n => n.id === id)!);
+    const positions = childNodes.map(n => n.position);
 
     const minX = Math.min(...positions.map(p => p.x)) - GROUP_PADDING;
-    const minY = Math.min(...positions.map(p => p.y)) - GROUP_PADDING - 10;
     const maxX = Math.max(...positions.map(p => p.x)) + NODE_WIDTH + GROUP_PADDING;
+    const minY = Math.min(...positions.map(p => p.y)) - GROUP_PADDING - 10;
     const maxY = Math.max(...positions.map(p => p.y)) + NODE_HEIGHT + GROUP_PADDING;
+    const groupWidth = maxX - minX;
+    const groupHeight = maxY - minY;
 
     const groupId = `group-${parentId}`;
     nodes.push({
@@ -199,7 +199,7 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
       type: 'group',
       data: { label: `${parent.kind === 3 ? 'Batch' : 'Message'} (${children.length} jobs)` },
       position: { x: minX, y: minY },
-      style: { width: maxX - minX, height: maxY - minY, zIndex: -1 },
+      style: { width: groupWidth, height: groupHeight, zIndex: -1 },
     });
 
     // Make child nodes relative to group

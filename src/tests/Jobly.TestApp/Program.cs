@@ -296,6 +296,87 @@ app.MapPost("/seed-flow", async (IPublisher publisher, IBatchPublisher batchPubl
     });
 });
 
+// Individual seed endpoints — each HTTP request gets its own Activity trace
+app.MapPost("/seed/simple-job", async (IPublisher publisher) =>
+{
+    var id = await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 });
+    await publisher.SaveChangesAsync();
+    return Results.Ok(new { detail = $"/jobly/detail/{id}" });
+});
+
+app.MapPost("/seed/failing-job", async (IPublisher publisher) =>
+{
+    var id = await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 2);
+    await publisher.SaveChangesAsync();
+    return Results.Ok(new { detail = $"/jobly/detail/{id}" });
+});
+
+app.MapPost("/seed/fan-out", async (IPublisher publisher, TestContext context) =>
+{
+    var parentId = await publisher.Enqueue(new RegisterRequest { Email = "flow-parent@test.com" });
+    await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, parentId);
+    await publisher.Enqueue(new SendEmailRequest { EmailLogId = 2 }, parentId);
+    await publisher.Enqueue(new RegisterRequest { Email = "flow-child@test.com" }, parentId);
+    await publisher.SaveChangesAsync();
+    var traceId = await context.Set<Job>().Where(x => x.Id == parentId).Select(x => x.TraceId).FirstAsync();
+    return Results.Ok(new { detail = $"/jobly/detail/{parentId}", trace = $"/jobly/trace/{traceId:N}" });
+});
+
+app.MapPost("/seed/chain", async (IPublisher publisher, IBatchPublisher batchPublisher, TestContext context) =>
+{
+    var jobId = await publisher.Enqueue(new RegisterRequest { Email = "chain-start@test.com" });
+    var batch1Jobs = Enumerable.Range(0, 5).Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
+    var batch1Id = await batchPublisher.ContinueBatchWith(batch1Jobs, jobId, "chain-phase-1");
+    var batch2Jobs = Enumerable.Range(0, 3).Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
+    var batch2Id = await batchPublisher.ContinueBatchWith(batch2Jobs, batch1Id, "chain-phase-2");
+    await publisher.SaveChangesAsync();
+    var traceId = await context.Set<Job>().Where(x => x.Id == jobId).Select(x => x.TraceId).FirstAsync();
+    return Results.Ok(new { detail = $"/jobly/detail/{jobId}", batch1 = $"/jobly/detail/{batch1Id}", batch2 = $"/jobly/detail/{batch2Id}", trace = $"/jobly/trace/{traceId:N}" });
+});
+
+app.MapPost("/seed/batch", async (IBatchPublisher batchPublisher, TestContext context) =>
+{
+    var batchJobs = Enumerable.Range(0, 8).Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
+    var batchId = await batchPublisher.StartNew(batchJobs, "flow-batch");
+    var contJobs = Enumerable.Range(0, 4).Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
+    var contId = await batchPublisher.ContinueBatchWith(contJobs, batchId, "flow-batch-cont");
+    await batchPublisher.SaveChangesAsync();
+    var traceId = await context.Set<Job>().Where(x => x.Id == batchId).Select(x => x.TraceId).FirstAsync();
+    return Results.Ok(new { detail = $"/jobly/detail/{batchId}", cont = $"/jobly/detail/{contId}", trace = $"/jobly/trace/{traceId:N}" });
+});
+
+app.MapPost("/seed/message", async (IPublisher publisher, TestContext context) =>
+{
+    var id = await publisher.Publish(new OrderNotification());
+    await publisher.SaveChangesAsync();
+    var traceId = await context.Set<Job>().Where(x => x.Id == id).Select(x => x.TraceId).FirstAsync();
+    return Results.Ok(new { detail = $"/jobly/detail/{id}", trace = $"/jobly/trace/{traceId:N}" });
+});
+
+app.MapPost("/seed/order-flow", async (IPublisher publisher, TestContext context) =>
+{
+    var id = await publisher.Enqueue(new ProcessOrderRequest { OrderId = "FLOW-001" });
+    await publisher.SaveChangesAsync();
+    var traceId = await context.Set<Job>().Where(x => x.Id == id).Select(x => x.TraceId).FirstAsync();
+    return Results.Ok(new { detail = $"/jobly/detail/{id}", trace = $"/jobly/trace/{traceId:N}" });
+});
+
+app.MapPost("/seed/light-flow", async (IPublisher publisher, TestContext context) =>
+{
+    var id = await publisher.Enqueue(new LightFlowRequest());
+    await publisher.SaveChangesAsync();
+    var traceId = await context.Set<Job>().Where(x => x.Id == id).Select(x => x.TraceId).FirstAsync();
+    return Results.Ok(new { detail = $"/jobly/detail/{id}", trace = $"/jobly/trace/{traceId:N}" });
+});
+
+app.MapPost("/seed/mutex", async (IPublisher publisher) =>
+{
+    var id1 = await publisher.Enqueue(new SlowRequest(), new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
+    var id2 = await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
+    await publisher.SaveChangesAsync();
+    return Results.Ok(new { holder = $"/jobly/detail/{id1}", cancelled = $"/jobly/detail/{id2}" });
+});
+
 app.MapPost("/seed-perf", async (IPublisher publisher, int? count) =>
 {
     var total = count ?? 10000;
