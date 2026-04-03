@@ -284,7 +284,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 CancellationMode = x.CancellationMode,
                 Message = x.Message,
                 HandlerType = x.HandlerType,
-                ScheduleTime = x.ScheduleTime,
+                ScheduleTime = x.ScheduleTime == DateTime.MinValue ? null : x.ScheduleTime,
                 RetriedTimes = x.RetriedTimes,
                 MaxRetries = x.MaxRetries,
                 ConcurrencyKey = x.ConcurrencyKey,
@@ -359,8 +359,16 @@ public class JobQueryService<TContext> : IJobQueryService
         }
 
         // Continuations (children linked via ParentJobId)
-        job.Continuations = await _context.Set<Job>()
-            .Where(x => x.ParentJobId == id)
+        // For batches/messages, exclude their own Job children (shown in FilteredJobsTable)
+        var continuationsQuery = _context.Set<Job>()
+            .Where(x => x.ParentJobId == id);
+
+        if (job.Kind == JobKind.Batch || job.Kind == JobKind.Message)
+        {
+            continuationsQuery = continuationsQuery.Where(x => x.Kind != JobKind.Job);
+        }
+
+        job.Continuations = await continuationsQuery
             .OrderBy(x => x.CreateTime)
             .Select(x => new ContinuationInfo
             {

@@ -144,6 +144,7 @@ export default function DetailPage() {
 
           {/* Flow */}
           <FlowCard
+            jobId={job.id}
             traceId={job.traceId}
             parentJob={job.parentJob}
             spawnedByJob={job.spawnedByJob}

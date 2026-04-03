@@ -43,7 +43,7 @@ function App() {
           <Route path="/batches/:state" element={<BatchesPage />} />
           <Route path="/recurring/:id" element={<RecurringDetailPage />} />
           <Route path="/recurring" element={<RecurringPage />} />
-          <Route path="/trace/:traceId" element={<TracePage />} />
+          <Route path="/trace/:traceId/:highlightId?" element={<TracePage />} />
           <Route path="/workers/:id" element={<WorkerDetailPage />} />
           <Route path="/servers/:id" element={<ServerDetailPage />} />
           <Route path="/servers" element={<ServersPage />} />

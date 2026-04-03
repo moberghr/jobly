@@ -72,30 +72,35 @@ public class BatchPublisher<TContext> : IBatchPublisher
 
         var batchChildJobs = batchJobMessages.ConvertAll(x => JobHelper.CreateJob(x, 0, null, null, _joblyConfiguration.DefaultQueue, batchJob.Id, batchJobsState, now));
 
-        // Propagate trace from execution context
+        // Propagate trace: execution context > parent's trace > self
         var executionContext = JobExecutionContext.Current;
-        foreach (var childJob in batchChildJobs)
-        {
-            if (executionContext != null)
-            {
-                childJob.TraceId = executionContext.TraceId;
-                childJob.SpawnedByJobId = executionContext.JobId;
-            }
-            else
-            {
-                childJob.TraceId = batchJob.Id; // Batch root trace
-            }
-        }
+        Guid? traceId = null;
+        Guid? spawnedBy = null;
 
-        // Batch job also gets the trace
         if (executionContext != null)
         {
-            batchJob.TraceId = executionContext.TraceId;
-            batchJob.SpawnedByJobId = executionContext.JobId;
+            traceId = executionContext.TraceId;
+            spawnedBy = executionContext.JobId;
         }
-        else
+        else if (parentId != null)
         {
-            batchJob.TraceId = batchJob.Id;
+            // Inherit trace from parent — check change tracker first (parent may not be committed yet)
+            var trackedParent = _context.ChangeTracker.Entries<Job>()
+                .FirstOrDefault(e => e.Entity.Id == parentId);
+            traceId = trackedParent?.Entity.TraceId
+                ?? await _context.Set<Job>()
+                    .Where(x => x.Id == parentId)
+                    .Select(x => x.TraceId)
+                    .FirstOrDefaultAsync();
+        }
+
+        batchJob.TraceId = traceId ?? batchJob.Id;
+        batchJob.SpawnedByJobId = spawnedBy;
+
+        foreach (var childJob in batchChildJobs)
+        {
+            childJob.TraceId = batchJob.TraceId;
+            childJob.SpawnedByJobId = spawnedBy;
         }
 
         var logs = new List<JobLog>();

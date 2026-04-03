@@ -224,44 +224,75 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     });
 });
 
-// Seed endpoint — creates flow scenarios to test FlowCard UI
-app.MapPost("/seed-flow", async (IPublisher publisher, IBatchPublisher batchPublisher) =>
+// Seed endpoint — creates flow scenarios to test FlowCard UI and trace page
+app.MapPost("/seed-flow", async (IPublisher publisher, IBatchPublisher batchPublisher, TestContext context) =>
 {
-    // 1. Job → 3 continuation jobs (fan-out)
-    var parentId = await publisher.Enqueue(new RegisterRequest { Email = "flow-parent@test.com" });
-    await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, parentId);
-    await publisher.Enqueue(new SendEmailRequest { EmailLogId = 2 }, parentId);
-    await publisher.Enqueue(new RegisterRequest { Email = "flow-child@test.com" }, parentId);
+    // 1. Simple standalone job (no relationships)
+    var simpleJobId = await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 });
 
-    // 2. Job → Batch(5) → Batch(3) chain
+    // 2. Simple failing job (shows retries + failed state)
+    var failingJobId = await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 2);
+
+    // 3. Job → 3 continuation jobs (fan-out, creates trace via handler spawning)
+    var fanOutId = await publisher.Enqueue(new RegisterRequest { Email = "flow-parent@test.com" });
+    await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, fanOutId);
+    await publisher.Enqueue(new SendEmailRequest { EmailLogId = 2 }, fanOutId);
+    await publisher.Enqueue(new RegisterRequest { Email = "flow-child@test.com" }, fanOutId);
+
+    // 4. Job → Batch(5) → Batch(3) chain
     var chainJobId = await publisher.Enqueue(new RegisterRequest { Email = "chain-start@test.com" });
     var batch1Jobs = Enumerable.Range(0, 5).Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
     var batch1Id = await batchPublisher.ContinueBatchWith(batch1Jobs, chainJobId, "chain-phase-1");
     var batch2Jobs = Enumerable.Range(0, 3).Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
-    await batchPublisher.ContinueBatchWith(batch2Jobs, batch1Id, "chain-phase-2");
+    var batch2Id = await batchPublisher.ContinueBatchWith(batch2Jobs, batch1Id, "chain-phase-2");
 
-    // 3. Batch(8) → continuation Batch(4)
+    // 5. Batch(8) → continuation Batch(4)
     var batchJobs = Enumerable.Range(0, 8).Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
     var batchId = await batchPublisher.StartNew(batchJobs, "flow-batch");
     var contJobs = Enumerable.Range(0, 4).Select(_ => new SendEmailRequest { EmailLogId = 1 }).ToList();
-    await batchPublisher.ContinueBatchWith(contJobs, batchId, "flow-batch-cont");
+    var batchContId = await batchPublisher.ContinueBatchWith(contJobs, batchId, "flow-batch-cont");
 
-    // 4. Message (pub/sub — spawns multiple child jobs with trace)
-    await publisher.Publish(new OrderNotification());
+    // 6. Message (pub/sub — spawns multiple child jobs with trace)
+    var messageId = await publisher.Publish(new OrderNotification());
 
-    // 5. ProcessOrder flow (complex: job → batch → job → message)
-    await publisher.Enqueue(new ProcessOrderRequest { OrderId = "FLOW-001" });
+    // 7. ProcessOrder flow (complex: job → batch of ShipItem → PublishInvoice → InvoiceNotification message)
+    var orderJobId = await publisher.Enqueue(new ProcessOrderRequest { OrderId = "FLOW-001" });
+
+    // 8. Light flow (job that spawns 3 emails + batch of 4 + parent with 2 continuations — good for trace testing)
+    var lightFlowId = await publisher.Enqueue(new LightFlowRequest());
+
+    // 9. Mutex jobs (same key — first holds mutex, rest cancelled)
+    var mutexId1 = await publisher.Enqueue(new SlowRequest(),
+        new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
+    var mutexId2 = await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 },
+        new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
 
     await publisher.SaveChangesAsync();
 
+    // Return all IDs for easy testing
     return Results.Ok(new
     {
-        fanOutParent = parentId,
-        chainStart = chainJobId,
-        batch = batchId,
-        batch1 = batch1Id,
-        message = 1,
-        orderFlow = 1,
+        links = new
+        {
+            simpleJob = $"/jobly/detail/{simpleJobId}",
+            failingJob = $"/jobly/detail/{failingJobId}",
+            fanOutJob = $"/jobly/detail/{fanOutId}",
+            fanOutTrace = $"/jobly/trace/{fanOutId}",
+            chainJob = $"/jobly/detail/{chainJobId}",
+            chainTrace = $"/jobly/trace/{chainJobId}",
+            batch1 = $"/jobly/detail/{batch1Id}",
+            batch2 = $"/jobly/detail/{batch2Id}",
+            batchStandalone = $"/jobly/detail/{batchId}",
+            batchCont = $"/jobly/detail/{batchContId}",
+            batchTrace = $"/jobly/trace/{batchId}",
+            message = $"/jobly/detail/{messageId}",
+            orderJob = $"/jobly/detail/{orderJobId}",
+            orderTrace = $"/jobly/trace/{orderJobId}",
+            lightFlow = $"/jobly/detail/{lightFlowId}",
+            lightFlowTrace = $"/jobly/trace/{lightFlowId}",
+            mutexHolder = $"/jobly/detail/{mutexId1}",
+            mutexCancelled = $"/jobly/detail/{mutexId2}",
+        },
     });
 });
 

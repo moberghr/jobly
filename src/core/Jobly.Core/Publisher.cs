@@ -117,7 +117,17 @@ public class Publisher<TContext> : IPublisher
             JobCount = 0,
         };
 
-        msg.TraceId = msg.Id;
+        // Trace propagation: inherit from execution context if inside a handler
+        var executionContext = JobExecutionContext.Current;
+        if (executionContext != null)
+        {
+            msg.TraceId = executionContext.TraceId;
+            msg.SpawnedByJobId = executionContext.JobId;
+        }
+        else
+        {
+            msg.TraceId = msg.Id;
+        }
 
         await _context.Set<Job>().AddAsync(msg);
 
@@ -214,12 +224,24 @@ public class Publisher<TContext> : IPublisher
             now,
             concurrencyKey: mutex);
 
-        // Automatic trace propagation: if called from within a job handler, inherit trace
+        // Automatic trace propagation: execution context > parent's trace > self
         var executionContext = JobExecutionContext.Current;
         if (executionContext != null)
         {
             newJob.TraceId = executionContext.TraceId;
             newJob.SpawnedByJobId = executionContext.JobId;
+        }
+        else if (parentId != null)
+        {
+            // Inherit trace from parent — check change tracker first (parent may not be committed yet)
+            var trackedParent = _context.ChangeTracker.Entries<Job>()
+                .FirstOrDefault(e => e.Entity.Id == parentId);
+            newJob.TraceId = trackedParent?.Entity.TraceId
+                ?? await _context.Set<Job>()
+                    .Where(x => x.Id == parentId)
+                    .Select(x => x.TraceId)
+                    .FirstOrDefaultAsync()
+                ?? newJob.Id;
         }
         else
         {

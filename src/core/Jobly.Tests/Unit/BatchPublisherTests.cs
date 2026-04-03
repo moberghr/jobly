@@ -152,6 +152,81 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
         batch.ShouldNotBeNull();
         batch.Type.ShouldBe("MyBatchName");
     }
+
+    [Fact]
+    public async Task ContinueBatchWith_InheritsParentTrace_SameContext()
+    {
+        // Arrange: parent and continuation batch in same context (not committed yet)
+        var ctx = _fixture.CreateContext();
+        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
+        var batchPublisher = CreateBatchPublisher(ctx);
+
+        var parentId = await publisher.Enqueue(new UnitRequest());
+        var jobs = new List<UnitRequest> { new(), new() };
+        var batchId = await batchPublisher.ContinueBatchWith(jobs, parentId);
+        await ctx.SaveChangesAsync();
+
+        // Assert: batch and children inherit parent's trace
+        var readCtx = _fixture.CreateContext();
+        var parent = await readCtx.Set<Job>().FindAsync(parentId);
+        var batch = await readCtx.Set<Job>().FindAsync(batchId);
+        var children = await readCtx.Set<Job>().Where(j => j.ParentJobId == batchId && j.Kind == JobKind.Job).ToListAsync();
+
+        parent.ShouldNotBeNull();
+        batch.ShouldNotBeNull();
+        batch.TraceId.ShouldBe(parent.TraceId);
+        children.ShouldAllBe(c => c.TraceId == parent.TraceId);
+    }
+
+    [Fact]
+    public async Task ContinueBatchWith_InheritsParentTrace_SeparateContext()
+    {
+        // Arrange: parent already committed
+        var setupCtx = _fixture.CreateContext();
+        var publisher = new Publisher<TestContext>(setupCtx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
+        var parentId = await publisher.Enqueue(new UnitRequest());
+        await setupCtx.SaveChangesAsync();
+
+        // Act: continuation batch in new context
+        var actCtx = _fixture.CreateContext();
+        var batchPublisher = CreateBatchPublisher(actCtx);
+        var jobs = new List<UnitRequest> { new(), new() };
+        var batchId = await batchPublisher.ContinueBatchWith(jobs, parentId);
+        await actCtx.SaveChangesAsync();
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var parent = await readCtx.Set<Job>().FindAsync(parentId);
+        var batch = await readCtx.Set<Job>().FindAsync(batchId);
+        var children = await readCtx.Set<Job>().Where(j => j.ParentJobId == batchId && j.Kind == JobKind.Job).ToListAsync();
+
+        parent.ShouldNotBeNull();
+        batch.ShouldNotBeNull();
+        batch.TraceId.ShouldBe(parent.TraceId);
+        children.ShouldAllBe(c => c.TraceId == parent.TraceId);
+    }
+
+    [Fact]
+    public async Task StartNew_GetsOwnTrace()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var batchPublisher = CreateBatchPublisher(ctx);
+        var jobs = new List<UnitRequest> { new(), new() };
+
+        // Act
+        var batchId = await batchPublisher.StartNew(jobs);
+        await ctx.SaveChangesAsync();
+
+        // Assert: batch and children share the batch's trace
+        var readCtx = _fixture.CreateContext();
+        var batch = await readCtx.Set<Job>().FindAsync(batchId);
+        var children = await readCtx.Set<Job>().Where(j => j.ParentJobId == batchId && j.Kind == JobKind.Job).ToListAsync();
+
+        batch.ShouldNotBeNull();
+        batch.TraceId.ShouldBe(batchId);
+        children.ShouldAllBe(c => c.TraceId == batchId);
+    }
 }
 
 [Collection("PostgreSql")]

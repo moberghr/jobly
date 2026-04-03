@@ -168,6 +168,68 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.ShouldNotBeNull();
         job.ScheduleTime.ShouldBeGreaterThan(DateTime.UtcNow.AddHours(1));
     }
+    [Fact]
+    public async Task Enqueue_WithParent_InheritsParentTrace_SameContext()
+    {
+        // Arrange: parent and child created in same context before SaveChanges
+        // (matches real usage: publisher.Enqueue parent, publisher.Enqueue child, then SaveChangesAsync)
+        var ctx = _fixture.CreateContext();
+        var publisher = CreatePublisher(ctx);
+
+        var parentId = await publisher.Enqueue(new UnitRequest());
+        var childId = await publisher.Enqueue(new UnitRequest(), parentId);
+        await ctx.SaveChangesAsync();
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var parent = await readCtx.Set<Job>().FindAsync(parentId);
+        var child = await readCtx.Set<Job>().FindAsync(childId);
+        parent.ShouldNotBeNull();
+        child.ShouldNotBeNull();
+        child.TraceId.ShouldBe(parent.TraceId);
+    }
+
+    [Fact]
+    public async Task Enqueue_WithParent_InheritsParentTrace_SeparateContext()
+    {
+        // Arrange: parent already committed to DB
+        var setupCtx = _fixture.CreateContext();
+        var setupPublisher = CreatePublisher(setupCtx);
+        var parentId = await setupPublisher.Enqueue(new UnitRequest());
+        await setupCtx.SaveChangesAsync();
+
+        // Act: child created in new context
+        var actCtx = _fixture.CreateContext();
+        var actPublisher = CreatePublisher(actCtx);
+        var childId = await actPublisher.Enqueue(new UnitRequest(), parentId);
+        await actCtx.SaveChangesAsync();
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var parent = await readCtx.Set<Job>().FindAsync(parentId);
+        var child = await readCtx.Set<Job>().FindAsync(childId);
+        parent.ShouldNotBeNull();
+        child.ShouldNotBeNull();
+        child.TraceId.ShouldBe(parent.TraceId);
+    }
+
+    [Fact]
+    public async Task Enqueue_WithoutParent_GetsOwnTrace()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var publisher = CreatePublisher(ctx);
+
+        // Act
+        var jobId = await publisher.Enqueue(new UnitRequest());
+        await ctx.SaveChangesAsync();
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        job.ShouldNotBeNull();
+        job.TraceId.ShouldBe(jobId);
+    }
 }
 
 [Collection("PostgreSql")]

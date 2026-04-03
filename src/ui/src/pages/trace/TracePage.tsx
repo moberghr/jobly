@@ -47,14 +47,15 @@ function isParallelChild(child: TraceJobModel, parent: TraceJobModel | undefined
 
 function TraceNode({ data }: NodeProps) {
   const navigate = useNavigate();
-  const job = data as unknown as TraceJobModel;
+  const job = data as unknown as TraceJobModel & { highlighted?: boolean };
+  const highlighted = job.highlighted;
   return (
     <div
-      className="bg-card border rounded-lg px-3 py-2 shadow-sm cursor-pointer hover:border-primary transition-colors"
+      className={`border rounded-lg px-3 py-2 shadow-sm cursor-pointer hover:border-primary transition-colors ${highlighted ? 'ring-2 ring-primary border-primary bg-primary/10' : 'bg-card'}`}
       style={{ width: NODE_WIDTH, minHeight: NODE_HEIGHT }}
       onClick={() => navigate(`/detail/${job.id}`)}
     >
-      <Handle type="target" position={Position.Left} className="!bg-muted-foreground !w-2 !h-2" />
+      <Handle type="target" position={Position.Left} className="!bg-transparent !border-0 !w-0 !h-0" />
       <div className="flex items-center gap-2 mb-1">
         {kindIcon(job.kind)}
         <span className="text-xs text-muted-foreground">{kindLabel(job.kind)}</span>
@@ -65,7 +66,7 @@ function TraceNode({ data }: NodeProps) {
         <StateBadge state={job.currentState} />
         {job.handlerType && <span className="text-xs text-muted-foreground truncate">{shortType(job.handlerType)}</span>}
       </div>
-      <Handle type="source" position={Position.Right} className="!bg-muted-foreground !w-2 !h-2" />
+      <Handle type="source" position={Position.Right} className="!bg-transparent !border-0 !w-0 !h-0" />
     </div>
   );
 }
@@ -77,18 +78,18 @@ function GroupNode({ data }: NodeProps) {
       className="border-2 border-dashed border-muted-foreground/30 rounded-xl"
       style={{ width: '100%', height: '100%', position: 'relative' }}
     >
-      <Handle type="target" position={Position.Left} className="!bg-muted-foreground !w-2 !h-2" />
+      <Handle type="target" position={Position.Left} className="!bg-transparent !border-0 !w-0 !h-0" />
       <span className="absolute -top-3 left-3 bg-background px-2 text-xs text-muted-foreground font-medium">
         {label}
       </span>
-      <Handle type="source" position={Position.Right} className="!bg-muted-foreground !w-2 !h-2" />
+      <Handle type="source" position={Position.Right} className="!bg-transparent !border-0 !w-0 !h-0" />
     </div>
   );
 }
 
 const nodeTypes: NodeTypes = { traceNode: TraceNode, group: GroupNode };
 
-function buildGraph(jobs: TraceJobModel[]): { nodes: Node[]; edges: Edge[] } {
+function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[]; edges: Edge[] } {
   const jobMap = new Map(jobs.map(j => [j.id, j]));
   const nodes: Node[] = [];
   const edges: Edge[] = [];
@@ -116,7 +117,7 @@ function buildGraph(jobs: TraceJobModel[]): { nodes: Node[]; edges: Edge[] } {
     nodes.push({
       id: job.id,
       type: 'traceNode',
-      data: job as unknown as Record<string, unknown>,
+      data: { ...job, highlighted: job.id === highlightId } as unknown as Record<string, unknown>,
       position: { x: 0, y: 0 },
     });
 
@@ -144,7 +145,6 @@ function buildGraph(jobs: TraceJobModel[]): { nodes: Node[]; edges: Edge[] } {
         target: job.id,
         type: 'smoothstep',
         style: { strokeDasharray: '5,5', stroke: '#94a3b8', strokeWidth: 1 },
-        animated: true,
       });
     }
   }
@@ -223,7 +223,7 @@ function buildGraph(jobs: TraceJobModel[]): { nodes: Node[]; edges: Edge[] } {
 }
 
 export default function TracePage() {
-  const { traceId } = useParams<{ traceId: string }>();
+  const { traceId, highlightId } = useParams<{ traceId: string; highlightId?: string }>();
   const [jobs, setJobs] = useState<TraceJobModel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -235,8 +235,8 @@ export default function TracePage() {
 
   const { nodes, edges } = useMemo(() => {
     if (!jobs || jobs.length === 0) return { nodes: [], edges: [] };
-    return buildGraph(jobs);
-  }, [jobs]);
+    return buildGraph(jobs, highlightId);
+  }, [jobs, highlightId]);
 
   if (error) return <ErrorState message={error} />;
   if (!jobs) return <LoadingState />;
@@ -256,6 +256,8 @@ export default function TracePage() {
           fitViewOptions={{ padding: 0.2 }}
           minZoom={0.1}
           maxZoom={2}
+          nodesConnectable={false}
+          nodesDraggable={false}
           proOptions={{ hideAttribution: true }}
         >
           <Controls className="!bg-card !border !border-border !shadow-sm [&>button]:!bg-card [&>button]:!border-border [&>button]:!fill-foreground [&>button:hover]:!bg-accent" />

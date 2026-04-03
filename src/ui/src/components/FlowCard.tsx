@@ -6,6 +6,7 @@ import { shortId, shortType } from '@/utils/format';
 import type { ContinuationInfo } from '@/types';
 
 interface FlowCardProps {
+  jobId?: string;
   traceId?: string | null;
   parentJob?: ContinuationInfo | null;
   spawnedByJob?: ContinuationInfo | null;
@@ -45,7 +46,7 @@ function GroupHeader({ label, count }: { label: string; count: number }) {
   );
 }
 
-export function FlowCard({ traceId, parentJob, spawnedByJob, continuations, spawnedJobs }: FlowCardProps) {
+export function FlowCard({ jobId, traceId, parentJob, spawnedByJob, continuations, spawnedJobs }: FlowCardProps) {
   const hasTable = parentJob || spawnedByJob || continuations.length > 0 || spawnedJobs.length > 0;
   const hasContent = traceId || hasTable;
   if (!hasContent) return null;
@@ -57,7 +58,7 @@ export function FlowCard({ traceId, parentJob, spawnedByJob, continuations, spaw
         {traceId && (
           <div>
             <span className="text-muted-foreground">Trace:</span>{' '}
-            <Link to={`/trace/${traceId}`} className="text-primary hover:underline font-mono text-xs">{shortId(traceId)}</Link>
+            <Link to={`/trace/${traceId}${jobId ? `/${jobId}` : ''}`} className="text-primary hover:underline font-mono text-xs">{shortId(traceId)}</Link>
           </div>
         )}
         {hasTable && (
