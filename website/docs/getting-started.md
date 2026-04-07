@@ -70,6 +70,10 @@ builder.Services.AddJobly<AppDbContext>();
 builder.Services.AddJobHandlers(typeof(Program).Assembly);
 ```
 
+:::tip TimeProvider
+Jobly automatically registers `TimeProvider.System` if one is not already registered. Override it in tests to control time.
+:::
+
 ### 4. Add a worker (optional)
 
 For apps that process jobs, use `AddJoblyWorker` instead (includes `AddJobly` internally):
@@ -98,10 +102,6 @@ app.UseJoblyUI(options =>
     options.UnauthorizedRedirectUrl = "/login";
 });
 ```
-
-:::tip TimeProvider
-Jobly automatically registers a `TimeProvider` in the DI container if one is not already registered. You do not need to add it yourself.
-:::
 
 ### 6. Define handlers
 
