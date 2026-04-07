@@ -12,6 +12,7 @@ jobs:
   publish:
     name: Pack and Publish
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       id-token: write  # Required for NuGet trusted publishing OIDC
 
