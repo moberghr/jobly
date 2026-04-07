@@ -1,13 +1,11 @@
 name: Deploy Docs to GitHub Pages
 
-# Disabled until GitHub Pages is enabled in repo settings
-# on:
-#   push:
-#     branches: [main]
-#     paths:
-#       - 'website/**'
-#   workflow_dispatch:
-on: workflow_dispatch
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'website/**'
+  workflow_dispatch:
 
 permissions:
   contents: read

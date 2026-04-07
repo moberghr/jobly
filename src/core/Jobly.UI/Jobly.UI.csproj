@@ -4,7 +4,8 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<RepositoryUrl>https://github.com/moberghr/jobly</RepositoryUrl>
+		<PackageId>Moberg.Jobly.UI</PackageId>
+		<Description>Real-time web dashboard for Jobly job monitoring and management</Description>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -21,7 +22,7 @@
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(Configuration)'!='Debug'">
-		<PackageReference Include="Jobly.Core" Version="0.1.0" />
+		<PackageReference Include="Moberg.Jobly.Core" Version="$(PackageVersion)" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(Configuration)'=='Debug'">

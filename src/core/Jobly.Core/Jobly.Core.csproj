@@ -4,7 +4,8 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-<RepositoryUrl>https://github.com/moberghr/jobly</RepositoryUrl>
+		<PackageId>Moberg.Jobly.Core</PackageId>
+		<Description>Distributed job processing, message queue, and in-memory mediator for .NET</Description>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -14,7 +15,6 @@
 	<ItemGroup>
 		<PackageReference Include="Cronos" Version="0.11.1" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.5" />
-		<PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
 	</ItemGroup>
 

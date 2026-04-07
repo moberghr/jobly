@@ -4,10 +4,27 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
+  <!-- Shared NuGet package metadata -->
+  <PropertyGroup>
+    <Authors>Moberg</Authors>
+    <Copyright>Copyright (c) Moberg 2026</Copyright>
+    <PackageProjectUrl>https://github.com/moberghr/jobly</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/moberghr/jobly</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>jobs;background;queue;mediator;scheduling;dotnet</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="all" />
     <PackageReference Include="Roslynator.Analyzers" Version="4.15.0" PrivateAssets="all" />
     <PackageReference Include="SonarAnalyzer.CSharp" Version="10.22.0.136894" PrivateAssets="all" />
     <PackageReference Include="Meziantou.Analyzer" Version="3.0.29" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Include README.md in all packages -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 </Project>
