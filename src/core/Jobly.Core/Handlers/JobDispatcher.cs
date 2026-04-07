@@ -10,6 +10,7 @@ public static class JobDispatcher
     private static readonly ConcurrentDictionary<(Type HandlerType, Type MessageType), MethodInfo> _handleMethodCache = new();
     private static readonly ConcurrentDictionary<Type, Type> _jobHandlerTypeCache = new();
     private static readonly ConcurrentDictionary<Type, Type> _messageHandlerTypeCache = new();
+    private static readonly ConcurrentDictionary<Type, Type> _requestHandlerTypeCache = new();
     private static readonly ConcurrentDictionary<Type, Type> _pipelineBehaviorTypeCache = new();
 
     /// <summary>
@@ -62,8 +63,8 @@ public static class JobDispatcher
     }
 
     /// <summary>
-    /// Executes a specific handler through the pipeline behavior chain.
-    /// Works for both IMessageHandler and IJobHandler (same reflection pattern).
+    /// Executes a job/message handler through the unified pipeline.
+    /// Wraps void-returning handlers to return Unit.
     /// </summary>
     public static async Task ExecuteHandlerCore(
         object message,
@@ -84,31 +85,42 @@ public static class JobDispatcher
                 "HandleAsync",
                 [key.MessageType, typeof(CancellationToken)])!);
 
-        // Build the innermost delegate: handler.HandleAsync(message, ct)
-        Task Innermost() =>
-            (Task)handleMethod.Invoke(handler, [message, cancellationToken])!;
-
-        // Resolve pipeline behaviors
-        var behaviorInterfaceType = _pipelineBehaviorTypeCache.GetOrAdd(messageType,
-            t => typeof(IPipelineBehavior<>).MakeGenericType(t));
-        var behaviors = provider.GetServices(behaviorInterfaceType).ToList();
-
-        // Build the chain from innermost to outermost
-        var chain = (JobHandlerDelegate)Innermost;
-        for (var i = behaviors.Count - 1; i >= 0; i--)
+        // Innermost: adapt void handler to return Unit
+        async Task<Unit> Innermost()
         {
-            var behavior = behaviors[i]!;
-            var behaviorHandleMethod = _handleMethodCache.GetOrAdd(
-                (behavior.GetType(), messageType),
-                key => key.HandlerType.GetMethod(
-                    "HandleAsync",
-                    [key.MessageType, typeof(JobHandlerDelegate), typeof(CancellationToken)])!);
-
-            var next = chain;
-            chain = () => (Task)behaviorHandleMethod.Invoke(behavior, [message, next, cancellationToken])!;
+            await ((Task)handleMethod.Invoke(handler, [message, cancellationToken])!);
+            return Unit.Value;
         }
 
-        await chain();
+        // Run through pipeline
+        await ExecutePipeline(message, messageType, (RequestHandlerDelegate<Unit>)Innermost, provider, cancellationToken);
+    }
+
+    /// <summary>
+    /// Executes an IRequestHandler through the unified pipeline. Returns the typed response.
+    /// </summary>
+    public static async Task<TResponse> ExecuteRequestHandler<TResponse>(
+        object request,
+        Type requestType,
+        IServiceProvider provider,
+        CancellationToken cancellationToken)
+    {
+        // Resolve IRequestHandler<TRequest, TResponse>
+        var handlerInterfaceType = _requestHandlerTypeCache.GetOrAdd(requestType,
+            t => typeof(IRequestHandler<,>).MakeGenericType(t, typeof(TResponse)));
+        var handler = provider.GetService(handlerInterfaceType)
+            ?? throw new InvalidOperationException($"No handler registered for {requestType.Name}");
+
+        var handleMethod = _handleMethodCache.GetOrAdd(
+            (handler.GetType(), requestType),
+            key => key.HandlerType.GetMethod(
+                "HandleAsync",
+                [key.MessageType, typeof(CancellationToken)])!);
+
+        Task<TResponse> Innermost() =>
+            (Task<TResponse>)handleMethod.Invoke(handler, [request, cancellationToken])!;
+
+        return await ExecutePipeline(request, requestType, (RequestHandlerDelegate<TResponse>)Innermost, provider, cancellationToken);
     }
 
     /// <summary>
@@ -139,5 +151,39 @@ public static class JobDispatcher
         var handlerInterfaceType = _jobHandlerTypeCache.GetOrAdd(messageType,
             t => typeof(IJobHandler<>).MakeGenericType(t));
         return ExecuteHandlerCore(message, messageType, handlerType, handlerInterfaceType, provider, ct);
+    }
+
+    /// <summary>
+    /// Builds and executes the pipeline behavior chain for any request type.
+    /// </summary>
+    private static async Task<TResponse> ExecutePipeline<TResponse>(
+        object message,
+        Type messageType,
+        RequestHandlerDelegate<TResponse> innermost,
+        IServiceProvider provider,
+        CancellationToken cancellationToken)
+    {
+        // Resolve pipeline behaviors: IPipelineBehavior<TRequest, TResponse>
+        var behaviorInterfaceType = _pipelineBehaviorTypeCache.GetOrAdd(
+            messageType,
+            t => typeof(IPipelineBehavior<,>).MakeGenericType(t, typeof(TResponse)));
+        var behaviors = provider.GetServices(behaviorInterfaceType).ToList();
+
+        // Build the chain from innermost to outermost
+        var chain = innermost;
+        for (var i = behaviors.Count - 1; i >= 0; i--)
+        {
+            var behavior = behaviors[i]!;
+            var behaviorHandleMethod = _handleMethodCache.GetOrAdd(
+                (behavior.GetType(), messageType),
+                key => key.HandlerType.GetMethod(
+                    "HandleAsync",
+                    [key.MessageType, typeof(RequestHandlerDelegate<TResponse>), typeof(CancellationToken)])!);
+
+            var next = chain;
+            chain = () => (Task<TResponse>)behaviorHandleMethod.Invoke(behavior, [message, next, cancellationToken])!;
+        }
+
+        return await chain();
     }
 }

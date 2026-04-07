@@ -1,4 +1,5 @@
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Handlers;
 using Jobly.Core.Entities;
 using Jobly.Core.Interceptors;
 using Jobly.Core.Services;
@@ -60,6 +61,8 @@ public static class ServiceConfiguration
             x.GetRequiredService<TContext>(),
             x.GetRequiredService<IOptions<JoblyConfiguration>>(),
             x.GetRequiredService<TimeProvider>()));
+
+        services.AddScoped<IMediator>(x => new Mediator(x));
 
         services.AddScoped<IRecurringJobPublisher>(x =>
             new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));

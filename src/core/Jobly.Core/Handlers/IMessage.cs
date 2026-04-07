@@ -4,4 +4,4 @@ namespace Jobly.Core.Handlers;
 /// Marker interface for queue messages. Messages can have multiple handlers.
 /// Each handler becomes an independent job.
 /// </summary>
-public interface IMessage;
+public interface IMessage : IRequest<Unit>;

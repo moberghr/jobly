@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Jobly.Tests.TestData.Handlers;
 
-public class LoggingPipelineBehavior : IPipelineBehavior<UnitRequest>
+public class LoggingPipelineBehavior : IPipelineBehavior<UnitRequest, Jobly.Core.Handlers.Unit>
 {
     private readonly ILogger<LoggingPipelineBehavior> _logger;
 
@@ -12,10 +12,11 @@ public class LoggingPipelineBehavior : IPipelineBehavior<UnitRequest>
         _logger = logger;
     }
 
-    public async Task HandleAsync(UnitRequest message, JobHandlerDelegate next, CancellationToken cancellationToken)
+    public async Task<Jobly.Core.Handlers.Unit> HandleAsync(UnitRequest message, RequestHandlerDelegate<Jobly.Core.Handlers.Unit> next, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Pipeline before handler");
-        await next();
+        var result = await next();
         _logger.LogInformation("Pipeline after handler");
+        return result;
     }
 }
