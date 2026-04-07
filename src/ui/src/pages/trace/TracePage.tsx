@@ -24,7 +24,8 @@ import * as api from '@/api';
 
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 72;
-const GROUP_PADDING = 20;
+const GROUP_PADDING = 30;
+const CHILD_GAP = 16;
 
 function kindIcon(kind: number) {
   if (kind === 3) return <Layers className="h-4 w-4 text-muted-foreground" />;
@@ -205,9 +206,8 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
   for (const job of jobs) {
     if (childrenInContainer.has(job.id)) continue; // positioned inside group, not by dagre
     const childCount = containers.get(job.id)?.length ?? 0;
-    const CHILD_GAP = 16;
     const height = childCount > 0
-      ? childCount * NODE_HEIGHT + (childCount - 1) * CHILD_GAP + GROUP_PADDING * 2 + 16
+      ? childCount * NODE_HEIGHT + (childCount - 1) * CHILD_GAP + GROUP_PADDING * 2 + 30
       : NODE_HEIGHT;
     g.setNode(job.id, { width: NODE_WIDTH, height });
   }
@@ -246,7 +246,6 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
   }
 
   // Create group nodes — position children inside group at container parent's dagre position
-  const CHILD_GAP = 8;
   for (const [parentId, children] of containers) {
     const parent = jobMap.get(parentId)!;
     const childIds = children.map(c => c.id);
@@ -267,7 +266,7 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
 
     const minX = parentX - GROUP_PADDING;
     const maxX = parentX + NODE_WIDTH + GROUP_PADDING;
-    const minY2 = startY - GROUP_PADDING - 16;
+    const minY2 = startY - GROUP_PADDING;
     const maxY = startY + totalChildHeight + GROUP_PADDING;
 
     const groupId = `group-${parentId}`;
@@ -277,7 +276,7 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
       type: 'group',
       data: { label, id: parentId, kind: parent.kind, state: parent.currentState, highlighted: parentId === highlightId },
       position: { x: minX, y: minY2 },
-      style: { width: maxX - minX, height: maxY - minY2, zIndex: -1 },
+      style: { width: maxX - minX, height: maxY - minY2, zIndex: -1, backgroundColor: 'transparent' },
     });
 
     // Make child nodes relative to group
@@ -288,6 +287,9 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
     }
   }
 
+  // React Flow requires parent nodes before children in the array
+  nodes.sort((a, b) => (a.parentId ? 1 : 0) - (b.parentId ? 1 : 0));
+
   return { nodes, edges };
 }
 
@@ -295,6 +297,7 @@ export default function TracePage() {
   const { traceId: rawTraceId, highlightId } = useParams<{ traceId: string; highlightId?: string }>();
   const [jobs, setJobs] = useState<TraceJobModel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
 
   // Normalize: accept both "4bf92f3577b34da6a3ce929d0e0e4736" and "4bf92f35-77b3-4da6-a3ce-929d0e0e4736"
   const traceId = rawTraceId && /^[0-9a-f]{32}$/i.test(rawTraceId)
@@ -315,6 +318,36 @@ export default function TracePage() {
     return buildGraph(jobs, highlightId);
   }, [jobs, highlightId]);
 
+  // Highlight source/target nodes when hovering an edge
+  const { styledNodes, styledEdges } = useMemo(() => {
+    if (!hoveredEdge) return { styledNodes: nodes, styledEdges: edges };
+
+    const edge = edges.find(e => e.id === hoveredEdge);
+    if (!edge) return { styledNodes: nodes, styledEdges: edges };
+
+    const connectedNodeIds = new Set([edge.source, edge.target]);
+
+    return {
+      styledNodes: nodes.map(n => ({
+        ...n,
+        style: {
+          ...n.style,
+          opacity: connectedNodeIds.has(n.id) ? 1 : 0.2,
+          transition: 'opacity 0.2s',
+        },
+      })),
+      styledEdges: edges.map(e => ({
+        ...e,
+        style: {
+          ...e.style,
+          opacity: e.id === hoveredEdge ? 1 : 0.1,
+          strokeWidth: e.id === hoveredEdge ? 3 : (e.style?.strokeWidth ?? 2),
+          transition: 'opacity 0.2s',
+        },
+      })),
+    };
+  }, [nodes, edges, hoveredEdge]);
+
   if (error) return <ErrorState message={error} />;
   if (!jobs) return <LoadingState />;
 
@@ -326,8 +359,8 @@ export default function TracePage() {
       </div>
       <div className="rounded-md border bg-card" style={{ height: 'calc(100vh - 12rem)' }}>
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
+          nodes={styledNodes}
+          edges={styledEdges}
           nodeTypes={nodeTypes}
           fitView
           fitViewOptions={{ padding: 0.2 }}
@@ -335,6 +368,8 @@ export default function TracePage() {
           maxZoom={2}
           nodesConnectable={false}
           nodesDraggable={false}
+          onEdgeMouseEnter={(_, edge) => setHoveredEdge(edge.id)}
+          onEdgeMouseLeave={() => setHoveredEdge(null)}
           proOptions={{ hideAttribution: true }}
         >
           <Controls className="!bg-card !border !border-border !shadow-sm [&>button]:!bg-card [&>button]:!border-border [&>button]:!fill-foreground [&>button:hover]:!bg-accent" />
