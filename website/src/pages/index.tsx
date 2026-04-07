@@ -28,8 +28,8 @@ function Features() {
   const features = [
     { title: 'Messages & Jobs', description: 'Two patterns in one library. Pub/sub messages with multiple handlers, and orchestrated jobs with scheduling, retries, continuations, and batches.' },
     { title: 'Built on EF Core', description: 'Uses your existing DbContext. Jobs are created in the same transaction as your business data (outbox pattern). Supports PostgreSQL and SQL Server.' },
-    { title: 'Real-time Dashboard', description: 'Hangfire-style dashboard with live graphs, job detail with full exception traces, pipeline logging, and job tracing across handlers.' },
-    { title: 'Crash Recovery', description: 'Per-job keep-alive heartbeat with automatic requeue on crash. No lost jobs, no wasted retries. Inspired by Hangfire\'s sliding invisibility timeout.' },
+    { title: 'Real-time Dashboard', description: 'Built-in dashboard with live graphs, job detail with full exception traces, pipeline logging, and job tracing across handlers.' },
+    { title: 'Crash Recovery', description: 'Per-job keep-alive heartbeat with automatic requeue on crash. No lost jobs, no wasted retries. Sliding invisibility timeout with configurable thresholds.' },
     { title: 'Pipeline Behaviors', description: 'Middleware chain wrapping all handler invocations. Add logging, metrics, validation, or authorization across all jobs and messages.' },
     { title: 'Job Tracing', description: 'Automatic trace propagation. When a handler spawns new jobs, they share a TraceId. See the full execution flow in the dashboard.' },
   ];

@@ -4,7 +4,7 @@ sidebar_position: 3
 
 # Crash Recovery
 
-Jobly uses a **sliding invisibility timeout** (inspired by Hangfire) to detect and recover from worker/server crashes.
+Jobly uses a **sliding invisibility timeout** to detect and recover from worker/server crashes.
 
 ## How It Works
 
