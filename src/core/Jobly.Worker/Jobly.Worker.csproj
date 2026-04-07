@@ -15,7 +15,7 @@
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(Configuration)'!='Debug'">
-		<PackageReference Include="Jobly.Core" Version="0.1.0" />
+		<PackageReference Include="Jobly.Core" Version="$(PackageVersion)" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(Configuration)'=='Debug'">
