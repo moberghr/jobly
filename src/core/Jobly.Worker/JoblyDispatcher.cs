@@ -121,8 +121,6 @@ public class JoblyDispatcher<TContext> : BackgroundService
             });
         }
 
-        await context.SaveChangesAsync(ct);
-
         // Note: mutex check for dispatcher mode happens in JoblyDispatcherWorker.ProcessJob
         // via distributed lock, not here in the batch fetch.
         await context.SaveChangesAsync(ct);
