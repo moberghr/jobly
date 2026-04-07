@@ -42,9 +42,59 @@ When `UnauthorizedRedirectUrl` is set:
 When `UnauthorizedRedirectUrl` is null:
 - All unauthorized requests return 401
 
+## Built-in Login
+
+Jobly can serve its own login page — no external auth setup needed. Users authenticate with credentials you validate, and Jobly manages the session via an HTTP-only signed cookie.
+
+```csharp
+builder.Services.AddDataProtection(); // Required for cookie signing
+builder.Services.AddScoped<IJoblyCredentialValidator, MyCredentialValidator>();
+
+app.UseJoblyUI(options =>
+{
+    options.UseBuiltInLogin<MyCredentialValidator>();
+});
+```
+
+Implement `IJoblyCredentialValidator` to check credentials against your database, LDAP, or any source:
+
+```csharp
+public class MyCredentialValidator : IJoblyCredentialValidator
+{
+    private readonly AppDbContext _db;
+
+    public MyCredentialValidator(AppDbContext db) => _db = db;
+
+    public async Task<bool> ValidateAsync(string username, string password)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username);
+        return user != null && BCrypt.Verify(password, user.PasswordHash);
+    }
+}
+```
+
+The validator is registered as **Scoped**, so it can inject DbContext and other scoped services.
+
 import Screenshot from '@site/src/components/Screenshot';
 
 <Screenshot light="/img/screenshots/11-login.png" dark="/img/screenshots/11-login-dark.png" alt="Login" />
+
+### How it works
+
+1. Unauthenticated users see the built-in login page at `/jobly`
+2. The SPA posts credentials to `/jobly/api/auth/login`
+3. On success, Jobly sets an HTTP-only signed cookie (1-day expiry via ASP.NET Data Protection)
+4. API requests include the cookie automatically — 401 triggers the login page
+5. Logout via `/jobly/api/auth/logout` clears the cookie
+
+### When to use built-in login vs custom auth
+
+| | Built-in Login | Custom Auth Filter |
+|---|---|---|
+| Setup | `UseBuiltInLogin<T>()` | `options.Authorization = new MyFilter()` |
+| Login page | Jobly serves it | Your app serves it |
+| Session | Jobly cookie | Your existing auth (cookies, JWT, etc.) |
+| Best for | Standalone dashboard access | Apps with existing authentication |
 
 ## Built-in Filters
 

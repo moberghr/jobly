@@ -113,10 +113,11 @@ public class OrderController : ControllerBase
     {
         _context.Orders.Add(order);
 
-        // Job is created in the same transaction (outbox pattern)
+        // Job is created in the same DbContext — committed atomically (outbox pattern)
         await _publisher.Enqueue(new SendEmailRequest { Email = order.Email });
 
-        await _context.SaveChangesAsync(); // Both saved atomically
+        // Single SaveChangesAsync commits both the order and the job
+        await _context.SaveChangesAsync();
         return Ok();
     }
 
@@ -129,6 +130,6 @@ public class OrderController : ControllerBase
 }
 ```
 
-:::info DbContext must be Scoped
-Jobly requires your DbContext to be registered as **Scoped** (the EF Core default). This ensures the publisher and your application code share the same DbContext instance within a scope, so jobs are committed atomically with your business data.
+:::info Transactional Outbox
+Jobly uses the [outbox pattern](/docs/outbox-pattern) — jobs are written to the same DbContext as your business data and committed in a single `SaveChangesAsync()`. This guarantees atomicity: if the transaction fails, both your data and the jobs roll back. No orphaned jobs, no lost work.
 :::

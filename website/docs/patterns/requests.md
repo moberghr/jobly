@@ -64,3 +64,44 @@ public class UserController : ControllerBase
 | Retries | Automatic | None (caller handles errors) |
 | Dashboard | Visible in UI | Not visible |
 | Interface | `IPublisher.Enqueue` / `Publish` | `IMediator.Send` |
+
+## Pipeline Behaviors
+
+All three patterns (jobs, messages, requests) run through a unified pipeline. Implement `IPipelineBehavior<TRequest, TResponse>` to add cross-cutting concerns like logging, validation, or timing:
+
+```csharp
+public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
+{
+    private readonly ILogger<LoggingBehavior<TRequest, TResponse>> _logger;
+
+    public LoggingBehavior(ILogger<LoggingBehavior<TRequest, TResponse>> logger) => _logger = logger;
+
+    public async Task<TResponse> HandleAsync(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken ct)
+    {
+        _logger.LogInformation("Handling {RequestType}", typeof(TRequest).Name);
+        var response = await next();
+        _logger.LogInformation("Handled {RequestType}", typeof(TRequest).Name);
+        return response;
+    }
+}
+```
+
+### Registration
+
+Auto-scan an assembly for all pipeline behavior implementations:
+
+```csharp
+builder.Services.AddPipelineBehaviors(typeof(Program).Assembly);
+```
+
+Or register manually:
+
+```csharp
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+```
+
+Behaviors execute in registration order, outermost first. The handler is the innermost call.

@@ -89,6 +89,10 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 |--------|------|---------|-------------|
 | `UseDispatcher` | `bool` | `false` | When true, uses a batch-fetch dispatcher instead of per-worker polling |
 
+By default, each worker polls the database independently for the next job. With `UseDispatcher = true`, a single dispatcher thread batch-fetches jobs and distributes them to workers via an in-memory channel. This reduces database load when running many workers, at the cost of slightly higher latency for the first job in a batch.
+
+Use dispatcher mode when you have many workers (20+) and want to reduce database polling pressure. For most setups, the default per-worker polling is simpler and works well.
+
 ### Worker Groups
 
 By default, all workers share the same queues and polling interval. Use worker groups for fine-grained control:

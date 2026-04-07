@@ -75,7 +75,7 @@ var followUps = new List<SendSummary> { new() };
 await batchPublisher.ContinueBatchWith(followUps, batchId);
 ```
 
-Batch continuation options:
+Batch continuation options control when continuations activate:
 
 ```csharp
 // Default: continuation only fires when ALL jobs succeed
@@ -84,6 +84,10 @@ await batchPublisher.StartNew(jobs, ContinuationOptions.OnlyOnSucceeded);
 // Fire when all jobs finish, regardless of success/failure
 await batchPublisher.StartNew(jobs, ContinuationOptions.OnAnyFinishedState);
 ```
+
+With `OnlyOnSucceeded` (default): if any job in the batch fails, the batch itself transitions to `Failed` and continuations stay in `Awaiting` state indefinitely. You can requeue the failed jobs from the dashboard — if they succeed on retry and the batch completes, continuations will activate normally.
+
+With `OnAnyFinishedState`: continuations fire as soon as all jobs reach a terminal state (Completed or Failed), regardless of outcome. Use this when the continuation needs to run even if some jobs failed (e.g., sending a summary report).
 
 ## Recurring Jobs
 
