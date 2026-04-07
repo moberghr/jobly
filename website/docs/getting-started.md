@@ -6,9 +6,9 @@ sidebar_position: 1
 
 Jobly is a distributed job processing and message queue library for .NET 10. It provides three patterns:
 
-- **Messages** (`IMessage`) — Pub/sub queue. Multiple handlers per message, each becomes an independent job.
-- **Jobs** (`IJob`) — Orchestrated background work. Single handler, scheduling, retries, continuations, batches.
-- **Requests** (`IRequest<TResponse>`) — In-memory request/response. Single handler, no persistence, returns a typed response via `IMediator.Send()`.
+- **[Messages](./patterns/messages.md)** (`IMessage`) — Pub/sub queue. Multiple handlers per message, each becomes an independent job.
+- **[Jobs](./patterns/jobs.md)** (`IJob`) — Orchestrated background work. Single handler, scheduling, retries, continuations, batches.
+- **[Requests](./patterns/requests.md)** (`IRequest<TResponse>`) — In-memory request/response. Single handler, no persistence, returns a typed response via `IMediator.Send()`.
 
 ## Installation
 

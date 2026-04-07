@@ -68,7 +68,7 @@ const config: Config = {
           title: 'Docs',
           items: [
             { label: 'Getting Started', to: '/docs/getting-started' },
-            { label: 'Messages & Jobs', to: '/docs/messages-and-jobs' },
+            { label: 'Patterns', to: '/docs/patterns' },
             { label: 'Dashboard', to: '/docs/dashboard/overview' },
           ],
         },
