@@ -27,6 +27,9 @@ public static class JobHandlerServiceExtensions
 
     private static void RegisterImplementations(IServiceCollection services, Assembly assembly, Type openGenericInterface)
     {
+        // Filter: skip abstract, interfaces, and nested private types (DI can't instantiate them).
+        // Open generics (e.g. TimingBehavior<T, TResponse>) are allowed — .NET DI resolves
+        // them as closed generics automatically when requested.
         var implementationTypes = assembly.GetTypes()
             .Where(t => t is { IsAbstract: false, IsInterface: false, IsNestedPrivate: false })
             .Where(t => t.GetInterfaces().Any(i =>
