@@ -1,13 +1,16 @@
 # Jobly
 
-A distributed job processing and message queue library for .NET 10. Supports pub/sub messaging, orchestrated background jobs, and a web dashboard — all with a unified pipeline.
+> It gets the job done.
+
+A distributed job processing, message queue, and in-memory mediator library for .NET 10. Three patterns, one unified pipeline, a real-time dashboard.
 
 ## Features
 
-- **Message Queue** — Publish messages with multiple handlers. Each handler runs as an independent, retryable job.
 - **Background Jobs** — Schedule and orchestrate jobs with retries, continuations, and batch processing.
+- **Message Queue** — Publish messages with multiple handlers. Each handler runs as an independent, retryable job.
+- **In-Memory Requests** — `IRequest<TResponse>` with `IMediator.Send()` for immediate, typed request/response. No database persistence.
+- **Unified Pipeline** — `IPipelineBehavior<T, TResponse>` wraps all three patterns (jobs, messages, requests).
 - **Named Queues** — Assign jobs to queues. Workers subscribe to specific queues. Alphabetical order = priority.
-- **Pipeline Behaviors** — Middleware chain wraps all handler executions (logging, validation, error handling).
 - **Execution Logs** — ILogger output automatically captured during handler execution, viewable in dashboard. Each log entry tracks which worker produced it.
 - **Unified Activity Log** — Single audit trail per job: lifecycle events (Created, Processing, Completed, Failed, Cancelled) + handler logs.
 - **Multi-Database** — PostgreSQL and SQL Server with row-level locking for concurrent worker safety.
@@ -156,26 +159,57 @@ await publisher.Enqueue(new GenerateReport { Month = 3 }, queue: "reports");
 await publisher.Enqueue(new FollowUp(), parentJobId: prepareId); // continuation
 ```
 
-### 4. Pipeline Behaviors
+### 4. Define Requests (In-Memory)
 
 ```csharp
-public class LoggingBehavior<T> : IPipelineBehavior<T> where T : class
+public class GetUser : IRequest<UserDto>
 {
-    private readonly ILogger<LoggingBehavior<T>> _logger;
+    public int UserId { get; set; }
+}
 
-    public async Task HandleAsync(T message, JobHandlerDelegate next, CancellationToken ct)
+public class GetUserHandler : IRequestHandler<GetUser, UserDto>
+{
+    public async Task<UserDto> HandleAsync(GetUser request, CancellationToken ct)
+    {
+        return await _db.Users.FindAsync(request.UserId, ct);
+    }
+}
+```
+
+**Send via IMediator:**
+
+```csharp
+var user = await mediator.Send(new GetUser { UserId = 1 });
+```
+
+Requests execute immediately in-process — no database, no worker, no retries. Errors bubble up to the caller.
+
+### 5. Pipeline Behaviors
+
+The unified pipeline wraps all three patterns (jobs, messages, requests):
+
+```csharp
+public class LoggingBehavior<T, TResponse> : IPipelineBehavior<T, TResponse>
+    where T : IRequest<TResponse>
+{
+    private readonly ILogger<LoggingBehavior<T, TResponse>> _logger;
+
+    public async Task<TResponse> HandleAsync(T request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
         _logger.LogInformation("Handling {Type}", typeof(T).Name);
-        try { await next(); }
-        finally { _logger.LogInformation("Handled {Type} in {Ms}ms", typeof(T).Name, sw.ElapsedMilliseconds); }
+        var result = await next();
+        _logger.LogInformation("Handled {Type} in {Ms}ms", typeof(T).Name, sw.ElapsedMilliseconds);
+        return result;
     }
 }
 
 builder.Services.AddPipelineBehaviors(typeof(Program).Assembly);
 ```
 
-### 5. Named Queues
+For jobs and messages, `TResponse` is `Unit`. For requests, it's your custom response type.
+
+### 6. Named Queues
 
 ```csharp
 options.Queues = ["a-critical", "b-default", "c-low"];
@@ -185,7 +219,7 @@ await publisher.Enqueue(new UrgentTask(), queue: "a-critical");
 await publisher.Publish(new LowPriorityEvent(), queue: "c-low");
 ```
 
-### 6. Recurring Jobs
+### 7. Recurring Jobs
 
 ```csharp
 await recurringPublisher.AddOrUpdateRecurringJob(
@@ -194,7 +228,7 @@ await recurringPublisher.AddOrUpdateRecurringJob(
 
 `AddOrUpdateRecurringJob` registers the definition. The `RecurringJobSchedulerTask` creates jobs when the cron time arrives. Execution history is tracked in `RecurringJobLog` and survives job cleanup.
 
-### 7. Dashboard Authorization
+### 8. Dashboard Authorization
 
 ```csharp
 app.UseJoblyUI(options =>
@@ -219,7 +253,7 @@ Built-in filter for localhost-only access:
 options.Authorization = new LocalRequestsOnlyAuthorizationFilter();
 ```
 
-### 8. Configuration
+### 9. Configuration
 
 ```csharp
 builder.Services.AddJoblyWorker<AppDbContext>(options =>
@@ -265,6 +299,15 @@ Enqueue(GenerateReport) → Job (Enqueued, queue="reports")
   → Pipeline → Handler → ILogger captured → Completed
   → stats:succeeded +1, stats:succeeded:{hour} +1
   → ExpireAt set → eventually cleaned up
+```
+
+### Request Flow
+```
+mediator.Send(GetUser { Id = 1 })
+  → Resolve IRequestHandler<GetUser, UserDto>
+  → Pipeline behaviors (logging, validation, etc.)
+  → Handler.HandleAsync → UserDto returned
+  → No database involved
 ```
 
 ### Cancellation Flow
