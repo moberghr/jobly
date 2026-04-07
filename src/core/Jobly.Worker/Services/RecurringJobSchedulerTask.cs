@@ -65,12 +65,12 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
                 continue;
             }
 
-            var nextExecution = CronExpression.Parse(recurringJob.Cron)
+            var nextExecution = CronExpression.Parse(recurringJob.Cron!)
                 .GetNextOccurrence(DateTime.SpecifyKind(now, DateTimeKind.Utc));
 
             var newJob = JobHelper.CreateJob(
-                message: recurringJob.Message,
-                type: recurringJob.Type,
+                message: recurringJob.Message!,
+                type: recurringJob.Type!,
                 retries: 0,
                 scheduleTime: now,
                 maxRetries: 0,

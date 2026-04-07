@@ -239,8 +239,14 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, jobCts.Token);
         while (!linked.IsCancellationRequested)
         {
-            try { await Task.Delay(interval, linked.Token); }
-            catch (OperationCanceledException) { return; }
+            try
+            {
+                await Task.Delay(interval, linked.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
 
             try
             {
@@ -264,7 +270,10 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
                     .Where(x => x.Id == jobId)
                     .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastKeepAlive, now), stoppingToken);
             }
-            catch (OperationCanceledException) { return; }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
             catch (Exception e)
             {
                 _logger.LogWarning(e, "Failed job monitor for {jobId}", jobId);

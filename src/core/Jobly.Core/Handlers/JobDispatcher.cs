@@ -18,7 +18,8 @@ public static class JobDispatcher
     /// </summary>
     public static List<Type> DiscoverMessageHandlers(Type messageType, IServiceProvider provider)
     {
-        var handlerInterfaceType = _messageHandlerTypeCache.GetOrAdd(messageType,
+        var handlerInterfaceType = _messageHandlerTypeCache.GetOrAdd(
+            messageType,
             t => typeof(IMessageHandler<>).MakeGenericType(t));
         var handlers = provider.GetServices(handlerInterfaceType);
         return [.. handlers.Select(h => h!.GetType()).Distinct()];
@@ -29,7 +30,8 @@ public static class JobDispatcher
     /// </summary>
     public static Type? DiscoverJobHandler(Type jobType, IServiceProvider provider)
     {
-        var handlerInterfaceType = _jobHandlerTypeCache.GetOrAdd(jobType,
+        var handlerInterfaceType = _jobHandlerTypeCache.GetOrAdd(
+            jobType,
             t => typeof(IJobHandler<>).MakeGenericType(t));
         var handler = provider.GetService(handlerInterfaceType);
         return handler?.GetType();
@@ -106,7 +108,8 @@ public static class JobDispatcher
         CancellationToken cancellationToken)
     {
         // Resolve IRequestHandler<TRequest, TResponse>
-        var handlerInterfaceType = _requestHandlerTypeCache.GetOrAdd(requestType,
+        var handlerInterfaceType = _requestHandlerTypeCache.GetOrAdd(
+            requestType,
             t => typeof(IRequestHandler<,>).MakeGenericType(t, typeof(TResponse)));
         var handler = provider.GetService(handlerInterfaceType)
             ?? throw new InvalidOperationException($"No handler registered for {requestType.Name}");
@@ -133,7 +136,8 @@ public static class JobDispatcher
         IServiceProvider provider,
         CancellationToken ct)
     {
-        var handlerInterfaceType = _messageHandlerTypeCache.GetOrAdd(messageType,
+        var handlerInterfaceType = _messageHandlerTypeCache.GetOrAdd(
+            messageType,
             t => typeof(IMessageHandler<>).MakeGenericType(t));
         return ExecuteHandlerCore(message, messageType, handlerType, handlerInterfaceType, provider, ct);
     }
@@ -148,7 +152,8 @@ public static class JobDispatcher
         IServiceProvider provider,
         CancellationToken ct)
     {
-        var handlerInterfaceType = _jobHandlerTypeCache.GetOrAdd(messageType,
+        var handlerInterfaceType = _jobHandlerTypeCache.GetOrAdd(
+            messageType,
             t => typeof(IJobHandler<>).MakeGenericType(t));
         return ExecuteHandlerCore(message, messageType, handlerType, handlerInterfaceType, provider, ct);
     }

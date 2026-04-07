@@ -20,7 +20,6 @@ public class JoblyDispatcher<TContext> : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<JoblyDispatcher<TContext>> _logger;
-    private readonly JoblyWorkerConfiguration _configuration;
     private readonly WorkerGroupConfiguration _groupConfiguration;
     private readonly TimeProvider _timeProvider;
     private readonly Channel<Job> _jobChannel;
@@ -35,7 +34,6 @@ public class JoblyDispatcher<TContext> : BackgroundService
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
-        _configuration = configuration.Value;
         _groupConfiguration = groupConfiguration;
         _timeProvider = timeProvider;
         _workerCount = groupConfiguration.WorkerCount;
@@ -127,7 +125,6 @@ public class JoblyDispatcher<TContext> : BackgroundService
 
         // Note: mutex check for dispatcher mode happens in JoblyDispatcherWorker.ProcessJob
         // via distributed lock, not here in the batch fetch.
-
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 

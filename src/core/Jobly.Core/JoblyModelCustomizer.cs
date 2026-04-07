@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Jobly.Core;
 
-internal class JoblyModelCustomizer : RelationalModelCustomizer
+internal sealed class JoblyModelCustomizer : RelationalModelCustomizer
 {
     public JoblyModelCustomizer(ModelCustomizerDependencies dependencies)
         : base(dependencies)

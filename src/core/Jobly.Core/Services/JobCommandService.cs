@@ -224,7 +224,7 @@ public class JobCommandService<TContext> : IJobCommandService
                 break;
             }
 
-            var batchResult = await BulkDeleteJobs(ids.ToArray());
+            var batchResult = await BulkDeleteJobs([.. ids]);
             result.Succeeded += batchResult.Succeeded;
             result.Skipped += batchResult.Skipped;
         }
@@ -248,7 +248,7 @@ public class JobCommandService<TContext> : IJobCommandService
                 break;
             }
 
-            var batchResult = await BulkRequeueJobs(ids.ToArray());
+            var batchResult = await BulkRequeueJobs([.. ids]);
             result.Succeeded += batchResult.Succeeded;
             result.Skipped += batchResult.Skipped;
         }

@@ -1,6 +1,6 @@
 using Jobly.Core.Data.Entities;
-using Jobly.Core.Handlers;
 using Jobly.Core.Entities;
+using Jobly.Core.Handlers;
 using Jobly.Core.Interceptors;
 using Jobly.Core.Services;
 using Microsoft.EntityFrameworkCore;
@@ -230,7 +230,6 @@ public static class ServiceConfiguration
 
         log.HasIndex(p => p.JobId);
         log.HasOne(p => p.Job).WithMany().HasForeignKey(p => p.JobId).OnDelete(DeleteBehavior.SetNull);
-
     }
 
     private static void AddServerEntity(ModelBuilder modelBuilder)

@@ -246,6 +246,30 @@ dotnet_diagnostic.S3925.severity = none
 # S2094: Remove empty class (EF entities, marker interfaces)
 dotnet_diagnostic.S2094.severity = none
 
+# S2326: Unused type parameter (IRequest<TResponse> — TResponse used for type-level routing)
+dotnet_diagnostic.S2326.severity = none
+
+# S3010: Static field assignment in constructor (OrchestrationTask singleton pattern)
+dotnet_diagnostic.S3010.severity = none
+
+# S6667: Log exception in catch (cancellation is informational, not an error)
+dotnet_diagnostic.S6667.severity = none
+
+# S3260: Private classes should be sealed (handled by CA1852)
+dotnet_diagnostic.S3260.severity = none
+
+# CA1000: Do not declare static members on generic types (test helpers by design)
+dotnet_diagnostic.CA1000.severity = none
+
+# CA1805: Do not explicitly initialize to default (Unit.Value intentional)
+dotnet_diagnostic.CA1805.severity = none
+
+# CA1305: Locale-sensitive formatting (invariant context, no user-facing strings)
+dotnet_diagnostic.CA1305.severity = none
+
+# CA1852: Seal types (handled via code fixes, suppress for edge cases)
+dotnet_diagnostic.CA1852.severity = suggestion
+
 # ============================================================
 # Meziantou.Analyzer
 # ============================================================

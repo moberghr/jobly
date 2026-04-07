@@ -207,9 +207,11 @@ public class OrchestrationTask<TContext> : ServerTaskBase<TContext>
 
                 await context.Set<Job>()
                     .Where(x => x.ParentJobId == child.Id && x.CurrentState == State.Awaiting)
-                    .ExecuteUpdateAsync(x => x
-                        .SetProperty(p => p.CurrentState, State.Failed)
-                        .SetProperty(p => p.ExpireAt, now.Add(jobExpirationTimeout)), ct);
+                    .ExecuteUpdateAsync(
+                        x => x
+                            .SetProperty(p => p.CurrentState, State.Failed)
+                            .SetProperty(p => p.ExpireAt, now.Add(jobExpirationTimeout)),
+                        ct);
 
                 foreach (var batchChildId in batchChildIds)
                 {

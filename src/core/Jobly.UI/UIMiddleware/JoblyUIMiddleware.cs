@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
@@ -49,13 +48,13 @@ public class JoblyUIMiddleware
             var loginPath = $"{_options.RoutePrefix}/api/auth/login";
             var logoutPath = $"{_options.RoutePrefix}/api/auth/logout";
 
-            if (path.Equals(loginPath, StringComparison.OrdinalIgnoreCase) && httpContext.Request.Method == "POST")
+            if (path.Equals(loginPath, StringComparison.OrdinalIgnoreCase) && string.Equals(httpContext.Request.Method, "POST", StringComparison.Ordinal))
             {
                 await HandleLogin(httpContext);
                 return;
             }
 
-            if (path.Equals(logoutPath, StringComparison.OrdinalIgnoreCase) && httpContext.Request.Method == "POST")
+            if (path.Equals(logoutPath, StringComparison.OrdinalIgnoreCase) && string.Equals(httpContext.Request.Method, "POST", StringComparison.Ordinal))
             {
                 httpContext.Response.Cookies.Delete(CookieName, new CookieOptions
                 {
@@ -70,33 +69,31 @@ public class JoblyUIMiddleware
         }
 
         // Auth check for dashboard requests
-        if (path.StartsWith(_options.RoutePrefix, StringComparison.Ordinal))
+        if (path.StartsWith(_options.RoutePrefix, StringComparison.Ordinal)
+            && _options.Authorization != null && !_options.Authorization.Authorize(httpContext))
         {
-            if (_options.Authorization != null && !_options.Authorization.Authorize(httpContext))
+            // API requests always get 401 (SPA handles it)
+            if (path.Contains("/api/", StringComparison.Ordinal))
             {
-                // API requests always get 401 (SPA handles it)
-                if (path.Contains("/api/", StringComparison.Ordinal))
-                {
-                    httpContext.Response.StatusCode = 401;
-                    return;
-                }
+                httpContext.Response.StatusCode = 401;
+                return;
+            }
 
-                // Built-in login: let the SPA through so it can show its own login page
-                if (_options.CredentialValidatorType != null)
-                {
-                    // Fall through to serve SPA — React app will detect 401 from API and show login
-                }
-                else if (_options.UnauthorizedRedirectUrl != null)
-                {
-                    var returnUrl = Uri.EscapeDataString(path);
-                    httpContext.Response.Redirect($"{_options.UnauthorizedRedirectUrl}?returnUrl={returnUrl}");
-                    return;
-                }
-                else
-                {
-                    httpContext.Response.StatusCode = 401;
-                    return;
-                }
+            // Built-in login: let the SPA through so it can show its own login page
+            if (_options.CredentialValidatorType != null)
+            {
+                // Fall through to serve SPA — React app will detect 401 from API and show login
+            }
+            else if (_options.UnauthorizedRedirectUrl != null)
+            {
+                var returnUrl = Uri.EscapeDataString(path);
+                httpContext.Response.Redirect($"{_options.UnauthorizedRedirectUrl}?returnUrl={returnUrl}");
+                return;
+            }
+            else
+            {
+                httpContext.Response.StatusCode = 401;
+                return;
             }
         }
 
@@ -119,9 +116,9 @@ public class JoblyUIMiddleware
 
     private async Task HandleLogin(HttpContext httpContext)
     {
-        var form = await httpContext.Request.ReadFormAsync();
-        var username = form["username"].FirstOrDefault() ?? "";
-        var password = form["password"].FirstOrDefault() ?? "";
+        var form = await httpContext.Request.ReadFormAsync(httpContext.RequestAborted);
+        var username = form["username"].FirstOrDefault() ?? string.Empty;
+        var password = form["password"].FirstOrDefault() ?? string.Empty;
 
         using var scope = _scopeFactory!.CreateScope();
         var validator = scope.ServiceProvider.GetRequiredService<IJoblyCredentialValidator>();
@@ -179,7 +176,7 @@ public class JoblyUIMiddleware
     /// <summary>
     /// Built-in auth filter that validates the Jobly cookie.
     /// </summary>
-    private class CookieAuthorizationFilter : IJoblyAuthorizationFilter
+    private sealed class CookieAuthorizationFilter : IJoblyAuthorizationFilter
     {
         private readonly IDataProtector _protector;
 

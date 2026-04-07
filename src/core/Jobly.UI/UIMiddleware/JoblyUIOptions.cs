@@ -30,7 +30,8 @@ public class JoblyUIOptions
     /// Enables the built-in login page with the specified credential validator.
     /// The validator is registered in DI as scoped, so it can inject DbContext, etc.
     /// </summary>
-    public void UseBuiltInLogin<TValidator>() where TValidator : class, IJoblyCredentialValidator
+    public void UseBuiltInLogin<TValidator>()
+        where TValidator : class, IJoblyCredentialValidator
     {
         CredentialValidatorType = typeof(TValidator);
     }

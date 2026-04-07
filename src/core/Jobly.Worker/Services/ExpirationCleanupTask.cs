@@ -103,7 +103,6 @@ public class ExpirationCleanupTask<TContext> : ServerTaskBase<TContext>
 
         // ServerTasks and ServerLogs for dead servers are cleaned up via cascade delete
         // when ServerCleanupTask removes the Server record.
-
         return expiredJobIds.Count;
     }
 
