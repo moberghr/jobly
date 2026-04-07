@@ -8,10 +8,12 @@ Each batch displays a **stacked progress bar** with green for completed jobs and
 
 Click through to see individual batch jobs and their states.
 
-![Batches](/img/screenshots/06-batches.png)
+import Screenshot from '@site/src/components/Screenshot';
+
+<Screenshot light="/img/screenshots/06-batches.png" dark="/img/screenshots/06-batches-dark.png" alt="Batches" />
 
 ## Batch Detail
 
 Shows the stacked green/red progress bar, creation time, full ID, and a table of all jobs in the batch with their current state.
 
-![Batch Detail](/img/screenshots/10-batch-detail.png)
+<Screenshot light="/img/screenshots/10-batch-detail.png" dark="/img/screenshots/10-batch-detail-dark.png" alt="Batch Detail" />

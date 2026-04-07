@@ -38,4 +38,10 @@ Below the metric cards, the dashboard includes two graphs:
 - **Realtime graph** — a live jobs/sec line chart that updates continuously
 - **Historical graph** — a bar chart with a 24-hour / 7-day toggle showing succeeded and failed job counts over time
 
-![Dashboard](/img/screenshots/01-dashboard.png)
+import Screenshot from '@site/src/components/Screenshot';
+
+<Screenshot
+  light="/img/screenshots/01-dashboard.png"
+  dark="/img/screenshots/01-dashboard-dark.png"
+  alt="Dashboard"
+/>

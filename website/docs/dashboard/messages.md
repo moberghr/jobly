@@ -15,4 +15,6 @@ The message detail page shows:
 - **Total jobs** — the `spawnedJobsCount`, reflecting all jobs spawned by the message
 - **Spawned jobs table** — lists every child job with its current state. State filter buttons let you narrow the list to specific states (e.g., show only Completed or only Failed jobs).
 
-![Messages](/img/screenshots/05-messages.png)
+import Screenshot from '@site/src/components/Screenshot';
+
+<Screenshot light="/img/screenshots/05-messages.png" dark="/img/screenshots/05-messages-dark.png" alt="Messages" />

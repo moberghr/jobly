@@ -21,4 +21,10 @@ Each recurring job tracks its executions via `RecurringJobLog` entries. The hist
 
 For full documentation on configuring and using recurring jobs, see [Recurring Jobs](/docs/recurring-jobs).
 
-![Recurring Jobs](/img/screenshots/07-recurring.png)
+import Screenshot from '@site/src/components/Screenshot';
+
+<Screenshot light="/img/screenshots/07-recurring.png" dark="/img/screenshots/07-recurring-dark.png" alt="Recurring Jobs" />
+
+Click a recurring job name to see its detail page with execution history:
+
+<Screenshot light="/img/screenshots/14-recurring-detail.png" dark="/img/screenshots/14-recurring-detail-dark.png" alt="Recurring Detail" />

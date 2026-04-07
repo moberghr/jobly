@@ -50,11 +50,13 @@ function Features() {
 }
 
 function Screenshots() {
+  const imgStyle = {width: '100%', borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)'};
   return (
     <section style={{padding: '2rem 0 4rem', background: 'var(--ifm-color-emphasis-100)'}}>
       <div className="container">
         <h2 style={{textAlign: 'center', marginBottom: '2rem'}}>Dashboard</h2>
-        <img src="/jobly/img/screenshots/01-dashboard.png" alt="Dashboard" style={{width: '100%', borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)'}} />
+        <img src="/jobly/img/screenshots/01-dashboard.png" alt="Dashboard" style={imgStyle} data-theme-target="light" />
+        <img src="/jobly/img/screenshots/01-dashboard-dark.png" alt="Dashboard" style={imgStyle} data-theme-target="dark" />
       </div>
     </section>
   );

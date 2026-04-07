@@ -18,7 +18,9 @@ The Failed state includes a type count bar at the top of the job list. Each bar 
 
 Requeueing a job resets its `ScheduleTime` to now, so the job executes immediately rather than retaining its original schedule time.
 
-![Failed Jobs](/img/screenshots/02-jobs-failed.png)
+import Screenshot from '@site/src/components/Screenshot';
+
+<Screenshot light="/img/screenshots/02-jobs-failed.png" dark="/img/screenshots/02-jobs-failed-dark.png" alt="Failed Jobs" />
 
 ## Job Detail
 
@@ -39,8 +41,8 @@ Click any job to see its full detail in a two-column layout:
 
 ### Completed Job with Trace
 
-![Job Detail with Trace](/img/screenshots/03-job-detail-trace.png)
+<Screenshot light="/img/screenshots/03-job-detail-trace.png" dark="/img/screenshots/03-job-detail-trace-dark.png" alt="Job Detail with Trace" />
 
 ### Failed Job with Exception
 
-![Failed Job Detail](/img/screenshots/09-job-detail-failed.png)
+<Screenshot light="/img/screenshots/09-job-detail-failed.png" dark="/img/screenshots/09-job-detail-failed-dark.png" alt="Failed Job Detail" />

@@ -38,9 +38,15 @@ public class ProcessOrderHandler : IJobHandler<ProcessOrderRequest>
 
 The dashboard shows the full trace:
 
-![Job detail with trace](/img/screenshots/03-job-detail-trace.png)
+import Screenshot from '@site/src/components/Screenshot';
+
+<Screenshot light="/img/screenshots/03-job-detail-trace.png" dark="/img/screenshots/03-job-detail-trace-dark.png" alt="Job detail with trace" />
 
 The "Trace (9 jobs)" card shows all jobs spawned from this ProcessOrderRequest: 6 ShipItemRequests and 2 PublishInvoiceRequests. Clicking any job navigates to its detail, which shows the same trace from that job's perspective.
+
+Clicking the trace link opens a dedicated visualization page showing the full DAG:
+
+<Screenshot light="/img/screenshots/12-trace.png" dark="/img/screenshots/12-trace-dark.png" alt="Trace visualization" />
 
 ## Message-Routed Jobs
 

@@ -42,6 +42,10 @@ When `UnauthorizedRedirectUrl` is set:
 When `UnauthorizedRedirectUrl` is null:
 - All unauthorized requests return 401
 
+import Screenshot from '@site/src/components/Screenshot';
+
+<Screenshot light="/img/screenshots/11-login.png" dark="/img/screenshots/11-login-dark.png" alt="Login" />
+
 ## Built-in Filters
 
 ### LocalRequestsOnlyAuthorizationFilter

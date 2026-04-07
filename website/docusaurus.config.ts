@@ -44,6 +44,7 @@ const config: Config = {
     image: 'img/screenshots/01-dashboard.png',
     colorMode: {
       respectPrefersColorScheme: true,
+      disableSwitch: false,
     },
     navbar: {
       title: 'Jobly',
