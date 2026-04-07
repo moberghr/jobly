@@ -2,9 +2,9 @@
 sidebar_position: 2
 ---
 
-# Messages & Jobs
+# Messages, Jobs & Requests
 
-Jobly supports two publishing patterns. Use the one that fits your use case, or mix both.
+Jobly supports three patterns. Use the ones that fit your use case, or mix all three.
 
 ## Messages (Pub/Sub)
 
@@ -134,22 +134,76 @@ await jobCommandService.DeleteJob(jobId);
 
 If the job is processing, this sets `CancellationMode = Graceful` instead of immediately changing state. The worker detects it and cancels the handler's `CancellationToken`. See [Job Cancellation](./cancellation.md) for the full flow.
 
-## Pipeline Behaviors
+## Requests (In-Memory)
 
-Pipeline behaviors wrap all handler invocations (both messages and jobs):
+Requests implement `IRequest<TResponse>` and have a **single handler** that returns a typed response. Unlike jobs and messages, requests are **not persisted to the database** — they execute immediately in-process via `IMediator.Send()`.
+
+Use requests for queries, commands that need a response, or any synchronous in-process work that benefits from the pipeline.
 
 ```csharp
-public class LoggingBehavior<T> : IPipelineBehavior<T> where T : class
+// Define a request with a response type
+public class GetUser : IRequest<UserDto>
 {
-    private readonly ILogger<LoggingBehavior<T>> _logger;
+    public int UserId { get; set; }
+}
 
-    public LoggingBehavior(ILogger<LoggingBehavior<T>> logger) => _logger = logger;
+// Single handler that returns TResponse
+public class GetUserHandler : IRequestHandler<GetUser, UserDto>
+{
+    private readonly AppDbContext _db;
 
-    public async Task HandleAsync(T message, JobHandlerDelegate next, CancellationToken ct)
+    public GetUserHandler(AppDbContext db) => _db = db;
+
+    public async Task<UserDto> HandleAsync(GetUser request, CancellationToken ct)
+    {
+        var user = await _db.Users.FindAsync(request.UserId, ct);
+        return new UserDto { Id = user.Id, Name = user.Name };
+    }
+}
+
+// Send via IMediator
+var user = await mediator.Send(new GetUser { UserId = 1 });
+```
+
+### Key differences from Jobs/Messages
+
+| | Jobs/Messages | Requests |
+|---|---|---|
+| Storage | Persisted to database | In-memory only |
+| Execution | Background worker | Immediate, in-process |
+| Response | None (Unit) | Typed TResponse |
+| Retries | Automatic | None (caller handles) |
+| Dashboard | Visible in UI | Not visible |
+
+### Type hierarchy
+
+All types share a common base:
+
+```csharp
+public interface IRequest<out TResponse>;     // Base
+public interface IJob : IRequest<Unit>;        // Persistent, single handler
+public interface IMessage : IRequest<Unit>;    // Persistent, multiple handlers
+// IRequest<TResponse> used directly           // In-memory, returns TResponse
+```
+
+## Pipeline Behaviors
+
+Pipeline behaviors wrap all handler invocations — jobs, messages, **and requests** — through a unified interface:
+
+```csharp
+public class LoggingBehavior<T, TResponse> : IPipelineBehavior<T, TResponse>
+    where T : IRequest<TResponse>
+{
+    private readonly ILogger<LoggingBehavior<T, TResponse>> _logger;
+
+    public LoggingBehavior(ILogger<LoggingBehavior<T, TResponse>> logger) => _logger = logger;
+
+    public async Task<TResponse> HandleAsync(T request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
     {
         _logger.LogInformation("Starting {Type}", typeof(T).Name);
-        await next();
+        var result = await next();
         _logger.LogInformation("Completed {Type}", typeof(T).Name);
+        return result;
     }
 }
 ```
@@ -157,7 +211,17 @@ public class LoggingBehavior<T> : IPipelineBehavior<T> where T : class
 Register as an open generic:
 
 ```csharp
-builder.Services.AddTransient(typeof(IPipelineBehavior<>), typeof(LoggingBehavior<>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+```
+
+The pipeline applies to all three patterns. For jobs and messages, `TResponse` is `Unit`. For requests, it's your custom response type. You can also target specific types:
+
+```csharp
+// Only for GetUser requests
+public class CacheBehavior : IPipelineBehavior<GetUser, UserDto> { ... }
+
+// Only for jobs (any IJob)
+public class RetryBehavior<T> : IPipelineBehavior<T, Unit> where T : IJob { ... }
 ```
 
 Logger output from pipeline behaviors appears in the job detail "Handler Output" section.

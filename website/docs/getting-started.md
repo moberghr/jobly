@@ -4,10 +4,11 @@ sidebar_position: 1
 
 # Getting Started
 
-Jobly is a distributed job processing and message queue library for .NET 10. It provides two patterns:
+Jobly is a distributed job processing and message queue library for .NET 10. It provides three patterns:
 
 - **Messages** (`IMessage`) — Pub/sub queue. Multiple handlers per message, each becomes an independent job.
 - **Jobs** (`IJob`) — Orchestrated background work. Single handler, scheduling, retries, continuations, batches.
+- **Requests** (`IRequest<TResponse>`) — In-memory request/response. Single handler, no persistence, returns a typed response via `IMediator.Send()`.
 
 ## Installation
 
@@ -85,12 +86,27 @@ public class SendEmailHandler : IJobHandler<SendEmailRequest>
 }
 ```
 
-### 6. Publish
+### 6. Define a request (optional)
+
+```csharp
+public class GetUser : IRequest<UserDto> { public int UserId { get; set; } }
+
+public class GetUserHandler : IRequestHandler<GetUser, UserDto>
+{
+    public async Task<UserDto> HandleAsync(GetUser request, CancellationToken ct)
+    {
+        // Query and return
+    }
+}
+```
+
+### 7. Publish & Send
 
 ```csharp
 public class OrderController : ControllerBase
 {
     private readonly IPublisher _publisher;
+    private readonly IMediator _mediator;
     private readonly AppDbContext _context;
 
     public async Task<IActionResult> CreateOrder(Order order)
@@ -102,6 +118,13 @@ public class OrderController : ControllerBase
 
         await _context.SaveChangesAsync(); // Both saved atomically
         return Ok();
+    }
+
+    public async Task<IActionResult> GetUser(int id)
+    {
+        // In-memory request — no database persistence, immediate response
+        var user = await _mediator.Send(new GetUser { UserId = id });
+        return Ok(user);
     }
 }
 ```
