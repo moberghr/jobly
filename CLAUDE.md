@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is Jobly
 
-Jobly is a distributed job processing and message queue library for .NET 10. Two patterns:
+Jobly is a distributed job processing and message queue library for .NET 10. Three patterns:
 
 - **Messages** (`IMessage`) — Pub/sub queue. Multiple handlers per message, each an independent job.
 - **Jobs** (`IJob`) — Orchestrated background work. Single handler, scheduling, retries, continuations, batches, named queues.
+- **Requests** (`IRequest<TResponse>`) — In-memory request/response. Single handler, no database persistence, returns typed response immediately via `IMediator.Send()`.
 
 Ships as NuGet packages (Jobly.Core, Jobly.UI, Jobly.Worker). Supports PostgreSQL and SQL Server.
 
@@ -42,6 +43,7 @@ publisher.Schedule(new SendReport(), tomorrow);           // IJob → scheduled
 publisher.Enqueue(new Task(), queue: "critical");         // Named queue
 publisher.Enqueue(new FollowUp(), parentJobId: id);       // Continuation
 batchPublisher.StartNew(jobs);                            // Kind=Batch job, children linked via ParentJobId
+var user = await mediator.Send(new GetUser(id));          // IRequest<User> → in-memory, returns User
 ```
 
 ### Handler Interfaces
@@ -49,7 +51,38 @@ batchPublisher.StartNew(jobs);                            // Kind=Batch job, chi
 ```csharp
 public interface IMessageHandler<in T> where T : IMessage { Task HandleAsync(T message, CancellationToken ct); }
 public interface IJobHandler<in T> where T : IJob { Task HandleAsync(T message, CancellationToken ct); }
-public interface IPipelineBehavior<in T> where T : class { Task HandleAsync(T message, JobHandlerDelegate next, CancellationToken ct); }
+public interface IRequestHandler<in TRequest, TResponse> where TRequest : IRequest<TResponse> { Task<TResponse> HandleAsync(TRequest request, CancellationToken ct); }
+public interface IPipelineBehavior<in TRequest, TResponse> where TRequest : IRequest<TResponse> { Task<TResponse> HandleAsync(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct); }
+```
+
+### Type Hierarchy
+
+All types implement `IRequest<TResponse>`. `IJob` and `IMessage` return `Unit` (void). `IRequest<TResponse>` returns a custom type.
+
+```csharp
+public interface IRequest<out TResponse>;              // Base — all types implement this
+public interface IJob : IRequest<Unit>;                 // Persistent, single handler
+public interface IMessage : IRequest<Unit>;             // Persistent, multiple handlers
+// IRequest<TResponse> used directly for in-memory     // In-memory, returns TResponse
+```
+
+### In-Memory Requests (IMediator)
+
+Requests are NOT persisted to the database. They execute immediately in-process and return a typed response. Resolved via `IMediator.Send()`. Go through the same unified `IPipelineBehavior<TRequest, TResponse>` pipeline as jobs and messages.
+
+```csharp
+public class GetUser : IRequest<UserDto> { public int Id { get; set; } }
+
+public class GetUserHandler : IRequestHandler<GetUser, UserDto>
+{
+    public async Task<UserDto> HandleAsync(GetUser request, CancellationToken ct)
+    {
+        return await _db.Users.FindAsync(request.Id, ct);
+    }
+}
+
+// Usage:
+var user = await mediator.Send(new GetUser { Id = 1 });
 ```
 
 ### Job Entity
