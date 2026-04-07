@@ -31,7 +31,38 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 Jobly automatically adds its interceptors (row locking) and entity configuration (Job, Message, Batch, etc.) when you register Jobly services in the next step.
 
-### 2. Register Jobly
+### 2. Create the database schema
+
+Jobly adds its tables (Job, JobLog, Server, Worker, etc.) to your DbContext model automatically. You just need to create the schema.
+
+**Using EF Core migrations** (recommended for production):
+
+```bash
+dotnet ef migrations add AddJobly
+dotnet ef database update
+```
+
+The migration will include all Jobly tables alongside your own. When you upgrade the Jobly NuGet package and the schema has changed, just add a new migration:
+
+```bash
+dotnet ef migrations add UpgradeJobly
+dotnet ef database update
+```
+
+EF Core detects the model diff automatically — no manual SQL needed.
+
+**Using EnsureCreatedAsync** (quick start / development):
+
+```csharp
+var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+await context.Database.EnsureCreatedAsync();
+```
+
+:::warning EnsureCreated doesn't support upgrades
+`EnsureCreatedAsync()` creates the schema from scratch but cannot apply incremental changes. Use EF migrations for production deployments where you need to upgrade Jobly versions without dropping the database.
+:::
+
+### 3. Register Jobly
 
 ```csharp
 // Publisher only — for apps that create jobs but don't process them
@@ -39,7 +70,7 @@ builder.Services.AddJobly<AppDbContext>();
 builder.Services.AddJobHandlers(typeof(Program).Assembly);
 ```
 
-### 3. Add a worker (optional)
+### 4. Add a worker (optional)
 
 For apps that process jobs, use `AddJoblyWorker` instead (includes `AddJobly` internally):
 
@@ -51,7 +82,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 });
 ```
 
-### 4. Add the dashboard (optional)
+### 5. Add the dashboard (optional)
 
 ```csharp
 app.UseJoblyUI(); // Serves at /jobly
@@ -72,7 +103,7 @@ app.UseJoblyUI(options =>
 Jobly automatically registers a `TimeProvider` in the DI container if one is not already registered. You do not need to add it yourself.
 :::
 
-### 5. Define handlers
+### 6. Define handlers
 
 ```csharp
 public class SendEmailRequest : IJob { public string Email { get; set; } }
@@ -86,7 +117,7 @@ public class SendEmailHandler : IJobHandler<SendEmailRequest>
 }
 ```
 
-### 6. Define a request (optional)
+### 7. Define a request (optional)
 
 ```csharp
 public class GetUser : IRequest<UserDto> { public int UserId { get; set; } }
@@ -100,7 +131,7 @@ public class GetUserHandler : IRequestHandler<GetUser, UserDto>
 }
 ```
 
-### 7. Publish & Send
+### 8. Publish & Send
 
 ```csharp
 public class OrderController : ControllerBase
