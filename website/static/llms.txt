@@ -1,0 +1,25 @@
+# Jobly
+
+> Distributed job processing, message queue, and in-memory mediator library for .NET 10. Three patterns, one unified pipeline, a real-time dashboard.
+
+Jobly ships as three NuGet packages: Moberg.Jobly.Core (publishing), Moberg.Jobly.Worker (processing), and Moberg.Jobly.UI (dashboard). Supports PostgreSQL and SQL Server. Uses the transactional outbox pattern — jobs are committed atomically with your business data.
+
+## Docs
+
+- [Getting Started](https://moberghr.github.io/jobly/docs/getting-started): Installation, DbContext setup, service registration, first handler
+- [Messages](https://moberghr.github.io/jobly/docs/patterns/messages): Pub/sub IMessage with multiple handlers, fan-out routing
+- [Jobs](https://moberghr.github.io/jobly/docs/patterns/jobs): IJob with scheduling, retries, continuations, batches, named queues, mutex
+- [Requests](https://moberghr.github.io/jobly/docs/patterns/requests): In-memory IRequest<TResponse> via IMediator.Send(), no persistence
+- [Patterns Overview](https://moberghr.github.io/jobly/docs/patterns): Type hierarchy, unified pipeline behaviors
+- [Outbox Pattern](https://moberghr.github.io/jobly/docs/outbox-pattern): Transactional outbox — jobs committed with business data
+- [Crash Recovery](https://moberghr.github.io/jobly/docs/crash-recovery): Sliding invisibility timeout, keep-alive, stale job recovery
+- [Job Tracing](https://moberghr.github.io/jobly/docs/tracing): TraceId and SpawnedByJobId for cross-job flow visibility
+- [Job Cancellation](https://moberghr.github.io/jobly/docs/cancellation): Graceful CancellationMode, handler CancellationToken
+- [Configuration](https://moberghr.github.io/jobly/docs/configuration): Worker, polling, retention, dispatcher mode, worker groups
+- [Recurring Jobs](https://moberghr.github.io/jobly/docs/recurring-jobs): Cron-based scheduling, deduplication, execution history
+- [Dashboard Auth](https://moberghr.github.io/jobly/docs/dashboard-auth): IJoblyAuthorizationFilter, built-in login, cookie auth
+- [Mutex](https://moberghr.github.io/jobly/docs/mutex): ConcurrencyKey-based mutual exclusion for jobs
+
+## Optional
+
+- [Full AI Reference](https://moberghr.github.io/jobly/llms-full.txt): Complete self-contained reference with all patterns, API, configuration, and examples

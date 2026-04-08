@@ -1,0 +1,1043 @@
+# Jobly — Complete AI Reference
+
+> Distributed job processing, message queue, and in-memory mediator library for .NET 10.
+
+Jobly provides three patterns — Messages (pub/sub), Jobs (orchestrated background work), and Requests (in-memory mediator) — through a unified pipeline. It uses the transactional outbox pattern: jobs are committed atomically with business data in the same DbContext. No separate message broker required.
+
+Ships as NuGet packages: Moberg.Jobly.Core, Moberg.Jobly.Worker, Moberg.Jobly.UI. Supports PostgreSQL and SQL Server.
+
+---
+
+## Installation
+
+```bash
+dotnet add package Moberg.Jobly.Core    # Publishing (required)
+dotnet add package Moberg.Jobly.Worker  # Worker service (if processing jobs)
+dotnet add package Moberg.Jobly.UI      # Dashboard (optional)
+```
+
+---
+
+## Setup
+
+### 1. Register DbContext
+
+Register your DbContext normally. Jobly hooks into it automatically:
+
+```csharp
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+```
+
+### 2. Register Jobly
+
+For publisher-only apps (create jobs but don't process them):
+
+```csharp
+builder.Services.AddJobly<AppDbContext>();
+builder.Services.AddJobHandlers(typeof(Program).Assembly);
+```
+
+For worker apps (create AND process jobs):
+
+```csharp
+builder.Services.AddJoblyWorker<AppDbContext>(options =>
+{
+    options.WorkerCount = 10;
+    options.Queues = ["default"];
+    options.PollingInterval = TimeSpan.FromSeconds(1);
+});
+builder.Services.AddJobHandlers(typeof(Program).Assembly);
+```
+
+`AddJoblyWorker` includes `AddJobly` internally — don't call both.
+
+### 3. Create Database Schema
+
+Jobly entities are added to your DbContext model automatically. Use standard EF Core migrations:
+
+```bash
+dotnet ef migrations add AddJobly
+dotnet ef database update
+```
+
+When upgrading the Jobly NuGet package:
+
+```bash
+dotnet ef migrations add UpgradeJobly
+dotnet ef database update
+```
+
+For quick start/development only (does not support upgrades):
+
+```csharp
+await context.Database.EnsureCreatedAsync();
+```
+
+### 4. Add Dashboard (Optional)
+
+```csharp
+app.UseJoblyUI(); // Serves at /jobly
+```
+
+### 5. Complete Minimal Example
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+
+builder.Services.AddJoblyWorker<AppDbContext>(options =>
+{
+    options.WorkerCount = 5;
+    options.Queues = ["default"];
+});
+
+builder.Services.AddJobHandlers(typeof(Program).Assembly);
+
+var app = builder.Build();
+
+app.UseJoblyUI();
+app.Run();
+```
+
+---
+
+## Three Patterns
+
+### Type Hierarchy
+
+All types implement `IRequest<TResponse>`:
+
+```csharp
+public interface IRequest<out TResponse>;     // Base — all types implement this
+public interface IJob : IRequest<Unit>;        // Persistent, single handler
+public interface IMessage : IRequest<Unit>;    // Persistent, multiple handlers
+// IRequest<TResponse> used directly           // In-memory, returns TResponse
+```
+
+| Pattern | Interface | Persistence | Handlers | Response | Dispatch |
+|---------|-----------|-------------|----------|----------|----------|
+| Messages | `IMessage` | Database | Multiple | Unit | `publisher.Publish()` |
+| Jobs | `IJob` | Database | Single | Unit | `publisher.Enqueue()` / `Schedule()` |
+| Requests | `IRequest<T>` | In-memory | Single | Typed `T` | `mediator.Send()` |
+
+---
+
+## Pattern 1: Messages (Pub/Sub)
+
+Messages implement `IMessage` and have multiple handlers. Each handler becomes an independent, retryable job.
+
+### Define a message and handlers
+
+```csharp
+public class OrderPlaced : IMessage
+{
+    public int OrderId { get; set; }
+}
+
+public class SendConfirmationEmail : IMessageHandler<OrderPlaced>
+{
+    private readonly ILogger<SendConfirmationEmail> _logger;
+
+    public SendConfirmationEmail(ILogger<SendConfirmationEmail> logger) => _logger = logger;
+
+    public async Task HandleAsync(OrderPlaced message, CancellationToken ct)
+    {
+        _logger.LogInformation("Sending email for order {OrderId}", message.OrderId);
+        // ILogger output is captured and viewable in the dashboard
+    }
+}
+
+public class NotifyWarehouse : IMessageHandler<OrderPlaced>
+{
+    public async Task HandleAsync(OrderPlaced message, CancellationToken ct)
+    {
+        // Runs independently — if email handler fails, this still succeeds
+    }
+}
+```
+
+### Publish
+
+```csharp
+await publisher.Publish(new OrderPlaced { OrderId = 123 });
+await context.SaveChangesAsync(); // Committed atomically with business data
+```
+
+### How message routing works
+
+1. `Publish()` creates a `Job` entity with `Kind = Message` in the database
+2. `MessageRoutingTask` (background task, polls every 1s) discovers all registered `IMessageHandler<T>` implementations
+3. For each handler, a child `Job` is created with `Kind = Job` and the handler pre-assigned
+4. Workers pick up each child job independently
+5. When all children complete, the parent message transitions to `Completed` or `Failed`
+
+---
+
+## Pattern 2: Jobs (Background Work)
+
+Jobs implement `IJob` and have a single handler. They support scheduling, retries, continuations, batches, named queues, and mutex.
+
+### Define a job and handler
+
+```csharp
+public class GenerateReport : IJob
+{
+    public int ReportId { get; set; }
+}
+
+public class GenerateReportHandler : IJobHandler<GenerateReport>
+{
+    private readonly ILogger<GenerateReportHandler> _logger;
+
+    public GenerateReportHandler(ILogger<GenerateReportHandler> logger) => _logger = logger;
+
+    public async Task HandleAsync(GenerateReport message, CancellationToken ct)
+    {
+        _logger.LogInformation("Generating report {ReportId}", message.ReportId);
+        // Handler logs appear in the job's Activity Log on the dashboard
+    }
+}
+```
+
+### Enqueue
+
+```csharp
+await publisher.Enqueue(new GenerateReport { ReportId = 1 });
+await publisher.SaveChangesAsync();
+```
+
+### Schedule for later
+
+```csharp
+await publisher.Schedule(new GenerateReport { ReportId = 1 }, DateTime.UtcNow.AddHours(1));
+await publisher.SaveChangesAsync();
+```
+
+### Retries
+
+```csharp
+await publisher.Enqueue(new GenerateReport { ReportId = 1 }, maxRetries: 3);
+```
+
+Failed jobs are retried automatically. Crash requeues (server died mid-execution) do NOT count against the retry limit.
+
+### Named queues
+
+```csharp
+await publisher.Enqueue(new GenerateReport { ReportId = 1 }, queue: "reports");
+```
+
+Queues are processed in alphabetical order. Use prefixes to control priority:
+
+```csharp
+options.Queues = ["a-critical", "b-default", "c-low"];
+// Workers always pick from a-critical before b-default, etc.
+```
+
+### Continuations
+
+```csharp
+var parentId = await publisher.Enqueue(new ProcessPayment { OrderId = 1 });
+await publisher.Enqueue(new SendReceipt { OrderId = 1 }, parentId); // Runs after parent completes
+await publisher.SaveChangesAsync();
+```
+
+### Batches
+
+```csharp
+var batchPublisher = serviceProvider.GetRequiredService<IBatchPublisher>();
+
+var jobs = orders.Select(o => new ProcessOrder { OrderId = o.Id }).ToList();
+var batchId = await batchPublisher.StartNew(jobs);
+await batchPublisher.SaveChangesAsync();
+
+// Continuation after batch completes
+var followUps = new List<SendSummary> { new() };
+await batchPublisher.ContinueBatchWith(followUps, batchId);
+await batchPublisher.SaveChangesAsync();
+```
+
+#### ContinuationOptions
+
+```csharp
+// Default: continuation fires only when ALL jobs succeed
+await batchPublisher.StartNew(jobs, options: ContinuationOptions.OnlyOnSucceeded);
+
+// Fire when all jobs finish, regardless of success/failure
+await batchPublisher.StartNew(jobs, options: ContinuationOptions.OnAnyFinishedState);
+```
+
+With `OnlyOnSucceeded` (default): if any job fails, the batch transitions to `Failed` and continuations stay in `Awaiting` state. You can requeue failed jobs from the dashboard.
+
+With `OnAnyFinishedState`: continuations fire as soon as all jobs reach a terminal state.
+
+### Mutex (concurrency control)
+
+Only one job per mutex key can be processing at a time:
+
+```csharp
+await publisher.Enqueue(
+    new ProcessPayment { CustomerId = 123 },
+    new JobParameters { Mutex = "payment:123" });
+```
+
+If a worker picks up a job whose mutex is already held by another processing job, the new job is cancelled automatically. Jobs without a mutex skip the check entirely (zero overhead).
+
+### JobParameters
+
+For full control, pass a `JobParameters` object:
+
+```csharp
+await publisher.Enqueue(new MyJob(), new JobParameters
+{
+    MaxRetries = 3,
+    Queue = "critical",
+    Mutex = "my-resource-key",
+    ScheduleTime = DateTime.UtcNow.AddMinutes(30),
+    ParentId = parentJobId,  // continuation
+});
+```
+
+---
+
+## Pattern 3: Requests (In-Memory Mediator)
+
+Requests implement `IRequest<TResponse>` and execute immediately in-process. No database, no worker, no retries.
+
+### Define a request and handler
+
+```csharp
+public class GetUser : IRequest<UserDto>
+{
+    public int UserId { get; set; }
+}
+
+public class GetUserHandler : IRequestHandler<GetUser, UserDto>
+{
+    private readonly AppDbContext _db;
+
+    public GetUserHandler(AppDbContext db) => _db = db;
+
+    public async Task<UserDto> HandleAsync(GetUser request, CancellationToken ct)
+    {
+        var user = await _db.Users.FindAsync(request.UserId, ct);
+        return new UserDto { Id = user.Id, Name = user.Name };
+    }
+}
+```
+
+### Send via IMediator
+
+```csharp
+public class UserController : ControllerBase
+{
+    private readonly IMediator _mediator;
+
+    public async Task<IActionResult> GetUser(int id)
+    {
+        var user = await _mediator.Send(new GetUser { UserId = id });
+        return Ok(user);
+    }
+}
+```
+
+### Key differences from Jobs/Messages
+
+- Requests are NOT persisted to the database
+- They execute immediately in-process, returning `TResponse` directly
+- Errors bubble up to the caller (no automatic retries)
+- Not visible in the dashboard
+- Use `IMediator.Send()`, not `IPublisher.Enqueue()`
+
+---
+
+## Transactional Outbox Pattern
+
+Jobs are created inside the same database transaction as your business data. A single `SaveChangesAsync()` commits everything atomically.
+
+```csharp
+public async Task<IActionResult> PlaceOrder(CreateOrderRequest request)
+{
+    var order = new Order { CustomerId = request.CustomerId };
+    _context.Orders.Add(order);
+
+    // These jobs are written to the same DbContext — not yet committed
+    await _publisher.Enqueue(new SendConfirmationEmail { OrderId = order.Id });
+    await _publisher.Publish(new OrderPlaced { OrderId = order.Id });
+
+    // Single SaveChangesAsync commits the order AND all jobs atomically
+    await _context.SaveChangesAsync();
+    return Ok(order.Id);
+}
+```
+
+If `SaveChangesAsync()` fails, both the order and the jobs roll back. No orphaned jobs.
+
+### DbContext must be Scoped
+
+The publisher and your application code must share the same DbContext instance. Register your DbContext as Scoped (the EF Core default). Do NOT use Transient lifetime.
+
+### With explicit transactions
+
+```csharp
+await using var transaction = await context.Database.BeginTransactionAsync();
+
+context.Orders.Add(order);
+await publisher.Enqueue(new ProcessOrder { OrderId = order.Id });
+
+await context.SaveChangesAsync();
+await transaction.CommitAsync(); // Jobs visible to workers only after commit
+```
+
+---
+
+## Pipeline Behaviors
+
+A unified pipeline wraps all handler invocations — jobs, messages, and requests. Implement `IPipelineBehavior<TRequest, TResponse>` for cross-cutting concerns:
+
+```csharp
+public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
+{
+    private readonly ILogger<LoggingBehavior<TRequest, TResponse>> _logger;
+
+    public LoggingBehavior(ILogger<LoggingBehavior<TRequest, TResponse>> logger) => _logger = logger;
+
+    public async Task<TResponse> HandleAsync(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken ct)
+    {
+        _logger.LogInformation("Handling {RequestType}", typeof(TRequest).Name);
+        var response = await next();
+        _logger.LogInformation("Handled {RequestType}", typeof(TRequest).Name);
+        return response;
+    }
+}
+```
+
+### Registration
+
+Auto-scan an assembly:
+
+```csharp
+builder.Services.AddPipelineBehaviors(typeof(Program).Assembly);
+```
+
+Or register manually:
+
+```csharp
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+```
+
+### Targeting specific types
+
+```csharp
+// Only for GetUser requests
+public class CacheBehavior : IPipelineBehavior<GetUser, UserDto> { ... }
+
+// Only for jobs (any IJob)
+public class RetryBehavior<T> : IPipelineBehavior<T, Unit> where T : IJob { ... }
+```
+
+For jobs and messages, `TResponse` is `Unit`. Behaviors execute in registration order, outermost first.
+
+---
+
+## Recurring Jobs
+
+Register a cron-based recurring job:
+
+```csharp
+var recurringPublisher = serviceProvider.GetRequiredService<IRecurringJobPublisher>();
+
+await recurringPublisher.AddOrUpdateRecurringJob(
+    new CleanupSessions(),
+    name: "session-cleanup",
+    cron: "0 * * * *");  // Every hour
+```
+
+`AddOrUpdateRecurringJob` only registers the definition — it does NOT create a job. The `RecurringJobSchedulerTask` background task creates jobs when the cron time arrives.
+
+### Cron expressions
+
+Standard 5-part (minute, hour, day, month, weekday) and 6-part with seconds:
+
+```
+* * * * *       Every minute
+0 * * * *       Every hour
+0 9 * * *       Daily at 9 AM
+0 0 * * 1       Every Monday at midnight
+*/5 * * * *     Every 5 minutes
+0 9 * * 1-5     Weekdays at 9 AM
+```
+
+### Update
+
+Call `AddOrUpdateRecurringJob` again with the same name:
+
+```csharp
+await recurringPublisher.AddOrUpdateRecurringJob(
+    new CleanupSessions(),
+    name: "session-cleanup",
+    cron: "*/30 * * * *");  // Changed to every 30 minutes
+```
+
+### Manual trigger
+
+```csharp
+var svc = serviceProvider.GetRequiredService<IRecurringJobService>();
+await svc.TriggerRecurringJob(id);
+```
+
+### Delete
+
+```csharp
+await recurringJobService.DeleteRecurringJob(id);
+```
+
+### Deduplication
+
+Before creating a new job, the scheduler checks if the most recent execution is still Enqueued or Processing. If so, it skips — no duplicate jobs.
+
+---
+
+## Job Cancellation
+
+Jobly uses graceful cancellation. When you cancel a processing job, the handler gets a chance to stop cleanly.
+
+### Cancel a job
+
+```csharp
+await jobCommandService.DeleteJob(jobId);
+```
+
+### Flow
+
+1. `DeleteJob` sets `CancellationMode = Graceful` (state stays `Processing`)
+2. `RunJobMonitor` detects it and cancels the handler's `CancellationToken`
+3. If handler respects the token: state becomes `Deleted`
+4. If handler completes despite cancellation: state becomes `Completed` (work happened)
+
+### Writing cancellable handlers
+
+```csharp
+public class LongRunningHandler : IJobHandler<LongRunningJob>
+{
+    public async Task HandleAsync(LongRunningJob message, CancellationToken ct)
+    {
+        foreach (var item in items)
+        {
+            ct.ThrowIfCancellationRequested();
+            await ProcessItem(item);
+        }
+    }
+}
+```
+
+---
+
+## Crash Recovery
+
+Jobly uses a sliding invisibility timeout to detect and recover from worker crashes.
+
+1. When a worker picks up a job, it sets `LastKeepAlive = now`
+2. During execution, keep-alive is refreshed every `InvisibilityTimeout / 5` (default: every 60s with a 5-minute timeout)
+3. If the worker crashes, the keep-alive stops
+4. After `InvisibilityTimeout` (default 5 minutes), the job is requeued automatically
+5. Crash requeues do NOT count against `MaxRetries`
+
+---
+
+## Job Tracing
+
+Every job gets two trace fields:
+
+- `TraceId` — All related jobs share this ID. The first job creates it.
+- `SpawnedByJobId` — Direct "who created me" link.
+
+When a handler creates new jobs, they automatically inherit the trace via `AsyncLocal` context:
+
+```csharp
+public class ProcessOrderHandler : IJobHandler<ProcessOrder>
+{
+    private readonly IBatchPublisher _batchPublisher;
+
+    public async Task HandleAsync(ProcessOrder message, CancellationToken ct)
+    {
+        // These jobs automatically inherit the trace from ProcessOrder
+        var items = orders.Select(i => new ShipItem { ItemId = i.Id }).ToList();
+        await _batchPublisher.StartNew(items);
+    }
+}
+```
+
+---
+
+## Configuration Reference
+
+### Core Configuration (AddJobly)
+
+```csharp
+builder.Services.AddJobly<AppDbContext>(options =>
+{
+    options.RetryCount = 3;                                    // Default max retries (default: 0)
+    options.DefaultQueue = "default";                          // Default queue name (default: "default")
+    options.JobExpirationTimeout = TimeSpan.FromDays(1);       // Completed/deleted job retention (default: 1 day)
+});
+```
+
+### Worker Configuration (AddJoblyWorker)
+
+```csharp
+builder.Services.AddJoblyWorker<AppDbContext>(options =>
+{
+    // Worker
+    options.WorkerCount = 10;                                  // Concurrent workers (default: min(CPU*5, 20))
+    options.PollingInterval = TimeSpan.FromSeconds(1);         // Poll delay when idle (default: 1s)
+    options.Queues = ["a-critical", "b-default", "c-low"];     // Subscribed queues (default: ["default"])
+
+    // Dispatcher mode (batch-fetch instead of per-worker polling)
+    options.UseDispatcher = false;                             // default: false
+
+    // Cancellation
+    options.CancellationCheckInterval = TimeSpan.FromSeconds(5); // default: 5s
+
+    // Server identity
+    options.ServerName = "my-api-server";                      // Dashboard display name
+    options.ServerId = Guid.NewGuid();                          // Auto-generated
+
+    // Health & crash recovery
+    options.HealthCheckInterval = TimeSpan.FromSeconds(10);    // default: 10s
+    options.HealthCheckTimeout = TimeSpan.FromMinutes(5);      // Server considered dead after this (default: 5m)
+    options.InvisibilityTimeout = TimeSpan.FromMinutes(5);     // Stale job requeue threshold (default: 5m)
+
+    // Job retention
+    options.JobExpirationTimeout = TimeSpan.FromDays(1);       // default: 1 day
+    options.ExpirationBatchSize = 1000;                        // default: 1000
+    options.MaxExpirableJobCount = null;                        // null = unlimited (default: null)
+
+    // Background task intervals
+    options.OrchestrationInterval = TimeSpan.FromSeconds(10);
+    options.MessageRoutingInterval = TimeSpan.FromSeconds(1);
+    options.CounterAggregationInterval = TimeSpan.FromSeconds(5);
+    options.ServerCleanupInterval = TimeSpan.FromSeconds(30);
+    options.StaleJobRecoveryInterval = TimeSpan.FromSeconds(30);
+    options.ExpirationCleanupInterval = TimeSpan.FromSeconds(60);
+
+    // Inherited from JoblyConfiguration
+    options.RetryCount = 3;
+    options.DefaultQueue = "default";
+});
+```
+
+### Worker Groups
+
+Split workers into groups with independent queues and polling intervals:
+
+```csharp
+builder.Services.AddJoblyWorker<AppDbContext>(options =>
+{
+    // Top-level settings become the first worker group
+    options.WorkerCount = 5;
+    options.Queues = ["critical"];
+    options.PollingInterval = TimeSpan.FromMilliseconds(100);
+
+    // Additional group
+    options.AddWorkerGroup(group =>
+    {
+        group.WorkerCount = 2;
+        group.Queues = ["reports", "default"];
+        group.PollingInterval = TimeSpan.FromSeconds(5);
+    });
+});
+// Creates 7 workers total: 5 on "critical" @ 100ms, 2 on "reports"/"default" @ 5s
+```
+
+### Dashboard Configuration
+
+```csharp
+app.UseJoblyUI(options =>
+{
+    options.Authorization = new MyAuthFilter();
+    options.UnauthorizedRedirectUrl = "/login";   // optional redirect for browsers
+});
+```
+
+---
+
+## Dashboard Authorization
+
+By default, the dashboard is open. Two approaches to restrict access:
+
+### Custom auth filter
+
+Use your existing authentication:
+
+```csharp
+public class MyAuthFilter : IJoblyAuthorizationFilter
+{
+    public bool Authorize(HttpContext httpContext)
+    {
+        return httpContext.User.Identity?.IsAuthenticated == true
+            && httpContext.User.IsInRole("Admin");
+    }
+}
+
+app.UseJoblyUI(options =>
+{
+    options.Authorization = new MyAuthFilter();
+    options.UnauthorizedRedirectUrl = "/login";
+});
+```
+
+`UseJoblyUI()` must come AFTER `UseAuthentication()` and `UseAuthorization()` in the pipeline.
+
+### Built-in login
+
+Jobly serves its own login page and manages session via HTTP-only signed cookie:
+
+```csharp
+builder.Services.AddDataProtection();
+builder.Services.AddScoped<IJoblyCredentialValidator, MyCredentialValidator>();
+
+app.UseJoblyUI(options =>
+{
+    options.UseBuiltInLogin<MyCredentialValidator>();
+});
+```
+
+```csharp
+public class MyCredentialValidator : IJoblyCredentialValidator
+{
+    private readonly AppDbContext _db;
+
+    public MyCredentialValidator(AppDbContext db) => _db = db;
+
+    public async Task<bool> ValidateAsync(string username, string password)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username);
+        return user != null && BCrypt.Verify(password, user.PasswordHash);
+    }
+}
+```
+
+### Localhost-only filter (built-in)
+
+```csharp
+options.Authorization = new LocalRequestsOnlyAuthorizationFilter();
+```
+
+---
+
+## Job Retention
+
+- Completed/Deleted jobs: auto-expire after `JobExpirationTimeout` (default 1 day)
+- Failed jobs: NEVER auto-expire (manual intervention required)
+- Optional count-based cleanup: `MaxExpirableJobCount` deletes oldest by ExpireAt when threshold exceeded
+- Statistics survive job deletion (persistent counters)
+- Recurring job logs: last 100 per recurring job retained
+
+---
+
+## DI Services Available
+
+After calling `AddJobly<TContext>()` or `AddJoblyWorker<TContext>()`, these services are available via dependency injection:
+
+| Service | Purpose |
+|---------|---------|
+| `IPublisher` | Enqueue jobs, publish messages, schedule jobs |
+| `IMediator` | Send in-memory requests |
+| `IBatchPublisher` | Create batches with continuations |
+| `IRecurringJobPublisher` | Register/update recurring job definitions |
+| `IJobQueryService` | Query jobs, job details, traces |
+| `IJobCommandService` | Delete, requeue, bulk operations on jobs |
+| `IJobGroupQueryService` | Query messages and batches |
+| `IRecurringJobService` | Trigger, delete recurring jobs, query history |
+| `IDashboardStatsService` | Dashboard statistics, server/worker info |
+| `TimeProvider` | Injectable time (registered as `TimeProvider.System` by default, override in tests) |
+
+---
+
+## Public API Reference
+
+### Handler Interfaces
+
+```csharp
+// Base request — all types implement this
+public interface IRequest<out TResponse>;
+
+// Job marker — persistent, single handler
+public interface IJob : IRequest<Unit>;
+
+// Message marker — persistent, multiple handlers
+public interface IMessage : IRequest<Unit>;
+
+// Handler for jobs
+public interface IJobHandler<in T> where T : IJob
+{
+    Task HandleAsync(T message, CancellationToken cancellationToken);
+}
+
+// Handler for messages
+public interface IMessageHandler<in T> where T : IMessage
+{
+    Task HandleAsync(T message, CancellationToken cancellationToken);
+}
+
+// Handler for requests
+public interface IRequestHandler<in TRequest, TResponse> where TRequest : IRequest<TResponse>
+{
+    Task<TResponse> HandleAsync(TRequest request, CancellationToken cancellationToken);
+}
+
+// Pipeline behavior — wraps all handler types
+public interface IPipelineBehavior<in TRequest, TResponse> where TRequest : IRequest<TResponse>
+{
+    Task<TResponse> HandleAsync(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken);
+}
+```
+
+### IPublisher
+
+The most common overloads are shown below. For full control, use the `JobParameters` overload which accepts all options in a single call.
+
+```csharp
+public interface IPublisher
+{
+    // Messages (pub/sub)
+    Task<Guid> Publish<T>(T message) where T : class, IMessage;
+    Task<Guid> Publish<T>(T message, string? queue) where T : class, IMessage;
+
+    // Jobs — common overloads (additional combinations of maxRetries, queue, parentJobId exist)
+    Task<Guid> Enqueue<T>(T job) where T : class, IJob;
+    Task<Guid> Enqueue<T>(T job, int maxRetries) where T : class, IJob;
+    Task<Guid> Enqueue<T>(T job, Guid parentJobId) where T : class, IJob;
+    Task<Guid> Enqueue<T>(T job, string queue) where T : class, IJob;
+    Task<Guid> Enqueue<T>(T job, JobParameters parameters) where T : class, IJob;  // Full control
+    Task<Guid> Schedule<T>(T job, DateTime scheduleTime) where T : class, IJob;
+
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
+}
+```
+
+Note: `publisher.SaveChangesAsync()` and `context.SaveChangesAsync()` flush the same underlying DbContext — they are interchangeable. Use whichever is available. The outbox pattern examples use `context.SaveChangesAsync()` to emphasize that jobs and business data are committed together.
+
+### IMediator
+
+```csharp
+public interface IMediator
+{
+    Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default);
+}
+```
+
+### IBatchPublisher
+
+```csharp
+public interface IBatchPublisher
+{
+    Task<Guid> StartNew<T>(List<T> jobs, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded) where T : class, IJob;
+    Task<Guid> ContinueBatchWith<T>(List<T> jobs, Guid parentId, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded) where T : class, IJob;
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
+}
+```
+
+### IRecurringJobPublisher
+
+```csharp
+public interface IRecurringJobPublisher
+{
+    Task AddOrUpdateRecurringJob<T>(T message, string name, string cron) where T : class, IJob;
+}
+```
+
+### IJoblyAuthorizationFilter
+
+```csharp
+public interface IJoblyAuthorizationFilter
+{
+    bool Authorize(HttpContext httpContext);
+}
+```
+
+### IJoblyCredentialValidator
+
+```csharp
+public interface IJoblyCredentialValidator
+{
+    Task<bool> ValidateAsync(string username, string password);
+}
+```
+
+### JobParameters
+
+```csharp
+public class JobParameters
+{
+    public int? MaxRetries { get; set; }
+    public string? Queue { get; set; }
+    public string? Mutex { get; set; }
+    public DateTime? ScheduleTime { get; set; }
+    public Guid? ParentId { get; set; }
+}
+```
+
+### Enums
+
+```csharp
+public enum State { Enqueued = 1, Awaiting = 2, Processing = 3, Completed = 4, Failed = 5, Deleted = 6 }
+public enum ContinuationOptions { OnlyOnSucceeded = 1, OnAnyFinishedState = 2 }
+public enum JobKind { Job = 1, Message = 2, Batch = 3 }
+public enum CancellationMode { None = 0, Graceful = 1 }
+```
+
+### Extension Methods
+
+```csharp
+// Core registration
+IServiceCollection.AddJobly<TContext>();
+IServiceCollection.AddJobly<TContext>(Action<JoblyConfiguration> options);
+
+// Worker registration (includes AddJobly internally)
+IServiceCollection.AddJoblyWorker<TContext>();
+IServiceCollection.AddJoblyWorker<TContext>(Action<JoblyWorkerConfiguration> options);
+
+// Handler scanning
+IServiceCollection.AddJobHandlers(Assembly assembly);        // IJobHandler<>, IMessageHandler<>, IRequestHandler<,>
+IServiceCollection.AddPipelineBehaviors(Assembly assembly);  // IPipelineBehavior<,>
+
+// Dashboard
+WebApplication.UseJoblyUI();
+WebApplication.UseJoblyUI(Action<JoblyUIOptions> setupAction);
+```
+
+---
+
+## Common Patterns
+
+### Controller with all three patterns
+
+```csharp
+public class OrderController : ControllerBase
+{
+    private readonly IPublisher _publisher;
+    private readonly IMediator _mediator;
+    private readonly AppDbContext _context;
+
+    public OrderController(IPublisher publisher, IMediator mediator, AppDbContext context)
+    {
+        _publisher = publisher;
+        _mediator = mediator;
+        _context = context;
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateOrder(CreateOrderRequest request)
+    {
+        // In-memory request for validation
+        var isValid = await _mediator.Send(new ValidateOrder { Data = request });
+        if (!isValid) return BadRequest();
+
+        var order = new Order { CustomerId = request.CustomerId };
+        _context.Orders.Add(order);
+
+        // Background job
+        await _publisher.Enqueue(new SendConfirmationEmail { OrderId = order.Id });
+
+        // Pub/sub message — multiple handlers
+        await _publisher.Publish(new OrderPlaced { OrderId = order.Id });
+
+        // All committed atomically
+        await _context.SaveChangesAsync();
+        return Ok(order.Id);
+    }
+}
+```
+
+### Validation pipeline behavior
+
+```csharp
+public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
+{
+    private readonly IEnumerable<IValidator<TRequest>> _validators;
+
+    public ValidationBehavior(IEnumerable<IValidator<TRequest>> validators) => _validators = validators;
+
+    public async Task<TResponse> HandleAsync(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken ct)
+    {
+        var failures = _validators
+            .Select(v => v.Validate(request))
+            .SelectMany(r => r.Errors)
+            .Where(f => f != null)
+            .ToList();
+
+        if (failures.Count > 0)
+            throw new ValidationException(failures);
+
+        return await next();
+    }
+}
+```
+
+### Batch with continuation
+
+```csharp
+public async Task ProcessMonthlyReports(List<int> months)
+{
+    var jobs = months.Select(m => new GenerateReport { Month = m }).ToList();
+    var batchId = await _batchPublisher.StartNew(jobs, options: ContinuationOptions.OnAnyFinishedState);
+
+    var summary = new List<SendReportSummary> { new() };
+    await _batchPublisher.ContinueBatchWith(summary, batchId);
+
+    await _batchPublisher.SaveChangesAsync();
+    // All individual reports run in parallel, then SendReportSummary fires when all finish
+}
+```
+
+### Separate publisher and worker apps
+
+Publisher app (web API):
+
+```csharp
+// Only creates jobs, doesn't process them
+builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connStr));
+builder.Services.AddJobly<AppDbContext>();
+builder.Services.AddJobHandlers(typeof(Program).Assembly);
+```
+
+Worker app (background service):
+
+```csharp
+// Only processes jobs
+builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connStr));
+builder.Services.AddJoblyWorker<AppDbContext>(options =>
+{
+    options.WorkerCount = 20;
+    options.Queues = ["default"];
+});
+builder.Services.AddJobHandlers(typeof(SharedHandlers).Assembly);
+```
+
+Both apps share the same database. The worker polls for and executes jobs created by the publisher.
+
+---
+
+## Key Design Rules
+
+1. **DbContext must be Scoped** (not Transient) — required for the outbox pattern to work
+2. **Call SaveChangesAsync()** after publishing — jobs are not committed until you save
+3. **Failed jobs never auto-delete** — they persist until manually handled
+4. **Queue order is alphabetical** — use prefixes like "a-", "b-", "c-" for priority
+5. **AddJoblyWorker includes AddJobly** — don't call both
+6. **UseJoblyUI after auth middleware** — so HttpContext.User is populated
+7. **TimeProvider is injectable** — use it for testability, Jobly registers TimeProvider.System by default
+8. **Handler ILogger output is captured** — logs appear in the job's activity log on the dashboard
