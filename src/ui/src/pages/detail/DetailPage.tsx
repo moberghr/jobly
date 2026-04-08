@@ -39,6 +39,11 @@ function getDuration(logs: JobLogModel[], currentIndex: number): string | null {
   return formatDuration(current - previous);
 }
 
+function formatJson(raw: string): string {
+  try { return JSON.stringify(JSON.parse(raw), null, 2); }
+  catch { return raw; }
+}
+
 function kindLabel(kind: number) {
   if (kind === 3) return 'Batch';
   if (kind === 2) return 'Message';
@@ -118,12 +123,22 @@ export default function DetailPage() {
             </Card>
           )}
 
-          {/* Payload */}
-          {job.message && (
+          {/* Payload & Metadata */}
+          {(job.message || (job.metadata && Object.keys(job.metadata).length > 0)) && (
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Payload</CardTitle></CardHeader>
-              <CardContent>
-                <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">{job.message}</pre>
+              <CardContent className="pt-4 space-y-4">
+                {job.message && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Payload</h3>
+                    <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">{formatJson(job.message)}</pre>
+                  </div>
+                )}
+                {job.metadata && Object.keys(job.metadata).length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Metadata</h3>
+                    <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">{JSON.stringify(job.metadata, null, 2)}</pre>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

@@ -153,9 +153,9 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     // --- Fix #5: Model metadata caching ---
 
     [Fact]
-    public void JobDetailModel_Metadata_CachedAcrossAccesses()
+    public void UnifiedJobDetailModel_Metadata_CachedAcrossAccesses_1()
     {
-        var model = new JobDetailModel { MetadataJson = """{"key":"value"}""" };
+        var model = new UnifiedJobDetailModel { MetadataJson = """{"key":"value"}""" };
 
         var first = model.Metadata;
         var second = model.Metadata;
@@ -179,9 +179,9 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     [Fact]
-    public void JobDetailModel_NullMetadataJson_ReturnsNull()
+    public void UnifiedJobDetailModel_NullMetadataJson_ReturnsNull()
     {
-        var model = new JobDetailModel { MetadataJson = null };
+        var model = new UnifiedJobDetailModel { MetadataJson = null };
         model.Metadata.ShouldBeNull();
     }
 
