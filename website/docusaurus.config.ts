@@ -24,6 +24,27 @@ const config: Config = {
     locales: ['en'],
   },
 
+  headTags: [
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'alternate',
+        type: 'text/plain',
+        title: 'LLM-friendly docs',
+        href: '/jobly/llms.txt',
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'alternate',
+        type: 'text/plain',
+        title: 'LLM-friendly full reference',
+        href: '/jobly/llms-full.txt',
+      },
+    },
+  ],
+
   presets: [
     [
       'classic',
@@ -77,6 +98,8 @@ const config: Config = {
           title: 'More',
           items: [
             { label: 'GitHub', href: 'https://github.com/moberghr/jobly' },
+            { label: 'AI Docs (llms.txt)', href: 'pathname:///jobly/llms.txt' },
+            { label: 'AI Full Reference', href: 'pathname:///jobly/llms-full.txt' },
           ],
         },
       ],
