@@ -53,12 +53,6 @@ public static class JoblyEndpoints
 
         apiGroup.MapGet("jobs/deleted", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobsList(request, State.Deleted));
 
-        apiGroup.MapGet("jobs/{jobId}", async ([FromServices] IJobQueryService jobQueryService, Guid jobId) =>
-        {
-            var model = await jobQueryService.GetJobById(jobId);
-            return model is null ? Results.NotFound() : Results.Ok(model);
-        });
-
         apiGroup.MapGet("jobs/{jobId}/siblings", async ([FromServices] IJobQueryService jobQueryService, Guid jobId, [AsParameters] BaseListRequest request) => await jobQueryService.GetSiblingJobs(jobId, request));
 
         apiGroup.MapGet("jobs/{jobId}/children", async ([FromServices] IJobQueryService jobQueryService, Guid jobId, [AsParameters] BaseListRequest request) => await jobQueryService.GetChildJobs(jobId, request));
@@ -106,12 +100,6 @@ public static class JoblyEndpoints
         apiGroup.MapPost("recurring/{id}/trigger", async ([FromServices] IRecurringJobService recurringJobService, int id) => await recurringJobService.TriggerRecurringJob(id));
 
         apiGroup.MapDelete("recurring/{id}", async ([FromServices] IRecurringJobService recurringJobService, int id) => await recurringJobService.DeleteRecurringJob(id));
-
-        apiGroup.MapGet("jobs/{jobId}/logs", async ([FromServices] IJobQueryService jobQueryService, Guid jobId) =>
-        {
-            var job = await jobQueryService.GetJobById(jobId);
-            return job?.Logs ?? [];
-        });
 
         apiGroup.MapGet("batches", async ([FromServices] IJobGroupQueryService svc, [AsParameters] BaseListRequest request, string? state) => await svc.GetJobGroups(JobKind.Batch, request, state));
 

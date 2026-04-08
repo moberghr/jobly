@@ -142,6 +142,23 @@ export default function DetailPage() {
             </CardContent>
           </Card>
 
+          {/* Metadata */}
+          {job.metadata && Object.keys(job.metadata).length > 0 && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Metadata</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-1 text-sm">
+                  {Object.entries(job.metadata).map(([key, value]) => (
+                    <div key={key} className="flex gap-2">
+                      <span className="text-muted-foreground shrink-0">{key}:</span>
+                      <span className="font-mono text-xs break-all">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Flow */}
           <FlowCard
             jobId={job.id}
