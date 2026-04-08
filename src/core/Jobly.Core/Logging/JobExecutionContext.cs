@@ -5,6 +5,8 @@ public class JobExecutionInfo
     public Guid JobId { get; set; }
 
     public Guid TraceId { get; set; }
+
+    public string? MetadataJson { get; set; }
 }
 
 public static class JobExecutionContext

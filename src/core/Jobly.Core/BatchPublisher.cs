@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
@@ -6,16 +7,17 @@ using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
 using Jobly.Core.Logging;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Jobly.Core;
 
 public interface IBatchPublisher
 {
-    Task<Guid> StartNew<T>(List<T> batchJobMessages, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded)
+    Task<Guid> StartNew<T>(List<T> batchJobMessages, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded, Dictionary<string, string>? metadata = null)
         where T : class, IJob;
 
-    Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded)
+    Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded, Dictionary<string, string>? metadata = null)
         where T : class, IJob;
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
@@ -27,27 +29,29 @@ public class BatchPublisher<TContext> : IBatchPublisher
     private readonly TContext _context;
     private readonly JoblyConfiguration _joblyConfiguration;
     private readonly TimeProvider _timeProvider;
+    private readonly IServiceProvider _serviceProvider;
 
-    public BatchPublisher(TContext context, IOptions<JoblyConfiguration> configuration, TimeProvider timeProvider)
+    public BatchPublisher(TContext context, IOptions<JoblyConfiguration> configuration, TimeProvider timeProvider, IServiceProvider serviceProvider)
     {
         _context = context;
         _joblyConfiguration = configuration.Value;
         _timeProvider = timeProvider;
+        _serviceProvider = serviceProvider;
     }
 
-    public async Task<Guid> StartNew<T>(List<T> batchJobMessages, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded)
+    public async Task<Guid> StartNew<T>(List<T> batchJobMessages, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded, Dictionary<string, string>? metadata = null)
         where T : class, IJob
     {
-        return await BaseCreateBatch(batchJobMessages, State.Enqueued, null, name, options);
+        return await BaseCreateBatch(batchJobMessages, State.Enqueued, null, name, options, metadata);
     }
 
-    public async Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded)
+    public async Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded, Dictionary<string, string>? metadata = null)
         where T : class, IJob
     {
-        return await BaseCreateBatch(batchJobMessages, State.Awaiting, parentId, name, options);
+        return await BaseCreateBatch(batchJobMessages, State.Awaiting, parentId, name, options, metadata);
     }
 
-    private async Task<Guid> BaseCreateBatch<T>(List<T> batchJobMessages, State batchJobsState, Guid? parentId, string? name, ContinuationOptions options)
+    private async Task<Guid> BaseCreateBatch<T>(List<T> batchJobMessages, State batchJobsState, Guid? parentId, string? name, ContinuationOptions options, Dictionary<string, string>? adHocMetadata = null)
         where T : class, IJob
     {
         if (batchJobMessages == null || batchJobMessages.Count == 0)
@@ -71,7 +75,11 @@ public class BatchPublisher<TContext> : IBatchPublisher
             ContinuationOptions = options,
         };
 
-        var batchChildJobs = batchJobMessages.ConvertAll(x => JobHelper.CreateJob(x, 0, null, null, _joblyConfiguration.DefaultQueue, batchJob.Id, batchJobsState, now));
+        // Run publish pipeline once for the child type — all children get the same metadata
+        var metadata = await RunPublishPipeline(batchJobMessages[0], adHocMetadata);
+        var serializedMetadata = metadata.Count > 0 ? JsonSerializer.Serialize(metadata) : null;
+
+        var batchChildJobs = batchJobMessages.ConvertAll(x => JobHelper.CreateJob(x, 0, null, null, _joblyConfiguration.DefaultQueue, batchJob.Id, batchJobsState, now, metadata: serializedMetadata));
 
         // Propagate trace: execution context > parent's trace > self
         var executionContext = JobExecutionContext.Current;
@@ -141,5 +149,52 @@ public class BatchPublisher<TContext> : IBatchPublisher
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<Dictionary<string, string>> RunPublishPipeline<T>(T job, Dictionary<string, string>? seed = null, CancellationToken ct = default)
+    {
+        var metadata = new Dictionary<string, string>();
+
+        // Seed with inherited metadata from parent execution context
+        var executionContext = JobExecutionContext.Current;
+        if (executionContext?.MetadataJson != null)
+        {
+            var inherited = JsonSerializer.Deserialize<Dictionary<string, string>>(executionContext.MetadataJson);
+            if (inherited != null)
+            {
+                foreach (var kvp in inherited)
+                {
+                    metadata[kvp.Key] = kvp.Value;
+                }
+            }
+        }
+
+        // Seed with ad-hoc metadata (overrides inherited)
+        if (seed != null)
+        {
+            foreach (var kvp in seed)
+            {
+                metadata[kvp.Key] = kvp.Value;
+            }
+        }
+
+        var context = new PublishContext<T> { Job = job, Metadata = metadata };
+
+        var behaviors = _serviceProvider.GetServices<IPublishPipelineBehavior<T>>().ToArray();
+        if (behaviors.Length == 0)
+        {
+            return metadata;
+        }
+
+        PublishDelegate chain = () => Task.CompletedTask;
+        for (var i = behaviors.Length - 1; i >= 0; i--)
+        {
+            var behavior = behaviors[i];
+            var next = chain;
+            chain = () => behavior.PublishAsync(context, next, ct);
+        }
+
+        await chain();
+        return context.Metadata;
     }
 }

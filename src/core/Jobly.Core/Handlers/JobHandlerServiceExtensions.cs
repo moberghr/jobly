@@ -22,6 +22,7 @@ public static class JobHandlerServiceExtensions
     public static IServiceCollection AddPipelineBehaviors(this IServiceCollection services, Assembly assembly)
     {
         RegisterImplementations(services, assembly, typeof(IPipelineBehavior<,>));
+        RegisterImplementations(services, assembly, typeof(IPublishPipelineBehavior<>));
         return services;
     }
 
@@ -42,7 +43,11 @@ public static class JobHandlerServiceExtensions
 
             foreach (var iface in interfaces)
             {
-                services.AddTransient(iface, implementationType);
+                // For open generic types, register using the generic type definitions
+                // so the DI container can resolve them as open generics.
+                var serviceType = iface.ContainsGenericParameters ? iface.GetGenericTypeDefinition() : iface;
+                var implType = implementationType.ContainsGenericParameters ? implementationType.GetGenericTypeDefinition() : implementationType;
+                services.AddTransient(serviceType, implType);
             }
         }
     }

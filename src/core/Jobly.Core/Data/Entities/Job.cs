@@ -49,4 +49,6 @@ public class Job
     public CancellationMode CancellationMode { get; set; }
 
     public string? ConcurrencyKey { get; set; }
+
+    public string? Metadata { get; set; }
 }

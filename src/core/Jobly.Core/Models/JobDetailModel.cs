@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Jobly.Core.Enums;
 
 namespace Jobly.Core.Models;
@@ -27,4 +29,13 @@ public class JobDetailModel : JobModel
     public string? ConcurrencyKey { get; set; }
 
     public List<ContinuationInfo> Continuations { get; set; } = [];
+
+    [JsonIgnore]
+    public string? MetadataJson { get; set; }
+
+    private Dictionary<string, string>? _metadata;
+
+    public Dictionary<string, string>? Metadata => _metadata ??= MetadataJson != null
+        ? JsonSerializer.Deserialize<Dictionary<string, string>>(MetadataJson)
+        : null;
 }

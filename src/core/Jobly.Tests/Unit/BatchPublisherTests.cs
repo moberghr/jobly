@@ -4,6 +4,7 @@ using Jobly.Core.Enums;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Shouldly;
 
@@ -21,7 +22,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
 
     private static BatchPublisher<TestContext> CreateBatchPublisher(TestContext ctx)
     {
-        return new BatchPublisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
+        return new BatchPublisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
     }
 
     [Fact]
@@ -158,7 +159,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
     {
         // Arrange: parent and continuation batch in same context (not committed yet)
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
+        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
         var batchPublisher = CreateBatchPublisher(ctx);
 
         var parentId = await publisher.Enqueue(new UnitRequest());
@@ -183,7 +184,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
     {
         // Arrange: parent already committed
         var setupCtx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(setupCtx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
+        var publisher = new Publisher<TestContext>(setupCtx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
         var parentId = await publisher.Enqueue(new UnitRequest());
         await setupCtx.SaveChangesAsync();
 

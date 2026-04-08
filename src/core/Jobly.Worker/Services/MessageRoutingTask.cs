@@ -111,6 +111,7 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
 
                 job.HandlerType = handlerType.AssemblyQualifiedName;
                 job.TraceId = message.TraceId;
+                job.Metadata = message.Metadata;
 
                 context.Set<Job>().Add(job);
                 context.Set<JobLog>().Add(new JobLog
