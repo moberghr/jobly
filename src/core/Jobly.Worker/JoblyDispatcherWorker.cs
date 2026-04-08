@@ -128,7 +128,15 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             {
                 JobId = job.Id,
                 TraceId = job.TraceId ?? job.Id,
+                MetadataJson = job.Metadata,
             };
+
+            var jobContext = scope.ServiceProvider.GetRequiredService<JobContext>();
+            jobContext.JobId = job.Id;
+            jobContext.TraceId = job.TraceId ?? job.Id;
+            jobContext.Metadata = job.Metadata != null
+                ? JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata) ?? new Dictionary<string, string>()
+                : new Dictionary<string, string>();
 
             handlerStopwatch = Stopwatch.StartNew();
             await ExecuteJob(job, scope.ServiceProvider, jobCts.Token);

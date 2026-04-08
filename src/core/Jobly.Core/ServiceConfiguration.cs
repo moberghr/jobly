@@ -60,7 +60,8 @@ public static class ServiceConfiguration
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(
             x.GetRequiredService<TContext>(),
             x.GetRequiredService<IOptions<JoblyConfiguration>>(),
-            x.GetRequiredService<TimeProvider>()));
+            x.GetRequiredService<TimeProvider>(),
+            x));
 
         services.AddScoped<IMediator>(x => new Mediator(x));
 
@@ -71,7 +72,14 @@ public static class ServiceConfiguration
         services.AddScoped<IJobGroupQueryService>(x => new JobGroupQueryService<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IRecurringJobService>(x => new RecurringJobService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
         services.AddScoped<IDashboardStatsService>(x => new DashboardStatsService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
-        services.AddTransient<IBatchPublisher, BatchPublisher<TContext>>();
+        services.AddScoped<IBatchPublisher>(x => new BatchPublisher<TContext>(
+            x.GetRequiredService<TContext>(),
+            x.GetRequiredService<IOptions<JoblyConfiguration>>(),
+            x.GetRequiredService<TimeProvider>(),
+            x));
+
+        services.AddScoped<JobContext>();
+        services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
 
         return services;
     }
@@ -192,6 +200,8 @@ public static class ServiceConfiguration
         job.Property(p => p.CancellationMode);
         job.Property(p => p.ConcurrencyKey);
         job.HasIndex(p => p.ConcurrencyKey);
+
+        job.Property(p => p.Metadata);
     }
 
     private static void AddRecurringJobEntity(ModelBuilder modelBuilder)

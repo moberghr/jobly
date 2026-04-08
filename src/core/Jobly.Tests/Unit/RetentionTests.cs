@@ -60,6 +60,8 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();
         services.AddSingleton<MultiHandlerCounter>();
+        services.AddScoped<Jobly.Core.Handlers.JobContext>();
+        services.AddScoped<Jobly.Core.Handlers.IJobContext>(x => x.GetRequiredService<Jobly.Core.Handlers.JobContext>());
 
         var workerConfig = new OptionsWrapper<JoblyWorkerConfiguration>(new JoblyWorkerConfiguration
         {
@@ -94,7 +96,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
+        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
         var jobId = await publisher.Enqueue(new UnitRequest());
         await ctx.SaveChangesAsync();
 
@@ -149,7 +151,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
+        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
 
         var statBefore = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
@@ -258,7 +260,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
     {
         // Arrange — enqueue and process a job so stats:succeeded is incremented
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
+        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
         var jobId = await publisher.Enqueue(new UnitRequest());
         await ctx.SaveChangesAsync();
 

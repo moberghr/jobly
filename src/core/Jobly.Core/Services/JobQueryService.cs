@@ -113,6 +113,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 TraceId = x.TraceId,
                 SpawnedByJobId = x.SpawnedByJobId,
                 ConcurrencyKey = x.ConcurrencyKey,
+                MetadataJson = x.Metadata,
             })
             .FirstOrDefaultAsync();
 
@@ -291,6 +292,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 ContinuationOptions = x.ContinuationOptions,
                 Queue = x.Queue,
                 TraceId = x.TraceId,
+                MetadataJson = x.Metadata,
             })
             .FirstOrDefaultAsync();
 

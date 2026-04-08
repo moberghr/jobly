@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Jobly.Core.Enums;
 
 namespace Jobly.Core.Models;
@@ -53,6 +55,16 @@ public class UnifiedJobDetailModel
     public List<ContinuationInfo> Continuations { get; set; } = [];
 
     public List<ContinuationInfo> SpawnedJobs { get; set; } = [];
+
+    // Metadata
+    [JsonIgnore]
+    public string? MetadataJson { get; set; }
+
+    private Dictionary<string, string>? _metadata;
+
+    public Dictionary<string, string>? Metadata => _metadata ??= MetadataJson != null
+        ? JsonSerializer.Deserialize<Dictionary<string, string>>(MetadataJson)
+        : null;
 
     // History
     public List<JobLogModel> Logs { get; set; } = [];
