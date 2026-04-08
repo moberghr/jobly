@@ -12,10 +12,10 @@ public class LoggingPipelineBehavior : IPipelineBehavior<UnitRequest, Jobly.Core
         _logger = logger;
     }
 
-    public async Task<Jobly.Core.Handlers.Unit> HandleAsync(UnitRequest message, RequestHandlerDelegate<Jobly.Core.Handlers.Unit> next, CancellationToken cancellationToken)
+    public async Task<Jobly.Core.Handlers.Unit> HandleAsync(UnitRequest message, RequestHandlerDelegate<UnitRequest, Jobly.Core.Handlers.Unit> next, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Pipeline before handler");
-        var result = await next();
+        var result = await next(message, cancellationToken);
         _logger.LogInformation("Pipeline after handler");
         return result;
     }
