@@ -188,6 +188,12 @@ Three categories:
 - Use `[Collection("PostgreSql-Integration")]` / `[Collection("SqlServer-Integration")]` fixtures (server running)
 - Server shared per collection fixture (boots once, Respawn between tests with retry on lock contention)
 
+**Multi-server integration tests** (`src/core/Jobly.Tests/Integration/MultiServerTests.cs`) — 16 tests, ~5s:
+- Use 2 `JoblyTestServer` instances (3 workers each) sharing one database container
+- Verify distributed coordination: row locks, distributed advisory locks, orchestration, message routing, mutex
+- Use `[Collection("PostgreSql-MultiServer")]` / `[Collection("SqlServer-MultiServer")]` fixtures
+- `IMultiServerDatabaseFixture` provides `Server1` and `Server2`
+
 **Dashboard auth tests** (`DashboardAuthTests`) — 7 tests, ~400ms:
 - Uses `WebApplication` with `TestServer` — no database, no Jobly services
 - Tests auth middleware in isolation: login, logout, cookie flow, filter, redirect
@@ -292,3 +298,121 @@ public class MyIntegrationTests_SqlServer : MyIntegrationTestsBase
 ### Worker Groups
 
 Workers can be split into groups with independent queues and polling intervals. Top-level `WorkerCount`/`Queues`/`PollingInterval` become the first implicit group. `AddWorkerGroup()` adds additional groups. Default `WorkerCount = Math.Min(Environment.ProcessorCount * 5, 20)`.
+
+---
+
+## Engineering Standards
+
+> Added by moberg-init on 2026-04-09. Based on:
+> - Moberg HR coding guidelines (`.claude/references/coding-guidelines.md`)
+> - Architecture principles (`.claude/references/architecture-principles.md`)
+> - Codebase scan of this repository
+>
+> Numbered rules (§X.Y) are referenced by the compliance reviewer.
+
+### §1 — Security & Data Integrity
+
+- **§1.1** No secrets, connection strings, or credentials in source code. Use `appsettings.Development.json` (gitignored) or environment variables for local dev.
+- **§1.2** No PII or sensitive data in log output. Job payloads may contain user data — never log `Message` (payload) contents at Info level or above.
+- **§1.3** All database mutations must use transactions or EF Core's implicit `SaveChanges` transaction. Explicit `BeginTransactionAsync` for multi-step mutations (see `JobCommandService.DeleteJob`).
+- **§1.4** Row-level locking via `TagWith(InterceptorConstants.RowLockTableJob)` for any fetch-then-update pattern. Never skip the lock tag on competitive fetches.
+
+### §2 — Architecture Patterns
+
+- **§2.1** Everything is a Job. No separate entity tables for messages or batches. Use `Kind` discriminator and `ParentJobId` chain.
+- **§2.2** Workers are pure executors. Never add orchestration, routing, or parent/child logic to worker code. That belongs in `ServerTaskBase` subclasses.
+- **§2.3** All background tasks extend `ServerTaskBase` with signal support. Use `Signal()` to wake tasks instead of reducing poll intervals.
+- **§2.4** Services expose interfaces (`IJobCommandService`, `IJobQueryService`, etc.). Generic implementations take `TContext : DbContext`.
+- **§2.5** `AddJobly<TContext>()` / `AddJoblyWorker<TContext>()` auto-configure the user's DbContext. Users register their DbContext normally — no manual Jobly configuration needed.
+- **§2.6** In-memory requests (`IRequest<TResponse>`) go through `IMediator.Send()` — same `IPipelineBehavior` pipeline as jobs/messages, but no database persistence.
+
+### §3 — Coding Style
+
+> Full guidelines: `.claude/references/coding-guidelines.md`
+
+- **§3.1** `var` for all local variables. No explicit types.
+- **§3.2** Private fields: `_camelCase`. Public members: `PascalCase`. Interfaces: `IPascalCase`. Constants/static readonly: `PascalCase` (no underscore).
+- **§3.3** Braces on all control flow (`if`, `else`, `while`, `for`, `foreach`) — even single-line bodies.
+- **§3.4** File-scoped namespaces. One type per file unless handler + request + response grouped together.
+- **§3.5** Lambda parameter is `x`; nested lambdas use `y`, `z`.
+- **§3.6** Split chained LINQ methods onto separate lines. Place `.` at the start of each line.
+
+```csharp
+// good
+var activeJobs = await _context.Set<Job>()
+    .Where(x => x.CurrentState == State.Enqueued)
+    .Where(x => x.ScheduleTime <= now)
+    .Select(x =>
+        new JobSummary
+        {
+            Id = x.Id,
+            Type = x.Type,
+        })
+    .ToListAsync();
+```
+
+- **§3.7** Separate multiple `&&` conditions into multiple `.Where()` calls.
+- **§3.8** Use `.Where()` before `.FirstOrDefault()` / `.SingleOrDefault()` — don't put predicates in the terminal method.
+- **§3.9** Blank line before `return` statements. No double blank lines. Private methods last in file.
+- **§3.10** Avoid `else` — return early (guard clauses).
+- **§3.11** Use object initializers. Omit `()` in `new Type { ... }`.
+- **§3.12** No `this.` prefix. No meaningless comments or XML doc on internal code.
+- **§3.13** `using` directives outside namespace. `System.*` first, alphabetically sorted.
+- **§3.14** Use simple `using var x = ...;` over `using (var x = ...) { }`.
+- **§3.15** Prefer `??` over ternary null checks. Prefer ternary over `if/else` for simple assignments.
+- **§3.16** Separate type members with a single blank line, except consecutive private fields (no blank line between them).
+- **§3.17** Create variables close to where they're used, not at the top of the method.
+- **§3.18** No helper lists — use `Select` or `yield return` instead.
+- **§3.19** Place `new` keyword on a new line in `Select` projections, indented one level deeper than `Select`.
+- **§3.20** Use `string.Equals` with `StringComparison` instead of `==` for string comparison (enforced by MA0006).
+
+### §4 — Testing Standards
+
+- **§4.1** Every new/changed public method must have tests. Both PostgreSQL and SQL Server subclasses.
+- **§4.2** Unit test pattern: abstract base class with `IDatabaseFixture`, concrete subclasses per database with `[Collection("PostgreSql")]` / `[Collection("SqlServer")]`.
+- **§4.3** Each unit test calls exactly ONE public method on ONE class. State set up via direct DB inserts.
+- **§4.4** Fresh `CreateContext()` for setup, act, and assert — no shared tracking.
+- **§4.5** Integration tests use `JoblyTestServer` with `Server.WaitForCompletion()` / `Server.WaitForJobState()`. Use `[Collection("PostgreSql-Integration")]` / `[Collection("SqlServer-Integration")]` fixtures.
+- **§4.6** No `Task.Delay` in tests except handlers designed to be cancelled.
+- **§4.7** Test handlers are simple: empty body, throw, or increment counter. No unnecessary abstractions.
+- **§4.8** Test naming: `MethodName_Scenario_ExpectedResult`.
+- **§4.9** Use Shouldly for assertions (`job.CurrentState.ShouldBe(State.Completed)`).
+- **§4.10** Cancel long-running jobs at end of integration tests to avoid blocking.
+
+### §5 — Data Layer
+
+- **§5.1** No raw SQL. All queries use EF Core LINQ. This ensures dual-database compatibility.
+- **§5.2** No `_context.Set<>()` subqueries inside `.Select()` projections. Use navigation properties or two-step fetch.
+- **§5.3** `AsNoTracking()` on read-only queries. `Select()` projections over `Include()` for reads.
+- **§5.4** EF Core entity configurations applied via `JoblyModelCustomizer` (auto-registered by `AddJobly`). Fluent API in `OnModelCreating` overrides.
+- **§5.5** DbContext lifetime is `Scoped`. Never register as Transient — outbox pattern requires shared instance.
+- **§5.6** `TimeProvider` for all timestamps. Never `DateTime.UtcNow` in production code.
+- **§5.7** One `SaveChanges` per handler/operation. Services should not call `SaveChanges` — the caller saves.
+- **§5.8** Add entities to context just before `SaveChanges`, not at the top of the method.
+- **§5.9** Use async EF Core methods (`ToListAsync`, `FirstOrDefaultAsync`, `SaveChangesAsync`).
+
+### §6 — Performance
+
+- **§6.1** Worker hot path is sacred. No additional logic in fetch/execute cycle.
+- **§6.2** Statistics use Counter rows (write-optimized) aggregated by `CounterAggregatorTask`. Never update Statistic rows directly.
+- **§6.3** Signal-driven wakeup for background tasks. Avoid reducing poll intervals as a performance hack.
+- **§6.4** Select only needed columns from database — never load full entities for read-only display.
+- **§6.5** Avoid initializing collections inside loops.
+
+### §7 — Git & Workflow
+
+- **§7.1** Branch naming: hierarchical with `/` — e.g., `feat/multi-server-tests`, `fix/calculator-multiplication`.
+- **§7.2** Commit messages: imperative mood, describe the "what" concisely — e.g., "Add deterministic ordering to server/worker API queries".
+- **§7.3** Static analyzers enforced in build: StyleCop, Roslynator, SonarAnalyzer, Meziantou. All in `Directory.Build.props`. Build must pass with zero warnings.
+- **§7.4** `.editorconfig` enforces code style at the IDE level. Do not override severity levels in individual projects.
+
+### §8 — Project-Specific Patterns
+
+- **§8.1** `JoblyConfiguration` via `IOptions<JoblyConfiguration>`. All configurable values go through this pattern.
+- **§8.2** Failed jobs never auto-deleted (`ExpireAt = null`). Only explicit user action or count-based cleanup.
+- **§8.3** `ContinuationOptions` is generalized to all job kinds — any job with children can control child activation on failure.
+- **§8.4** `RequeueJob` resets `ScheduleTime` to now. Requeued jobs always execute immediately.
+- **§8.5** Cancellation uses `CancellationMode` enum, not immediate state change. Worker monitors and cancels handler token.
+- **§8.6** `ConcurrencyKey` for mutex. Worker checks after marking Processing — if held, cancels with "mutex held" log.
+- **§8.7** `RecurringJobSchedulerTask` creates jobs, `AddOrUpdateRecurringJob` only registers/updates definitions.
+- **§8.8** Source generator (`Jobly.SourceGenerator`) for zero-allocation mediator and worker dispatch.

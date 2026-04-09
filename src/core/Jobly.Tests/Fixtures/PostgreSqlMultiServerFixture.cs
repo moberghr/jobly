@@ -1,0 +1,71 @@
+using Jobly.Core.Interceptors;
+using Jobly.Tests.Integration;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Respawn;
+using Testcontainers.PostgreSql;
+
+namespace Jobly.Tests.Fixtures;
+
+public class PostgreSqlMultiServerFixture : IAsyncLifetime, IMultiServerDatabaseFixture, IDatabaseFixture
+{
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
+        .WithImage("postgres:latest")
+        .Build();
+
+    private Respawner _respawner = null!;
+    private string _connectionString = null!;
+
+    public JoblyTestServer Server1 { get; private set; } = null!;
+
+    public JoblyTestServer Server2 { get; private set; } = null!;
+
+    // IDatabaseFixture.TestServer — not used, but required by the interface for CreateContext reuse
+    JoblyTestServer? IDatabaseFixture.TestServer => Server1;
+
+    public async Task InitializeAsync()
+    {
+        await _container.StartAsync();
+        _connectionString = _container.GetConnectionString();
+
+        await using var context = CreateContext();
+        await context.Database.EnsureCreatedAsync();
+
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync();
+        _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
+        {
+            DbAdapter = DbAdapter.Postgres,
+            TablesToIgnore = [new Respawn.Graph.Table("Server"), new Respawn.Graph.Table("Worker"), new Respawn.Graph.Table("WorkerGroup"), new Respawn.Graph.Table("ServerTask"), new Respawn.Graph.Table("ServerLog")],
+        });
+
+        Server1 = await JoblyTestServer.StartAsync(this, config => config.WorkerCount = 3);
+        Server2 = await JoblyTestServer.StartAsync(this, config => config.WorkerCount = 3);
+    }
+
+    public async Task ResetAsync()
+    {
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync();
+        await _respawner.ResetAsync(conn);
+    }
+
+    public TestContext CreateContext()
+    {
+        return new TestContext(new DbContextOptionsBuilder<TestContext>()
+            .UseNpgsql(_connectionString)
+            .UseSnakeCaseNamingConvention()
+            .AddInterceptors(new PostgresRowLockInterceptor(), new SaveChangesConcurrencyTokenInterceptor())
+            .Options);
+    }
+
+    public async Task DisposeAsync()
+    {
+        await Server2.DisposeAsync();
+        await Server1.DisposeAsync();
+        await _container.DisposeAsync();
+    }
+}
+
+[CollectionDefinition("PostgreSql-MultiServer")]
+public class PostgreSqlMultiServerCollection : ICollectionFixture<PostgreSqlMultiServerFixture>;
