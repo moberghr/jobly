@@ -16,16 +16,21 @@ A distributed job processing, message queue, and in-memory mediator library for 
 - **In-Memory Requests** — `IRequest<TResponse>` with `IMediator.Send()` for immediate, typed request/response. No database persistence.
 - **Unified Pipeline** — `IPipelineBehavior<T, TResponse>` wraps all three patterns (jobs, messages, requests).
 - **Named Queues** — Assign jobs to queues. Workers subscribe to specific queues. Alphabetical order = priority.
-- **Execution Logs** — ILogger output automatically captured during handler execution, viewable in dashboard. Each log entry tracks which worker produced it.
+- **Execution Logs** — ILogger output automatically captured and flushed to the database every ~1 second during handler execution, viewable in dashboard in real time. Each log entry tracks which worker produced it.
 - **Unified Activity Log** — Single audit trail per job: lifecycle events (Created, Processing, Completed, Failed, Cancelled) + handler logs.
+- **Naming Convention Support** — Entity configurations respect EF Core naming conventions (e.g., `UseSnakeCaseNamingConvention()`). All Jobly tables default to the `jobly` schema (configurable via `JoblyConfiguration.Schema`).
 - **Multi-Database** — PostgreSQL and SQL Server with row-level locking for concurrent worker safety.
 - **Server Monitoring** — Worker registration, heartbeat tracking, orphaned job recovery. Worker detail page shows job activity.
 - **Job Retention** — Configurable `JobExpirationTimeout` (default 1 day). Optional `MaxExpirableJobCount` threshold. Failed jobs persist forever.
 - **Time-Series Stats** — Hourly succeeded/failed counts for historical graphs.
 - **Recurring Jobs** — Cron-based scheduled job execution. Immutable execution history via RecurringJobLog.
 - **Graceful Cancellation** — CancellationMode enum signals handlers to stop. Job stays in Processing with "Cancelling..." badge until handler exits. Handlers that complete despite cancellation are marked Completed.
+- **Pause / Resume** — Pause and resume job processing at the server or worker group level. Paused workers stop picking up new jobs; in-progress jobs continue to completion.
+- **Job Metadata** — Attach key-value metadata to jobs via `JobParameters.Metadata`. Metadata inherited by child jobs, accessible in handlers via `IJobContext`. Publish pipeline behaviors (`IPublishPipelineBehavior<T>`) for cross-cutting metadata.
+- **Real-time Handler Logs** — ILogger output flushed to the database every ~1 second during handler execution, visible in dashboard while the job is still processing.
 - **Failed Job Type Filter** — Group failed jobs by type, filter, and bulk delete/requeue all of a specific type.
 - **Dashboard Auth** — Pluggable `IJoblyAuthorizationFilter` with optional redirect URL. Ships with `LocalRequestsOnlyAuthorizationFilter`.
+- **Configurable Handler Logging** — `EnableHandlerLogging` option (default true) to suppress handler ILogger output from the JobLog table when not needed.
 - **Dashboard** — React-based web UI with realtime graph, historical graph, dark mode, clickable metric cards, bulk actions, batch progress bars, worker detail page.
 - **TimeProvider** — All production code uses injectable `TimeProvider` for testability.
 
@@ -363,7 +368,7 @@ src/
 │   ├── Jobly.Core/          # Entities, handlers, publisher, services, logging
 │   ├── Jobly.Worker/        # Worker service, background tasks, dispatcher
 │   ├── Jobly.UI/            # Dashboard API endpoints + embedded SPA
-│   └── Jobly.Tests/         # 220 tests (xUnit + Shouldly + Testcontainers + Respawn)
+│   └── Jobly.Tests/         # 632 tests (xUnit + Shouldly + Testcontainers + Respawn)
 ├── tests/
 │   ├── Jobly.Test.Shared/   # Shared test handlers
 │   ├── Jobly.TestApp/       # Test web application with login page
@@ -375,8 +380,8 @@ src/
 
 ```bash
 dotnet build Jobly.sln
-dotnet test Jobly.sln --filter "Category!=SqlServer"  # PostgreSQL only (~15s)
-dotnet test Jobly.sln                                   # Both databases (~30s)
+dotnet test Jobly.sln --filter "Category!=SqlServer"  # PostgreSQL only (~45s)
+dotnet test Jobly.sln                                   # Both databases (~80s)
 cd src/ui && npm run dev                                # Dashboard on :5173
 ```
 

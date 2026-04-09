@@ -577,6 +577,109 @@ public class ProcessOrderHandler : IJobHandler<ProcessOrder>
 
 ---
 
+## Job Metadata
+
+Attach key-value metadata to jobs at publish time. Metadata is inherited by child jobs, accessible in handlers via `IJobContext`, and visible in the dashboard.
+
+### Ad-hoc metadata
+
+```csharp
+await publisher.Enqueue(new ProcessOrder { OrderId = 123 }, new JobParameters
+{
+    Metadata = new Dictionary<string, string>
+    {
+        ["tenant"] = "acme-corp",
+        ["priority"] = "high",
+    },
+});
+```
+
+### Reading metadata in handlers
+
+```csharp
+public class ProcessOrderHandler : IJobHandler<ProcessOrder>
+{
+    private readonly IJobContext _jobContext;
+
+    public ProcessOrderHandler(IJobContext jobContext) => _jobContext = jobContext;
+
+    public async Task HandleAsync(ProcessOrder message, CancellationToken ct)
+    {
+        var tenant = _jobContext.Metadata["tenant"];
+        var jobId = _jobContext.JobId;
+        var traceId = _jobContext.TraceId;
+    }
+}
+```
+
+### Publish pipeline behaviors
+
+For cross-cutting metadata (e.g., tenant ID on every job), implement `IPublishPipelineBehavior<T>`:
+
+```csharp
+public class TenantMetadataBehavior<T> : IPublishPipelineBehavior<T>
+{
+    private readonly ITenantProvider _tenantProvider;
+
+    public TenantMetadataBehavior(ITenantProvider tenantProvider) => _tenantProvider = tenantProvider;
+
+    public async Task PublishAsync(PublishContext<T> context, PublishDelegate next, CancellationToken ct)
+    {
+        context.Metadata["tenant"] = _tenantProvider.CurrentTenantId;
+        await next();
+    }
+}
+
+// Register as open generic
+builder.Services.AddTransient(typeof(IPublishPipelineBehavior<>), typeof(TenantMetadataBehavior<>));
+```
+
+### Metadata inheritance
+
+When a handler creates child jobs, metadata from the parent is automatically inherited. Ad-hoc metadata from `JobParameters` merges with inherited metadata (ad-hoc wins on key conflict).
+
+### Metadata sources (priority order)
+
+1. Inherited metadata — from parent job's execution context
+2. Ad-hoc metadata — from `JobParameters.Metadata`
+3. Pipeline metadata — from `IPublishPipelineBehavior<T>` implementations
+
+Later sources override earlier ones for the same key.
+
+---
+
+## Pause / Resume
+
+Pause and resume job processing at the server or worker group level.
+
+### API
+
+```
+POST /api/servers/{serverId}/pause
+POST /api/servers/{serverId}/resume
+POST /api/groups/{groupId}/pause
+POST /api/groups/{groupId}/resume
+```
+
+### How it works
+
+1. Pause request sets `PausedAt` timestamp on the server or worker group
+2. `HeartbeatTask` (every ~3s) reads pause state from database into `PauseStateHolder`
+3. Workers check `PauseStateHolder` before each poll — if paused, skip
+4. Resume clears `PausedAt`, next heartbeat propagates the change
+
+Paused workers stop picking up new jobs. Jobs already in progress continue to completion.
+
+---
+
+## Real-time Handler Logs
+
+Handler `ILogger` output is flushed to the database every ~1 second during execution (not just after completion). Logs are visible in the dashboard while the job is still processing.
+
+The `RunJobMonitor` task runs alongside each handler execution, periodically draining the log collector and persisting entries. This also handles keep-alive updates and cancellation detection.
+
+---
+
 ## Configuration Reference
 
 ### Core Configuration (AddJobly)
@@ -584,6 +687,7 @@ public class ProcessOrderHandler : IJobHandler<ProcessOrder>
 ```csharp
 builder.Services.AddJobly<AppDbContext>(options =>
 {
+    options.Schema = "jobly";                                  // Database schema (default: "jobly", null for default)
     options.RetryCount = 3;                                    // Default max retries (default: 0)
     options.DefaultQueue = "default";                          // Default queue name (default: "default")
     options.JobExpirationTimeout = TimeSpan.FromDays(1);       // Completed/deleted job retention (default: 1 day)
@@ -599,6 +703,9 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     options.WorkerCount = 10;                                  // Concurrent workers (default: min(CPU*5, 20))
     options.PollingInterval = TimeSpan.FromSeconds(1);         // Poll delay when idle (default: 1s)
     options.Queues = ["a-critical", "b-default", "c-low"];     // Subscribed queues (default: ["default"])
+
+    // Handler logging
+    options.EnableHandlerLogging = true;                       // false to suppress ILogger capture (default: true)
 
     // Dispatcher mode (batch-fetch instead of per-worker polling)
     options.UseDispatcher = false;                             // default: false
@@ -758,6 +865,8 @@ After calling `AddJobly<TContext>()` or `AddJoblyWorker<TContext>()`, these serv
 | `IJobGroupQueryService` | Query messages and batches |
 | `IRecurringJobService` | Trigger, delete recurring jobs, query history |
 | `IDashboardStatsService` | Dashboard statistics, server/worker info |
+| `IJobContext` | Current job's ID, trace ID, and metadata (available inside handlers) |
+| `IServerCommandService` | Pause/resume servers and worker groups |
 | `TimeProvider` | Injectable time (registered as `TimeProvider.System` by default, override in tests) |
 
 ---
@@ -798,6 +907,36 @@ public interface IRequestHandler<in TRequest, TResponse> where TRequest : IReque
 public interface IPipelineBehavior<in TRequest, TResponse> where TRequest : IRequest<TResponse>
 {
     Task<TResponse> HandleAsync(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken);
+}
+```
+
+### IJobContext & IJobMetadata
+
+```csharp
+public interface IJobMetadata
+{
+    IReadOnlyDictionary<string, string> Metadata { get; }
+}
+
+public interface IJobContext : IJobMetadata
+{
+    Guid JobId { get; }
+    Guid TraceId { get; }
+}
+```
+
+### IPublishPipelineBehavior
+
+```csharp
+public class PublishContext<T> : IJobMetadata
+{
+    public required T Job { get; init; }
+    public Dictionary<string, string> Metadata { get; init; } = new();
+}
+
+public interface IPublishPipelineBehavior<T>
+{
+    Task PublishAsync(PublishContext<T> context, PublishDelegate next, CancellationToken ct);
 }
 ```
 
@@ -883,6 +1022,7 @@ public class JobParameters
     public string? Mutex { get; set; }
     public DateTime? ScheduleTime { get; set; }
     public Guid? ParentId { get; set; }
+    public Dictionary<string, string>? Metadata { get; set; }
 }
 ```
 
@@ -1040,4 +1180,8 @@ Both apps share the same database. The worker polls for and executes jobs create
 5. **AddJoblyWorker includes AddJobly** — don't call both
 6. **UseJoblyUI after auth middleware** — so HttpContext.User is populated
 7. **TimeProvider is injectable** — use it for testability, Jobly registers TimeProvider.System by default
-8. **Handler ILogger output is captured** — logs appear in the job's activity log on the dashboard
+8. **Handler ILogger output is captured** — logs are flushed every ~1s and appear in the dashboard in real time
+9. **Job metadata is inherited** — child jobs automatically inherit parent metadata via ambient context
+10. **Pause is propagated via heartbeat** — there may be a ~3s delay between pause command and workers stopping
+11. **Jobly tables use the `jobly` schema by default** — configurable via `JoblyConfiguration.Schema`, set to `null` for default schema
+12. **Naming conventions are respected** — entity configs don't hardcode table/column names, so `UseSnakeCaseNamingConvention()` works

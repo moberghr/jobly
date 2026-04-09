@@ -12,7 +12,7 @@ Jobly ships with a built-in web dashboard for monitoring and managing jobs.
 app.UseJoblyUI(); // Serves at /jobly
 ```
 
-To restrict access to the dashboard, see [Dashboard Auth](/docs/dashboard-auth).
+To restrict access to the dashboard, see [Dashboard Auth](/docs/operations/dashboard-auth).
 
 ## Dashboard
 

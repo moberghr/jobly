@@ -36,7 +36,7 @@ Each Jobly server runs 8 background tasks that handle orchestration and maintena
 | **ExpirationCleanup** | 60s (`ExpirationCleanupInterval`) | Deletes expired completed/deleted jobs and old statistics |
 | **RecurringJobScheduler** | 15s | Creates job instances when recurring job cron expressions fire |
 
-All intervals are configurable via [Configuration](/docs/configuration#background-task-intervals).
+All intervals are configurable via [Configuration](/docs/operations/configuration#background-task-intervals).
 
 The server detail page shows each task's last status, duration, and run time:
 

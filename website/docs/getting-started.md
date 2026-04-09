@@ -29,7 +29,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 ```
 
-Jobly automatically adds its interceptors (row locking) and entity configuration (Job, Message, Batch, etc.) when you register Jobly services in the next step.
+Jobly automatically adds its interceptors (row locking) and entity configuration (Job, Message, Batch, etc.) when you register Jobly services in the next step. All Jobly tables are placed in the `jobly` schema by default.
+
+:::tip Naming Conventions
+Jobly respects EF Core naming conventions. If you use `UseSnakeCaseNamingConvention()`, Jobly's tables and columns will follow your convention automatically.
+:::
 
 ### 2. Create the database schema
 
@@ -162,5 +166,5 @@ public class OrderController : ControllerBase
 ```
 
 :::info Transactional Outbox
-Jobly uses the [outbox pattern](/docs/outbox-pattern) — jobs are written to the same DbContext as your business data and committed in a single `SaveChangesAsync()`. This guarantees atomicity: if the transaction fails, both your data and the jobs roll back. No orphaned jobs, no lost work.
+Jobly uses the [outbox pattern](/docs/features/outbox-pattern) — jobs are written to the same DbContext as your business data and committed in a single `SaveChangesAsync()`. This guarantees atomicity: if the transaction fails, both your data and the jobs roll back. No orphaned jobs, no lost work.
 :::

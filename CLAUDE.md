@@ -18,7 +18,7 @@ Ships as NuGet packages (Jobly.Core, Jobly.UI, Jobly.Worker). Supports PostgreSQ
 # Backend (from src/)
 dotnet build Jobly.sln
 dotnet test Jobly.sln --filter "Category!=SqlServer"   # PostgreSQL only
-dotnet test Jobly.sln                                    # All databases (464 tests, ~30s)
+dotnet test Jobly.sln                                    # All databases (632 tests, ~30s)
 
 # Run specific test suites
 dotnet test Jobly.sln --filter "FullyQualifiedName~Jobly.Tests.Unit"         # Unit tests only
@@ -158,6 +158,9 @@ Default: no auth (open access).
 - `RequeueJob` resets `ScheduleTime` to now — requeued jobs always execute immediately.
 - Count-based cleanup: `MaxExpirableJobCount` (default null/disabled) — deletes oldest by `ExpireAt` when threshold exceeded. Failed jobs excluded (null `ExpireAt`).
 - `JobExpirationTimeout` configurable on base `JoblyConfiguration` (default 1 day). Used by worker, command service, and orchestration task.
+- Job metadata: `JobParameters.Metadata` (key-value dictionary), stored as JSON on the Job entity. `IJobContext` gives handlers access to metadata, job ID, and trace ID. `IPublishPipelineBehavior<T>` intercepts publish for cross-cutting metadata. Metadata inherited by child jobs via ambient context.
+- Pause/Resume: Server and worker group level. `PausedAt` timestamp on Server and WorkerGroup entities. `PauseStateHolder` (in-memory snapshot) updated by `HeartbeatTask`, checked by workers before each poll. API endpoints: `POST /api/servers/{id}/pause|resume`, `POST /api/groups/{id}/pause|resume`.
+- Real-time log flushing: `RunJobMonitor` drains `JobLogCollector` every ~1s during handler execution and persists logs to the database. Logs visible in dashboard while the job is still processing.
 
 ### Backend (.NET 10)
 
@@ -172,19 +175,19 @@ Default: no auth (open access).
 
 ## Testing
 
-464 tests (232 PostgreSQL + 232 SQL Server) using xUnit, Shouldly, Testcontainers + Respawn (~30s).
+632 tests (316 PostgreSQL + 316 SQL Server) using xUnit, Shouldly, Testcontainers + Respawn (~30s).
 
 ### Test Structure
 
 Three categories:
 
-**Unit tests** (`src/core/Jobly.Tests/Unit/`) — ~400 tests, ~14s:
+**Unit tests** (`src/core/Jobly.Tests/Unit/`) — ~500 tests, ~15s:
 - Each test calls exactly ONE public method on ONE class
 - State set up via direct DB inserts, not via other services
 - Fresh `CreateContext()` for setup, act, and assert (no shared tracking)
 - Use `[Collection("PostgreSql")]` / `[Collection("SqlServer")]` fixtures (no server running)
 
-**Integration tests** (`src/core/Jobly.Tests/Integration/`) — ~56 tests, ~16s:
+**Integration tests** (`src/core/Jobly.Tests/Integration/`) — ~72 tests, ~35s:
 - Use `JoblyTestServer` — boots full worker + all background tasks against a real database
 - Tests publish jobs, wait for results via `Server.WaitForCompletion()` / `Server.WaitForJobState()`
 - Use `[Collection("PostgreSql-Integration")]` / `[Collection("SqlServer-Integration")]` fixtures (server running)
