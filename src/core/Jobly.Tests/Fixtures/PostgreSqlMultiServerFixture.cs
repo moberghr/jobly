@@ -36,7 +36,7 @@ public class PostgreSqlMultiServerFixture : IAsyncLifetime, IMultiServerDatabase
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
-            TablesToIgnore = [new Respawn.Graph.Table("Server"), new Respawn.Graph.Table("Worker"), new Respawn.Graph.Table("WorkerGroup"), new Respawn.Graph.Table("ServerTask"), new Respawn.Graph.Table("ServerLog")],
+            TablesToIgnore = FixtureHelper.GetServerTablesToIgnore(context),
         });
 
         Server1 = await JoblyTestServer.StartAsync(this, config => config.WorkerCount = 3);

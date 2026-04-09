@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Jobly.Core;
 
@@ -13,6 +15,9 @@ internal sealed class JoblyModelCustomizer : RelationalModelCustomizer
     public override void Customize(ModelBuilder modelBuilder, DbContext context)
     {
         base.Customize(modelBuilder, context);
-        modelBuilder.AddOutboxStateEntity();
+
+        var config = context.GetService<IOptions<JoblyConfiguration>>()?.Value;
+        var schema = config != null ? config.Schema : "jobly";
+        modelBuilder.AddOutboxStateEntity(schema);
     }
 }
