@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Jobly.Core.Data.Entities;
 
 namespace Jobly.Core.Logging;
@@ -10,11 +11,11 @@ public class JobLogCollector
 
     public Guid? WorkerId { get; set; }
 
-    public List<JobLog> Entries { get; } = [];
+    private readonly ConcurrentQueue<JobLog> _entries = new();
 
     public void Add(string level, string message, string? exception = null)
     {
-        Entries.Add(new JobLog
+        _entries.Enqueue(new JobLog
         {
             JobId = JobId,
             Timestamp = TimeProvider.GetUtcNow().UtcDateTime,
@@ -23,6 +24,16 @@ public class JobLogCollector
             Exception = exception,
             WorkerId = WorkerId,
         });
+    }
+
+    public List<JobLog> Drain()
+    {
+        var list = new List<JobLog>();
+        while (_entries.TryDequeue(out var entry))
+        {
+            list.Add(entry);
+        }
+        return list;
     }
 }
 
