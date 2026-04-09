@@ -127,6 +127,30 @@ public static class JoblyEndpoints
 
         apiGroup.MapGet("servers/{serverId}/logs", async ([FromServices] IDashboardStatsService statsService, Guid serverId, [AsParameters] BaseListRequest request, [FromQuery] string? taskName) => await statsService.GetServerLogs(serverId, request, taskName));
 
+        apiGroup.MapPost("servers/{serverId}/pause", async ([FromServices] IServerCommandService svc, Guid serverId) =>
+        {
+            var result = await svc.PauseServer(serverId);
+            return result ? Results.Ok() : Results.NotFound();
+        });
+
+        apiGroup.MapPost("servers/{serverId}/resume", async ([FromServices] IServerCommandService svc, Guid serverId) =>
+        {
+            var result = await svc.ResumeServer(serverId);
+            return result ? Results.Ok() : Results.NotFound();
+        });
+
+        apiGroup.MapPost("groups/{groupId}/pause", async ([FromServices] IServerCommandService svc, Guid groupId) =>
+        {
+            var result = await svc.PauseWorkerGroup(groupId);
+            return result ? Results.Ok() : Results.NotFound();
+        });
+
+        apiGroup.MapPost("groups/{groupId}/resume", async ([FromServices] IServerCommandService svc, Guid groupId) =>
+        {
+            var result = await svc.ResumeWorkerGroup(groupId);
+            return result ? Results.Ok() : Results.NotFound();
+        });
+
         apiGroup.MapGet("workers/{workerId}", async ([FromServices] IDashboardStatsService statsService, Guid workerId) =>
         {
             var model = await statsService.GetWorkerById(workerId);

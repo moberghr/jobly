@@ -19,4 +19,10 @@ public class WorkerDetailModel
     public string? Queues { get; set; }
 
     public double? PollingIntervalMs { get; set; }
+
+    public DateTime? ServerPausedAt { get; set; }
+
+    public Guid? WorkerGroupId { get; set; }
+
+    public DateTime? WorkerGroupPausedAt { get; set; }
 }

@@ -77,6 +77,8 @@ public static class ServiceConfiguration
     {
         services.AddJobly<TContext>();
 
+        services.AddSingleton<PauseStateHolder>();
+
         services.AddLogging(builder => builder.AddProvider(new JobLoggerProvider()));
 
         // Register distributed locks — resolved lazily from the DbContext's connection string

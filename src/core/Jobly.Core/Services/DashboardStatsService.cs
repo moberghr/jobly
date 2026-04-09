@@ -129,9 +129,9 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
 
     public async Task<List<ServerModel>> GetServers()
     {
-        var servers = await _context.Set<Server>().ToListAsync();
+        var servers = await _context.Set<Server>().OrderBy(s => s.StartedTime).ToListAsync();
 
-        var workers = await _context.Set<Worker>().Include(w => w.WorkerGroup).ToListAsync();
+        var workers = await _context.Set<Worker>().Include(w => w.WorkerGroup).OrderBy(w => w.WorkerGroupId).ThenBy(w => w.Id).ToListAsync();
 
         var processingJobs = await _context.Set<Job>()
             .Where(x => x.CurrentState == State.Processing)
@@ -154,6 +154,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             ServiceCount = s.ServiceCount,
             CpuUsagePercent = s.CpuUsagePercent,
             MemoryWorkingSetBytes = s.MemoryWorkingSetBytes,
+            PausedAt = s.PausedAt,
             Workers = workersByServer.GetValueOrDefault(s.Id, [])
                 .ConvertAll(w =>
                 {
@@ -167,6 +168,8 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
                         CurrentJobType = activeJob?.Type,
                         Queues = w.WorkerGroup?.Queues,
                         PollingIntervalMs = w.WorkerGroup?.PollingIntervalMs,
+                        WorkerGroupId = w.WorkerGroupId,
+                        WorkerGroupPausedAt = w.WorkerGroup?.PausedAt,
                     };
                 }),
         });
@@ -186,6 +189,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
         var workers = await _context.Set<Worker>()
             .Include(w => w.WorkerGroup)
             .Where(w => w.ServerId == serverId)
+            .OrderBy(w => w.WorkerGroupId).ThenBy(w => w.Id)
             .ToListAsync();
 
         var processingJobs = await _context.Set<Job>()
@@ -204,6 +208,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             ServiceCount = server.ServiceCount,
             CpuUsagePercent = server.CpuUsagePercent,
             MemoryWorkingSetBytes = server.MemoryWorkingSetBytes,
+            PausedAt = server.PausedAt,
             Workers = workers.ConvertAll(w =>
             {
                 jobByWorker.TryGetValue(w.Id, out var activeJob);
@@ -216,6 +221,8 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
                     CurrentJobType = activeJob?.Type,
                     Queues = w.WorkerGroup?.Queues,
                     PollingIntervalMs = w.WorkerGroup?.PollingIntervalMs,
+                    WorkerGroupId = w.WorkerGroupId,
+                    WorkerGroupPausedAt = w.WorkerGroup?.PausedAt,
                 };
             }),
         };
@@ -452,6 +459,9 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             CurrentJobType = activeJob?.Type,
             Queues = worker.WorkerGroup?.Queues,
             PollingIntervalMs = worker.WorkerGroup?.PollingIntervalMs,
+            ServerPausedAt = server?.PausedAt,
+            WorkerGroupId = worker.WorkerGroupId,
+            WorkerGroupPausedAt = worker.WorkerGroup?.PausedAt,
             ServerId = worker.ServerId,
             ServerName = server?.ServerName ?? "Unknown",
         };

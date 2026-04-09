@@ -47,6 +47,43 @@ public class JoblyTestServer : IAsyncDisposable
         return scope.ServiceProvider.GetRequiredService<IJobCommandService>();
     }
 
+    public IServerCommandService CreateServerCommandService()
+    {
+        var scope = _host.Services.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<IServerCommandService>();
+    }
+
+    public Guid ServerId
+    {
+        get
+        {
+            var config = _host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<JoblyWorkerConfiguration>>().Value;
+            return config.ServerId;
+        }
+    }
+
+    public PauseStateHolder PauseState => _host.Services.GetRequiredService<PauseStateHolder>();
+
+    /// <summary>
+    /// Polls until the PauseStateHolder reflects the expected paused/resumed state for a group.
+    /// Use instead of Task.Delay after calling pause/resume APIs.
+    /// </summary>
+    public async Task WaitForPauseState(Guid groupId, bool expectedPaused, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
+        while (DateTime.UtcNow < deadline)
+        {
+            if (PauseState.IsPaused(groupId) == expectedPaused)
+            {
+                return;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"PauseStateHolder did not reach expected state (paused={expectedPaused}) for group {groupId} within {timeout ?? TimeSpan.FromSeconds(5)}");
+    }
+
     public static async Task<JoblyTestServer> StartAsync(IDatabaseFixture fixture)
     {
         var tempCtx = fixture.CreateContext();
@@ -80,7 +117,7 @@ public class JoblyTestServer : IAsyncDisposable
                     config.OrchestrationInterval = TimeSpan.FromMilliseconds(100);
                     config.MessageRoutingInterval = TimeSpan.FromMilliseconds(500);
                     config.InvisibilityTimeout = TimeSpan.FromMinutes(1);
-                    config.HealthCheckInterval = TimeSpan.FromSeconds(30);
+                    config.HealthCheckInterval = TimeSpan.FromMilliseconds(200);
                     config.UseDispatcher = false;
                 });
             })

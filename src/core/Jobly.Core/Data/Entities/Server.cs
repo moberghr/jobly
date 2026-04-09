@@ -15,4 +15,6 @@ public class Server
     public double? CpuUsagePercent { get; set; }
 
     public long? MemoryWorkingSetBytes { get; set; }
+
+    public DateTime? PausedAt { get; set; }
 }

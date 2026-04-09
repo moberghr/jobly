@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/Pagination';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { shortId, formatBytes } from '@/utils/format';
-import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronRight, RefreshCw, Pause, Play } from 'lucide-react';
 import type { ServerModel, WorkerModel, ServerTaskSummary, ServerLogModel, PagedList } from '@/types';
 import * as api from '@/api';
 
@@ -31,17 +33,31 @@ export default function ServerDetailPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const handleTogglePause = async () => {
+    if (!server || !id) return;
+    if (server.pausedAt) {
+      await api.resumeServer(id);
+    } else {
+      await api.pauseServer(id);
+    }
+    fetchData();
+  };
+
   if (error) return <ErrorState message={error} />;
   if (!server) return <LoadingState />;
 
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
-        <span className="inline-block w-3 h-3 rounded-full bg-green-500" />
+        <span className={`inline-block w-3 h-3 rounded-full ${server.pausedAt ? 'bg-amber-500' : 'bg-green-500'}`} />
         <h1 className="text-2xl font-bold">{server.serverName}</h1>
+        {server.pausedAt && <Badge variant="outline" className="text-amber-600 border-amber-300">Paused</Badge>}
         <button onClick={fetchData} className="p-2 rounded-md hover:bg-accent text-muted-foreground" title="Refresh">
           <RefreshCw className="h-4 w-4" />
         </button>
+        <Button variant="outline" size="sm" onClick={handleTogglePause} title={server.pausedAt ? 'Resume server' : 'Pause server'}>
+          {server.pausedAt ? <><Play className="h-4 w-4 mr-1" /> Resume</> : <><Pause className="h-4 w-4 mr-1" /> Pause</>}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -54,6 +70,9 @@ export default function ServerDetailPage() {
             <div><span className="text-muted-foreground">Memory:</span> {server.memoryWorkingSetBytes != null ? formatBytes(server.memoryWorkingSetBytes) : 'N/A'}</div>
             <div><span className="text-muted-foreground">Started:</span> <RelativeTime date={server.startedTime} /></div>
             <div><span className="text-muted-foreground">Heartbeat:</span> <RelativeTime date={server.lastHeartbeatTime} /></div>
+            {server.pausedAt && (
+              <div><span className="text-muted-foreground">Paused since:</span> <RelativeTime date={server.pausedAt} /></div>
+            )}
             <div><span className="text-muted-foreground">ID:</span> <span className="font-mono text-xs">{server.id}</span></div>
           </CardContent>
         </Card>
@@ -63,9 +82,10 @@ export default function ServerDetailPage() {
       {/* Worker Groups */}
       <h2 className="text-lg font-semibold mb-3">Worker Groups</h2>
       {(() => {
-        const groups = new Map<string, typeof server.workers>();
+        // Group by workerGroupId when available, fall back to queues|pollingMs
+        const groups = new Map<string, WorkerModel[]>();
         for (const w of server.workers) {
-          const key = `${w.queues ?? 'default'}|${w.pollingIntervalMs ?? 1000}`;
+          const key = w.workerGroupId ?? `${w.queues ?? 'default'}|${w.pollingIntervalMs ?? 1000}`;
           if (!groups.has(key)) groups.set(key, []);
           groups.get(key)!.push(w);
         }
@@ -75,8 +95,19 @@ export default function ServerDetailPage() {
               const queues = workers[0].queues ?? 'default';
               const pollingMs = workers[0].pollingIntervalMs ?? 1000;
               const active = workers.filter(w => w.currentJobId).length;
+              const groupId = workers[0].workerGroupId;
+              const groupPausedAt = workers[0].workerGroupPausedAt;
               return (
-                <WorkerGroupSection key={key} queues={queues} pollingMs={pollingMs} workers={workers} activeCount={active} />
+                <WorkerGroupSection
+                  key={key}
+                  queues={queues}
+                  pollingMs={pollingMs}
+                  workers={workers}
+                  activeCount={active}
+                  groupId={groupId}
+                  groupPausedAt={groupPausedAt}
+                  onTogglePause={fetchData}
+                />
               );
             })}
           </div>
@@ -104,8 +135,27 @@ export default function ServerDetailPage() {
   );
 }
 
-function WorkerGroupSection({ queues, pollingMs, workers, activeCount }: { queues: string; pollingMs: number; workers: WorkerModel[]; activeCount: number }) {
+function WorkerGroupSection({ queues, pollingMs, workers, activeCount, groupId, groupPausedAt, onTogglePause }: {
+  queues: string;
+  pollingMs: number;
+  workers: WorkerModel[];
+  activeCount: number;
+  groupId: string | null;
+  groupPausedAt: string | null;
+  onTogglePause: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
+
+  const handleToggleGroupPause = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!groupId) return;
+    if (groupPausedAt) {
+      await api.resumeWorkerGroup(groupId);
+    } else {
+      await api.pauseWorkerGroup(groupId);
+    }
+    onTogglePause();
+  };
 
   return (
     <Card>
@@ -115,7 +165,9 @@ function WorkerGroupSection({ queues, pollingMs, workers, activeCount }: { queue
       >
         <div className="flex items-center gap-3">
           {expanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+          <span className={`inline-block w-2 h-2 rounded-full ${groupPausedAt ? 'bg-amber-500' : 'bg-green-500'}`} />
           <span className="font-medium text-sm">{workers.length} workers</span>
+          {groupPausedAt && <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">Paused</Badge>}
           {activeCount > 0 && (
             <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
               {activeCount} active
@@ -123,9 +175,23 @@ function WorkerGroupSection({ queues, pollingMs, workers, activeCount }: { queue
           )}
           <span className="text-xs text-muted-foreground">·</span>
           <span className="text-xs text-muted-foreground">Polling: {pollingMs >= 1000 ? `${(pollingMs / 1000).toFixed(pollingMs % 1000 === 0 ? 0 : 1)}s` : `${pollingMs}ms`}</span>
+          <span className="ml-auto">
+            {groupId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleToggleGroupPause}
+                title={groupPausedAt ? 'Resume group' : 'Pause group'}
+                className="h-7 px-2"
+              >
+                {groupPausedAt ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+              </Button>
+            )}
+          </span>
         </div>
         <div className="ml-7 mt-1 text-xs text-muted-foreground">
           Queues: <span className="font-mono">{queues}</span>
+          {groupPausedAt && <span className="ml-3">· Paused since <RelativeTime date={groupPausedAt} /></span>}
         </div>
       </button>
 
