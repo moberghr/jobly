@@ -18,3 +18,10 @@
 - Batch continuations are nested batches (Kind=Batch with ParentId=originalBatchId), not direct children. When asserting batch structure, query continuation batch children separately.
 - Don't assert that "both servers processed some jobs" in multi-server tests. Jobly provides no fairness guarantee — competitive fetch-and-lock means one server can win all fetches. Test correctness (no duplicates), not load distribution.
 - Always await cleanup of CancellableRequest after `DeleteJob` — call `WaitForJobState(id, State.Deleted)` to ensure the handler exits before the next test runs.
+
+## 2026-04-09 — Dashboard demo mode & screenshots
+
+- Axios custom adapters receive `config.url` with the `baseURL` already resolved (full path like `/jobly/api/status`, not just `/status`). Strip the baseURL prefix before pattern-matching in mock adapters.
+- Vite `server.proxy: undefined` inside a `server: {}` object does NOT disable the proxy — the `undefined` value is ignored and defaults apply. To conditionally disable proxy, return separate objects: `server: isDemo ? {} : { proxy: { ... } }`.
+- When using `reuseExistingServer: true` in Playwright, stale Vite dev servers on the same port from previous runs will be reused even if the config changed. Use a distinct port for the screenshot Vite server to avoid conflicts.
+- `State.Scheduled` does not exist in the frontend type system — scheduled jobs have `currentState: State.Enqueued` with a future `scheduleTime`. The `/jobs/scheduled` endpoint returns enqueued jobs filtered by schedule time on the backend.
