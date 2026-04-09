@@ -129,9 +129,9 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
 
     public async Task<List<ServerModel>> GetServers()
     {
-        var servers = await _context.Set<Server>().ToListAsync();
+        var servers = await _context.Set<Server>().OrderBy(s => s.StartedTime).ToListAsync();
 
-        var workers = await _context.Set<Worker>().Include(w => w.WorkerGroup).ToListAsync();
+        var workers = await _context.Set<Worker>().Include(w => w.WorkerGroup).OrderBy(w => w.WorkerGroupId).ThenBy(w => w.Id).ToListAsync();
 
         var processingJobs = await _context.Set<Job>()
             .Where(x => x.CurrentState == State.Processing)
@@ -189,6 +189,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
         var workers = await _context.Set<Worker>()
             .Include(w => w.WorkerGroup)
             .Where(w => w.ServerId == serverId)
+            .OrderBy(w => w.WorkerGroupId).ThenBy(w => w.Id)
             .ToListAsync();
 
         var processingJobs = await _context.Set<Job>()
