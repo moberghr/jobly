@@ -98,7 +98,7 @@ await recurringPublisher.AddOrUpdateRecurringJob(
     new CleanupSessions(), name: "session-cleanup", cron: "0 * * * *");
 ```
 
-This only registers the definition. The `RecurringJobSchedulerTask` creates jobs when the cron time arrives. See [Recurring Jobs](/docs/recurring-jobs) for full details.
+This only registers the definition. The `RecurringJobSchedulerTask` creates jobs when the cron time arrives. See [Recurring Jobs](/docs/features/recurring-jobs) for full details.
 
 ## Cancellation
 
@@ -108,7 +108,7 @@ Cancel a running job gracefully:
 await jobCommandService.DeleteJob(jobId);
 ```
 
-If the job is processing, this sets `CancellationMode = Graceful` instead of immediately changing state. The worker detects it and cancels the handler's `CancellationToken`. See [Job Cancellation](/docs/cancellation) for the full flow.
+If the job is processing, this sets `CancellationMode = Graceful` instead of immediately changing state. The worker detects it and cancels the handler's `CancellationToken`. See [Job Cancellation](/docs/features/cancellation) for the full flow.
 
 ## Mutex
 
@@ -119,4 +119,4 @@ await publisher.Enqueue(new ProcessPayment { CustomerId = 123 },
     new JobParameters { Mutex = "payment:123" });
 ```
 
-See [Mutex](/docs/mutex) for details.
+See [Mutex](/docs/features/mutex) for details.

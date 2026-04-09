@@ -162,5 +162,5 @@ public class OrderController : ControllerBase
 ```
 
 :::info Transactional Outbox
-Jobly uses the [outbox pattern](/docs/outbox-pattern) — jobs are written to the same DbContext as your business data and committed in a single `SaveChangesAsync()`. This guarantees atomicity: if the transaction fails, both your data and the jobs roll back. No orphaned jobs, no lost work.
+Jobly uses the [outbox pattern](/docs/features/outbox-pattern) — jobs are written to the same DbContext as your business data and committed in a single `SaveChangesAsync()`. This guarantees atomicity: if the transaction fails, both your data and the jobs roll back. No orphaned jobs, no lost work.
 :::

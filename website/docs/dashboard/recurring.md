@@ -19,7 +19,7 @@ Each recurring job tracks its executions via `RecurringJobLog` entries. The hist
 - **Trigger** — immediately creates and enqueues a new job instance, regardless of the cron schedule
 - **Delete** — removes the recurring job definition (existing job instances are not affected)
 
-For full documentation on configuring and using recurring jobs, see [Recurring Jobs](/docs/recurring-jobs).
+For full documentation on configuring and using recurring jobs, see [Recurring Jobs](/docs/features/recurring-jobs).
 
 import Screenshot from '@site/src/components/Screenshot';
 

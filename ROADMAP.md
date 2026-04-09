@@ -22,8 +22,8 @@ Don't enqueue if an identical job is already pending (Enqueued/Processing). Dedu
 ### Job Priority
 Explicit priority levels within a queue. Higher priority jobs fetched first.
 
-### Pause/Resume Queues
-Stop processing a specific queue without stopping the server. Workers skip paused queues.
+### ~~Pause/Resume~~ ✅
+Implemented at the server and worker group level. Paused servers/groups stop picking up new jobs; in-progress jobs continue to completion. Controllable via dashboard or API.
 
 ## Observability
 
@@ -33,8 +33,8 @@ Handlers report 0-100% progress via a context object. Stored on the job, visible
 ### OpenTelemetry Integration
 Activity/span for job execution. Correlates with HTTP traces via TraceId. Export to Jaeger/Zipkin/etc.
 
-### Job Tags / Metadata
-Arbitrary key-value pairs on jobs. Filterable in dashboard. Useful for grouping by tenant, feature area, etc.
+### ~~Job Metadata~~ ✅
+Implemented as `JobParameters.Metadata` (key-value pairs), `IJobContext` for handler access, and `IPublishPipelineBehavior<T>` for cross-cutting metadata. Metadata inherited by child jobs. Visible in dashboard.
 
 ### Webhook on Completion
 Configure a URL to POST to when a job reaches a terminal state. Useful for async API patterns.

@@ -11,14 +11,16 @@ Jobly ships as three NuGet packages: Moberg.Jobly.Core (publishing), Moberg.Jobl
 - [Jobs](https://moberghr.github.io/jobly/docs/patterns/jobs): IJob with scheduling, retries, continuations, batches, named queues, mutex
 - [Requests](https://moberghr.github.io/jobly/docs/patterns/requests): In-memory IRequest<TResponse> via IMediator.Send(), no persistence
 - [Patterns Overview](https://moberghr.github.io/jobly/docs/patterns): Type hierarchy, unified pipeline behaviors
-- [Outbox Pattern](https://moberghr.github.io/jobly/docs/outbox-pattern): Transactional outbox — jobs committed with business data
-- [Crash Recovery](https://moberghr.github.io/jobly/docs/crash-recovery): Sliding invisibility timeout, keep-alive, stale job recovery
-- [Job Tracing](https://moberghr.github.io/jobly/docs/tracing): TraceId and SpawnedByJobId for cross-job flow visibility
-- [Job Cancellation](https://moberghr.github.io/jobly/docs/cancellation): Graceful CancellationMode, handler CancellationToken
-- [Configuration](https://moberghr.github.io/jobly/docs/configuration): Worker, polling, retention, dispatcher mode, worker groups
-- [Recurring Jobs](https://moberghr.github.io/jobly/docs/recurring-jobs): Cron-based scheduling, deduplication, execution history
-- [Dashboard Auth](https://moberghr.github.io/jobly/docs/dashboard-auth): IJoblyAuthorizationFilter, built-in login, cookie auth
-- [Mutex](https://moberghr.github.io/jobly/docs/mutex): ConcurrencyKey-based mutual exclusion for jobs
+- [Outbox Pattern](https://moberghr.github.io/jobly/docs/features/outbox-pattern): Transactional outbox — jobs committed with business data
+- [Recurring Jobs](https://moberghr.github.io/jobly/docs/features/recurring-jobs): Cron-based scheduling, deduplication, execution history
+- [Job Metadata](https://moberghr.github.io/jobly/docs/features/metadata): Key-value metadata, publish pipeline behaviors, IJobContext
+- [Mutex](https://moberghr.github.io/jobly/docs/features/mutex): ConcurrencyKey-based mutual exclusion for jobs
+- [Job Cancellation](https://moberghr.github.io/jobly/docs/features/cancellation): Graceful CancellationMode, handler CancellationToken
+- [Pause / Resume](https://moberghr.github.io/jobly/docs/features/pause): Pause servers and worker groups, resume processing
+- [Job Tracing](https://moberghr.github.io/jobly/docs/features/tracing): TraceId and SpawnedByJobId for cross-job flow visibility
+- [Configuration](https://moberghr.github.io/jobly/docs/operations/configuration): Worker, polling, retention, dispatcher mode, worker groups
+- [Crash Recovery](https://moberghr.github.io/jobly/docs/operations/crash-recovery): Sliding invisibility timeout, keep-alive, stale job recovery
+- [Dashboard Auth](https://moberghr.github.io/jobly/docs/operations/dashboard-auth): IJoblyAuthorizationFilter, built-in login, cookie auth
 
 ## Optional
 
