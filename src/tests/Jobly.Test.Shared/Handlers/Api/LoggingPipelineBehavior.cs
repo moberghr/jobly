@@ -13,11 +13,11 @@ public class TimingPipelineBehavior<T, TResponse> : IPipelineBehavior<T, TRespon
         _logger = logger;
     }
 
-    public async Task<TResponse> HandleAsync(T message, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
+    public async Task<TResponse> HandleAsync(T message, RequestHandlerDelegate<T, TResponse> next, CancellationToken cancellationToken)
     {
         var start = DateTime.UtcNow;
         _logger.LogInformation("Starting handler for {Type}", typeof(T).Name);
-        var result = await next();
+        var result = await next(message, cancellationToken);
         var elapsed = DateTime.UtcNow - start;
         _logger.LogInformation("Completed handler for {Type} in {Elapsed}ms", typeof(T).Name, elapsed.TotalMilliseconds);
         return result;

@@ -7,6 +7,7 @@ using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
 using Jobly.Core.Logging;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Jobly.Core;
@@ -81,12 +82,14 @@ public class Publisher<TContext> : IPublisher
     private readonly TContext _context;
     private readonly JoblyConfiguration _configuration;
     private readonly TimeProvider _timeProvider;
+    private readonly IServiceProvider _serviceProvider;
 
-    public Publisher(TContext context, IOptions<JoblyConfiguration> configuration, TimeProvider timeProvider)
+    public Publisher(TContext context, IOptions<JoblyConfiguration> configuration, TimeProvider timeProvider, IServiceProvider serviceProvider)
     {
         _context = context;
         _configuration = configuration.Value;
         _timeProvider = timeProvider;
+        _serviceProvider = serviceProvider;
     }
 
     // --- IMessage: create Message-kind Job ---
@@ -106,6 +109,9 @@ public class Publisher<TContext> : IPublisher
         where T : class, IMessage
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        var publishCtx = await RunPublishPipeline(message, seed: null, CancellationToken.None);
+
         var msg = new Job
         {
             Kind = JobKind.Message,
@@ -116,6 +122,7 @@ public class Publisher<TContext> : IPublisher
             ScheduleTime = now,
             CurrentState = State.Enqueued,
             JobCount = 0,
+            Metadata = SerializeMetadata(publishCtx.Metadata),
         };
 
         // Trace propagation: inherit from execution context if inside a handler
@@ -174,7 +181,7 @@ public class Publisher<TContext> : IPublisher
 
     public async Task<Guid> Enqueue<T>(T job, JobParameters jobParameters)
         where T : class, IJob
-        => await CreateJob(job, jobParameters.ScheduleTime, jobParameters.MaxRetries, jobParameters.Queue, jobParameters.ParentId, jobParameters.Mutex);
+        => await CreateJob(job, jobParameters.ScheduleTime, jobParameters.MaxRetries, jobParameters.Queue, jobParameters.ParentId, jobParameters.Mutex, jobParameters.Metadata);
 
     public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime)
         where T : class, IJob
@@ -214,10 +221,14 @@ public class Publisher<TContext> : IPublisher
         int? maxRetries,
         string? queue,
         Guid? parentId,
-        string? mutex = null)
+        string? mutex = null,
+        Dictionary<string, string>? adHocMetadata = null)
         where T : class, IJob
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        var publishCtx = await RunPublishPipeline(job, adHocMetadata, CancellationToken.None);
+
         var newJob = JobHelper.CreateJob(
             job,
             _configuration.RetryCount,
@@ -227,7 +238,8 @@ public class Publisher<TContext> : IPublisher
             parentId,
             null,
             now,
-            concurrencyKey: mutex);
+            concurrencyKey: mutex,
+            metadata: SerializeMetadata(publishCtx.Metadata));
 
         // Automatic trace propagation: execution context > parent's trace > self
         var executionContext = JobExecutionContext.Current;
@@ -273,5 +285,57 @@ public class Publisher<TContext> : IPublisher
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<PublishContext<T>> RunPublishPipeline<T>(T job, Dictionary<string, string>? seed, CancellationToken ct)
+    {
+        var metadata = new Dictionary<string, string>();
+
+        // Seed with inherited metadata from parent execution context
+        var executionContext = JobExecutionContext.Current;
+        if (executionContext?.MetadataJson != null)
+        {
+            var inherited = JsonSerializer.Deserialize<Dictionary<string, string>>(executionContext.MetadataJson);
+            if (inherited != null)
+            {
+                foreach (var kvp in inherited)
+                {
+                    metadata[kvp.Key] = kvp.Value;
+                }
+            }
+        }
+
+        // Seed with ad-hoc metadata (overrides inherited)
+        if (seed != null)
+        {
+            foreach (var kvp in seed)
+            {
+                metadata[kvp.Key] = kvp.Value;
+            }
+        }
+
+        var context = new PublishContext<T> { Job = job, Metadata = metadata };
+
+        var behaviors = _serviceProvider.GetServices<IPublishPipelineBehavior<T>>().ToArray();
+        if (behaviors.Length == 0)
+        {
+            return context;
+        }
+
+        PublishDelegate chain = () => Task.CompletedTask;
+        for (var i = behaviors.Length - 1; i >= 0; i--)
+        {
+            var behavior = behaviors[i];
+            var next = chain;
+            chain = () => behavior.PublishAsync(context, next, ct);
+        }
+
+        await chain();
+        return context;
+    }
+
+    private static string? SerializeMetadata(Dictionary<string, string> metadata)
+    {
+        return metadata.Count > 0 ? JsonSerializer.Serialize(metadata) : null;
     }
 }

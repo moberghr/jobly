@@ -55,21 +55,6 @@ export interface JobModel {
   handlerType: string | null;
 }
 
-export interface JobDetailModel extends JobModel {
-  kind: number;
-  parentJobId: string | null;
-  retriedTimes: number;
-  maxRetries: number;
-  logs: JobLogModel[];
-  siblingJobCount: number;
-  childJobCount: number;
-  traceId: string | null;
-  spawnedByJobId: string | null;
-  traceJobCount: number;
-  concurrencyKey: string | null;
-  continuations: ContinuationInfo[];
-}
-
 export interface JobLogModel {
   id: string;
   eventType: string;
@@ -136,6 +121,7 @@ export interface UnifiedJobDetailModel {
   spawnedByJob: ContinuationInfo | null;
   continuations: ContinuationInfo[];
   spawnedJobs: ContinuationInfo[];
+  metadata: Record<string, string> | null;
   logs: JobLogModel[];
 }
 

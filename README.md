@@ -4,6 +4,11 @@
 
 A distributed job processing, message queue, and in-memory mediator library for .NET 10. Three patterns, one unified pipeline, a real-time dashboard.
 
+[![NuGet](https://img.shields.io/nuget/v/Moberg.Jobly.Core?label=Jobly.Core)](https://www.nuget.org/packages/Moberg.Jobly.Core)
+[![NuGet](https://img.shields.io/nuget/v/Moberg.Jobly.Worker?label=Jobly.Worker)](https://www.nuget.org/packages/Moberg.Jobly.Worker)
+[![NuGet](https://img.shields.io/nuget/v/Moberg.Jobly.UI?label=Jobly.UI)](https://www.nuget.org/packages/Moberg.Jobly.UI)
+[![Docs](https://img.shields.io/badge/docs-moberghr.github.io%2Fjobly-blue)](https://moberghr.github.io/jobly/)
+
 ## Features
 
 - **Background Jobs** — Schedule and orchestrate jobs with retries, continuations, and batch processing.

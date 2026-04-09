@@ -60,6 +60,8 @@ public abstract class PipelineTestsBase : IAsyncLifetime
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();
         services.AddSingleton<MultiHandlerCounter>();
+        services.AddScoped<Jobly.Core.Handlers.JobContext>();
+        services.AddScoped<Jobly.Core.Handlers.IJobContext>(x => x.GetRequiredService<Jobly.Core.Handlers.JobContext>());
 
         var workerConfig = new OptionsWrapper<JoblyWorkerConfiguration>(new JoblyWorkerConfiguration
         {

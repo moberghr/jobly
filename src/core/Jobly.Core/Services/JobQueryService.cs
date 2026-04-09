@@ -16,8 +16,6 @@ public interface IJobQueryService
 
     Task<PagedList<JobModel>> GetAwaitingJobs(BaseListRequest request);
 
-    Task<JobDetailModel?> GetJobById(Guid jobId);
-
     Task<PagedList<JobModel>> GetSiblingJobs(Guid jobId, BaseListRequest request);
 
     Task<PagedList<JobModel>> GetChildJobs(Guid jobId, BaseListRequest request);
@@ -90,87 +88,6 @@ public class JobQueryService<TContext> : IJobQueryService
     public async Task<PagedList<JobModel>> GetAwaitingJobs(BaseListRequest request)
     {
         return await GetJobsByState(State.Awaiting).ToPagedListAsync(request);
-    }
-
-    public async Task<JobDetailModel?> GetJobById(Guid jobId)
-    {
-        var job = await _context.Set<Job>()
-            .Where(x => x.Id == jobId)
-            .Select(x => new JobDetailModel
-            {
-                Id = x.Id,
-                Type = x.Type,
-                Message = x.Message,
-                CreateTime = x.CreateTime,
-                ScheduleTime = x.ScheduleTime,
-                CurrentState = x.CurrentState,
-                CancellationMode = x.CancellationMode,
-                HandlerType = x.HandlerType,
-                Kind = x.Kind,
-                ParentJobId = x.ParentJobId,
-                RetriedTimes = x.RetriedTimes,
-                MaxRetries = x.MaxRetries,
-                TraceId = x.TraceId,
-                SpawnedByJobId = x.SpawnedByJobId,
-                ConcurrencyKey = x.ConcurrencyKey,
-            })
-            .FirstOrDefaultAsync();
-
-        if (job == null)
-        {
-            return null;
-        }
-
-        job.Logs = await _context.Set<JobLog>()
-            .Where(x => x.JobId == jobId)
-            .OrderBy(x => x.Timestamp)
-            .Select(x => new JobLogModel
-            {
-                Id = x.Id,
-                EventType = x.EventType,
-                Timestamp = x.Timestamp,
-                Level = x.Level,
-                Message = x.Message,
-                Exception = x.Exception,
-                DurationMs = x.DurationMs,
-                WorkerId = x.WorkerId,
-            })
-            .ToListAsync();
-
-        // Counts for related jobs
-        if (job.ParentJobId != null)
-        {
-            job.SiblingJobCount = await _context.Set<Job>()
-                .Where(x => x.ParentJobId == job.ParentJobId && x.Kind == JobKind.Job && x.Id != jobId)
-                .CountAsync();
-        }
-
-        job.ChildJobCount = await _context.Set<Job>()
-            .Where(x => x.ParentJobId == jobId)
-            .CountAsync();
-
-        if (job.TraceId != null)
-        {
-            job.TraceJobCount = await _context.Set<Job>()
-                .Where(x => x.TraceId == job.TraceId && x.Id != jobId)
-                .CountAsync();
-        }
-
-        // Continuations: all children linked to this job
-        job.Continuations = await _context.Set<Job>()
-            .Where(x => x.ParentJobId == jobId)
-            .OrderBy(x => x.CreateTime)
-            .Select(x => new ContinuationInfo
-            {
-                Id = x.Id,
-                Kind = x.Kind,
-                CurrentState = x.CurrentState,
-                Type = x.Type,
-                HandlerType = x.HandlerType,
-            })
-            .ToListAsync();
-
-        return job;
     }
 
     public async Task<PagedList<JobModel>> GetSiblingJobs(Guid jobId, BaseListRequest request)
@@ -291,6 +208,7 @@ public class JobQueryService<TContext> : IJobQueryService
                 ContinuationOptions = x.ContinuationOptions,
                 Queue = x.Queue,
                 TraceId = x.TraceId,
+                MetadataJson = x.Metadata,
             })
             .FirstOrDefaultAsync();
 

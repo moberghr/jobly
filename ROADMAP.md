@@ -49,10 +49,11 @@ Generate handler registration, type mappings, and serialization code at compile 
 
 ## Infrastructure
 
-### Database Migrations
-Hybrid approach: ship SQL migration scripts per version in the NuGet package AND provide `MigrateJoblySchema()` helper that runs them automatically at startup. Currently uses `EnsureCreatedAsync()` which only works for fresh databases. Need versioned schema tracking (migration table), per-provider SQL scripts (PostgreSQL + SQL Server), and idempotent migrations.
+### ~~Database Migrations~~ ✅
+Jobly's entities are added to the user's DbContext model via `JoblyModelCustomizer`. Standard EF Core migrations (`dotnet ef migrations add`) pick up Jobly's tables automatically, including on NuGet upgrades. Documented in Getting Started.
 
-## In-Process Messaging
+### ~~In-Memory Mediator~~ ✅
+Implemented as `IRequest<TResponse>` with `IMediator.Send()`. Supports `IPipelineBehavior<TRequest, TResponse>` for cross-cutting concerns. Same pipeline as jobs and messages, no database persistence.
 
-### In-Memory Mediator
-Use Jobly's handler interfaces (IJobHandler, IMessageHandler, IPipelineBehavior) for in-process request/response and pub/sub without database persistence. Same handler code works for both in-memory (immediate) and background (persisted) execution. Lets you use Jobly as the single processing abstraction in your app — like MediatR but with the option to go async/persisted when needed.
+### Runtime Schema Migration Helper
+Optional `MigrateJoblySchemaAsync()` for users who don't use EF migrations. Diffs the EF model against the database at runtime, generates and executes only Jobly table DDL. Respects naming conventions. Lower priority — EF migrations cover most users.

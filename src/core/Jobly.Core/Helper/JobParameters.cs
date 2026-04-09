@@ -21,4 +21,6 @@ public class JobParameters
     public State? State { get; set; }
 
     public string? Mutex { get; set; }
+
+    public Dictionary<string, string>? Metadata { get; set; }
 }

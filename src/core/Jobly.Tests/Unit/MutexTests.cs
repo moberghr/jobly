@@ -197,6 +197,8 @@ public abstract class MutexTestsBase : IAsyncLifetime
         services.AddJobHandlers(typeof(MutexTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
+        services.AddScoped<Jobly.Core.Handlers.JobContext>();
+        services.AddScoped<Jobly.Core.Handlers.IJobContext>(x => x.GetRequiredService<Jobly.Core.Handlers.JobContext>());
 
         var workerConfig = new OptionsWrapper<JoblyWorkerConfiguration>(new JoblyWorkerConfiguration
         {

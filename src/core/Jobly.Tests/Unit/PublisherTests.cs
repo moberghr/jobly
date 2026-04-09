@@ -6,6 +6,7 @@ using Jobly.Core.Handlers;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Shouldly;
 
@@ -23,7 +24,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
 
     private static Publisher<TestContext> CreatePublisher(TestContext ctx)
     {
-        return new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System);
+        return new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
     }
 
     [Fact]

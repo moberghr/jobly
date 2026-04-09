@@ -106,6 +106,7 @@ public class JoblyTestServer : IAsyncDisposable
                 services.AddPipelineBehaviors(typeof(JoblyTestServer).Assembly);
                 services.AddSingleton<TestData.Handlers.CounterService>();
                 services.AddSingleton<TestData.Handlers.MultiHandlerCounter>();
+                services.AddSingleton<TestData.Handlers.MetadataCapture>();
 
                 services.AddJoblyWorker<TestContext>(config =>
                 {
@@ -260,6 +261,9 @@ public class JoblyTestServer : IAsyncDisposable
             .AsNoTracking()
             .ToListAsync();
     }
+
+    public T GetService<T>() where T : notnull
+        => _host.Services.GetRequiredService<T>();
 
     public async Task<Job> GetJob(Guid jobId)
     {

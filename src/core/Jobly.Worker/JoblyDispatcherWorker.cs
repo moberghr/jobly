@@ -115,7 +115,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         var logCollector = new JobLogCollector { JobId = job.Id, TimeProvider = _timeProvider, WorkerId = _workerId };
 
         using var jobCts = new CancellationTokenSource();
-        var monitorTask = RunJobMonitor(job.Id, jobCts, cancellationToken);
+        var monitorTask = RunJobMonitor(job.Id, logCollector, jobCts, cancellationToken);
 
         Stopwatch? handlerStopwatch = null;
         try
@@ -128,7 +128,15 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             {
                 JobId = job.Id,
                 TraceId = job.TraceId ?? job.Id,
+                MetadataJson = job.Metadata,
             };
+
+            var jobContext = scope.ServiceProvider.GetRequiredService<JobContext>();
+            jobContext.JobId = job.Id;
+            jobContext.TraceId = job.TraceId ?? job.Id;
+            jobContext.Metadata = job.Metadata != null
+                ? JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata) ?? new Dictionary<string, string>()
+                : new Dictionary<string, string>();
 
             handlerStopwatch = Stopwatch.StartNew();
             await ExecuteJob(job, scope.ServiceProvider, jobCts.Token);
@@ -233,42 +241,75 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         await JobDispatcher.ExecuteJobHandler(payload, messageType, jobHandlerType, provider, cancellationToken);
     }
 
-    private async Task RunJobMonitor(Guid jobId, CancellationTokenSource jobCts, CancellationToken stoppingToken)
+    private async Task RunJobMonitor(Guid jobId, JobLogCollector logCollector, CancellationTokenSource jobCts, CancellationToken stoppingToken)
     {
-        var interval = _configuration.CancellationCheckInterval;
+        var logFlushInterval = TimeSpan.FromSeconds(1);
+        var cancellationCheckInterval = _configuration.CancellationCheckInterval;
+        var tickInterval = logFlushInterval < cancellationCheckInterval ? logFlushInterval : cancellationCheckInterval;
+        var timeSinceLastCheck = TimeSpan.Zero;
+
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, jobCts.Token);
         while (!linked.IsCancellationRequested)
         {
             try
             {
-                await Task.Delay(interval, linked.Token);
+                await Task.Delay(tickInterval, linked.Token);
             }
             catch (OperationCanceledException)
             {
                 return;
             }
 
+            timeSinceLastCheck += tickInterval;
+
             try
             {
+                var pendingLogs = logCollector.Drain();
+                var doCancellationCheck = timeSinceLastCheck >= cancellationCheckInterval;
+
+                if (pendingLogs.Count == 0 && !doCancellationCheck)
+                {
+                    continue;
+                }
+
                 using var s = _scopeFactory.CreateScope();
                 var ctx = s.ServiceProvider.GetRequiredService<TContext>();
 
-                var cancellationMode = await ctx.Set<Job>()
-                    .Where(x => x.Id == jobId)
-                    .Select(x => x.CancellationMode)
-                    .FirstOrDefaultAsync(stoppingToken);
-
-                if (cancellationMode != CancellationMode.None)
+                if (doCancellationCheck)
                 {
-                    _logger.LogInformation("Job {jobId} cancellation requested ({mode}), cancelling handler", jobId, cancellationMode);
-                    await jobCts.CancelAsync();
-                    return;
+                    timeSinceLastCheck = TimeSpan.Zero;
+
+                    var cancellationMode = await ctx.Set<Job>()
+                        .Where(x => x.Id == jobId)
+                        .Select(x => x.CancellationMode)
+                        .FirstOrDefaultAsync(stoppingToken);
+
+                    if (cancellationMode != CancellationMode.None)
+                    {
+                        _logger.LogInformation("Job {jobId} cancellation requested ({mode}), cancelling handler", jobId, cancellationMode);
+
+                        // Flush any pending logs before cancelling — they were already drained from the queue
+                        if (pendingLogs.Count > 0)
+                        {
+                            ctx.Set<JobLog>().AddRange(pendingLogs);
+                            await ctx.SaveChangesAsync(stoppingToken);
+                        }
+
+                        await jobCts.CancelAsync();
+                        return;
+                    }
+
+                    var now = _timeProvider.GetUtcNow().UtcDateTime;
+                    await ctx.Set<Job>()
+                        .Where(x => x.Id == jobId)
+                        .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastKeepAlive, now), stoppingToken);
                 }
 
-                var now = _timeProvider.GetUtcNow().UtcDateTime;
-                await ctx.Set<Job>()
-                    .Where(x => x.Id == jobId)
-                    .ExecuteUpdateAsync(x => x.SetProperty(p => p.LastKeepAlive, now), stoppingToken);
+                if (pendingLogs.Count > 0)
+                {
+                    ctx.Set<JobLog>().AddRange(pendingLogs);
+                    await ctx.SaveChangesAsync(stoppingToken);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -335,12 +376,13 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
 
     private static async Task SaveJobLogs(TContext context, JobLogCollector collector)
     {
-        if (collector.Entries.Count == 0)
+        var entries = collector.Drain();
+        if (entries.Count == 0)
         {
             return;
         }
 
-        await context.Set<JobLog>().AddRangeAsync(collector.Entries);
+        await context.Set<JobLog>().AddRangeAsync(entries);
     }
 
     private static void AddCounters(TContext context, string totalKey, string hourlyKey)

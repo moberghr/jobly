@@ -60,10 +60,10 @@ public class MediatorTests
 
         public TrackingBehavior(List<string> log) => _log = log;
 
-        public async Task<TResponse> HandleAsync(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
+        public async Task<TResponse> HandleAsync(TRequest request, RequestHandlerDelegate<TRequest, TResponse> next, CancellationToken ct)
         {
             _log.Add("before");
-            var result = await next();
+            var result = await next(request, ct);
             _log.Add("after");
             return result;
         }

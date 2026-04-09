@@ -8,6 +8,7 @@ import { FilteredJobsTable } from '@/components/FilteredJobsTable';
 import { RelativeTime } from '@/components/RelativeTime';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
+import { usePolling } from '@/hooks/usePolling';
 import { State } from '@/types';
 import type { UnifiedJobDetailModel, JobLogModel } from '@/types';
 import * as api from '@/api';
@@ -39,6 +40,11 @@ function getDuration(logs: JobLogModel[], currentIndex: number): string | null {
   return formatDuration(current - previous);
 }
 
+function formatJson(raw: string): string {
+  try { return JSON.stringify(JSON.parse(raw), null, 2); }
+  catch { return raw; }
+}
+
 function kindLabel(kind: number) {
   if (kind === 3) return 'Batch';
   if (kind === 2) return 'Message';
@@ -54,6 +60,17 @@ export default function DetailPage() {
   useEffect(() => {
     if (id) api.getDetail(id).then(setJob).catch(() => setError('Unable to load details'));
   }, [id]);
+
+  const isProcessing = job?.currentState === State.Processing;
+
+  usePolling(
+    useCallback(() => {
+      if (id && isProcessing) {
+        api.getDetail(id).then(setJob).catch(() => {});
+      }
+    }, [id, isProcessing]),
+    3000
+  );
 
   const handleCountsUpdate = useCallback((counts: Record<string, number>) => {
     setJobCounts(counts);
@@ -118,12 +135,22 @@ export default function DetailPage() {
             </Card>
           )}
 
-          {/* Payload */}
-          {job.message && (
+          {/* Payload & Metadata */}
+          {(job.message || (job.metadata && Object.keys(job.metadata).length > 0)) && (
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Payload</CardTitle></CardHeader>
-              <CardContent>
-                <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">{job.message}</pre>
+              <CardContent className="pt-4 space-y-4">
+                {job.message && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Payload</h3>
+                    <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">{formatJson(job.message)}</pre>
+                  </div>
+                )}
+                {job.metadata && Object.keys(job.metadata).length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Metadata</h3>
+                    <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">{JSON.stringify(job.metadata, null, 2)}</pre>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -190,7 +217,7 @@ export default function DetailPage() {
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm">Handler Output ({handlerLogs.length})</CardTitle></CardHeader>
               <CardContent>
-                <div className="space-y-1 font-mono text-xs max-h-96 overflow-auto">
+                <div className="space-y-1 font-mono text-xs max-h-[80vh] overflow-auto">
                   {handlerLogs.map((log) => (
                     <div key={log.id} className={`flex gap-2 ${
                       log.level === 'Error' ? 'text-red-600' :
