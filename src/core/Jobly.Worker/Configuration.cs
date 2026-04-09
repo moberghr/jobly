@@ -79,6 +79,13 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     public int? MaxExpirableJobCount { get; set; }
 
     /// <summary>
+    /// When true (default), handler ILogger output is captured and written to the JobLog table.
+    /// When false, only system state-transition logs (Processing, Completed, Failed, etc.) are written.
+    /// Disabling reduces database write overhead for high-throughput workloads.
+    /// </summary>
+    public bool EnableHandlerLogging { get; set; } = true;
+
+    /// <summary>
     /// When true, uses a single dispatcher per worker group that batch-fetches jobs
     /// and distributes them to workers, reducing per-job DB overhead.
     /// When false (default), each worker independently fetches its own jobs.
