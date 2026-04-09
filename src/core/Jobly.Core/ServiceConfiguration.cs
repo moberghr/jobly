@@ -141,25 +141,24 @@ public static class ServiceConfiguration
         return optionsBuilder;
     }
 
-    public static void AddOutboxStateEntity(this ModelBuilder modelBuilder)
+    public static void AddOutboxStateEntity(this ModelBuilder modelBuilder, string? schema = "jobly")
     {
-        AddJobEntity(modelBuilder);
-        AddRecurringJobEntity(modelBuilder);
-        AddRecurringJobLogEntity(modelBuilder);
-        AddServerEntity(modelBuilder);
-        AddWorkerEntity(modelBuilder);
-        AddWorkerGroupEntity(modelBuilder);
-        AddJobLogEntity(modelBuilder);
-        AddStatisticEntity(modelBuilder);
-        AddCounterEntity(modelBuilder);
-        AddServerTaskEntity(modelBuilder);
-        AddServerLogEntity(modelBuilder);
+        AddJobEntity(modelBuilder, schema);
+        AddRecurringJobEntity(modelBuilder, schema);
+        AddRecurringJobLogEntity(modelBuilder, schema);
+        AddServerEntity(modelBuilder, schema);
+        AddWorkerEntity(modelBuilder, schema);
+        AddWorkerGroupEntity(modelBuilder, schema);
+        AddJobLogEntity(modelBuilder, schema);
+        AddStatisticEntity(modelBuilder, schema);
+        AddCounterEntity(modelBuilder, schema);
+        AddServerTaskEntity(modelBuilder, schema);
+        AddServerLogEntity(modelBuilder, schema);
     }
 
-    private static void AddJobEntity(ModelBuilder modelBuilder)
+    private static void AddJobEntity(ModelBuilder modelBuilder, string? schema)
     {
         var job = modelBuilder.Entity<Job>();
-        job.ToTable(nameof(Job));
 
         job.Property(p => p.Id);
         job.HasKey(p => p.Id);
@@ -203,12 +202,13 @@ public static class ServiceConfiguration
         job.HasIndex(p => p.ConcurrencyKey);
 
         job.Property(p => p.Metadata);
+
+        job.Metadata.SetSchema(schema);
     }
 
-    private static void AddRecurringJobEntity(ModelBuilder modelBuilder)
+    private static void AddRecurringJobEntity(ModelBuilder modelBuilder, string? schema)
     {
         var recurringJob = modelBuilder.Entity<RecurringJob>();
-        recurringJob.ToTable(nameof(RecurringJob));
 
         recurringJob.Property(p => p.Id);
         recurringJob.HasKey(p => p.Id);
@@ -223,12 +223,13 @@ public static class ServiceConfiguration
         recurringJob.Property(p => p.LastExecution);
 
         recurringJob.Property(p => p.Version).IsConcurrencyToken();
+
+        recurringJob.Metadata.SetSchema(schema);
     }
 
-    private static void AddRecurringJobLogEntity(ModelBuilder modelBuilder)
+    private static void AddRecurringJobLogEntity(ModelBuilder modelBuilder, string? schema)
     {
         var log = modelBuilder.Entity<RecurringJobLog>();
-        log.ToTable(nameof(RecurringJobLog));
 
         log.Property(p => p.Id);
         log.HasKey(p => p.Id);
@@ -241,12 +242,13 @@ public static class ServiceConfiguration
 
         log.HasIndex(p => p.JobId);
         log.HasOne(p => p.Job).WithMany().HasForeignKey(p => p.JobId).OnDelete(DeleteBehavior.SetNull);
+
+        log.Metadata.SetSchema(schema);
     }
 
-    private static void AddServerEntity(ModelBuilder modelBuilder)
+    private static void AddServerEntity(ModelBuilder modelBuilder, string? schema)
     {
         var server = modelBuilder.Entity<Server>();
-        server.ToTable(nameof(Server));
 
         server.Property(p => p.Id);
         server.HasKey(p => p.Id);
@@ -258,12 +260,13 @@ public static class ServiceConfiguration
         server.Property(p => p.ServiceCount);
 
         server.Property(p => p.PausedAt);
+
+        server.Metadata.SetSchema(schema);
     }
 
-    private static void AddWorkerEntity(ModelBuilder modelBuilder)
+    private static void AddWorkerEntity(ModelBuilder modelBuilder, string? schema)
     {
         var worker = modelBuilder.Entity<Worker>();
-        worker.ToTable(nameof(Worker));
 
         worker.Property(p => p.Id);
         worker.HasKey(p => p.Id);
@@ -280,12 +283,13 @@ public static class ServiceConfiguration
         worker.HasOne(p => p.WorkerGroup)
             .WithMany()
             .HasForeignKey(p => p.WorkerGroupId);
+
+        worker.Metadata.SetSchema(schema);
     }
 
-    private static void AddWorkerGroupEntity(ModelBuilder modelBuilder)
+    private static void AddWorkerGroupEntity(ModelBuilder modelBuilder, string? schema)
     {
         var wg = modelBuilder.Entity<WorkerGroup>();
-        wg.ToTable(nameof(WorkerGroup));
 
         wg.Property(p => p.Id);
         wg.HasKey(p => p.Id);
@@ -299,12 +303,13 @@ public static class ServiceConfiguration
         wg.HasOne(p => p.Server)
             .WithMany()
             .HasForeignKey(p => p.ServerId);
+
+        wg.Metadata.SetSchema(schema);
     }
 
-    private static void AddJobLogEntity(ModelBuilder modelBuilder)
+    private static void AddJobLogEntity(ModelBuilder modelBuilder, string? schema)
     {
         var jobLog = modelBuilder.Entity<JobLog>();
-        jobLog.ToTable(nameof(JobLog));
 
         jobLog.Property(p => p.Id);
         jobLog.HasKey(p => p.Id);
@@ -319,24 +324,26 @@ public static class ServiceConfiguration
         jobLog.Property(p => p.WorkerId);
 
         jobLog.HasIndex(p => p.JobId);
+
+        jobLog.Metadata.SetSchema(schema);
     }
 
-    private static void AddStatisticEntity(ModelBuilder modelBuilder)
+    private static void AddStatisticEntity(ModelBuilder modelBuilder, string? schema)
     {
         var stat = modelBuilder.Entity<Statistic>();
-        stat.ToTable(nameof(Statistic));
 
         stat.Property(p => p.Key);
         stat.HasKey(p => p.Key);
         stat.Property(p => p.Value);
 
         // No seed data — Statistic rows are created by the counter aggregator on demand.
+
+        stat.Metadata.SetSchema(schema);
     }
 
-    private static void AddCounterEntity(ModelBuilder modelBuilder)
+    private static void AddCounterEntity(ModelBuilder modelBuilder, string? schema)
     {
         var counter = modelBuilder.Entity<Counter>();
-        counter.ToTable(nameof(Counter));
 
         counter.Property(p => p.Id);
         counter.HasKey(p => p.Id);
@@ -344,12 +351,13 @@ public static class ServiceConfiguration
         counter.Property(p => p.Value);
 
         counter.HasIndex(p => p.Key);
+
+        counter.Metadata.SetSchema(schema);
     }
 
-    private static void AddServerTaskEntity(ModelBuilder modelBuilder)
+    private static void AddServerTaskEntity(ModelBuilder modelBuilder, string? schema)
     {
         var serverTask = modelBuilder.Entity<ServerTask>();
-        serverTask.ToTable(nameof(ServerTask));
 
         serverTask.Property(p => p.Id);
         serverTask.HasKey(p => p.Id);
@@ -367,12 +375,13 @@ public static class ServiceConfiguration
             .OnDelete(DeleteBehavior.Cascade);
 
         serverTask.HasIndex(p => p.ServerId);
+
+        serverTask.Metadata.SetSchema(schema);
     }
 
-    private static void AddServerLogEntity(ModelBuilder modelBuilder)
+    private static void AddServerLogEntity(ModelBuilder modelBuilder, string? schema)
     {
         var serverLog = modelBuilder.Entity<ServerLog>();
-        serverLog.ToTable(nameof(ServerLog));
 
         serverLog.Property(p => p.Id);
         serverLog.HasKey(p => p.Id);
@@ -391,5 +400,7 @@ public static class ServiceConfiguration
         serverLog.HasIndex(p => p.ServerId);
         serverLog.HasIndex(p => p.ServerTaskId);
         serverLog.HasIndex(p => p.Timestamp);
+
+        serverLog.Metadata.SetSchema(schema);
     }
 }

@@ -145,6 +145,8 @@ Default: no auth (open access).
 ### Key Design Decisions
 
 - **No raw SQL** — all queries use EF Core LINQ. No `_context.Set<>()` subqueries inside `.Select()` projections — use navigation properties or two-step fetch instead.
+- **Naming conventions respected** — entity configurations do NOT use `.ToTable()`, so EF Core naming conventions (e.g., `UseSnakeCaseNamingConvention()`) can transform table/column names freely. Schema is set via `entity.Metadata.SetSchema()` to avoid re-pinning table names.
+- **Default schema** — All Jobly tables default to the `"jobly"` schema. Configurable via `JoblyConfiguration.Schema`. Set to `null` for the database's default schema.
 - **TimeProvider** — all production code uses injectable `TimeProvider` instead of `DateTime.UtcNow`. Registered as `TryAddSingleton(TimeProvider.System)` in `AddJobly`. Test code can use `DateTime.UtcNow` directly.
 - **DbContext must be registered as Scoped** (not Transient). The outbox pattern requires the publisher and application code to share the same DbContext instance within a scope.
 - Everything is a Job. `ParentJobId` replaces both the old MessageId and BatchId foreign keys.
