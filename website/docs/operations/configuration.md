@@ -11,6 +11,7 @@ Used by the publisher side (`AddJobly<TContext>`):
 ```csharp
 builder.Services.AddJobly<AppDbContext>(options =>
 {
+    options.Schema = "jobly";      // Database schema for all Jobly tables (default: "jobly", null for default schema)
     options.RetryCount = 3;        // Default max retries for new jobs (default: 0)
     options.DefaultQueue = "default"; // Queue name when none specified (default: "default")
     options.JobExpirationTimeout = TimeSpan.FromDays(1); // How long completed/deleted jobs kept (default: 1 day)
@@ -19,9 +20,22 @@ builder.Services.AddJobly<AppDbContext>(options =>
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
+| `Schema` | `string?` | `"jobly"` | Database schema for all Jobly tables. Set to `null` for the database's default schema. |
 | `RetryCount` | `int` | `0` | Default max retries for jobs that don't specify their own |
 | `DefaultQueue` | `string` | `"default"` | Queue used when no queue is specified at publish time |
 | `JobExpirationTimeout` | `TimeSpan` | `1 day` | How long completed/deleted jobs are kept before cleanup. Failed jobs never expire. |
+
+### Naming Conventions
+
+Jobly's entity configurations do **not** hardcode table or column names. If you use a naming convention plugin (e.g., `UseSnakeCaseNamingConvention()`), it will transform Jobly's tables and columns just like your own entities:
+
+```csharp
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(connectionString)
+           .UseSnakeCaseNamingConvention());
+```
+
+This produces tables like `jobly.job`, `jobly.job_log`, `jobly.server`, etc.
 
 ## Worker Configuration (`JoblyWorkerConfiguration`)
 
@@ -76,6 +90,12 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 | `WorkerCount` | `int` | `min(CPU * 5, 20)` | Number of concurrent worker threads |
 | `PollingInterval` | `TimeSpan` | `1 second` | Delay between polls when no jobs are available |
 | `Queues` | `string[]` | `["default"]` | Queues this worker subscribes to. Processed in alphabetical order |
+
+### Handler Logging
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `EnableHandlerLogging` | `bool` | `true` | When true, handler `ILogger` output is captured and stored in the JobLog table. Set to `false` to suppress handler log capture (lifecycle events like Created/Completed are always recorded). |
 
 ### Cancellation
 

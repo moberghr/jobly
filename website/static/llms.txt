@@ -18,7 +18,7 @@ Jobly ships as three NuGet packages: Moberg.Jobly.Core (publishing), Moberg.Jobl
 - [Job Cancellation](https://moberghr.github.io/jobly/docs/features/cancellation): Graceful CancellationMode, handler CancellationToken
 - [Pause / Resume](https://moberghr.github.io/jobly/docs/features/pause): Pause servers and worker groups, resume processing
 - [Job Tracing](https://moberghr.github.io/jobly/docs/features/tracing): TraceId and SpawnedByJobId for cross-job flow visibility
-- [Configuration](https://moberghr.github.io/jobly/docs/operations/configuration): Worker, polling, retention, dispatcher mode, worker groups
+- [Configuration](https://moberghr.github.io/jobly/docs/operations/configuration): Worker, polling, retention, dispatcher mode, worker groups, schema, naming conventions
 - [Crash Recovery](https://moberghr.github.io/jobly/docs/operations/crash-recovery): Sliding invisibility timeout, keep-alive, stale job recovery
 - [Dashboard Auth](https://moberghr.github.io/jobly/docs/operations/dashboard-auth): IJoblyAuthorizationFilter, built-in login, cookie auth
 

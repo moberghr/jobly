@@ -15,6 +15,8 @@ sidebar_position: 6
 - **Real-time Handler Logs** — Handler `ILogger` output is now flushed to the database every ~1 second during execution, instead of only after the handler completes. Logs are visible in the dashboard while the job is still processing.
 - **Multi-server Integration Tests** — 16 new tests (8 per database) verify distributed coordination: row locks, advisory locks, orchestration, message routing, and mutex enforcement across two independent servers sharing one database.
 - **Deterministic Query Ordering** — Job and message fetch queries now use explicit ordering by queue and schedule time, ensuring predictable behavior in multi-server deployments.
+- **Naming Convention Support** — Entity configurations respect EF Core naming conventions (e.g., `UseSnakeCaseNamingConvention()`). All Jobly tables default to the `jobly` schema, configurable via `JoblyConfiguration.Schema`.
+- **Configurable Handler Logging** — `EnableHandlerLogging` option (default true) to suppress handler `ILogger` output from the JobLog table when not needed. Lifecycle events are always recorded.
 - **AI-friendly Documentation** — Added `llms.txt` and `llms-full.txt` for LLM/agent consumption, following the llms.txt convention.
 
 ### Improvements
@@ -22,11 +24,11 @@ sidebar_position: 6
 - Sidebar reorganized into logical groups: Patterns, Features, Operations, Dashboard
 - Dashboard shows metadata alongside job payload as formatted JSON
 - NuGet badges added to README
+- Deterministic query ordering for predictable multi-server behavior
 
 ### Stats
 
-- 608 tests (304 PostgreSQL + 304 SQL Server)
-- 5 PRs merged (#90-#95)
+- 632 tests (316 PostgreSQL + 316 SQL Server)
 
 ---
 

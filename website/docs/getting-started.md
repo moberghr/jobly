@@ -29,7 +29,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 ```
 
-Jobly automatically adds its interceptors (row locking) and entity configuration (Job, Message, Batch, etc.) when you register Jobly services in the next step.
+Jobly automatically adds its interceptors (row locking) and entity configuration (Job, Message, Batch, etc.) when you register Jobly services in the next step. All Jobly tables are placed in the `jobly` schema by default.
+
+:::tip Naming Conventions
+Jobly respects EF Core naming conventions. If you use `UseSnakeCaseNamingConvention()`, Jobly's tables and columns will follow your convention automatically.
+:::
 
 ### 2. Create the database schema
 

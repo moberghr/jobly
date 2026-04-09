@@ -18,7 +18,7 @@ Ships as NuGet packages (Jobly.Core, Jobly.UI, Jobly.Worker). Supports PostgreSQ
 # Backend (from src/)
 dotnet build Jobly.sln
 dotnet test Jobly.sln --filter "Category!=SqlServer"   # PostgreSQL only
-dotnet test Jobly.sln                                    # All databases (608 tests, ~30s)
+dotnet test Jobly.sln                                    # All databases (632 tests, ~30s)
 
 # Run specific test suites
 dotnet test Jobly.sln --filter "FullyQualifiedName~Jobly.Tests.Unit"         # Unit tests only
@@ -175,7 +175,7 @@ Default: no auth (open access).
 
 ## Testing
 
-608 tests (304 PostgreSQL + 304 SQL Server) using xUnit, Shouldly, Testcontainers + Respawn (~30s).
+632 tests (316 PostgreSQL + 316 SQL Server) using xUnit, Shouldly, Testcontainers + Respawn (~30s).
 
 ### Test Structure
 

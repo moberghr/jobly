@@ -687,6 +687,7 @@ The `RunJobMonitor` task runs alongside each handler execution, periodically dra
 ```csharp
 builder.Services.AddJobly<AppDbContext>(options =>
 {
+    options.Schema = "jobly";                                  // Database schema (default: "jobly", null for default)
     options.RetryCount = 3;                                    // Default max retries (default: 0)
     options.DefaultQueue = "default";                          // Default queue name (default: "default")
     options.JobExpirationTimeout = TimeSpan.FromDays(1);       // Completed/deleted job retention (default: 1 day)
@@ -702,6 +703,9 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     options.WorkerCount = 10;                                  // Concurrent workers (default: min(CPU*5, 20))
     options.PollingInterval = TimeSpan.FromSeconds(1);         // Poll delay when idle (default: 1s)
     options.Queues = ["a-critical", "b-default", "c-low"];     // Subscribed queues (default: ["default"])
+
+    // Handler logging
+    options.EnableHandlerLogging = true;                       // false to suppress ILogger capture (default: true)
 
     // Dispatcher mode (batch-fetch instead of per-worker polling)
     options.UseDispatcher = false;                             // default: false
@@ -1179,3 +1183,5 @@ Both apps share the same database. The worker polls for and executes jobs create
 8. **Handler ILogger output is captured** — logs are flushed every ~1s and appear in the dashboard in real time
 9. **Job metadata is inherited** — child jobs automatically inherit parent metadata via ambient context
 10. **Pause is propagated via heartbeat** — there may be a ~3s delay between pause command and workers stopping
+11. **Jobly tables use the `jobly` schema by default** — configurable via `JoblyConfiguration.Schema`, set to `null` for default schema
+12. **Naming conventions are respected** — entity configs don't hardcode table/column names, so `UseSnakeCaseNamingConvention()` works
