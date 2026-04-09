@@ -365,3 +365,4 @@ FodyWeavers.xsd
 
 # Playwright MCP snapshots
 .playwright-mcp/
+tasks/todo.md

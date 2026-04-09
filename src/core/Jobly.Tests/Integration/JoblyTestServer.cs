@@ -84,7 +84,12 @@ public class JoblyTestServer : IAsyncDisposable
         throw new TimeoutException($"PauseStateHolder did not reach expected state (paused={expectedPaused}) for group {groupId} within {timeout ?? TimeSpan.FromSeconds(5)}");
     }
 
-    public static async Task<JoblyTestServer> StartAsync(IDatabaseFixture fixture)
+    public static Task<JoblyTestServer> StartAsync(IDatabaseFixture fixture)
+    {
+        return StartAsync(fixture, configure: null);
+    }
+
+    public static async Task<JoblyTestServer> StartAsync(IDatabaseFixture fixture, Action<JoblyWorkerConfiguration>? configure)
     {
         var tempCtx = fixture.CreateContext();
         var connectionString = tempCtx.Database.GetConnectionString()!;
@@ -119,6 +124,8 @@ public class JoblyTestServer : IAsyncDisposable
                     config.InvisibilityTimeout = TimeSpan.FromMinutes(1);
                     config.HealthCheckInterval = TimeSpan.FromMilliseconds(200);
                     config.UseDispatcher = false;
+
+                    configure?.Invoke(config);
                 });
             })
             .Build();
