@@ -8,6 +8,7 @@ import { FilteredJobsTable } from '@/components/FilteredJobsTable';
 import { RelativeTime } from '@/components/RelativeTime';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
+import { usePolling } from '@/hooks/usePolling';
 import { State } from '@/types';
 import type { UnifiedJobDetailModel, JobLogModel } from '@/types';
 import * as api from '@/api';
@@ -59,6 +60,17 @@ export default function DetailPage() {
   useEffect(() => {
     if (id) api.getDetail(id).then(setJob).catch(() => setError('Unable to load details'));
   }, [id]);
+
+  const isProcessing = job?.currentState === State.Processing;
+
+  usePolling(
+    useCallback(() => {
+      if (id && isProcessing) {
+        api.getDetail(id).then(setJob).catch(() => {});
+      }
+    }, [id, isProcessing]),
+    3000
+  );
 
   const handleCountsUpdate = useCallback((counts: Record<string, number>) => {
     setJobCounts(counts);
@@ -205,7 +217,7 @@ export default function DetailPage() {
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm">Handler Output ({handlerLogs.length})</CardTitle></CardHeader>
               <CardContent>
-                <div className="space-y-1 font-mono text-xs max-h-96 overflow-auto">
+                <div className="space-y-1 font-mono text-xs max-h-[80vh] overflow-auto">
                   {handlerLogs.map((log) => (
                     <div key={log.id} className={`flex gap-2 ${
                       log.level === 'Error' ? 'text-red-600' :
