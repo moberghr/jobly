@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Pagination } from '@/components/Pagination';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
+import { Badge } from '@/components/ui/badge';
 import { shortId, shortType } from '@/utils/format';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import type { WorkerDetailModel, WorkerJobLogModel, PagedList } from '@/types';
@@ -64,6 +65,8 @@ export default function WorkerDetailPage() {
         ) : (
           <span className="text-sm text-muted-foreground">Idle</span>
         )}
+        {worker?.serverPausedAt && <Badge variant="outline" className="text-amber-600 border-amber-300">Server Paused</Badge>}
+        {worker?.workerGroupPausedAt && <Badge variant="outline" className="text-amber-600 border-amber-300">Group Paused</Badge>}
       </div>
 
       {worker && (

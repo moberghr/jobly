@@ -181,6 +181,7 @@ export interface ServerModel {
   serviceCount: number;
   cpuUsagePercent: number | null;
   memoryWorkingSetBytes: number | null;
+  pausedAt: string | null;
   workers: WorkerModel[];
 }
 
@@ -210,6 +211,8 @@ export interface WorkerModel {
   currentJobType: string | null;
   queues: string | null;
   pollingIntervalMs: number | null;
+  workerGroupId: string | null;
+  workerGroupPausedAt: string | null;
 }
 
 export interface PagedList<T> {
@@ -235,6 +238,9 @@ export interface WorkerDetailModel {
   serverName: string;
   queues: string | null;
   pollingIntervalMs: number | null;
+  serverPausedAt: string | null;
+  workerGroupId: string | null;
+  workerGroupPausedAt: string | null;
 }
 
 export interface WorkerJobLogModel {

@@ -16,6 +16,8 @@ public class ServerModel
 
     public long? MemoryWorkingSetBytes { get; set; }
 
+    public DateTime? PausedAt { get; set; }
+
     public List<WorkerModel> Workers { get; set; } = [];
 }
 
@@ -34,4 +36,8 @@ public class WorkerModel
     public string? Queues { get; set; }
 
     public double? PollingIntervalMs { get; set; }
+
+    public Guid? WorkerGroupId { get; set; }
+
+    public DateTime? WorkerGroupPausedAt { get; set; }
 }

@@ -31,7 +31,7 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     /// </summary>
     public string[] Queues { get; set; } = ["default"];
 
-    public TimeSpan HealthCheckInterval { get; set; } = TimeSpan.FromSeconds(10);
+    public TimeSpan HealthCheckInterval { get; set; } = TimeSpan.FromSeconds(3);
 
     public TimeSpan HealthCheckTimeout { get; set; } = TimeSpan.FromMinutes(5);
 

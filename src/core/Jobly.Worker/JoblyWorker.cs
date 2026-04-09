@@ -10,18 +10,28 @@ public class JoblyWorker<TContext> : BackgroundService
     private readonly ILogger<JoblyWorker<TContext>> _logger;
     private readonly IJoblyWorkerService _joblyWorkerService;
     private readonly WorkerGroupConfiguration _groupConfiguration;
+    private readonly PauseStateHolder _pauseStateHolder;
+    private readonly Guid _workerGroupId;
 
-    public JoblyWorker(IJoblyWorkerService joblyWorkerService, ILogger<JoblyWorker<TContext>> logger, WorkerGroupConfiguration groupConfiguration)
+    public JoblyWorker(IJoblyWorkerService joblyWorkerService, ILogger<JoblyWorker<TContext>> logger, WorkerGroupConfiguration groupConfiguration, PauseStateHolder pauseStateHolder, Guid workerGroupId)
     {
         _joblyWorkerService = joblyWorkerService;
         _logger = logger;
         _groupConfiguration = groupConfiguration;
+        _pauseStateHolder = pauseStateHolder;
+        _workerGroupId = workerGroupId;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            if (_pauseStateHolder.IsPaused(_workerGroupId))
+            {
+                await Task.Delay(_groupConfiguration.PollingInterval, stoppingToken);
+                continue;
+            }
+
             var didProcessJob = await _joblyWorkerService.GetAndProcessJob(stoppingToken);
             if (!didProcessJob)
             {

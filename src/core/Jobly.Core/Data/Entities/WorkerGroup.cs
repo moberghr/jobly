@@ -13,4 +13,6 @@ public class WorkerGroup
     public string Queues { get; set; } = "default";
 
     public double PollingIntervalMs { get; set; } = 1000;
+
+    public DateTime? PausedAt { get; set; }
 }

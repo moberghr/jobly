@@ -13,6 +13,7 @@ namespace Jobly.Worker.Services;
 public class HeartbeatTask<TContext> : ServerTaskBase<TContext>
     where TContext : DbContext
 {
+    private readonly PauseStateHolder _pauseStateHolder;
     private TimeSpan? _previousCpuTime;
     private DateTime _previousWallTime;
 
@@ -20,9 +21,12 @@ public class HeartbeatTask<TContext> : ServerTaskBase<TContext>
         IServiceScopeFactory scopeFactory,
         ILogger<HeartbeatTask<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        PauseStateHolder pauseStateHolder)
         : base(scopeFactory, logger, configuration, timeProvider)
     {
+        _pauseStateHolder = pauseStateHolder;
+
         try
         {
             var process = System.Diagnostics.Process.GetCurrentProcess();
@@ -75,6 +79,13 @@ public class HeartbeatTask<TContext> : ServerTaskBase<TContext>
         }
 
         await context.SaveChangesAsync(ct);
+
+        // Update pause state for workers to read
+        var groupPauseStates = await context.Set<WorkerGroup>()
+            .Where(g => g.ServerId == ServerId)
+            .ToDictionaryAsync(g => g.Id, g => g.PausedAt != null, ct);
+        _pauseStateHolder.Update(server.PausedAt != null, groupPauseStates);
+
         return null;
     }
 }

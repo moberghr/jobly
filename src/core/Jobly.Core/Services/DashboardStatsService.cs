@@ -154,6 +154,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             ServiceCount = s.ServiceCount,
             CpuUsagePercent = s.CpuUsagePercent,
             MemoryWorkingSetBytes = s.MemoryWorkingSetBytes,
+            PausedAt = s.PausedAt,
             Workers = workersByServer.GetValueOrDefault(s.Id, [])
                 .ConvertAll(w =>
                 {
@@ -167,6 +168,8 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
                         CurrentJobType = activeJob?.Type,
                         Queues = w.WorkerGroup?.Queues,
                         PollingIntervalMs = w.WorkerGroup?.PollingIntervalMs,
+                        WorkerGroupId = w.WorkerGroupId,
+                        WorkerGroupPausedAt = w.WorkerGroup?.PausedAt,
                     };
                 }),
         });
@@ -204,6 +207,7 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             ServiceCount = server.ServiceCount,
             CpuUsagePercent = server.CpuUsagePercent,
             MemoryWorkingSetBytes = server.MemoryWorkingSetBytes,
+            PausedAt = server.PausedAt,
             Workers = workers.ConvertAll(w =>
             {
                 jobByWorker.TryGetValue(w.Id, out var activeJob);
@@ -216,6 +220,8 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
                     CurrentJobType = activeJob?.Type,
                     Queues = w.WorkerGroup?.Queues,
                     PollingIntervalMs = w.WorkerGroup?.PollingIntervalMs,
+                    WorkerGroupId = w.WorkerGroupId,
+                    WorkerGroupPausedAt = w.WorkerGroup?.PausedAt,
                 };
             }),
         };
@@ -452,6 +458,9 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             CurrentJobType = activeJob?.Type,
             Queues = worker.WorkerGroup?.Queues,
             PollingIntervalMs = worker.WorkerGroup?.PollingIntervalMs,
+            ServerPausedAt = server?.PausedAt,
+            WorkerGroupId = worker.WorkerGroupId,
+            WorkerGroupPausedAt = worker.WorkerGroup?.PausedAt,
             ServerId = worker.ServerId,
             ServerName = server?.ServerName ?? "Unknown",
         };

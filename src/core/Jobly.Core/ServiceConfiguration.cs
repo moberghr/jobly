@@ -71,6 +71,7 @@ public static class ServiceConfiguration
         services.AddScoped<IJobGroupQueryService>(x => new JobGroupQueryService<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IRecurringJobService>(x => new RecurringJobService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
         services.AddScoped<IDashboardStatsService>(x => new DashboardStatsService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
+        services.AddScoped<IServerCommandService>(x => new ServerCommandService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
         services.AddTransient<IBatchPublisher, BatchPublisher<TContext>>();
 
         return services;
@@ -245,6 +246,8 @@ public static class ServiceConfiguration
         server.Property(p => p.LastHeartbeatTime);
 
         server.Property(p => p.ServiceCount);
+
+        server.Property(p => p.PausedAt);
     }
 
     private static void AddWorkerEntity(ModelBuilder modelBuilder)
@@ -281,6 +284,7 @@ public static class ServiceConfiguration
         wg.Property(p => p.WorkerCount);
         wg.Property(p => p.Queues);
         wg.Property(p => p.PollingIntervalMs);
+        wg.Property(p => p.PausedAt);
 
         wg.HasOne(p => p.Server)
             .WithMany()

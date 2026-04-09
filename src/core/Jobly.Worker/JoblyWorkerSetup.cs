@@ -18,18 +18,21 @@ public class JoblyWorkerSetup<TContext> : IHostedService
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IServiceProvider _serviceProvider;
     private readonly TimeProvider _timeProvider;
+    private readonly PauseStateHolder _pauseStateHolder;
     private readonly List<BackgroundService> _workers = [];
 
     public JoblyWorkerSetup(
         IOptions<JoblyWorkerConfiguration> configuration,
         IServiceScopeFactory serviceScopeFactory,
         IServiceProvider serviceProvider,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        PauseStateHolder pauseStateHolder)
     {
         _serviceProvider = serviceProvider;
         _serviceScopeFactory = serviceScopeFactory;
         _configuration = configuration.Value;
         _timeProvider = timeProvider;
+        _pauseStateHolder = pauseStateHolder;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -37,8 +40,8 @@ public class JoblyWorkerSetup<TContext> : IHostedService
         var workerGroups = _configuration.GetEffectiveWorkerGroups();
         var totalWorkerCount = workerGroups.Sum(g => g.WorkerCount);
 
-        // Build worker IDs per group
-        var workerIdsPerGroup = new List<(WorkerGroupConfiguration Group, List<Guid> Ids)>();
+        // Build worker IDs and group entity IDs per group
+        var workerIdsPerGroup = new List<(WorkerGroupConfiguration Group, List<Guid> WorkerIds, Guid GroupEntityId)>();
         foreach (var group in workerGroups)
         {
             var ids = new List<Guid>();
@@ -47,10 +50,8 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                 ids.Add(Guid.NewGuid());
             }
 
-            workerIdsPerGroup.Add((group, ids));
+            workerIdsPerGroup.Add((group, ids, Guid.Empty));
         }
-
-        var allWorkerIds = workerIdsPerGroup.SelectMany(g => g.Ids).ToList();
 
         // Register server and all workers in one transaction
         using (var scope = _serviceScopeFactory.CreateScope())
@@ -68,8 +69,9 @@ public class JoblyWorkerSetup<TContext> : IHostedService
             };
             await context.Set<Server>().AddAsync(server, cancellationToken);
 
-            foreach (var (group, ids) in workerIdsPerGroup)
+            for (var g = 0; g < workerIdsPerGroup.Count; g++)
             {
+                var (group, ids, _) = workerIdsPerGroup[g];
                 var workerGroup = new Jobly.Core.Data.Entities.WorkerGroup
                 {
                     ServerId = _configuration.ServerId,
@@ -78,6 +80,9 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                     PollingIntervalMs = group.PollingInterval.TotalMilliseconds,
                 };
                 await context.Set<Jobly.Core.Data.Entities.WorkerGroup>().AddAsync(workerGroup, cancellationToken);
+
+                // Capture the generated WorkerGroup entity ID
+                workerIdsPerGroup[g] = (group, ids, workerGroup.Id);
 
                 foreach (var workerId in ids)
                 {
@@ -95,11 +100,17 @@ public class JoblyWorkerSetup<TContext> : IHostedService
             }
 
             await context.SaveChangesAsync(cancellationToken);
+
+            // Initialize PauseStateHolder from DB before starting workers,
+            // so workers never see a stale "not paused" default on startup.
+            var groupPauseStates = workerIdsPerGroup
+                .ToDictionary(x => x.GroupEntityId, _ => false);
+            _pauseStateHolder.Update(false, groupPauseStates);
         }
 
         // Start worker background services per group
         var workerIndex = 0;
-        foreach (var group in workerGroups)
+        foreach (var (group, workerIds, groupEntityId) in workerIdsPerGroup)
         {
             if (_configuration.UseDispatcher)
             {
@@ -108,7 +119,9 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                     _serviceProvider.GetRequiredService<ILogger<JoblyDispatcher<TContext>>>(),
                     _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>(),
                     group,
-                    _timeProvider);
+                    _timeProvider,
+                    _pauseStateHolder,
+                    groupEntityId);
 
                 await dispatcher.StartAsync(cancellationToken);
                 _workers.Add(dispatcher);
@@ -116,7 +129,7 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                 for (var i = 0; i < group.WorkerCount; i++)
                 {
                     var worker = new JoblyDispatcherWorker<TContext>(
-                        allWorkerIds[workerIndex],
+                        workerIds[i],
                         dispatcher.JobReader,
                         _serviceScopeFactory,
                         _serviceProvider.GetRequiredService<ILogger<JoblyDispatcherWorker<TContext>>>(),
@@ -133,7 +146,7 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                 for (var i = 0; i < group.WorkerCount; i++)
                 {
                     var workerService = new JoblyWorkerService<TContext>(
-                        allWorkerIds[workerIndex],
+                        workerIds[i],
                         _serviceScopeFactory,
                         _serviceProvider.GetRequiredService<ILogger<JoblyWorkerService<TContext>>>(),
                         _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>(),
@@ -144,7 +157,9 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                     var worker = new JoblyWorker<TContext>(
                         workerService,
                         _serviceProvider.GetRequiredService<ILogger<JoblyWorker<TContext>>>(),
-                        group);
+                        group,
+                        _pauseStateHolder,
+                        groupEntityId);
 
                     await worker.StartAsync(cancellationToken);
                     _workers.Add(worker);

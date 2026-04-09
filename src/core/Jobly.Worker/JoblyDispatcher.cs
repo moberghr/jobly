@@ -24,19 +24,25 @@ public class JoblyDispatcher<TContext> : BackgroundService
     private readonly TimeProvider _timeProvider;
     private readonly Channel<Job> _jobChannel;
     private readonly int _workerCount;
+    private readonly PauseStateHolder _pauseStateHolder;
+    private readonly Guid _workerGroupId;
 
     public JoblyDispatcher(
         IServiceScopeFactory scopeFactory,
         ILogger<JoblyDispatcher<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
         WorkerGroupConfiguration groupConfiguration,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        PauseStateHolder pauseStateHolder,
+        Guid workerGroupId)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _groupConfiguration = groupConfiguration;
         _timeProvider = timeProvider;
         _workerCount = groupConfiguration.WorkerCount;
+        _pauseStateHolder = pauseStateHolder;
+        _workerGroupId = workerGroupId;
 
         _jobChannel = Channel.CreateBounded<Job>(new BoundedChannelOptions(_workerCount)
         {
@@ -53,6 +59,12 @@ public class JoblyDispatcher<TContext> : BackgroundService
         {
             try
             {
+                if (_pauseStateHolder.IsPaused(_workerGroupId))
+                {
+                    await Task.Delay(_groupConfiguration.PollingInterval, stoppingToken);
+                    continue;
+                }
+
                 var fetched = await FetchAndDistribute(stoppingToken);
                 if (!fetched)
                 {

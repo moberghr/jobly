@@ -124,5 +124,10 @@ export const getWorkerById = (workerId: string) =>
 export const getWorkerJobLogs = (workerId: string, page = 0, pageSize = 20) =>
   api.get<PagedList<WorkerJobLogModel>>(`/workers/${workerId}/logs`, { params: { page, pageSize } }).then(r => r.data);
 
+export const pauseServer = (serverId: string) => api.post(`/servers/${serverId}/pause`);
+export const resumeServer = (serverId: string) => api.post(`/servers/${serverId}/resume`);
+export const pauseWorkerGroup = (groupId: string) => api.post(`/groups/${groupId}/pause`);
+export const resumeWorkerGroup = (groupId: string) => api.post(`/groups/${groupId}/resume`);
+
 export const getStatsHistory = (hours = 24) =>
   api.get<StatsHistoryPoint[]>('/stats/history', { params: { hours } }).then(r => r.data);
