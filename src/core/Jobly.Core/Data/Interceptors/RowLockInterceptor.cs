@@ -1,5 +1,5 @@
 using System.Data.Common;
-using Jobly.Core.Entities;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Jobly.Core.Interceptors;
@@ -56,12 +56,16 @@ public class PostgresRowLockInterceptor : DbCommandInterceptor
     }
 }
 
-public class SqlServerRowLockInterceptor : DbCommandInterceptor
+public partial class SqlServerRowLockInterceptor : DbCommandInterceptor
 {
+    // Matches the first FROM [table] AS [alias] or FROM [schema].[table] AS [alias] pattern
+    [GeneratedRegex(@"(FROM\s+(?:\[\w+\]\.)*\[\w+\]\s+AS\s+\[\w+\])")]
+    private static partial Regex FromClausePattern();
+
     public override InterceptionResult<DbDataReader> ReaderExecuting(
-    DbCommand command,
-    CommandEventData eventData,
-    InterceptionResult<DbDataReader> result)
+        DbCommand command,
+        CommandEventData eventData,
+        InterceptionResult<DbDataReader> result)
     {
         ManipulateCommand(command);
 
@@ -84,15 +88,15 @@ public class SqlServerRowLockInterceptor : DbCommandInterceptor
         if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJob}", StringComparison.Ordinal)
             && !command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJobWait}", StringComparison.Ordinal))
         {
-            command.CommandText = command.CommandText.Replace($"FROM [{nameof(Job)}] AS [j]", $"FROM [{nameof(Job)}] AS [j] WITH (ROWLOCK, UPDLOCK, READPAST)", StringComparison.Ordinal);
+            command.CommandText = FromClausePattern().Replace(command.CommandText, "$1 WITH (ROWLOCK, UPDLOCK, READPAST)", 1);
         }
         else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJobWait}", StringComparison.Ordinal))
         {
-            command.CommandText = command.CommandText.Replace($"FROM [{nameof(Job)}] AS [j]", $"FROM [{nameof(Job)}] AS [j] WITH (ROWLOCK, UPDLOCK)", StringComparison.Ordinal);
+            command.CommandText = FromClausePattern().Replace(command.CommandText, "$1 WITH (ROWLOCK, UPDLOCK)", 1);
         }
         else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableCounter}", StringComparison.Ordinal))
         {
-            command.CommandText = command.CommandText.Replace("FROM [Counter] AS [c]", "FROM [Counter] AS [c] WITH (ROWLOCK, UPDLOCK, READPAST)", StringComparison.Ordinal);
+            command.CommandText = FromClausePattern().Replace(command.CommandText, "$1 WITH (ROWLOCK, UPDLOCK, READPAST)", 1);
         }
     }
 }
