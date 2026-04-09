@@ -123,7 +123,11 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             PerfTrace.Mark(PerfTrace.ExecuteHandler);
             _logger.LogInformation("Worker {workerId} executing job {id}", _workerId, job.Id);
 
-            JobLogContext.Current = logCollector;
+            if (_configuration.EnableHandlerLogging)
+            {
+                JobLogContext.Current = logCollector;
+            }
+
             JobExecutionContext.Current = new JobExecutionInfo
             {
                 JobId = job.Id,
@@ -154,7 +158,10 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             PerfTrace.Mark(PerfTrace.BeginTransaction2);
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
             UpdateJobState(context, job, null, handlerStopwatch.Elapsed.TotalMilliseconds);
-            await SaveJobLogs(context, logCollector);
+            if (_configuration.EnableHandlerLogging)
+            {
+                await SaveJobLogs(context, logCollector);
+            }
 
             PerfTrace.Mark(PerfTrace.SaveCompleted);
             await context.SaveChangesAsync(default);
@@ -188,7 +195,11 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
                 DurationMs = handlerStopwatch?.Elapsed.TotalMilliseconds,
                 WorkerId = _workerId,
             });
-            await SaveJobLogs(context, logCollector);
+            if (_configuration.EnableHandlerLogging)
+            {
+                await SaveJobLogs(context, logCollector);
+            }
+
             await context.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
         }
@@ -203,7 +214,10 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
 
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
             UpdateJobState(context, job, e, handlerStopwatch?.Elapsed.TotalMilliseconds);
-            await SaveJobLogs(context, logCollector);
+            if (_configuration.EnableHandlerLogging)
+            {
+                await SaveJobLogs(context, logCollector);
+            }
             await context.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
         }

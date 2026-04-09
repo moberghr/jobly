@@ -51,7 +51,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    private JoblyWorkerService<TestContext> CreateWorker()
+    private JoblyWorkerService<TestContext> CreateWorker(bool enableHandlerLogging = true)
     {
         var services = new ServiceCollection();
         services.AddJobHandlers(typeof(HandlerLogTestsBase).Assembly);
@@ -68,6 +68,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
             WorkerCount = 1,
             ServerId = ServerId,
             Queues = DefaultQueues,
+            EnableHandlerLogging = enableHandlerLogging,
         });
         services.AddSingleton<IOptions<JoblyWorkerConfiguration>>(workerConfig);
         services.AddSingleton<IOptions<JoblyConfiguration>>(workerConfig);
@@ -257,6 +258,74 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
         // Each should have its own logs
         logs1.ShouldContain(l => l.Message.Contains("Processing logging request", StringComparison.Ordinal));
         logs2.ShouldContain(l => l.Message.Contains("About to fail", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task GetAndProcessJob_HandlerLoggingDisabled_HandlerLogsNotWritten()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            Type = typeof(LoggingRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new LoggingRequest()),
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+        await ctx.SaveChangesAsync();
+
+        var worker = CreateWorker(enableHandlerLogging: false);
+
+        // Act
+        await worker.GetAndProcessJob(CancellationToken.None);
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var handlerLogs = await readCtx.Set<JobLog>()
+            .Where(x => x.JobId == jobId)
+            .Where(x => x.EventType == "Log")
+            .ToListAsync();
+
+        handlerLogs.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetAndProcessJob_HandlerLoggingDisabled_StateLogsStillWritten()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            Type = typeof(LoggingRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new LoggingRequest()),
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+        await ctx.SaveChangesAsync();
+
+        var worker = CreateWorker(enableHandlerLogging: false);
+
+        // Act
+        await worker.GetAndProcessJob(CancellationToken.None);
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var allLogs = await readCtx.Set<JobLog>()
+            .Where(x => x.JobId == jobId)
+            .ToListAsync();
+
+        allLogs.ShouldContain(x => string.Equals(x.EventType, "Processing", StringComparison.Ordinal));
+        allLogs.ShouldContain(x => string.Equals(x.EventType, "Completed", StringComparison.Ordinal));
     }
 }
 
