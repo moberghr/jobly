@@ -4,6 +4,38 @@ sidebar_position: 6
 
 # Releases
 
+## 0.6.0
+
+*2026-04-12*
+
+### New Features
+
+- **OpenTelemetry Distributed Tracing** — Every job execution creates a `System.Diagnostics.Activity` with W3C-format TraceId, SpanId, and ParentSpanId. Trace context is automatically propagated through job chains: when a handler enqueues a child job, the child's `ParentSpanId` links back to the handler's span. Message routing and batch creation also propagate span context. New `ParentSpanId` column on the Job entity stores the spawner's span ID.
+- **Span Attributes** — Job execution spans include OTel semantic convention tags (`messaging.system`, `messaging.destination.name`, `messaging.operation.name`, `messaging.message.id`) and Jobly-specific tags (`jobly.job.type`, `jobly.job.kind`, `jobly.job.status`, `jobly.job.duration_ms`, `jobly.job.retry_count`). Failed spans are marked with `ActivityStatusCode.Error`.
+- **Span Events** — Key lifecycle moments recorded as events on the span: `jobly.job.completed`, `jobly.job.failed` (with exception info), `jobly.job.retried` (with retry/max counts), `jobly.job.cancelled`.
+- **OTel Metrics** — Four `System.Diagnostics.Metrics` instruments via a `Meter` named `"Jobly"`: `jobly.job.duration` (histogram, ms), `jobly.job.active` (up-down counter), `jobly.job.completed` (counter with status tag), `jobly.job.enqueued` (counter with kind tag). All tagged by queue and type for filtering.
+- **Automatic Log Correlation** — `AddJoblyWorker` configures `ActivityTrackingOptions` so TraceId, SpanId, and ParentId appear in log output by default. No additional configuration needed.
+
+### Integration
+
+All features are on by default with zero configuration. To export to OTel backends:
+
+```csharp
+builder.Services.AddOpenTelemetry()
+    .WithTracing(t => t.AddSource("Jobly"))
+    .WithMetrics(m => m.AddMeter("Jobly"));
+```
+
+### Migration
+
+This release adds a new nullable `ParentSpanId` column to the Job table. Run an EF Core migration after upgrading.
+
+### Stats
+
+- 658 tests (310 PostgreSQL + 310 SQL Server + 38 unit)
+
+---
+
 ## 0.5.0
 
 *2026-04-09*

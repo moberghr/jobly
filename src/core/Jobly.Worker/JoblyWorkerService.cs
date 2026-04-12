@@ -134,6 +134,15 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         using var jobCts = new CancellationTokenSource();
         var monitorTask = RunJobMonitor(job.Id, logCollector, jobCts, cancellationToken);
 
+        var activity = JoblyTelemetry.StartJobActivity(job.TraceId ?? job.Id, job.ParentSpanId);
+        var jobTypeName = JoblyTelemetry.GetShortTypeName(job.Type);
+        activity.SetTag("messaging.system", "jobly");
+        activity.SetTag("messaging.operation.name", "process");
+        activity.SetTag("messaging.destination.name", job.Queue);
+        activity.SetTag("messaging.message.id", job.Id.ToString());
+        activity.SetTag("jobly.job.type", jobTypeName);
+        activity.SetTag("jobly.job.kind", job.Kind.ToString());
+        JoblyTelemetry.JobsActive.Add(1, new KeyValuePair<string, object?>("queue", job.Queue));
         Stopwatch? handlerStopwatch = null;
         try
         {
@@ -163,6 +172,16 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await ExecuteJob(job, scope.ServiceProvider, jobCts.Token);
             handlerStopwatch.Stop();
 
+            var durationMs = handlerStopwatch.Elapsed.TotalMilliseconds;
+            activity.SetTag("jobly.job.status", "succeeded");
+            activity.SetTag("jobly.job.duration_ms", durationMs);
+            activity.AddEvent(new ActivityEvent("jobly.job.completed", tags: new ActivityTagsCollection
+            {
+                { "duration_ms", durationMs },
+            }));
+            JoblyTelemetry.JobDuration.Record(durationMs, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", "succeeded"));
+            JoblyTelemetry.JobsCompleted.Add(1, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", "succeeded"));
+
             JobLogContext.Current = null;
             JobExecutionContext.Current = null;
 
@@ -190,6 +209,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         {
             // Job was cancelled (deleted while running)
             handlerStopwatch?.Stop();
+            activity.SetTag("jobly.job.status", "cancelled");
+            activity.AddEvent(new ActivityEvent("jobly.job.cancelled"));
+            JoblyTelemetry.JobsCompleted.Add(1, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", "cancelled"));
             JobLogContext.Current = null;
             JobExecutionContext.Current = null;
             _logger.LogInformation("Job {id} was cancelled", job.Id);
@@ -224,6 +246,35 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         catch (Exception e)
         {
             handlerStopwatch?.Stop();
+            var willRetry = job.RetriedTimes < job.MaxRetries;
+            var errorStatus = willRetry ? "retried" : "failed";
+            var errorDurationMs = handlerStopwatch?.Elapsed.TotalMilliseconds;
+            activity.SetStatus(ActivityStatusCode.Error, Truncate(e.Message, 256));
+            activity.SetTag("jobly.job.status", errorStatus);
+            if (job.RetriedTimes > 0 || willRetry)
+            {
+                activity.SetTag("jobly.job.retry_count", willRetry ? job.RetriedTimes + 1 : job.RetriedTimes);
+            }
+
+            if (willRetry)
+            {
+                activity.AddEvent(new ActivityEvent("jobly.job.retried", tags: new ActivityTagsCollection
+                {
+                    { "retry_count", job.RetriedTimes + 1 },
+                    { "max_retries", job.MaxRetries },
+                }));
+            }
+            else
+            {
+                activity.AddEvent(new ActivityEvent("jobly.job.failed", tags: new ActivityTagsCollection
+                {
+                    { "exception.type", e.GetType().FullName },
+                    { "exception.message", e.Message },
+                }));
+            }
+
+            JoblyTelemetry.JobDuration.Record(errorDurationMs ?? 0, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", errorStatus));
+            JoblyTelemetry.JobsCompleted.Add(1, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", errorStatus));
             JobLogContext.Current = null;
             JobExecutionContext.Current = null;
             _logger.LogError(e, "Error executing job {id}", job.Id);
@@ -231,7 +282,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await monitorTask;
 
             await using var endTransaction = await context.Database.BeginTransactionAsync(default);
-            UpdateJobState(context, job, e, handlerStopwatch?.Elapsed.TotalMilliseconds);
+            UpdateJobState(context, job, e, errorDurationMs);
             if (_configuration.EnableHandlerLogging)
             {
                 await SaveJobLogs(context, logCollector);
@@ -241,6 +292,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         }
         finally
         {
+            JoblyTelemetry.JobsActive.Add(-1, new KeyValuePair<string, object?>("queue", job.Queue));
+            activity.Stop();
+            activity.Dispose();
             JobLogContext.Current = null;
             JobExecutionContext.Current = null;
 
@@ -429,5 +483,10 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     {
         context.Set<Counter>().Add(new Counter { Key = totalKey, Value = 1 });
         context.Set<Counter>().Add(new Counter { Key = hourlyKey, Value = 1 });
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        return value.Length <= maxLength ? value : value[..maxLength];
     }
 }
