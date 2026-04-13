@@ -80,7 +80,16 @@ public static class ServiceConfiguration
 
         services.AddSingleton<PauseStateHolder>();
 
-        services.AddLogging(builder => builder.AddProvider(new JobLoggerProvider()));
+        services.AddLogging(builder =>
+        {
+            builder.AddProvider(new JobLoggerProvider());
+            builder.Configure(options =>
+            {
+                options.ActivityTrackingOptions |= ActivityTrackingOptions.TraceId
+                    | ActivityTrackingOptions.SpanId
+                    | ActivityTrackingOptions.ParentId;
+            });
+        });
 
         // Register distributed locks — resolved from DbContextOptions to preserve credentials.
         // Database.GetConnectionString() may strip passwords (Npgsql PersistSecurityInfo=false).

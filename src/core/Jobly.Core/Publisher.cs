@@ -141,6 +141,13 @@ public class Publisher<TContext> : IPublisher
             msg.TraceId = msg.Id;
         }
 
+        if (Activity.Current?.SpanId is { } msgSpanId && msgSpanId != default)
+        {
+            msg.ParentSpanId = msgSpanId.ToHexString();
+        }
+
+        JoblyTelemetry.JobsEnqueued.Add(1, new KeyValuePair<string, object?>("queue", msg.Queue), new KeyValuePair<string, object?>("kind", "message"));
+
         await _context.Set<Job>().AddAsync(msg);
 
         return msg.Id;
@@ -268,6 +275,13 @@ public class Publisher<TContext> : IPublisher
         {
             newJob.TraceId = newJob.Id; // Root of a new trace
         }
+
+        if (Activity.Current?.SpanId is { } jobSpanId && jobSpanId != default)
+        {
+            newJob.ParentSpanId = jobSpanId.ToHexString();
+        }
+
+        JoblyTelemetry.JobsEnqueued.Add(1, new KeyValuePair<string, object?>("queue", newJob.Queue), new KeyValuePair<string, object?>("kind", "job"));
 
         await _context.Set<Job>().AddAsync(newJob);
         await _context.Set<JobLog>().AddAsync(new JobLog

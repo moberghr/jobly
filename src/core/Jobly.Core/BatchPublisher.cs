@@ -111,10 +111,19 @@ public class BatchPublisher<TContext> : IBatchPublisher
         batchJob.TraceId = traceId ?? batchJob.Id;
         batchJob.SpawnedByJobId = spawnedBy;
 
+        string? parentSpanId = null;
+        if (Activity.Current?.SpanId is { } batchSpanId && batchSpanId != default)
+        {
+            parentSpanId = batchSpanId.ToHexString();
+        }
+
+        batchJob.ParentSpanId = parentSpanId;
+
         foreach (var childJob in batchChildJobs)
         {
             childJob.TraceId = batchJob.TraceId;
             childJob.SpawnedByJobId = spawnedBy;
+            childJob.ParentSpanId = parentSpanId;
         }
 
         var logs = new List<JobLog>();
@@ -138,6 +147,9 @@ public class BatchPublisher<TContext> : IBatchPublisher
             Timestamp = now,
             Message = $"Batch job created in queue \"{batchJob.Queue}\"",
         });
+
+        JoblyTelemetry.JobsEnqueued.Add(batchChildJobs.Count, new KeyValuePair<string, object?>("queue", batchJob.Queue), new KeyValuePair<string, object?>("kind", "job"));
+        JoblyTelemetry.JobsEnqueued.Add(1, new KeyValuePair<string, object?>("queue", batchJob.Queue), new KeyValuePair<string, object?>("kind", "batch"));
 
         _context.Set<Job>().AddRange(batchChildJobs);
         _context.Set<Job>().Add(batchJob);
