@@ -11,7 +11,10 @@ namespace Jobly.Tests.Integration;
 
 public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
 {
-    protected EndToEndIntegrationTestsBase(IDatabaseFixture fixture) : base(fixture) { }
+    protected EndToEndIntegrationTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
+    {
+    }
 
     [Fact]
     public async Task GivenComplexWorkload_WhenProcessedByRealWorkers_ThenAllJobsReachTerminalState()
@@ -138,12 +141,18 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
 [Collection("PostgreSql-Integration")]
 public class EndToEndIntegrationTests_PostgreSql : EndToEndIntegrationTestsBase
 {
-    public EndToEndIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
+    public EndToEndIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class EndToEndIntegrationTests_SqlServer : EndToEndIntegrationTestsBase
 {
-    public EndToEndIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
+    public EndToEndIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }

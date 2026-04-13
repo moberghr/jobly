@@ -71,29 +71,41 @@ public class SqlServerRowLockInterceptorTests
         command.CommandText.ShouldContain("FROM [jobly].[Counter] AS [c] WITH (ROWLOCK, UPDLOCK, READPAST)");
     }
 
-    private static DbCommand CreateCommand(string commandText)
+    private static FakeDbCommand CreateCommand(string commandText)
     {
         return new FakeDbCommand { CommandText = commandText };
     }
 
     private sealed class FakeDbCommand : DbCommand
     {
+        [System.Diagnostics.CodeAnalysis.AllowNull]
         public override string CommandText { get; set; } = string.Empty;
+
         public override int CommandTimeout { get; set; }
+
         public override CommandType CommandType { get; set; }
+
         public override bool DesignTimeVisible { get; set; }
+
         public override UpdateRowSource UpdatedRowSource { get; set; }
+
         protected override DbConnection? DbConnection { get; set; }
+
         protected override DbParameterCollection DbParameterCollection => null!;
+
         protected override DbTransaction? DbTransaction { get; set; }
 
-        public override void Cancel() { }
+        public override void Cancel()
+        {
+        }
 
         public override int ExecuteNonQuery() => 0;
 
         public override object? ExecuteScalar() => null;
 
-        public override void Prepare() { }
+        public override void Prepare()
+        {
+        }
 
         protected override DbParameter CreateDbParameter() => null!;
 

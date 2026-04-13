@@ -80,12 +80,18 @@ public abstract class WorkerIdLogTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class WorkerIdLogTests_PostgreSql : WorkerIdLogTestsBase
 {
-    public WorkerIdLogTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public WorkerIdLogTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class WorkerIdLogTests_SqlServer : WorkerIdLogTestsBase
 {
-    public WorkerIdLogTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public WorkerIdLogTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

@@ -10,7 +10,10 @@ namespace Jobly.Tests.Integration;
 
 public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
 {
-    protected ConcurrencyEdgeCaseTestsBase(IDatabaseFixture fixture) : base(fixture) { }
+    protected ConcurrencyEdgeCaseTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
+    {
+    }
 
     [Fact]
     public async Task GivenConcurrentDeleteOnSameJob_ThenOnlyOneDeleteRecorded()
@@ -108,12 +111,18 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
 [Collection("PostgreSql-Integration")]
 public class ConcurrencyEdgeCaseTests_PostgreSql : ConcurrencyEdgeCaseTestsBase
 {
-    public ConcurrencyEdgeCaseTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
+    public ConcurrencyEdgeCaseTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class ConcurrencyEdgeCaseTests_SqlServer : ConcurrencyEdgeCaseTestsBase
 {
-    public ConcurrencyEdgeCaseTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
+    public ConcurrencyEdgeCaseTests_SqlServer(SqlServerIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }

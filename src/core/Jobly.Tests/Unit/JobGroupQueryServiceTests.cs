@@ -273,12 +273,18 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class JobGroupQueryServiceTests_PostgreSql : JobGroupQueryServiceTestsBase
 {
-    public JobGroupQueryServiceTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public JobGroupQueryServiceTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class JobGroupQueryServiceTests_SqlServer : JobGroupQueryServiceTestsBase
 {
-    public JobGroupQueryServiceTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public JobGroupQueryServiceTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

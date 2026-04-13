@@ -62,10 +62,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 app.UseAuthorization();
-app.UseJoblyUI(options =>
-{
-    options.UseBuiltInLogin<DemoCredentialValidator>();
-});
+app.UseJoblyUI(options => options.UseBuiltInLogin<DemoCredentialValidator>());
 app.MapControllers();
 
 // Seed endpoint — creates a realistic demo workload
@@ -156,11 +153,13 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
 
     // === Mutex jobs (same key — first holds mutex with slow handler, rest get cancelled) ===
     // Uses a-critical queue so these are picked up before the 300+ other jobs
-    await publisher.Enqueue(new SlowRequest(),
+    await publisher.Enqueue(
+        new SlowRequest(),
         new JobParameters { Queue = "a-critical", Mutex = "payment:customer-42" });
     for (var i = 0; i < 4; i++)
     {
-        await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 },
+        await publisher.Enqueue(
+            new SendEmailRequest { EmailLogId = 1 },
             new JobParameters { Queue = "a-critical", Mutex = "payment:customer-42" });
     }
 
@@ -185,7 +184,8 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     {
         mixedBatchJobs.Add(new SendEmailRequest { EmailLogId = 1 });
     }
-    var mixedBatchId = await batchPublisher.StartNew(mixedBatchJobs, "mixed-result-batch");
+
+    await batchPublisher.StartNew(mixedBatchJobs, "mixed-result-batch");
 
     // === Named batch (type column won't be null) ===
     var namedBatchJobs = Enumerable.Range(0, 5)
@@ -262,9 +262,11 @@ app.MapPost("/seed-flow", async (IPublisher publisher, IBatchPublisher batchPubl
     var lightFlowId = await publisher.Enqueue(new LightFlowRequest());
 
     // 9. Mutex jobs (same key — first holds mutex, rest cancelled)
-    var mutexId1 = await publisher.Enqueue(new SlowRequest(),
+    var mutexId1 = await publisher.Enqueue(
+        new SlowRequest(),
         new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
-    var mutexId2 = await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 },
+    var mutexId2 = await publisher.Enqueue(
+        new SendEmailRequest { EmailLogId = 1 },
         new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
 
     await publisher.SaveChangesAsync();
@@ -471,7 +473,10 @@ app.MapGet("/perf-continuation-latency", async (TestContext context) =>
             .Where(l => l.EventType == "Completed")
             .MaxAsync(l => (DateTime?)l.Timestamp);
 
-        if (lastChildCompleted == null) continue;
+        if (lastChildCompleted == null)
+        {
+            continue;
+        }
 
         // Find continuation batch
         var contBatchId = await context.Set<Job>()
@@ -479,7 +484,10 @@ app.MapGet("/perf-continuation-latency", async (TestContext context) =>
             .Select(j => j.Id)
             .FirstOrDefaultAsync();
 
-        if (contBatchId == Guid.Empty) continue;
+        if (contBatchId == Guid.Empty)
+        {
+            continue;
+        }
 
         // First processing time of continuation children
         var firstContProcessing = await context.Set<JobLog>()
@@ -487,13 +495,19 @@ app.MapGet("/perf-continuation-latency", async (TestContext context) =>
             .Where(l => l.EventType == "Processing")
             .MinAsync(l => (DateTime?)l.Timestamp);
 
-        if (firstContProcessing == null) continue;
+        if (firstContProcessing == null)
+        {
+            continue;
+        }
 
         var latencyMs = (firstContProcessing.Value - lastChildCompleted.Value).TotalMilliseconds;
         latencies.Add(latencyMs);
     }
 
-    if (latencies.Count == 0) return Results.Ok(new { error = "No continuation chains found" });
+    if (latencies.Count == 0)
+    {
+        return Results.Ok(new { error = "No continuation chains found" });
+    }
 
     latencies.Sort();
     return Results.Ok(new
@@ -540,6 +554,6 @@ internal class DemoCredentialValidator : IJoblyCredentialValidator
 {
     public Task<bool> ValidateAsync(string username, string password)
     {
-        return Task.FromResult(username == "admin" && password == "admin");
+        return Task.FromResult(string.Equals(username, "admin", StringComparison.Ordinal) && string.Equals(password, "admin", StringComparison.Ordinal));
     }
 }

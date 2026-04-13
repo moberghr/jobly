@@ -11,7 +11,7 @@ public class CounterCommand : IJobHandler<CounterRequest>
 
     private readonly CounterService _counterService;
 
-    public Task HandleAsync(CounterRequest message, CancellationToken ct)
+    public Task HandleAsync(CounterRequest message, CancellationToken cancellationToken)
     {
         _counterService.Increment();
         return Task.CompletedTask;

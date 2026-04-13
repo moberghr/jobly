@@ -258,6 +258,12 @@ dotnet_diagnostic.S6667.severity = none
 # S3260: Private classes should be sealed (handled by CA1852)
 dotnet_diagnostic.S3260.severity = none
 
+# S3011: Reflection accessibility bypass (intentional in JobDispatcher for cached generic dispatch)
+dotnet_diagnostic.S3011.severity = none
+
+# CA1711: Type names ending in 'Delegate'/'Collection' (delegate types and xUnit fixtures)
+dotnet_diagnostic.CA1711.severity = none
+
 # CA1000: Do not declare static members on generic types (test helpers by design)
 dotnet_diagnostic.CA1000.severity = none
 
@@ -492,8 +498,9 @@ dotnet_analyzer_diagnostic.category-StyleCop.CSharp.OrderingRules.severity = non
 # Test projects — relaxed rules
 # ============================================================
 [**/Jobly.Tests/**/*.cs]
-# SA1401: Public fields needed for Interlocked.Increment in test counters
+# SA1401/CA1051: Public fields needed for Interlocked.Increment in test counters
 dotnet_diagnostic.SA1401.severity = none
+dotnet_diagnostic.CA1051.severity = none
 # MA0025: Empty method body — intentional in test handlers
 dotnet_diagnostic.MA0025.severity = none
 # S112: General exceptions — intentional in test throw handlers
@@ -508,6 +515,8 @@ dotnet_diagnostic.SA1401.severity = none
 dotnet_diagnostic.S112.severity = none
 # CA1873: Logging argument evaluation — test handlers
 dotnet_diagnostic.CA1873.severity = none
+# CA1716: Namespace 'Shared' conflicts with reserved keyword — test project name is fixed
+dotnet_diagnostic.CA1716.severity = none
 
 [**/Jobly.TestApp/**.cs]
 # MA0047/S3903: File-scoped class in top-level program

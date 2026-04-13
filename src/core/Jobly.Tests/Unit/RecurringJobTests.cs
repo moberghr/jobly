@@ -193,12 +193,18 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class RecurringJobTests_PostgreSql : RecurringJobTestsBase
 {
-    public RecurringJobTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public RecurringJobTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class RecurringJobTests_SqlServer : RecurringJobTestsBase
 {
-    public RecurringJobTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public RecurringJobTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

@@ -311,8 +311,6 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
         // Arrange
         var ctx = _fixture.CreateContext();
         var traceId = Guid.NewGuid();
-        var capture1 = new ActivityCapture();
-        var capture2 = new ActivityCapture();
 
         ctx.Set<Job>().Add(new Job
         {
@@ -395,12 +393,18 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class ActivityTraceTests_PostgreSql : ActivityTraceTestsBase
 {
-    public ActivityTraceTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public ActivityTraceTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class ActivityTraceTests_SqlServer : ActivityTraceTestsBase
 {
-    public ActivityTraceTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public ActivityTraceTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

@@ -181,12 +181,18 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class DashboardBreakdownTests_PostgreSql : DashboardBreakdownTestsBase
 {
-    public DashboardBreakdownTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public DashboardBreakdownTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class DashboardBreakdownTests_SqlServer : DashboardBreakdownTestsBase
 {
-    public DashboardBreakdownTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public DashboardBreakdownTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

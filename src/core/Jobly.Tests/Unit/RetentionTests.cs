@@ -335,12 +335,18 @@ public abstract class RetentionTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class RetentionTests_PostgreSql : RetentionTestsBase
 {
-    public RetentionTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public RetentionTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class RetentionTests_SqlServer : RetentionTestsBase
 {
-    public RetentionTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public RetentionTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

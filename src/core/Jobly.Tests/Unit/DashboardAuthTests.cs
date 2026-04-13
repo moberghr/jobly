@@ -34,7 +34,7 @@ public class DashboardAuthTests
         // Apply middleware manually
         app.UseMiddleware<JoblyUIMiddleware>(options);
 
-        await app.StartAsync();
+        await app.StartAsync(CancellationToken.None);
         return (app, app.GetTestClient());
     }
 
@@ -44,7 +44,7 @@ public class DashboardAuthTests
         var (app, client) = await CreateApp();
         try
         {
-            var response = await client.GetAsync("/jobly/api/test");
+            var response = await client.GetAsync("/jobly/api/test", CancellationToken.None);
             response.StatusCode.ShouldBe(HttpStatusCode.OK);
         }
         finally
@@ -60,7 +60,7 @@ public class DashboardAuthTests
         var (app, client) = await CreateApp(o => o.UseBuiltInLogin<TestCredentialValidator>());
         try
         {
-            var response = await client.GetAsync("/jobly/api/test");
+            var response = await client.GetAsync("/jobly/api/test", CancellationToken.None);
             response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         }
         finally
@@ -80,7 +80,7 @@ public class DashboardAuthTests
                 new KeyValuePair<string, string>("username", "admin"),
                 new KeyValuePair<string, string>("password", "admin"),
             ]);
-            var response = await client.PostAsync("/jobly/api/auth/login", form);
+            var response = await client.PostAsync("/jobly/api/auth/login", form, CancellationToken.None);
 
             response.StatusCode.ShouldBe(HttpStatusCode.OK);
             response.Headers.TryGetValues("Set-Cookie", out var cookies).ShouldBeTrue();
@@ -103,7 +103,7 @@ public class DashboardAuthTests
                 new KeyValuePair<string, string>("username", "admin"),
                 new KeyValuePair<string, string>("password", "wrong"),
             ]);
-            var response = await client.PostAsync("/jobly/api/auth/login", form);
+            var response = await client.PostAsync("/jobly/api/auth/login", form, CancellationToken.None);
 
             response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         }
@@ -125,7 +125,7 @@ public class DashboardAuthTests
                 new KeyValuePair<string, string>("username", "admin"),
                 new KeyValuePair<string, string>("password", "admin"),
             ]);
-            var loginResponse = await client.PostAsync("/jobly/api/auth/login", form);
+            var loginResponse = await client.PostAsync("/jobly/api/auth/login", form, CancellationToken.None);
             loginResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
             var setCookie = loginResponse.Headers.GetValues("Set-Cookie").First();
@@ -133,7 +133,7 @@ public class DashboardAuthTests
             client.DefaultRequestHeaders.Add("Cookie", cookieValue);
 
             // API should work now
-            var response = await client.GetAsync("/jobly/api/test");
+            var response = await client.GetAsync("/jobly/api/test", CancellationToken.None);
             response.StatusCode.ShouldBe(HttpStatusCode.OK);
         }
         finally
@@ -149,7 +149,7 @@ public class DashboardAuthTests
         var (app, client) = await CreateApp(o => o.Authorization = new DenyAllFilter());
         try
         {
-            var response = await client.GetAsync("/jobly/api/test");
+            var response = await client.GetAsync("/jobly/api/test", CancellationToken.None);
             response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         }
         finally
@@ -172,7 +172,7 @@ public class DashboardAuthTests
             var handler = app.GetTestServer().CreateHandler();
             using var noRedirectClient = new HttpClient(handler) { BaseAddress = client.BaseAddress };
 
-            var response = await noRedirectClient.GetAsync("/jobly");
+            var response = await noRedirectClient.GetAsync("/jobly", CancellationToken.None);
             response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
             response.Headers.Location!.ToString().ShouldStartWith("/login");
         }
@@ -188,7 +188,7 @@ internal class TestCredentialValidator : IJoblyCredentialValidator
 {
     public Task<bool> ValidateAsync(string username, string password)
     {
-        return Task.FromResult(username == "admin" && password == "admin");
+        return Task.FromResult(string.Equals(username, "admin", StringComparison.Ordinal) && string.Equals(password, "admin", StringComparison.Ordinal));
     }
 }
 

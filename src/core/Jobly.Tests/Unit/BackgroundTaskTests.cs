@@ -240,12 +240,18 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class BackgroundTaskTests_PostgreSql : BackgroundTaskTestsBase
 {
-    public BackgroundTaskTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public BackgroundTaskTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class BackgroundTaskTests_SqlServer : BackgroundTaskTestsBase
 {
-    public BackgroundTaskTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public BackgroundTaskTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

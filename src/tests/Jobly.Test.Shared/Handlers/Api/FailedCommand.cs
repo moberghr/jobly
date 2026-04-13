@@ -18,13 +18,13 @@ public class FailedCommand : IJobHandler<FailedJobRequest>
         _publisher = publisher;
     }
 
-    public async Task HandleAsync(FailedJobRequest message, CancellationToken ct)
+    public async Task HandleAsync(FailedJobRequest message, CancellationToken cancellationToken)
     {
         if (message.SchedululeTime.HasValue)
         {
             await _publisher.Schedule(new ThrowExceptionRequest(), message.SchedululeTime.Value);
 
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(cancellationToken);
 
             return;
         }
@@ -34,6 +34,6 @@ public class FailedCommand : IJobHandler<FailedJobRequest>
             await _publisher.Enqueue(new ThrowExceptionRequest());
         }
 
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

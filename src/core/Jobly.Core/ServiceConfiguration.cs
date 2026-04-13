@@ -337,7 +337,6 @@ public static class ServiceConfiguration
         stat.Property(p => p.Value);
 
         // No seed data — Statistic rows are created by the counter aggregator on demand.
-
         stat.Metadata.SetSchema(schema);
     }
 

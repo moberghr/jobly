@@ -215,12 +215,18 @@ public abstract class JobLogTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class JobLogTests_PostgreSql : JobLogTestsBase
 {
-    public JobLogTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public JobLogTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class JobLogTests_SqlServer : JobLogTestsBase
 {
-    public JobLogTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public JobLogTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

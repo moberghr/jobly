@@ -9,7 +9,10 @@ namespace Jobly.Tests.Integration;
 
 public abstract class PauseIntegrationTestsBase : IntegrationTestBase
 {
-    protected PauseIntegrationTestsBase(IDatabaseFixture fixture) : base(fixture) { }
+    protected PauseIntegrationTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
+    {
+    }
 
     private async Task<Guid> GetFirstGroupId()
     {
@@ -28,6 +31,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
 
         await svc.PauseServer(Server.ServerId);
         await Server.WaitForPauseState(groupId, expectedPaused: true);
+        Server.PauseState.IsPaused(groupId).ShouldBeTrue();
 
         // Cleanup
         await svc.ResumeServer(Server.ServerId);
@@ -139,12 +143,18 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
 [Collection("PostgreSql-Integration")]
 public class PauseIntegrationTests_PostgreSql : PauseIntegrationTestsBase
 {
-    public PauseIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
+    public PauseIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class PauseIntegrationTests_SqlServer : PauseIntegrationTestsBase
 {
-    public PauseIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
+    public PauseIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }

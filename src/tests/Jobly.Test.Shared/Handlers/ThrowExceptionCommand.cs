@@ -9,8 +9,8 @@ public class ThrowExceptionRequest : IJob
 
 public class ThrowExceptionCommand : IJobHandler<ThrowExceptionRequest>
 {
-    public Task HandleAsync(ThrowExceptionRequest message, CancellationToken ct)
+    public Task HandleAsync(ThrowExceptionRequest message, CancellationToken cancellationToken)
     {
-        throw new Exception("This is from ThrowExceptionCommand");
+        throw new InvalidOperationException("This is from ThrowExceptionCommand");
     }
 }

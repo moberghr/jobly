@@ -279,12 +279,18 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class PublisherOverloadTests_PostgreSql : PublisherOverloadTestsBase
 {
-    public PublisherOverloadTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public PublisherOverloadTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class PublisherOverloadTests_SqlServer : PublisherOverloadTestsBase
 {
-    public PublisherOverloadTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public PublisherOverloadTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

@@ -192,12 +192,18 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class ServerQueryTests_PostgreSql : ServerQueryTestsBase
 {
-    public ServerQueryTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public ServerQueryTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class ServerQueryTests_SqlServer : ServerQueryTestsBase
 {
-    public ServerQueryTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public ServerQueryTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

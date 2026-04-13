@@ -25,6 +25,7 @@ public class SingleMessageHandler : IMessageHandler<SingleHandlerMessage>
 public class MultiHandlerCounter
 {
     public int CountA;
+
     public int CountB;
 
     public void IncrementA() => Interlocked.Increment(ref CountA);

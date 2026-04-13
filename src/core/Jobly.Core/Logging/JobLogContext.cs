@@ -33,6 +33,7 @@ public class JobLogCollector
         {
             list.Add(entry);
         }
+
         return list;
     }
 }

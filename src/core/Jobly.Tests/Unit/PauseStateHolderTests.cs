@@ -91,7 +91,7 @@ public class PauseStateHolderTests
     /// Torn:    server=false, group=false → IsPaused=FALSE (bug!)
     /// </summary>
     [Fact]
-    public void Update_IsAtomic_NeverExposesTornState()
+    public async Task Update_IsAtomic_NeverExposesTornState()
     {
         var holder = new PauseStateHolder();
         var groupId = Guid.NewGuid();
@@ -138,7 +138,7 @@ public class PauseStateHolderTests
         }
 
         Volatile.Write(ref readerDone, true);
-        readerTask.Wait();
+        await readerTask;
 
         iterations.ShouldBeGreaterThan(0, "Reader task did not execute");
         tornReadsDetected.ShouldBe(0, $"Detected {tornReadsDetected} torn reads out of {iterations} iterations");

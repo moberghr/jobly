@@ -224,12 +224,18 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class StatCounterTests_PostgreSql : StatCounterTestsBase
 {
-    public StatCounterTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public StatCounterTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class StatCounterTests_SqlServer : StatCounterTestsBase
 {
-    public StatCounterTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public StatCounterTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

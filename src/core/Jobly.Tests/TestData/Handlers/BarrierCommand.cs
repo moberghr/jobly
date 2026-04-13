@@ -23,5 +23,6 @@ public class BarrierCommand : IJobHandler<BarrierRequest>
 public class BarrierSignal
 {
     public SemaphoreSlim Running { get; } = new(0);
+
     public SemaphoreSlim CanFinish { get; } = new(0);
 }

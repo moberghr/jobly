@@ -148,8 +148,8 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             jobContext.JobId = job.Id;
             jobContext.TraceId = job.TraceId ?? job.Id;
             jobContext.Metadata = job.Metadata != null
-                ? JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata) ?? new Dictionary<string, string>()
-                : new Dictionary<string, string>();
+                ? JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata) ?? []
+                : [];
 
             handlerStopwatch = Stopwatch.StartNew();
             await ExecuteJob(job, scope.ServiceProvider, jobCts.Token);
@@ -269,6 +269,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             {
                 await SaveJobLogs(context, logCollector);
             }
+
             await context.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
         }

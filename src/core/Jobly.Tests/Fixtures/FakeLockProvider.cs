@@ -32,10 +32,22 @@ internal class FakeLock(string name, ConcurrentDictionary<string, bool> heldLock
     }
 
     public ValueTask<IDistributedSynchronizationHandle> AcquireAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
-        => new(Acquire(timeout, cancellationToken));
+    {
+        var handle = heldLocks.TryAdd(name, true)
+            ? new FakeHandle(name, heldLocks)
+            : throw new InvalidOperationException("Lock not acquired");
+
+        return new ValueTask<IDistributedSynchronizationHandle>(handle);
+    }
 
     public ValueTask<IDistributedSynchronizationHandle?> TryAcquireAsync(TimeSpan timeout = default, CancellationToken cancellationToken = default)
-        => new(TryAcquire(timeout, cancellationToken));
+    {
+        IDistributedSynchronizationHandle? handle = heldLocks.TryAdd(name, true)
+            ? new FakeHandle(name, heldLocks)
+            : null;
+
+        return new ValueTask<IDistributedSynchronizationHandle?>(handle);
+    }
 }
 
 internal class FakeHandle(string name, ConcurrentDictionary<string, bool> heldLocks) : IDistributedSynchronizationHandle
@@ -46,7 +58,8 @@ internal class FakeHandle(string name, ConcurrentDictionary<string, bool> heldLo
 
     public ValueTask DisposeAsync()
     {
-        Dispose();
+        heldLocks.TryRemove(name, out _);
+
         return default;
     }
 }

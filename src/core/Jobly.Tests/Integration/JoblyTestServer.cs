@@ -93,8 +93,8 @@ public class JoblyTestServer : IAsyncDisposable
     {
         var tempCtx = fixture.CreateContext();
         var connectionString = tempCtx.Database.GetConnectionString()!;
-        var isPostgres = tempCtx.Database.ProviderName?.Contains("Npgsql") == true;
-        tempCtx.Dispose();
+        var isPostgres = tempCtx.Database.ProviderName?.Contains("Npgsql", StringComparison.Ordinal) == true;
+        await tempCtx.DisposeAsync();
 
         var host = Host.CreateDefaultBuilder()
             .ConfigureServices(services =>
@@ -102,9 +102,13 @@ public class JoblyTestServer : IAsyncDisposable
                 services.AddDbContext<TestContext>(options =>
                 {
                     if (isPostgres)
+                    {
                         options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention();
+                    }
                     else
+                    {
                         options.UseSqlServer(connectionString);
+                    }
                 });
 
                 services.AddJobHandlers(typeof(JoblyTestServer).Assembly);
@@ -141,7 +145,7 @@ public class JoblyTestServer : IAsyncDisposable
     /// </summary>
     public async Task ReRegisterServer()
     {
-        using var scope = _host.Services.CreateScope();
+        await using var scope = _host.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<TestContext>();
 
         // Check if server still exists (Respawn may have deleted it)
@@ -269,7 +273,8 @@ public class JoblyTestServer : IAsyncDisposable
             .ToListAsync();
     }
 
-    public T GetService<T>() where T : notnull
+    public T GetService<T>()
+        where T : notnull
         => _host.Services.GetRequiredService<T>();
 
     public async Task<Job> GetJob(Guid jobId)
@@ -282,6 +287,7 @@ public class JoblyTestServer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        GC.SuppressFinalize(this);
         await _host.StopAsync();
         _host.Dispose();
     }

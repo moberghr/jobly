@@ -443,12 +443,18 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class OrchestrationTaskTests_PostgreSql : OrchestrationTaskTestsBase
 {
-    public OrchestrationTaskTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public OrchestrationTaskTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class OrchestrationTaskTests_SqlServer : OrchestrationTaskTestsBase
 {
-    public OrchestrationTaskTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public OrchestrationTaskTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

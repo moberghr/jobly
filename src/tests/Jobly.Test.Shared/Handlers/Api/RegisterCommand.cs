@@ -16,7 +16,7 @@ public class RegisterCommand : IJobHandler<RegisterRequest>
         _batchPublisher = batchPublisher;
     }
 
-    public async Task HandleAsync(RegisterRequest message, CancellationToken ct)
+    public async Task HandleAsync(RegisterRequest message, CancellationToken cancellationToken)
     {
         var registration = new Registration
         {
@@ -34,9 +34,9 @@ public class RegisterCommand : IJobHandler<RegisterRequest>
 
         _context.EmailLogs.Add(emailLog);
 
-        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(cancellationToken);
 
         var sendEmailRequest = new SendEmailRequest
         {
@@ -60,9 +60,9 @@ public class RegisterCommand : IJobHandler<RegisterRequest>
             await _publisher.Enqueue(sendEmailRequest, parentId);
         }
 
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(cancellationToken);
 
-        await transaction.CommitAsync(ct);
+        await transaction.CommitAsync(cancellationToken);
     }
 }
 

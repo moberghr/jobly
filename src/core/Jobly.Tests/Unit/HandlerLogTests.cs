@@ -332,12 +332,18 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class HandlerLogTests_PostgreSql : HandlerLogTestsBase
 {
-    public HandlerLogTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public HandlerLogTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class HandlerLogTests_SqlServer : HandlerLogTestsBase
 {
-    public HandlerLogTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public HandlerLogTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

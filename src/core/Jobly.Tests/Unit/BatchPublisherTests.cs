@@ -233,12 +233,18 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class BatchPublisherUnitTests_PostgreSql : BatchPublisherUnitTestsBase
 {
-    public BatchPublisherUnitTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public BatchPublisherUnitTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class BatchPublisherUnitTests_SqlServer : BatchPublisherUnitTestsBase
 {
-    public BatchPublisherUnitTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public BatchPublisherUnitTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

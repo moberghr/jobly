@@ -198,12 +198,18 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class ServerCommandServiceTests_PostgreSql : ServerCommandServiceTestsBase
 {
-    public ServerCommandServiceTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public ServerCommandServiceTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class ServerCommandServiceTests_SqlServer : ServerCommandServiceTestsBase
 {
-    public ServerCommandServiceTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public ServerCommandServiceTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

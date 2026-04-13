@@ -6,7 +6,7 @@ public class MetadataRequest : IJob;
 
 public class MetadataCommand(IJobContext jobContext, MetadataCapture capture) : IJobHandler<MetadataRequest>
 {
-    public Task HandleAsync(MetadataRequest message, CancellationToken ct)
+    public Task HandleAsync(MetadataRequest message, CancellationToken cancellationToken)
     {
         capture.CapturedMetadata = new Dictionary<string, string>(jobContext.Metadata);
         return Task.CompletedTask;

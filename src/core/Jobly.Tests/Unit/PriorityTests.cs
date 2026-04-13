@@ -252,12 +252,18 @@ public abstract class PriorityTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class PriorityTests_PostgreSql : PriorityTestsBase
 {
-    public PriorityTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public PriorityTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class PriorityTests_SqlServer : PriorityTestsBase
 {
-    public PriorityTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public PriorityTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

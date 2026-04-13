@@ -12,15 +12,15 @@ public class PrecessLogCommand : IJobHandler<PrecessLogRequest>
         _context = context;
     }
 
-    public async Task HandleAsync(PrecessLogRequest message, CancellationToken ct)
+    public async Task HandleAsync(PrecessLogRequest message, CancellationToken cancellationToken)
     {
         var testTask = await _context.TestLogs
             .Where(x => x.Id == message.TestTaskId)
-            .FirstAsync(ct);
+            .FirstAsync(cancellationToken);
 
         testTask.ProcessedTime = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }
 

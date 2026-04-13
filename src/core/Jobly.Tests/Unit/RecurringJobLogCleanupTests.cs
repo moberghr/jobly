@@ -109,19 +109,27 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
         var cleanCtx = _fixture.CreateContext();
         await ExpirationCleanupTask<TestContext>.CleanupRecurringJobLogs(cleanCtx);
 
-        // No exception = pass
+        var readCtx = _fixture.CreateContext();
+        var count = await readCtx.Set<RecurringJobLog>().CountAsync();
+        count.ShouldBe(0);
     }
 }
 
 [Collection("PostgreSql")]
 public class RecurringJobLogCleanupTests_PostgreSql : RecurringJobLogCleanupTestsBase
 {
-    public RecurringJobLogCleanupTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public RecurringJobLogCleanupTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class RecurringJobLogCleanupTests_SqlServer : RecurringJobLogCleanupTestsBase
 {
-    public RecurringJobLogCleanupTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public RecurringJobLogCleanupTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

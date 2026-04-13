@@ -248,12 +248,18 @@ public abstract class RetryTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class RetryTests_PostgreSql : RetryTestsBase
 {
-    public RetryTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public RetryTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class RetryTests_SqlServer : RetryTestsBase
 {
-    public RetryTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public RetryTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

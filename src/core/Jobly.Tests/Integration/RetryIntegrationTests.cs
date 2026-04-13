@@ -10,7 +10,10 @@ namespace Jobly.Tests.Integration;
 
 public abstract class RetryIntegrationTestsBase : IntegrationTestBase
 {
-    protected RetryIntegrationTestsBase(IDatabaseFixture fixture) : base(fixture) { }
+    protected RetryIntegrationTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
+    {
+    }
 
     [Fact]
     public async Task GivenFailingJobWithThreeRetries_WhenProcessed_ThenRetriesThreeTimesThenFails()
@@ -80,12 +83,18 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
 [Collection("PostgreSql-Integration")]
 public class RetryIntegrationTests_PostgreSql : RetryIntegrationTestsBase
 {
-    public RetryIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
+    public RetryIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class RetryIntegrationTests_SqlServer : RetryIntegrationTestsBase
 {
-    public RetryIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
+    public RetryIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }
