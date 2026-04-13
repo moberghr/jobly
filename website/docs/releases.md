@@ -30,6 +30,11 @@ builder.Services.AddOpenTelemetry()
 
 This release adds a new nullable `ParentSpanId` column to the Job table. Run an EF Core migration after upgrading.
 
+### Bug Fixes
+
+- **Distributed lock credential stripping** — Connection string resolution now reads from `DbContextOptions` RelationalOptionsExtension instead of `Database.GetConnectionString()`, which strips passwords via Npgsql `PersistSecurityInfo=false`. Also handles `NpgsqlDataSource` configurations.
+- **Server status indicators** — Dashboard servers page now shows heartbeat-based status dots: green (active), red (stale >30s), amber (paused). "Inactive" badge shown when heartbeat is stale.
+
 ### Stats
 
 - 658 tests (310 PostgreSQL + 310 SQL Server + 38 unit)
