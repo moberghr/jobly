@@ -4,6 +4,20 @@ sidebar_position: 6
 
 # Releases
 
+## 0.6.1
+
+*2026-04-13*
+
+### Bug Fixes
+
+- **Scoped service resolution in lock provider** — `IDistributedLockProvider` singleton factory resolved `DbContextOptions<TContext>` from the root provider, but `AddDbContext` registers it as scoped. This threw `InvalidOperationException` when scope validation is enabled (e.g. `WebApplication.CreateBuilder()` in Development). Fixed by creating a scope inside the factory.
+
+### Code Quality
+
+- **Fix all 401 build warnings** — Zero warnings across the entire solution. Fixes include: regex DoS hardening (NonBacktracking), collection expression simplification, constructor formatting, CancellationToken propagation, string.Equals usage, and async call consistency. All rule suppressions via `.editorconfig` — no `#pragma` or `[SuppressMessage]` attributes.
+
+---
+
 ## 0.6.0
 
 *2026-04-12*
