@@ -52,5 +52,25 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+const HEARTBEAT_STALE_THRESHOLD_MS = 30_000;
+
+export function isServerStale(lastHeartbeatTime: string): boolean {
+  return Date.now() - new Date(lastHeartbeatTime).getTime() > HEARTBEAT_STALE_THRESHOLD_MS;
+}
+
+export function serverStatusDotColor(lastHeartbeatTime: string, pausedAt: string | null): string {
+  if (pausedAt) {
+    return 'bg-amber-500';
+  }
+
+  const elapsed = Date.now() - new Date(lastHeartbeatTime).getTime();
+  if (elapsed > HEARTBEAT_STALE_THRESHOLD_MS) {
+    return 'bg-red-500';
+  }
+
+  return 'bg-green-500';
 }
