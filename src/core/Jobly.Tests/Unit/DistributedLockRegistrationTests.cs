@@ -18,7 +18,7 @@ public class DistributedLockRegistrationTests
         services.AddDbContext<TestContext>(o => o.UseNpgsql("Host=localhost;Database=test;Username=user;Password=secret"));
         services.AddJoblyWorker<TestContext>();
 
-        using var sp = services.BuildServiceProvider();
+        using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var provider = sp.GetRequiredService<IDistributedLockProvider>();
 
         provider.ShouldBeOfType<PostgresDistributedSynchronizationProvider>();
@@ -31,7 +31,7 @@ public class DistributedLockRegistrationTests
         services.AddDbContext<TestContext>(o => o.UseSqlServer("Server=localhost;Database=test;User Id=sa;Password=secret;TrustServerCertificate=True"));
         services.AddJoblyWorker<TestContext>();
 
-        using var sp = services.BuildServiceProvider();
+        using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var provider = sp.GetRequiredService<IDistributedLockProvider>();
 
         provider.ShouldBeOfType<SqlDistributedSynchronizationProvider>();
@@ -56,7 +56,7 @@ public class DistributedLockRegistrationTests
         // Poison: any attempt to resolve TestContext will throw
         services.AddScoped<TestContext>(_ => throw new InvalidOperationException("DbContext should not be resolved for connection string"));
 
-        using var sp = services.BuildServiceProvider();
+        using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var provider = sp.GetRequiredService<IDistributedLockProvider>();
 
         provider.ShouldBeOfType<PostgresDistributedSynchronizationProvider>();
@@ -75,7 +75,7 @@ public class DistributedLockRegistrationTests
         // Poison: any attempt to resolve TestContext will throw
         services.AddScoped<TestContext>(_ => throw new InvalidOperationException("DbContext should not be resolved for connection string"));
 
-        using var sp = services.BuildServiceProvider();
+        using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var provider = sp.GetRequiredService<IDistributedLockProvider>();
 
         provider.ShouldBeOfType<SqlDistributedSynchronizationProvider>();
@@ -89,8 +89,9 @@ public class DistributedLockRegistrationTests
         services.AddDbContext<TestContext>(o => o.UseNpgsql(connectionString));
         services.AddJoblyWorker<TestContext>();
 
-        using var sp = services.BuildServiceProvider();
-        var options = sp.GetRequiredService<DbContextOptions<TestContext>>();
+        using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        using var scope = sp.CreateScope();
+        var options = scope.ServiceProvider.GetRequiredService<DbContextOptions<TestContext>>();
         var extension = options.Extensions.OfType<RelationalOptionsExtension>().FirstOrDefault();
 
         extension.ShouldNotBeNull();
@@ -104,7 +105,7 @@ public class DistributedLockRegistrationTests
         services.AddDbContext<TestContext>(o => o.UseNpgsql("Host=localhost;Database=test;Username=user;Password=secret"));
         services.AddJoblyWorker<TestContext>();
 
-        using var sp = services.BuildServiceProvider();
+        using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var provider = sp.GetRequiredService<IDistributedLockProvider>();
         var distributedLock = provider.CreateLock("test-lock");
 

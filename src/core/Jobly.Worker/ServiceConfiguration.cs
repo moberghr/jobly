@@ -95,13 +95,13 @@ public static class ServiceConfiguration
         // Database.GetConnectionString() may strip passwords (Npgsql PersistSecurityInfo=false).
         services.AddSingleton<IDistributedLockProvider>(sp =>
         {
-            var dbOptions = sp.GetRequiredService<DbContextOptions<TContext>>();
+            using var scope = sp.CreateScope();
+            var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<TContext>>();
             var relationalExtension = dbOptions.Extensions.OfType<RelationalOptionsExtension>().FirstOrDefault();
             var connectionString = relationalExtension?.ConnectionString;
 
             if (connectionString is null)
             {
-                using var scope = sp.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<TContext>();
                 connectionString = context.Database.GetConnectionString()
                     ?? throw new InvalidOperationException("Cannot resolve connection string for distributed locks.");
