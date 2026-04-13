@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/Pagination';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
-import { shortId, formatBytes } from '@/utils/format';
+import { shortId, formatBytes, serverStatusDotColor, isServerStale } from '@/utils/format';
 import { ChevronDown, ChevronRight, RefreshCw, Pause, Play } from 'lucide-react';
 import type { ServerModel, WorkerModel, ServerTaskSummary, ServerLogModel, PagedList } from '@/types';
 import * as api from '@/api';
@@ -49,9 +49,10 @@ export default function ServerDetailPage() {
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
-        <span className={`inline-block w-3 h-3 rounded-full ${server.pausedAt ? 'bg-amber-500' : 'bg-green-500'}`} />
+        <span className={`inline-block w-3 h-3 rounded-full ${serverStatusDotColor(server.lastHeartbeatTime, server.pausedAt)}`} />
         <h1 className="text-2xl font-bold">{server.serverName}</h1>
         {server.pausedAt && <Badge variant="outline" className="text-amber-600 border-amber-300">Paused</Badge>}
+        {isServerStale(server.lastHeartbeatTime) && <Badge variant="outline" className="text-red-600 border-red-300">Inactive</Badge>}
         <button onClick={fetchData} className="p-2 rounded-md hover:bg-accent text-muted-foreground" title="Refresh">
           <RefreshCw className="h-4 w-4" />
         </button>

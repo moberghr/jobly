@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { formatBytes } from '@/utils/format';
+import { formatBytes, serverStatusDotColor, isServerStale } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { useRefreshKey } from '@/hooks/useRefreshKey';
@@ -53,11 +53,12 @@ export default function ServersPage() {
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <span className={`inline-block w-2 h-2 rounded-full ${server.pausedAt ? 'bg-amber-500' : 'bg-green-500'}`} />
+                    <span className={`inline-block w-2 h-2 rounded-full ${serverStatusDotColor(server.lastHeartbeatTime, server.pausedAt)}`} />
                     <Link to={`/servers/${server.id}`} className="text-primary hover:underline">
                       {server.serverName}
                     </Link>
                     {server.pausedAt && <Badge variant="outline" className="text-amber-600 border-amber-300">Paused</Badge>}
+                    {isServerStale(server.lastHeartbeatTime) && <Badge variant="outline" className="text-red-600 border-red-300">Inactive</Badge>}
                   </CardTitle>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span>{server.serviceCount} workers</span>
