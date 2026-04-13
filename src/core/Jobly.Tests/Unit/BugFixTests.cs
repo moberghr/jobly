@@ -157,12 +157,18 @@ public abstract class BugFixTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class BugFixTests_PostgreSql : BugFixTestsBase
 {
-    public BugFixTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public BugFixTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class BugFixTests_SqlServer : BugFixTestsBase
 {
-    public BugFixTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public BugFixTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

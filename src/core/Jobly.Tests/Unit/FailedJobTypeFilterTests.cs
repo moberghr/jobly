@@ -274,12 +274,18 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class FailedJobTypeFilterTests_PostgreSql : FailedJobTypeFilterTestsBase
 {
-    public FailedJobTypeFilterTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public FailedJobTypeFilterTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class FailedJobTypeFilterTests_SqlServer : FailedJobTypeFilterTestsBase
 {
-    public FailedJobTypeFilterTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public FailedJobTypeFilterTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

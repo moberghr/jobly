@@ -10,7 +10,10 @@ namespace Jobly.Tests.Integration;
 
 public abstract class MutexIntegrationTestsBase : IntegrationTestBase
 {
-    protected MutexIntegrationTestsBase(IDatabaseFixture fixture) : base(fixture) { }
+    protected MutexIntegrationTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
+    {
+    }
 
     [Fact]
     public async Task GivenTwoJobsWithSameMutex_WhenProcessed_ThenSecondIsCancelled()
@@ -49,12 +52,18 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
 [Collection("PostgreSql-Integration")]
 public class MutexIntegrationTests_PostgreSql : MutexIntegrationTestsBase
 {
-    public MutexIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
+    public MutexIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class MutexIntegrationTests_SqlServer : MutexIntegrationTestsBase
 {
-    public MutexIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
+    public MutexIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }

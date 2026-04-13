@@ -502,12 +502,18 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class OTelMetricsTests_PostgreSql : OTelMetricsTestsBase
 {
-    public OTelMetricsTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public OTelMetricsTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class OTelMetricsTests_SqlServer : OTelMetricsTestsBase
 {
-    public OTelMetricsTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public OTelMetricsTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

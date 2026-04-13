@@ -4,7 +4,7 @@ namespace Jobly.Tests.Integration;
 
 public abstract class IntegrationTestBase : IAsyncLifetime
 {
-    protected readonly IDatabaseFixture _fixture;
+    private readonly IDatabaseFixture _fixture;
 
     protected IntegrationTestBase(IDatabaseFixture fixture)
     {

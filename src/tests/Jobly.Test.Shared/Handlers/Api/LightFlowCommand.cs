@@ -21,7 +21,7 @@ public class LightFlowHandler : IJobHandler<LightFlowRequest>
         _context = context;
     }
 
-    public async Task HandleAsync(LightFlowRequest message, CancellationToken ct)
+    public async Task HandleAsync(LightFlowRequest message, CancellationToken cancellationToken)
     {
         var email = new SendEmailRequest { EmailLogId = 1 };
 
@@ -42,6 +42,6 @@ public class LightFlowHandler : IJobHandler<LightFlowRequest>
         await _publisher.Enqueue(email, parentId);
         await _publisher.Enqueue(new PublishInvoiceRequest { OrderId = "LIGHT-001" }, parentId);
 
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

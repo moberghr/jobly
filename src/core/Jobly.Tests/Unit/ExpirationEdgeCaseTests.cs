@@ -59,7 +59,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         await InsertExpiredJob(ctx);
 
-        var oldKey = "stats:failed:2020-01-01-10";
+        const string oldKey = "stats:failed:2020-01-01-10";
         ctx.Set<Statistic>().Add(new Statistic { Key = oldKey, Value = 5 });
         await ctx.SaveChangesAsync();
 
@@ -207,12 +207,18 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class ExpirationEdgeCaseTests_PostgreSql : ExpirationEdgeCaseTestsBase
 {
-    public ExpirationEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public ExpirationEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class ExpirationEdgeCaseTests_SqlServer : ExpirationEdgeCaseTestsBase
 {
-    public ExpirationEdgeCaseTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public ExpirationEdgeCaseTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

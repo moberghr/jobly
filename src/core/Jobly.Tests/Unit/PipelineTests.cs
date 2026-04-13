@@ -125,7 +125,7 @@ public abstract class PipelineTestsBase : IAsyncLifetime
             .Where(x => x.JobId == jobId)
             .ToListAsync();
 
-        var handlerLogs = allLogs.Where(x => x.EventType == "Log").ToList();
+        var handlerLogs = allLogs.Where(x => string.Equals(x.EventType, "Log", StringComparison.Ordinal)).ToList();
 
         handlerLogs.ShouldContain(l => l.Message.Contains("Pipeline before handler"));
         handlerLogs.ShouldContain(l => l.Message.Contains("Pipeline after handler"));
@@ -135,12 +135,18 @@ public abstract class PipelineTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class PipelineTests_PostgreSql : PipelineTestsBase
 {
-    public PipelineTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public PipelineTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class PipelineTests_SqlServer : PipelineTestsBase
 {
-    public PipelineTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public PipelineTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

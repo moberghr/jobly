@@ -12,15 +12,15 @@ public class SendEmailCommand : IJobHandler<SendEmailRequest>
         _context = context;
     }
 
-    public async Task HandleAsync(SendEmailRequest message, CancellationToken ct)
+    public async Task HandleAsync(SendEmailRequest message, CancellationToken cancellationToken)
     {
         var emailLog = await _context.EmailLogs
             .Where(x => x.Id == message.EmailLogId)
-            .FirstAsync(cancellationToken: ct);
+            .FirstAsync(cancellationToken: cancellationToken);
 
         emailLog.ProcessedTime = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }
 

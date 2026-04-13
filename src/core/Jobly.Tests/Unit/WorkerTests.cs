@@ -279,12 +279,18 @@ public abstract class WorkerTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class WorkerTests_PostgreSql : WorkerTestsBase
 {
-    public WorkerTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public WorkerTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class WorkerTests_SqlServer : WorkerTestsBase
 {
-    public WorkerTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public WorkerTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

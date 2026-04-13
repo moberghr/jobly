@@ -8,7 +8,7 @@ public class PublishContext<T> : IJobMetadata
 {
     public required T Job { get; init; }
 
-    public Dictionary<string, string> Metadata { get; init; } = new();
+    public Dictionary<string, string> Metadata { get; init; } = [];
 
     IReadOnlyDictionary<string, string> IJobMetadata.Metadata => Metadata;
 }

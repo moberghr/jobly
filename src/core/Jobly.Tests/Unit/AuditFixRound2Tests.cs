@@ -51,6 +51,7 @@ public abstract class AuditFixRound2TestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var job = await readCtx.Set<Job>().FindAsync(jobId);
         job.ShouldNotBeNull();
+
         // Should NOT be Enqueued — that would cause double execution while worker is still running
         job.CurrentState.ShouldNotBe(State.Enqueued, "Requeuing a Processing job would cause double execution");
     }
@@ -182,12 +183,18 @@ public abstract class AuditFixRound2TestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class AuditFixRound2Tests_PostgreSql : AuditFixRound2TestsBase
 {
-    public AuditFixRound2Tests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public AuditFixRound2Tests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class AuditFixRound2Tests_SqlServer : AuditFixRound2TestsBase
 {
-    public AuditFixRound2Tests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public AuditFixRound2Tests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

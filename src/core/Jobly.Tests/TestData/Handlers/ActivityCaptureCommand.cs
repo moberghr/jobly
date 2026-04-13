@@ -14,7 +14,7 @@ public class ActivityCaptureCommand : IJobHandler<ActivityCaptureRequest>
         _capture = capture;
     }
 
-    public Task HandleAsync(ActivityCaptureRequest message, CancellationToken ct)
+    public Task HandleAsync(ActivityCaptureRequest message, CancellationToken cancellationToken)
     {
         var activity = Activity.Current;
         if (activity != null)
@@ -32,7 +32,10 @@ public class ActivityCaptureCommand : IJobHandler<ActivityCaptureRequest>
 public class ActivityCapture
 {
     public string? TraceId { get; set; }
+
     public string? SpanId { get; set; }
+
     public string? ParentSpanId { get; set; }
-    public Dictionary<string, string?> Tags { get; set; } = new();
+
+    public Dictionary<string, string?> Tags { get; set; } = [];
 }

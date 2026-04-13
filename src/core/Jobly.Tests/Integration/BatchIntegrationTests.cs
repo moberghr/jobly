@@ -10,7 +10,10 @@ namespace Jobly.Tests.Integration;
 
 public abstract class BatchIntegrationTestsBase : IntegrationTestBase
 {
-    protected BatchIntegrationTestsBase(IDatabaseFixture fixture) : base(fixture) { }
+    protected BatchIntegrationTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
+    {
+    }
 
     [Fact]
     public async Task GivenBatchOfFive_WhenAllComplete_ThenBatchFinalizes()
@@ -209,12 +212,18 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
 [Collection("PostgreSql-Integration")]
 public class BatchIntegrationTests_PostgreSql : BatchIntegrationTestsBase
 {
-    public BatchIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
+    public BatchIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class BatchIntegrationTests_SqlServer : BatchIntegrationTestsBase
 {
-    public BatchIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
+    public BatchIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }

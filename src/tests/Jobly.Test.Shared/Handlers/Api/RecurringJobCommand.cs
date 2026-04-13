@@ -23,7 +23,7 @@ public class RecurringJobCommand : IJobHandler<RecurringJobRequest>
         _publisher = publisher;
     }
 
-    public async Task HandleAsync(RecurringJobRequest message, CancellationToken ct)
+    public async Task HandleAsync(RecurringJobRequest message, CancellationToken cancellationToken)
     {
         var registration = new Registration
         {
@@ -41,15 +41,15 @@ public class RecurringJobCommand : IJobHandler<RecurringJobRequest>
 
         _context.EmailLogs.Add(emailLog);
 
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(cancellationToken);
 
         var sendEmailRequest = new SendEmailRequest
         {
             EmailLogId = emailLog.Id,
         };
 
-        await _publisher.AddOrUpdateRecurringJob(sendEmailRequest, message.Name, message.Cron);
+        await _publisher.AddOrUpdateRecurringJob(sendEmailRequest, message.Name!, message.Cron!);
 
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

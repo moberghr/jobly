@@ -169,6 +169,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.ShouldNotBeNull();
         job.ScheduleTime.ShouldBeGreaterThan(DateTime.UtcNow.AddHours(1));
     }
+
     [Fact]
     public async Task Enqueue_WithParent_InheritsParentTrace_SameContext()
     {
@@ -236,12 +237,18 @@ public abstract class PublisherTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class PublisherTests_PostgreSql : PublisherTestsBase
 {
-    public PublisherTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public PublisherTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class PublisherTests_SqlServer : PublisherTestsBase
 {
-    public PublisherTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public PublisherTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

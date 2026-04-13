@@ -100,12 +100,18 @@ public abstract class RecurringJobLogCascadeTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class RecurringJobLogCascadeTests_PostgreSql : RecurringJobLogCascadeTestsBase
 {
-    public RecurringJobLogCascadeTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public RecurringJobLogCascadeTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class RecurringJobLogCascadeTests_SqlServer : RecurringJobLogCascadeTestsBase
 {
-    public RecurringJobLogCascadeTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public RecurringJobLogCascadeTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

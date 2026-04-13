@@ -10,7 +10,10 @@ namespace Jobly.Tests.Integration;
 
 public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
 {
-    protected ConcurrencyIntegrationTestsBase(IDatabaseFixture fixture) : base(fixture) { }
+    protected ConcurrencyIntegrationTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
+    {
+    }
 
     [Fact]
     public async Task GivenFiftyCounterJobs_WithFiveWorkers_ThenAllProcessedExactlyOnce()
@@ -111,12 +114,18 @@ public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
 [Collection("PostgreSql-Integration")]
 public class ConcurrencyIntegrationTests_PostgreSql : ConcurrencyIntegrationTestsBase
 {
-    public ConcurrencyIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
+    public ConcurrencyIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class ConcurrencyIntegrationTests_SqlServer : ConcurrencyIntegrationTestsBase
 {
-    public ConcurrencyIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
+    public ConcurrencyIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }

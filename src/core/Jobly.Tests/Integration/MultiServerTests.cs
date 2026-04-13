@@ -12,7 +12,10 @@ namespace Jobly.Tests.Integration;
 
 public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
 {
-    protected MultiServerTestsBase(IMultiServerDatabaseFixture fixture) : base(fixture) { }
+    protected MultiServerTestsBase(IMultiServerDatabaseFixture fixture)
+        : base(fixture)
+    {
+    }
 
     [Fact]
     public async Task GivenManyJobs_WithTwoServers_ThenEachJobProcessedExactlyOnce()
@@ -436,12 +439,18 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
 [Collection("PostgreSql-MultiServer")]
 public class MultiServerTests_PostgreSql : MultiServerTestsBase
 {
-    public MultiServerTests_PostgreSql(PostgreSqlMultiServerFixture fixture) : base(fixture) { }
+    public MultiServerTests_PostgreSql(PostgreSqlMultiServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer-MultiServer")]
 [Trait("Category", "SqlServer")]
 public class MultiServerTests_SqlServer : MultiServerTestsBase
 {
-    public MultiServerTests_SqlServer(SqlServerMultiServerFixture fixture) : base(fixture) { }
+    public MultiServerTests_SqlServer(SqlServerMultiServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

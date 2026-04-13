@@ -227,12 +227,18 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class RecurringJobEdgeCaseTests_PostgreSql : RecurringJobEdgeCaseTestsBase
 {
-    public RecurringJobEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public RecurringJobEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class RecurringJobEdgeCaseTests_SqlServer : RecurringJobEdgeCaseTestsBase
 {
-    public RecurringJobEdgeCaseTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public RecurringJobEdgeCaseTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

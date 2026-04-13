@@ -151,12 +151,18 @@ public abstract class AuditFixRound3TestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class AuditFixRound3Tests_PostgreSql : AuditFixRound3TestsBase
 {
-    public AuditFixRound3Tests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public AuditFixRound3Tests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class AuditFixRound3Tests_SqlServer : AuditFixRound3TestsBase
 {
-    public AuditFixRound3Tests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public AuditFixRound3Tests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

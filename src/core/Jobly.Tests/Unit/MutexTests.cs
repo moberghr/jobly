@@ -76,12 +76,12 @@ public abstract class MutexTestsBase : IAsyncLifetime
 
         // Assert: job2 should be cancelled (Deleted)
         var readCtx = _fixture.CreateContext();
-        var job2 = await readCtx.Set<Job>().FindAsync(job2Id);
+        var job2 = await readCtx.Set<Job>().FindAsync([job2Id], CancellationToken.None);
         job2.ShouldNotBeNull();
         job2.CurrentState.ShouldBe(State.Deleted);
 
         var log = await readCtx.Set<JobLog>()
-            .FirstOrDefaultAsync(l => l.JobId == job2Id && l.EventType == "Deleted");
+            .FirstOrDefaultAsync(l => l.JobId == job2Id && l.EventType == "Deleted", CancellationToken.None);
         log.ShouldNotBeNull();
         log.Message.ShouldContain("mutex");
         log.Message.ShouldContain("payment:123");
@@ -232,12 +232,18 @@ public abstract class MutexTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class MutexTests_PostgreSql : MutexTestsBase
 {
-    public MutexTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public MutexTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class MutexTests_SqlServer : MutexTestsBase
 {
-    public MutexTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public MutexTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

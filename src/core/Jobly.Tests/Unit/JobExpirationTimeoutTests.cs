@@ -90,12 +90,18 @@ public abstract class JobExpirationTimeoutTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class JobExpirationTimeoutTests_PostgreSql : JobExpirationTimeoutTestsBase
 {
-    public JobExpirationTimeoutTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public JobExpirationTimeoutTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class JobExpirationTimeoutTests_SqlServer : JobExpirationTimeoutTestsBase
 {
-    public JobExpirationTimeoutTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public JobExpirationTimeoutTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

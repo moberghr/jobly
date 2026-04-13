@@ -9,7 +9,10 @@ namespace Jobly.Tests.Integration;
 
 public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
 {
-    protected CancellationIntegrationTestsBase(IDatabaseFixture fixture) : base(fixture) { }
+    protected CancellationIntegrationTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
+    {
+    }
 
     [Fact]
     public async Task GivenProcessingJob_WhenDeleted_ThenHandlerIsCancelledAndLoggedAsCancelled()
@@ -53,7 +56,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
         await Server.WaitForJobLog(jobId, "CancellationRequested", timeout: TimeSpan.FromSeconds(5));
 
         var logs = await Server.GetJobLogs(jobId);
-        var cancellationLog = logs.First(l => l.EventType == "CancellationRequested");
+        var cancellationLog = logs.First(l => string.Equals(l.EventType, "CancellationRequested", StringComparison.Ordinal));
         cancellationLog.WorkerId.ShouldBeNull();
     }
 
@@ -74,11 +77,11 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
         var logs = await Server.GetJobLogs(jobId);
 
         // Worker-produced logs (Processing, Cancelled) should have a WorkerId
-        var processingLog = logs.FirstOrDefault(l => l.EventType == "Processing");
+        var processingLog = logs.FirstOrDefault(l => string.Equals(l.EventType, "Processing", StringComparison.Ordinal));
         processingLog.ShouldNotBeNull();
         processingLog.WorkerId.ShouldNotBeNull();
 
-        var cancelledLog = logs.First(l => l.EventType == "Cancelled");
+        var cancelledLog = logs.First(l => string.Equals(l.EventType, "Cancelled", StringComparison.Ordinal));
         cancelledLog.WorkerId.ShouldNotBeNull();
     }
 
@@ -107,12 +110,18 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
 [Collection("PostgreSql-Integration")]
 public class CancellationIntegrationTests_PostgreSql : CancellationIntegrationTestsBase
 {
-    public CancellationIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
+    public CancellationIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class CancellationIntegrationTests_SqlServer : CancellationIntegrationTestsBase
 {
-    public CancellationIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
+    public CancellationIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }

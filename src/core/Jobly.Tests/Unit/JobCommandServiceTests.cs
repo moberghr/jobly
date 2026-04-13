@@ -413,12 +413,18 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class JobCommandServiceTests_PostgreSql : JobCommandServiceTestsBase
 {
-    public JobCommandServiceTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public JobCommandServiceTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class JobCommandServiceTests_SqlServer : JobCommandServiceTestsBase
 {
-    public JobCommandServiceTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public JobCommandServiceTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

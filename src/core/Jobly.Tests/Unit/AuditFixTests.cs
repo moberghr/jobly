@@ -30,9 +30,6 @@ public abstract class AuditFixTestsBase : IAsyncLifetime
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    private static readonly Guid ServerId = Guid.NewGuid();
-    private static readonly string[] DefaultQueues = ["default"];
-
     /// <summary>
     /// CRITICAL #1: Stale recovery must respect CancellationMode.
     /// If a job has CancellationMode=Graceful (user called DeleteJob), stale recovery
@@ -177,12 +174,18 @@ public abstract class AuditFixTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class AuditFixTests_PostgreSql : AuditFixTestsBase
 {
-    public AuditFixTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public AuditFixTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class AuditFixTests_SqlServer : AuditFixTestsBase
 {
-    public AuditFixTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public AuditFixTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

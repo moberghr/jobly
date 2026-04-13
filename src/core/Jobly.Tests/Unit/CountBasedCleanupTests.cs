@@ -256,12 +256,18 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class CountBasedCleanupTests_PostgreSql : CountBasedCleanupTestsBase
 {
-    public CountBasedCleanupTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public CountBasedCleanupTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class CountBasedCleanupTests_SqlServer : CountBasedCleanupTestsBase
 {
-    public CountBasedCleanupTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public CountBasedCleanupTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

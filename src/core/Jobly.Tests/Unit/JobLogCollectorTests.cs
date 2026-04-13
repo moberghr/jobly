@@ -36,7 +36,7 @@ public class JobLogCollectorTests
     public async Task Drain_DoesNotLoseEntries_WhenAddAndDrainConcurrently()
     {
         var collector = new JobLogCollector { JobId = Guid.NewGuid() };
-        var totalEntries = 1000;
+        const int totalEntries = 1000;
         var allDrained = new List<Core.Data.Entities.JobLog>();
 
         // Producer: add entries from multiple threads

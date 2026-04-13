@@ -9,7 +9,10 @@ namespace Jobly.Tests.Integration;
 
 public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
 {
-    protected TracePropagationIntegrationTestsBase(IDatabaseFixture fixture) : base(fixture) { }
+    protected TracePropagationIntegrationTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
+    {
+    }
 
     [Fact]
     public async Task GivenJobThatSpawnsChild_ThenChildHasSpawnedByJobId()
@@ -87,12 +90,18 @@ public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
 [Collection("PostgreSql-Integration")]
 public class TracePropagationIntegrationTests_PostgreSql : TracePropagationIntegrationTestsBase
 {
-    public TracePropagationIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
+    public TracePropagationIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class TracePropagationIntegrationTests_SqlServer : TracePropagationIntegrationTestsBase
 {
-    public TracePropagationIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
+    public TracePropagationIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }

@@ -176,12 +176,18 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class MessageRoutingErrorTests_PostgreSql : MessageRoutingErrorTestsBase
 {
-    public MessageRoutingErrorTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public MessageRoutingErrorTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class MessageRoutingErrorTests_SqlServer : MessageRoutingErrorTestsBase
 {
-    public MessageRoutingErrorTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public MessageRoutingErrorTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

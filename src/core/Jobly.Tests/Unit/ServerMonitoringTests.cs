@@ -106,12 +106,18 @@ public abstract class ServerMonitoringTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class ServerMonitoringTests_PostgreSql : ServerMonitoringTestsBase
 {
-    public ServerMonitoringTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public ServerMonitoringTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class ServerMonitoringTests_SqlServer : ServerMonitoringTestsBase
 {
-    public ServerMonitoringTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public ServerMonitoringTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

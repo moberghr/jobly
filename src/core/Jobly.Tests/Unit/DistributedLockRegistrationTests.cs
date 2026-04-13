@@ -84,7 +84,7 @@ public class DistributedLockRegistrationTests
     [Fact]
     public void AddJoblyWorker_OptionsExtensionPreservesPassword_AfterJoblyWrapsOptions()
     {
-        var connectionString = "Host=localhost;Database=test;Username=user;Password=secret123";
+        const string connectionString = "Host=localhost;Database=test;Username=user;Password=secret123";
         var services = new ServiceCollection();
         services.AddDbContext<TestContext>(o => o.UseNpgsql(connectionString));
         services.AddJoblyWorker<TestContext>();

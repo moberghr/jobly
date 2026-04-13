@@ -14,7 +14,7 @@ public class OrderEmailHandler : IMessageHandler<OrderNotification>
         _logger = logger;
     }
 
-    public Task HandleAsync(OrderNotification message, CancellationToken ct)
+    public Task HandleAsync(OrderNotification message, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Sending order confirmation email");
         return Task.CompletedTask;
@@ -30,7 +30,7 @@ public class OrderSlackHandler : IMessageHandler<OrderNotification>
         _logger = logger;
     }
 
-    public Task HandleAsync(OrderNotification message, CancellationToken ct)
+    public Task HandleAsync(OrderNotification message, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Posting order notification to Slack");
         return Task.CompletedTask;

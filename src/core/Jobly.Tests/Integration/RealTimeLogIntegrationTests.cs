@@ -9,7 +9,10 @@ namespace Jobly.Tests.Integration;
 
 public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
 {
-    protected RealTimeLogIntegrationTestsBase(IDatabaseFixture fixture) : base(fixture) { }
+    protected RealTimeLogIntegrationTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
+    {
+    }
 
     [Fact]
     public async Task GivenProcessingJob_WhenHandlerLogs_ThenLogsAppearInDbBeforeCompletion()
@@ -102,12 +105,18 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
 [Collection("PostgreSql-Integration")]
 public class RealTimeLogIntegrationTests_PostgreSql : RealTimeLogIntegrationTestsBase
 {
-    public RealTimeLogIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
+    public RealTimeLogIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class RealTimeLogIntegrationTests_SqlServer : RealTimeLogIntegrationTestsBase
 {
-    public RealTimeLogIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
+    public RealTimeLogIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }

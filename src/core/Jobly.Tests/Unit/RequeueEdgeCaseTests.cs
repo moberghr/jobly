@@ -149,12 +149,18 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class RequeueEdgeCaseTests_PostgreSql : RequeueEdgeCaseTestsBase
 {
-    public RequeueEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public RequeueEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class RequeueEdgeCaseTests_SqlServer : RequeueEdgeCaseTestsBase
 {
-    public RequeueEdgeCaseTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public RequeueEdgeCaseTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

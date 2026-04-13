@@ -59,7 +59,7 @@ public class PostgresRowLockInterceptor : DbCommandInterceptor
 public partial class SqlServerRowLockInterceptor : DbCommandInterceptor
 {
     // Matches the first FROM [table] AS [alias] or FROM [schema].[table] AS [alias] pattern
-    [GeneratedRegex(@"(FROM\s+(?:\[\w+\]\.)*\[\w+\]\s+AS\s+\[\w+\])")]
+    [GeneratedRegex(@"(?<from>FROM\s+(?:\[\w+\]\.)*\[\w+\]\s+AS\s+\[\w+\])", RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture)]
     private static partial Regex FromClausePattern();
 
     public override InterceptionResult<DbDataReader> ReaderExecuting(
@@ -88,15 +88,15 @@ public partial class SqlServerRowLockInterceptor : DbCommandInterceptor
         if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJob}", StringComparison.Ordinal)
             && !command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJobWait}", StringComparison.Ordinal))
         {
-            command.CommandText = FromClausePattern().Replace(command.CommandText, "$1 WITH (ROWLOCK, UPDLOCK, READPAST)", 1);
+            command.CommandText = FromClausePattern().Replace(command.CommandText, "${from} WITH (ROWLOCK, UPDLOCK, READPAST)", 1);
         }
         else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableJobWait}", StringComparison.Ordinal))
         {
-            command.CommandText = FromClausePattern().Replace(command.CommandText, "$1 WITH (ROWLOCK, UPDLOCK)", 1);
+            command.CommandText = FromClausePattern().Replace(command.CommandText, "${from} WITH (ROWLOCK, UPDLOCK)", 1);
         }
         else if (command.CommandText.StartsWith($"-- {InterceptorConstants.RowLockTableCounter}", StringComparison.Ordinal))
         {
-            command.CommandText = FromClausePattern().Replace(command.CommandText, "$1 WITH (ROWLOCK, UPDLOCK, READPAST)", 1);
+            command.CommandText = FromClausePattern().Replace(command.CommandText, "${from} WITH (ROWLOCK, UPDLOCK, READPAST)", 1);
         }
     }
 }

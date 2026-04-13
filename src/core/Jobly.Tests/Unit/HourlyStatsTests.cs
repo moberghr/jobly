@@ -225,12 +225,18 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class HourlyStatsTests_PostgreSql : HourlyStatsTestsBase
 {
-    public HourlyStatsTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public HourlyStatsTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class HourlyStatsTests_SqlServer : HourlyStatsTestsBase
 {
-    public HourlyStatsTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public HourlyStatsTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

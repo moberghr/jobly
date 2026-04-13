@@ -46,7 +46,6 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
     }
 
     // --- Publisher.Enqueue ---
-
     [Fact]
     public async Task Enqueue_WithActiveActivity_CapturesParentSpanId()
     {
@@ -104,7 +103,6 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
     }
 
     // --- Publisher.Publish (Message) ---
-
     [Fact]
     public async Task Publish_WithActiveActivity_CapturesParentSpanId()
     {
@@ -131,7 +129,6 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
     }
 
     // --- BatchPublisher ---
-
     [Fact]
     public async Task StartBatch_WithActiveActivity_CapturesParentSpanIdOnBatchAndChildren()
     {
@@ -172,7 +169,6 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
     }
 
     // --- MessageRoutingTask propagation ---
-
     [Fact]
     public async Task MessageRouting_PropagatesParentSpanIdToChildJobs()
     {
@@ -257,7 +253,6 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
     }
 
     // --- Publisher inside handler (JobExecutionContext active) ---
-
     [Fact]
     public async Task Enqueue_InsideHandlerWithActivity_CapturesHandlerSpanId()
     {
@@ -304,12 +299,18 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class SpanPropagationTests_PostgreSql : SpanPropagationTestsBase
 {
-    public SpanPropagationTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public SpanPropagationTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class SpanPropagationTests_SqlServer : SpanPropagationTestsBase
 {
-    public SpanPropagationTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public SpanPropagationTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

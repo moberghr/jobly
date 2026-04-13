@@ -285,12 +285,18 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class CrashRecoveryTests_PostgreSql : CrashRecoveryTestsBase
 {
-    public CrashRecoveryTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public CrashRecoveryTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class CrashRecoveryTests_SqlServer : CrashRecoveryTestsBase
 {
-    public CrashRecoveryTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public CrashRecoveryTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

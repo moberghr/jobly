@@ -253,12 +253,18 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
 [Collection("PostgreSql")]
 public class RetentionEdgeCaseTests_PostgreSql : RetentionEdgeCaseTestsBase
 {
-    public RetentionEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
+    public RetentionEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer")]
 [Trait("Category", "SqlServer")]
 public class RetentionEdgeCaseTests_SqlServer : RetentionEdgeCaseTestsBase
 {
-    public RetentionEdgeCaseTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
+    public RetentionEdgeCaseTests_SqlServer(SqlServerFixture fixture)
+        : base(fixture)
+    {
+    }
 }

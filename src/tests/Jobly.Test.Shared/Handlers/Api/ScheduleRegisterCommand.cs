@@ -23,7 +23,7 @@ public class ScheduleRegisterCommand : IJobHandler<ScheduleRegisterRequest>
         _publisher = publisher;
     }
 
-    public async Task HandleAsync(ScheduleRegisterRequest message, CancellationToken ct)
+    public async Task HandleAsync(ScheduleRegisterRequest message, CancellationToken cancellationToken)
     {
         var registration = new Registration
         {
@@ -41,9 +41,9 @@ public class ScheduleRegisterCommand : IJobHandler<ScheduleRegisterRequest>
 
         _context.EmailLogs.Add(emailLog);
 
-        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(cancellationToken);
 
         var sendEmailRequest = new SendEmailRequest
         {
@@ -64,8 +64,8 @@ public class ScheduleRegisterCommand : IJobHandler<ScheduleRegisterRequest>
             await _publisher.Enqueue(sendEmailRequest, jobParams);
         }
 
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(cancellationToken);
 
-        await transaction.CommitAsync(ct);
+        await transaction.CommitAsync(cancellationToken);
     }
 }

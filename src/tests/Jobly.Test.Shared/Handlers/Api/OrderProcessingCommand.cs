@@ -25,7 +25,7 @@ public class ProcessOrderHandler : IJobHandler<ProcessOrderRequest>
         _logger = logger;
     }
 
-    public async Task HandleAsync(ProcessOrderRequest message, CancellationToken ct)
+    public async Task HandleAsync(ProcessOrderRequest message, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Processing order {OrderId}", message.OrderId);
 
@@ -63,10 +63,10 @@ public class ShipItemHandler : IJobHandler<ShipItemRequest>
         _logger = logger;
     }
 
-    public async Task HandleAsync(ShipItemRequest message, CancellationToken ct)
+    public async Task HandleAsync(ShipItemRequest message, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Shipping item {Index} for order {OrderId}", message.ItemIndex, message.OrderId);
-        await Task.Delay(100, ct); // Simulate work
+        await Task.Delay(100, cancellationToken); // Simulate work
     }
 }
 
@@ -88,11 +88,11 @@ public class PublishInvoiceHandler : IJobHandler<PublishInvoiceRequest>
         _context = context;
     }
 
-    public async Task HandleAsync(PublishInvoiceRequest message, CancellationToken ct)
+    public async Task HandleAsync(PublishInvoiceRequest message, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Publishing invoice notification for order {OrderId}", message.OrderId);
         await _publisher.Publish(new InvoiceNotification { OrderId = message.OrderId });
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }
 
@@ -110,7 +110,7 @@ public class InvoiceEmailHandler : IMessageHandler<InvoiceNotification>
         _logger = logger;
     }
 
-    public Task HandleAsync(InvoiceNotification message, CancellationToken ct)
+    public Task HandleAsync(InvoiceNotification message, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Sending invoice email for order {OrderId}", message.OrderId);
         return Task.CompletedTask;
@@ -126,7 +126,7 @@ public class InvoiceWebhookHandler : IMessageHandler<InvoiceNotification>
         _logger = logger;
     }
 
-    public Task HandleAsync(InvoiceNotification message, CancellationToken ct)
+    public Task HandleAsync(InvoiceNotification message, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Sending invoice webhook for order {OrderId}", message.OrderId);
         return Task.CompletedTask;

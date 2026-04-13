@@ -6,8 +6,8 @@ public class SlowRequest : IJob;
 
 public class SlowCommand : IJobHandler<SlowRequest>
 {
-    public async Task HandleAsync(SlowRequest message, CancellationToken ct)
+    public async Task HandleAsync(SlowRequest message, CancellationToken cancellationToken)
     {
-        await Task.Delay(30000, ct); // 30 seconds
+        await Task.Delay(30000, cancellationToken); // 30 seconds
     }
 }

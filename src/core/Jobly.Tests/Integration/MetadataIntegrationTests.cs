@@ -11,7 +11,10 @@ namespace Jobly.Tests.Integration;
 
 public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
 {
-    protected MetadataIntegrationTestsBase(IDatabaseFixture fixture) : base(fixture) { }
+    protected MetadataIntegrationTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
+    {
+    }
 
     [Fact]
     public async Task PublishJob_WithPublishPipeline_MetadataPersistedAndAvailableInHandler()
@@ -88,12 +91,18 @@ public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
 [Collection("PostgreSql-Integration")]
 public class MetadataIntegrationTests_PostgreSql : MetadataIntegrationTestsBase
 {
-    public MetadataIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
+    public MetadataIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }
 
 [Collection("SqlServer-Integration")]
 [Trait("Category", "SqlServer")]
 public class MetadataIntegrationTests_SqlServer : MetadataIntegrationTestsBase
 {
-    public MetadataIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
+    public MetadataIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture)
+        : base(fixture)
+    {
+    }
 }
