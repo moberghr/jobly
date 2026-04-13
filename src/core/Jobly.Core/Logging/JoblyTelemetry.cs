@@ -47,7 +47,12 @@ public static class JoblyTelemetry
 
     private static bool IsValidSpanId(string? value)
     {
-        return value != null && value.Length == 16 && value.All(char.IsAsciiHexDigit);
+        if (value == null || value.Length != 16)
+        {
+            return false;
+        }
+
+        return value.All(char.IsAsciiHexDigit);
     }
 
     public static string GetShortTypeName(string? assemblyQualifiedName)
