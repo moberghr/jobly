@@ -51,5 +51,6 @@ public class Job
     public string? ConcurrencyKey { get; set; }
 
     public string? Metadata { get; set; }
+
     public string? ParentSpanId { get; set; }
 }
