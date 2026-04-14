@@ -59,7 +59,7 @@ public class CacheBehavior : IPipelineBehavior<GetUser, UserDto> { ... }
 public class RetryBehavior<T> : IPipelineBehavior<T, Unit> where T : IJob { ... }
 ```
 
-For jobs and messages, `TResponse` is `Unit`. For requests, it's your custom response type. Logger output from pipeline behaviors appears in the job detail "Handler Output" section.
+For jobs and messages, `TResponse` is `Unit`. For requests, it's your custom response type. For streams, it's `IAsyncEnumerable<T>`. Logger output from pipeline behaviors appears in the job detail "Handler Output" section.
 
 Stream requests use a separate pipeline — `IStreamPipelineBehavior<TRequest, TResponse>`:
 

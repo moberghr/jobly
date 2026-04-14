@@ -249,7 +249,7 @@ public class LoggingBehavior<T, TResponse> : IPipelineBehavior<T, TResponse>
 builder.Services.AddPipelineBehaviors(typeof(Program).Assembly);
 ```
 
-For jobs and messages, `TResponse` is `Unit`. For requests, it's your custom response type.
+For jobs and messages, `TResponse` is `Unit`. For requests, it's your custom response type. For streams, it's `IAsyncEnumerable<T>`.
 
 ### 7. Named Queues
 
