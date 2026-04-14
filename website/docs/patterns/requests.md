@@ -108,7 +108,7 @@ Behaviors execute in registration order, outermost first. The handler is the inn
 
 ## Streams
 
-Stream requests implement `IStreamRequest<TResponse>` and return `IAsyncEnumerable<TResponse>` — items are yielded lazily, one at a time. Like standard requests, streams are not persisted to the database.
+Stream requests implement `IStreamRequest<TResponse>` (which extends `IRequest<IAsyncEnumerable<TResponse>>`) and return `IAsyncEnumerable<TResponse>` — items are yielded lazily, one at a time. Like all request types, streams are part of the unified type hierarchy. `IPipelineBehavior` applies at the request level (auth, logging). Streams are not persisted to the database.
 
 ### Define a stream request
 
@@ -170,9 +170,10 @@ public class StreamTimingBehavior<T, TResponse> : IStreamPipelineBehavior<T, TRe
 
 | | Requests | Streams |
 |---|---|---|
-| Interface | `IRequest<T>` | `IStreamRequest<T>` |
+| Interface | `IRequest<T>` | `IStreamRequest<T>` (extends `IRequest<IAsyncEnumerable<T>>`) |
 | Handler | `IRequestHandler<TReq, T>` | `IStreamRequestHandler<TReq, T>` |
 | Return type | `Task<T>` | `IAsyncEnumerable<T>` |
-| Pipeline | `IPipelineBehavior` | `IStreamPipelineBehavior` |
+| Request pipeline | `IPipelineBehavior` | `IPipelineBehavior` (same, applies automatically) |
+| Enumeration pipeline | N/A | `IStreamPipelineBehavior` |
 | Dispatch | `mediator.Send()` | `mediator.CreateStream()` |
 | Execution | Eager — single result | Lazy — items yielded on demand |

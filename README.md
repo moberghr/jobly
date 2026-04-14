@@ -15,7 +15,7 @@ A distributed job processing, message queue, and in-memory mediator library for 
 - **Message Queue** — Publish messages with multiple handlers. Each handler runs as an independent, retryable job.
 - **In-Memory Requests** — `IRequest<TResponse>` with `IMediator.Send()` for immediate, typed request/response. No database persistence.
 - **In-Memory Streams** — `IStreamRequest<TResponse>` with `IMediator.CreateStream()` for lazy, item-by-item streaming via `IAsyncEnumerable<TResponse>`. No database persistence.
-- **Unified Pipeline** — `IPipelineBehavior<T, TResponse>` wraps jobs, messages, and requests. `IStreamPipelineBehavior<T, TResponse>` wraps streams.
+- **Unified Pipeline** — `IPipelineBehavior<T, TResponse>` wraps all four patterns. `IStreamPipelineBehavior<T, TResponse>` adds enumeration-level wrapping for streams.
 - **Named Queues** — Assign jobs to queues. Workers subscribe to specific queues. Alphabetical order = priority.
 - **Execution Logs** — ILogger output automatically captured and flushed to the database every ~1 second during handler execution, viewable in dashboard in real time. Each log entry tracks which worker produced it.
 - **Unified Activity Log** — Single audit trail per job: lifecycle events (Created, Processing, Completed, Failed, Cancelled) + handler logs.
@@ -228,7 +228,7 @@ Streams execute lazily in-process — items are yielded one at a time. No databa
 
 ### 6. Pipeline Behaviors
 
-The unified pipeline wraps jobs, messages, and requests. Streams have their own `IStreamPipelineBehavior` pipeline:
+The unified pipeline wraps all four patterns — jobs, messages, requests, and streams:
 
 ```csharp
 public class LoggingBehavior<T, TResponse> : IPipelineBehavior<T, TResponse>
@@ -355,9 +355,9 @@ mediator.Send(GetUser { Id = 1 })
 ### Stream Flow
 ```
 mediator.CreateStream(GetUsers { Role = "Admin" })
-  → Resolve IStreamRequestHandler<GetUsers, UserDto>
-  → Stream pipeline behaviors (IStreamPipelineBehavior chain)
-  → Handler.HandleAsync → IAsyncEnumerable<UserDto> returned
+  → IPipelineBehavior chain (request-level: auth, logging)
+  → IStreamPipelineBehavior chain (enumeration-level)
+  → IStreamRequestHandler.HandleAsync → IAsyncEnumerable<UserDto>
   → Items yielded lazily on enumeration
   → No database involved
 ```
