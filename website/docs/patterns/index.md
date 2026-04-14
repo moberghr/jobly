@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Patterns
 
-Jobly provides four patterns for dispatching work.
+Jobly provides four patterns for dispatching work. All share a unified pipeline and type hierarchy.
 
 | Pattern | Interface | Persistence | Handlers | Response |
 |---------|-----------|-------------|----------|----------|
