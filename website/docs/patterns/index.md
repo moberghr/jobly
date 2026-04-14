@@ -15,14 +15,14 @@ Jobly provides four patterns for dispatching work.
 
 ## Type Hierarchy
 
-Jobs and messages implement `IRequest<TResponse>`. Streams have a separate base interface:
+All types implement `IRequest<TResponse>`:
 
 ```csharp
-public interface IRequest<out TResponse>;          // Base — jobs, messages, and requests implement this
-public interface IJob : IRequest<Unit>;             // Persistent, single handler
-public interface IMessage : IRequest<Unit>;         // Persistent, multiple handlers
-// IRequest<TResponse> used directly                // In-memory, returns TResponse
-public interface IStreamRequest<out TResponse>;     // Separate — in-memory streaming, returns IAsyncEnumerable<TResponse>
+public interface IRequest<out TResponse>;                                        // Base
+public interface IJob : IRequest<Unit>;                                          // Persistent, single handler
+public interface IMessage : IRequest<Unit>;                                      // Persistent, multiple handlers
+// IRequest<TResponse> used directly                                            // In-memory, returns TResponse
+public interface IStreamRequest<out TResponse> : IRequest<IAsyncEnumerable<TResponse>>; // In-memory, streams TResponse
 ```
 
 ## Pipeline Behaviors

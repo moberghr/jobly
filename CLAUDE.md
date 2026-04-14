@@ -61,14 +61,14 @@ public interface IStreamPipelineBehavior<TRequest, TResponse> where TRequest : I
 
 ### Type Hierarchy
 
-`IJob` and `IMessage` implement `IRequest<Unit>`. `IStreamRequest<TResponse>` is a separate hierarchy for in-memory streaming.
+All types implement `IRequest<TResponse>`. `IStreamRequest<TResponse>` extends `IRequest<IAsyncEnumerable<TResponse>>` — streams are requests whose response is an async enumerable.
 
 ```csharp
-public interface IRequest<out TResponse>;              // Base — jobs, messages, and requests implement this
-public interface IJob : IRequest<Unit>;                 // Persistent, single handler
-public interface IMessage : IRequest<Unit>;             // Persistent, multiple handlers
-// IRequest<TResponse> used directly for in-memory     // In-memory, returns TResponse
-public interface IStreamRequest<out TResponse>;         // Separate — in-memory streaming, returns IAsyncEnumerable<TResponse>
+public interface IRequest<out TResponse>;                                        // Base — all types implement this
+public interface IJob : IRequest<Unit>;                                          // Persistent, single handler
+public interface IMessage : IRequest<Unit>;                                      // Persistent, multiple handlers
+// IRequest<TResponse> used directly for in-memory                              // In-memory, returns TResponse
+public interface IStreamRequest<out TResponse> : IRequest<IAsyncEnumerable<TResponse>>; // In-memory, streams TResponse
 ```
 
 ### In-Memory Requests (IMediator)
@@ -92,7 +92,7 @@ var user = await mediator.Send(new GetUser { Id = 1 });
 
 ### In-Memory Streams (IMediator)
 
-Streams are NOT persisted to the database. They execute immediately in-process and return an async enumerable. Resolved via `IMediator.CreateStream()`. Go through the `IStreamPipelineBehavior<TRequest, TResponse>` pipeline (separate from the `IPipelineBehavior` pipeline used by jobs, messages, and requests).
+Streams are NOT persisted to the database. They execute immediately in-process and return an async enumerable. Resolved via `IMediator.CreateStream()`. Since `IStreamRequest<T>` extends `IRequest<IAsyncEnumerable<T>>`, request-level `IPipelineBehavior` applies automatically (auth, logging, counting). For enumeration-level concerns (timing, per-item transforms), use `IStreamPipelineBehavior<TRequest, TResponse>`.
 
 ```csharp
 public class GetUsers : IStreamRequest<UserDto> { public string Role { get; set; } }
@@ -360,7 +360,7 @@ Workers can be split into groups with independent queues and polling intervals. 
 - **§2.4** Services expose interfaces (`IJobCommandService`, `IJobQueryService`, etc.). Generic implementations take `TContext : DbContext`.
 - **§2.5** `AddJobly<TContext>()` / `AddJoblyWorker<TContext>()` auto-configure the user's DbContext. Users register their DbContext normally — no manual Jobly configuration needed.
 - **§2.6** In-memory requests (`IRequest<TResponse>`) go through `IMediator.Send()` — same `IPipelineBehavior` pipeline as jobs/messages, but no database persistence.
-- **§2.7** In-memory streams (`IStreamRequest<TResponse>`) go through `IMediator.CreateStream()` — separate `IStreamPipelineBehavior` pipeline, returns `IAsyncEnumerable<TResponse>`, no database persistence.
+- **§2.7** In-memory streams (`IStreamRequest<TResponse>`) go through `IMediator.CreateStream()` — `IPipelineBehavior` applies at request level, `IStreamPipelineBehavior` wraps enumeration, returns `IAsyncEnumerable<TResponse>`, no database persistence.
 
 ### §3 — Coding Style
 

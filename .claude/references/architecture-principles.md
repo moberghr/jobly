@@ -59,5 +59,5 @@ Never add logic to the worker fetch/execute path. Keep it minimal — fetch, mut
 ### 16. Failed Jobs Never Auto-Delete
 Failed jobs always have `ExpireAt = null`. Only explicit user action (dashboard delete/requeue) or count-based cleanup removes them.
 
-### 17. Stream Requests Are Separate From Requests
-`IStreamRequest<TResponse>` does not inherit `IRequest<TResponse>` — they are separate type hierarchies with different return semantics (`IAsyncEnumerable<T>` vs `Task<T>`). Each has its own handler interface, pipeline behavior interface, and dispatch path. A type should implement one or the other, not both.
+### 17. Stream Requests Extend the Unified Hierarchy
+`IStreamRequest<TResponse>` extends `IRequest<IAsyncEnumerable<TResponse>>` — streams are requests whose response is an async enumerable. This preserves the unified type hierarchy: `IPipelineBehavior` applies to streams at the request level (auth, logging). `IStreamPipelineBehavior` wraps the actual enumeration for concerns like timing and per-item transforms.

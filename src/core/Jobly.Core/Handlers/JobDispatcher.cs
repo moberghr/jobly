@@ -239,8 +239,8 @@ public static class JobDispatcher
     }
 
     /// <summary>
-    /// Fully-typed pipeline for IStreamRequest types. Uses direct calls instead of MethodInfo.Invoke for
-    /// handler and behavior execution.
+    /// Fully-typed pipeline for IStreamRequest types. Composes IStreamPipelineBehavior (enumeration-level)
+    /// inside IPipelineBehavior (request-level), then executes the combined chain.
     /// </summary>
     private static IAsyncEnumerable<TResponse> ExecuteTypedStreamPipeline<TRequest, TResponse>(
         object request,
@@ -252,16 +252,45 @@ public static class JobDispatcher
             ?? throw new InvalidOperationException($"No stream handler registered for {typeof(TRequest).Name}");
 
         var typedRequest = (TRequest)request;
-        StreamHandlerDelegate<TRequest, TResponse> chain = handler.HandleAsync;
 
-        var behaviors = provider.GetServices<IStreamPipelineBehavior<TRequest, TResponse>>().ToArray();
-        for (var i = behaviors.Length - 1; i >= 0; i--)
+        // Inner chain: IStreamPipelineBehavior → handler
+        StreamHandlerDelegate<TRequest, TResponse> streamChain = handler.HandleAsync;
+
+        var streamBehaviors = provider.GetServices<IStreamPipelineBehavior<TRequest, TResponse>>().ToArray();
+        for (var i = streamBehaviors.Length - 1; i >= 0; i--)
         {
-            var b = behaviors[i];
-            var next = chain;
-            chain = (req, ct) => b.HandleAsync(req, next, ct);
+            var b = streamBehaviors[i];
+            var next = streamChain;
+            streamChain = (req, ct) => b.HandleAsync(req, next, ct);
         }
 
-        return chain(typedRequest, cancellationToken);
+        // Outer chain: IPipelineBehavior (request-level, wraps the stream envelope)
+        var requestBehaviors = provider.GetServices<IPipelineBehavior<TRequest, IAsyncEnumerable<TResponse>>>().ToArray();
+        if (requestBehaviors.Length == 0)
+        {
+            return streamChain(typedRequest, cancellationToken);
+        }
+
+        RequestHandlerDelegate<TRequest, IAsyncEnumerable<TResponse>> requestChain =
+            (req, ct) => Task.FromResult(streamChain(req, ct));
+        for (var i = requestBehaviors.Length - 1; i >= 0; i--)
+        {
+            var b = requestBehaviors[i];
+            var next = requestChain;
+            requestChain = (req, ct) => b.HandleAsync(req, next, ct);
+        }
+
+        return UnwrapStreamTask(requestChain(typedRequest, cancellationToken), cancellationToken);
+    }
+
+    private static async IAsyncEnumerable<TResponse> UnwrapStreamTask<TResponse>(
+        Task<IAsyncEnumerable<TResponse>> task,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var enumerable = await task;
+        await foreach (var item in enumerable.WithCancellation(cancellationToken))
+        {
+            yield return item;
+        }
     }
 }

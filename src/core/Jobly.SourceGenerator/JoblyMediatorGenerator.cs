@@ -118,23 +118,30 @@ public sealed class JoblyMediatorGenerator : IIncrementalGenerator
                     continue;
                 }
 
-                // It's a plain IRequest<TResponse> — mediator path
-                var responseType = requestInterface.TypeArguments[0];
-                var responseFullName = GetFullyQualifiedName(responseType);
+                // Check if it's an IStreamRequest type — handled in the stream branch below
+                var isStream = iStreamRequestSymbol is not null && candidate.AllInterfaces.Any(i =>
+                    i.OriginalDefinition.Equals(iStreamRequestSymbol, SymbolEqualityComparer.Default));
 
-                var handlerKey = candidateFullName + "|" + responseFullName;
-                if (allHandlerMap.TryGetValue(handlerKey, out var reqHandlerSymbol))
+                if (!isStream)
                 {
-                    var wrapperFieldName = "_wrapper_" + candidate.Name;
-                    requestTypes.Add(new RequestTypeInfo(
-                        candidateFullName,
-                        responseFullName,
-                        GetFullyQualifiedName(reqHandlerSymbol),
-                        wrapperFieldName,
-                        candidate.DeclaredAccessibility));
-                }
+                    // It's a plain IRequest<TResponse> — mediator path
+                    var responseType = requestInterface.TypeArguments[0];
+                    var responseFullName = GetFullyQualifiedName(responseType);
 
-                continue;
+                    var handlerKey = candidateFullName + "|" + responseFullName;
+                    if (allHandlerMap.TryGetValue(handlerKey, out var reqHandlerSymbol))
+                    {
+                        var wrapperFieldName = "_wrapper_" + candidate.Name;
+                        requestTypes.Add(new RequestTypeInfo(
+                            candidateFullName,
+                            responseFullName,
+                            GetFullyQualifiedName(reqHandlerSymbol),
+                            wrapperFieldName,
+                            candidate.DeclaredAccessibility));
+                    }
+
+                    continue;
+                }
             }
 
             // Check if this type implements IStreamRequest<T>
@@ -382,24 +389,56 @@ public sealed class JoblyMediatorGenerator : IIncrementalGenerator
             sb.AppendLine("    internal sealed class StreamHandlerWrapper<TRequest, TResponse>");
             sb.AppendLine("        where TRequest : global::Jobly.Core.Handlers.IStreamRequest<TResponse>");
             sb.AppendLine("    {");
-            sb.AppendLine("        private global::Jobly.Core.Handlers.StreamHandlerDelegate<TRequest, TResponse> _rootHandler = null!;");
+            sb.AppendLine("        private global::Jobly.Core.Handlers.StreamHandlerDelegate<TRequest, TResponse> _streamHandler = null!;");
+            sb.AppendLine("        private global::Jobly.Core.Handlers.RequestHandlerDelegate<TRequest, global::System.Collections.Generic.IAsyncEnumerable<TResponse>> _requestChain = null!;");
+            sb.AppendLine("        private bool _hasRequestBehaviors;");
             sb.AppendLine();
             sb.AppendLine("        public void Init(global::System.IServiceProvider sp)");
             sb.AppendLine("        {");
             sb.AppendLine("            var handler = sp.GetRequiredService<global::Jobly.Core.Handlers.IStreamRequestHandler<TRequest, TResponse>>();");
-            sb.AppendLine("            var behaviors = sp.GetServices<global::Jobly.Core.Handlers.IStreamPipelineBehavior<TRequest, TResponse>>().ToArray();");
-            sb.AppendLine("            global::Jobly.Core.Handlers.StreamHandlerDelegate<TRequest, TResponse> chain = handler.HandleAsync;");
-            sb.AppendLine("            for (int i = behaviors.Length - 1; i >= 0; i--)");
+            sb.AppendLine("            var streamBehaviors = sp.GetServices<global::Jobly.Core.Handlers.IStreamPipelineBehavior<TRequest, TResponse>>().ToArray();");
+            sb.AppendLine("            global::Jobly.Core.Handlers.StreamHandlerDelegate<TRequest, TResponse> streamChain = handler.HandleAsync;");
+            sb.AppendLine("            for (int i = streamBehaviors.Length - 1; i >= 0; i--)");
             sb.AppendLine("            {");
-            sb.AppendLine("                var b = behaviors[i];");
-            sb.AppendLine("                var next = chain;");
-            sb.AppendLine("                chain = (req, ct) => b.HandleAsync(req, next, ct);");
+            sb.AppendLine("                var b = streamBehaviors[i];");
+            sb.AppendLine("                var next = streamChain;");
+            sb.AppendLine("                streamChain = (req, ct) => b.HandleAsync(req, next, ct);");
             sb.AppendLine("            }");
-            sb.AppendLine("            _rootHandler = chain;");
+            sb.AppendLine("            _streamHandler = streamChain;");
+            sb.AppendLine();
+            sb.AppendLine("            var requestBehaviors = sp.GetServices<global::Jobly.Core.Handlers.IPipelineBehavior<TRequest, global::System.Collections.Generic.IAsyncEnumerable<TResponse>>>().ToArray();");
+            sb.AppendLine("            _hasRequestBehaviors = requestBehaviors.Length > 0;");
+            sb.AppendLine("            global::Jobly.Core.Handlers.RequestHandlerDelegate<TRequest, global::System.Collections.Generic.IAsyncEnumerable<TResponse>> requestChain =");
+            sb.AppendLine("                (req, ct) => global::System.Threading.Tasks.Task.FromResult(streamChain(req, ct));");
+            sb.AppendLine("            for (int i = requestBehaviors.Length - 1; i >= 0; i--)");
+            sb.AppendLine("            {");
+            sb.AppendLine("                var b = requestBehaviors[i];");
+            sb.AppendLine("                var next = requestChain;");
+            sb.AppendLine("                requestChain = (req, ct) => b.HandleAsync(req, next, ct);");
+            sb.AppendLine("            }");
+            sb.AppendLine("            _requestChain = requestChain;");
             sb.AppendLine("        }");
             sb.AppendLine();
             sb.AppendLine("        public global::System.Collections.Generic.IAsyncEnumerable<TResponse> Handle(TRequest request, global::System.Threading.CancellationToken ct)");
-            sb.AppendLine("            => _rootHandler(request, ct);");
+            sb.AppendLine("        {");
+            sb.AppendLine("            if (!_hasRequestBehaviors)");
+            sb.AppendLine("            {");
+            sb.AppendLine("                return _streamHandler(request, ct);");
+            sb.AppendLine("            }");
+            sb.AppendLine();
+            sb.AppendLine("            return UnwrapStreamTask(_requestChain(request, ct), ct);");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        private static async global::System.Collections.Generic.IAsyncEnumerable<TResponse> UnwrapStreamTask(");
+            sb.AppendLine("            global::System.Threading.Tasks.Task<global::System.Collections.Generic.IAsyncEnumerable<TResponse>> task,");
+            sb.AppendLine("            [global::System.Runtime.CompilerServices.EnumeratorCancellation] global::System.Threading.CancellationToken ct)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            var enumerable = await task;");
+            sb.AppendLine("            await foreach (var item in enumerable.WithCancellation(ct))");
+            sb.AppendLine("            {");
+            sb.AppendLine("                yield return item;");
+            sb.AppendLine("            }");
+            sb.AppendLine("        }");
             sb.AppendLine("    }");
             sb.AppendLine();
         }

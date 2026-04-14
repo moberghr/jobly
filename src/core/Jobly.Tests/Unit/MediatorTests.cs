@@ -199,6 +199,29 @@ public class MediatorTests
         items.ShouldBe([0, 1]);
     }
 
+    [Fact]
+    public async Task CreateStream_WithRequestPipelineBehavior_ExecutesBehavior()
+    {
+        var log = new List<string>();
+
+        var services = new ServiceCollection();
+        services.AddTransient<IStreamRequestHandler<GetNumbersStreamRequest, int>, GetNumbersStreamHandler>();
+        services.AddTransient<IPipelineBehavior<GetNumbersStreamRequest, IAsyncEnumerable<int>>>(
+            _ => new TrackingBehavior<GetNumbersStreamRequest, IAsyncEnumerable<int>>(log));
+        services.AddScoped<IMediator>(x => new Mediator(x));
+        var provider = services.BuildServiceProvider();
+
+        var mediator = provider.GetRequiredService<IMediator>();
+        var items = new List<int>();
+        await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 3 }))
+        {
+            items.Add(item);
+        }
+
+        items.ShouldBe([0, 1, 2]);
+        log.ShouldBe(["before", "after"]);
+    }
+
     private class TrackingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
         where TRequest : IRequest<TResponse>
     {
