@@ -13,6 +13,7 @@ public static class JobHandlerServiceExtensions
         RegisterImplementations(services, assembly, typeof(IJobHandler<>));
         RegisterImplementations(services, assembly, typeof(IMessageHandler<>));
         RegisterImplementations(services, assembly, typeof(IRequestHandler<,>));
+        RegisterImplementations(services, assembly, typeof(IStreamRequestHandler<,>));
         return services;
     }
 
@@ -23,6 +24,7 @@ public static class JobHandlerServiceExtensions
     {
         RegisterImplementations(services, assembly, typeof(IPipelineBehavior<,>));
         RegisterImplementations(services, assembly, typeof(IPublishPipelineBehavior<>));
+        RegisterImplementations(services, assembly, typeof(IStreamPipelineBehavior<,>));
         return services;
     }
 

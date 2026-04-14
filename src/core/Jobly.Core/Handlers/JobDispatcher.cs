@@ -11,10 +11,14 @@ public static class JobDispatcher
     private static readonly ConcurrentDictionary<Type, Type> _jobHandlerTypeCache = new();
     private static readonly ConcurrentDictionary<Type, Type> _messageHandlerTypeCache = new();
     private static readonly ConcurrentDictionary<Type, MethodInfo> _typedPipelineMethodCache = new();
+    private static readonly ConcurrentDictionary<Type, MethodInfo> _typedStreamPipelineMethodCache = new();
     private static readonly ConcurrentDictionary<Type, MethodInfo> _typedHandlerCoreMethodCache = new();
 
     private static readonly MethodInfo ExecuteTypedPipelineMethodInfo =
         typeof(JobDispatcher).GetMethod(nameof(ExecuteTypedPipeline), BindingFlags.NonPublic | BindingFlags.Static)!;
+
+    private static readonly MethodInfo ExecuteTypedStreamPipelineMethodInfo =
+        typeof(JobDispatcher).GetMethod(nameof(ExecuteTypedStreamPipeline), BindingFlags.NonPublic | BindingFlags.Static)!;
 
     private static readonly MethodInfo ExecuteTypedHandlerCoreMethodInfo =
         typeof(JobDispatcher).GetMethod(nameof(ExecuteTypedHandlerCore), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -206,5 +210,58 @@ public static class JobDispatcher
             messageType,
             t => typeof(IJobHandler<>).MakeGenericType(t));
         return ExecuteHandlerCore(message, messageType, handlerType, handlerInterfaceType, provider, ct);
+    }
+
+    /// <summary>
+    /// Executes an IStreamRequestHandler through the stream pipeline. Returns a typed async enumerable.
+    /// Uses MakeGenericMethod to enter a fully-typed pipeline where direct calls replace reflection.
+    /// </summary>
+    public static IAsyncEnumerable<TResponse> ExecuteStreamHandler<TResponse>(
+        object request,
+        Type requestType,
+        IServiceProvider provider,
+        CancellationToken cancellationToken)
+    {
+        var typedMethod = _typedStreamPipelineMethodCache.GetOrAdd(
+            requestType,
+            t => ExecuteTypedStreamPipelineMethodInfo.MakeGenericMethod(t, typeof(TResponse)));
+
+        try
+        {
+            return (IAsyncEnumerable<TResponse>)typedMethod.Invoke(null, [request, provider, cancellationToken])!;
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+
+            throw; // Unreachable, satisfies compiler
+        }
+    }
+
+    /// <summary>
+    /// Fully-typed pipeline for IStreamRequest types. Uses direct calls instead of MethodInfo.Invoke for
+    /// handler and behavior execution.
+    /// </summary>
+    private static IAsyncEnumerable<TResponse> ExecuteTypedStreamPipeline<TRequest, TResponse>(
+        object request,
+        IServiceProvider provider,
+        CancellationToken cancellationToken)
+        where TRequest : IStreamRequest<TResponse>
+    {
+        var handler = provider.GetService<IStreamRequestHandler<TRequest, TResponse>>()
+            ?? throw new InvalidOperationException($"No stream handler registered for {typeof(TRequest).Name}");
+
+        var typedRequest = (TRequest)request;
+        StreamHandlerDelegate<TRequest, TResponse> chain = handler.HandleAsync;
+
+        var behaviors = provider.GetServices<IStreamPipelineBehavior<TRequest, TResponse>>().ToArray();
+        for (var i = behaviors.Length - 1; i >= 0; i--)
+        {
+            var b = behaviors[i];
+            var next = chain;
+            chain = (req, ct) => b.HandleAsync(req, next, ct);
+        }
+
+        return chain(typedRequest, cancellationToken);
     }
 }

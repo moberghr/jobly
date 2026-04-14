@@ -2,7 +2,7 @@
 
 > It gets the job done.
 
-A distributed job processing, message queue, and in-memory mediator library for .NET 10. Three patterns, one unified pipeline, a real-time dashboard.
+A distributed job processing, message queue, and in-memory mediator library for .NET 10. Four patterns, one unified pipeline, a real-time dashboard.
 
 [![NuGet](https://img.shields.io/nuget/v/Moberg.Jobly.Core?label=Jobly.Core)](https://www.nuget.org/packages/Moberg.Jobly.Core)
 [![NuGet](https://img.shields.io/nuget/v/Moberg.Jobly.Worker?label=Jobly.Worker)](https://www.nuget.org/packages/Moberg.Jobly.Worker)
@@ -14,7 +14,8 @@ A distributed job processing, message queue, and in-memory mediator library for 
 - **Background Jobs** — Schedule and orchestrate jobs with retries, continuations, and batch processing.
 - **Message Queue** — Publish messages with multiple handlers. Each handler runs as an independent, retryable job.
 - **In-Memory Requests** — `IRequest<TResponse>` with `IMediator.Send()` for immediate, typed request/response. No database persistence.
-- **Unified Pipeline** — `IPipelineBehavior<T, TResponse>` wraps all three patterns (jobs, messages, requests).
+- **In-Memory Streams** — `IStreamRequest<TResponse>` with `IMediator.CreateStream()` for lazy, item-by-item streaming via `IAsyncEnumerable<TResponse>`. No database persistence.
+- **Unified Pipeline** — `IPipelineBehavior<T, TResponse>` wraps jobs, messages, and requests. `IStreamPipelineBehavior<T, TResponse>` wraps streams.
 - **Named Queues** — Assign jobs to queues. Workers subscribe to specific queues. Alphabetical order = priority.
 - **Execution Logs** — ILogger output automatically captured and flushed to the database every ~1 second during handler execution, viewable in dashboard in real time. Each log entry tracks which worker produced it.
 - **Unified Activity Log** — Single audit trail per job: lifecycle events (Created, Processing, Completed, Failed, Cancelled) + handler logs.
@@ -194,9 +195,40 @@ var user = await mediator.Send(new GetUser { UserId = 1 });
 
 Requests execute immediately in-process — no database, no worker, no retries. Errors bubble up to the caller.
 
-### 5. Pipeline Behaviors
+### 5. Define Streams (In-Memory)
 
-The unified pipeline wraps all three patterns (jobs, messages, requests):
+```csharp
+public class GetUsers : IStreamRequest<UserDto>
+{
+    public string Role { get; set; }
+}
+
+public class GetUsersHandler : IStreamRequestHandler<GetUsers, UserDto>
+{
+    public async IAsyncEnumerable<UserDto> HandleAsync(GetUsers request, [EnumeratorCancellation] CancellationToken ct)
+    {
+        await foreach (var user in _db.Users.AsAsyncEnumerable().WithCancellation(ct))
+        {
+            yield return new UserDto { Id = user.Id, Name = user.Name };
+        }
+    }
+}
+```
+
+**Stream via IMediator:**
+
+```csharp
+await foreach (var user in mediator.CreateStream(new GetUsers { Role = "Admin" }))
+{
+    Console.WriteLine(user.Name);
+}
+```
+
+Streams execute lazily in-process — items are yielded one at a time. No database persistence, no worker, no retries.
+
+### 6. Pipeline Behaviors
+
+The unified pipeline wraps jobs, messages, and requests. Streams have their own `IStreamPipelineBehavior` pipeline:
 
 ```csharp
 public class LoggingBehavior<T, TResponse> : IPipelineBehavior<T, TResponse>
@@ -219,7 +251,7 @@ builder.Services.AddPipelineBehaviors(typeof(Program).Assembly);
 
 For jobs and messages, `TResponse` is `Unit`. For requests, it's your custom response type.
 
-### 6. Named Queues
+### 7. Named Queues
 
 ```csharp
 options.Queues = ["a-critical", "b-default", "c-low"];
@@ -229,7 +261,7 @@ await publisher.Enqueue(new UrgentTask(), queue: "a-critical");
 await publisher.Publish(new LowPriorityEvent(), queue: "c-low");
 ```
 
-### 7. Recurring Jobs
+### 8. Recurring Jobs
 
 ```csharp
 await recurringPublisher.AddOrUpdateRecurringJob(
@@ -238,7 +270,7 @@ await recurringPublisher.AddOrUpdateRecurringJob(
 
 `AddOrUpdateRecurringJob` registers the definition. The `RecurringJobSchedulerTask` creates jobs when the cron time arrives. Execution history is tracked in `RecurringJobLog` and survives job cleanup.
 
-### 8. Dashboard Authorization
+### 9. Dashboard Authorization
 
 ```csharp
 app.UseJoblyUI(options =>
@@ -263,7 +295,7 @@ Built-in filter for localhost-only access:
 options.Authorization = new LocalRequestsOnlyAuthorizationFilter();
 ```
 
-### 9. Configuration
+### 10. Configuration
 
 ```csharp
 builder.Services.AddJoblyWorker<AppDbContext>(options =>
@@ -317,6 +349,16 @@ mediator.Send(GetUser { Id = 1 })
   → Resolve IRequestHandler<GetUser, UserDto>
   → Pipeline behaviors (logging, validation, etc.)
   → Handler.HandleAsync → UserDto returned
+  → No database involved
+```
+
+### Stream Flow
+```
+mediator.CreateStream(GetUsers { Role = "Admin" })
+  → Resolve IStreamRequestHandler<GetUsers, UserDto>
+  → Stream pipeline behaviors (IStreamPipelineBehavior chain)
+  → Handler.HandleAsync → IAsyncEnumerable<UserDto> returned
+  → Items yielded lazily on enumeration
   → No database involved
 ```
 

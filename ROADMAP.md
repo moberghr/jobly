@@ -55,5 +55,8 @@ Jobly's entities are added to the user's DbContext model via `JoblyModelCustomiz
 ### ~~In-Memory Mediator~~ ✅
 Implemented as `IRequest<TResponse>` with `IMediator.Send()`. Supports `IPipelineBehavior<TRequest, TResponse>` for cross-cutting concerns. Same pipeline as jobs and messages, no database persistence.
 
+### ~~Stream Requests~~ ✅
+Implemented as `IStreamRequest<TResponse>` with `IMediator.CreateStream()`. Returns `IAsyncEnumerable<TResponse>` for lazy streaming. Supports `IStreamPipelineBehavior<TRequest, TResponse>` for pipeline behaviors. Source generator provides zero-allocation dispatch.
+
 ### Runtime Schema Migration Helper
 Optional `MigrateJoblySchemaAsync()` for users who don't use EF migrations. Diffs the EF model against the database at runtime, generates and executes only Jobly table DDL. Respects naming conventions. Lower priority — EF migrations cover most users.

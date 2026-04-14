@@ -105,3 +105,74 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavi
 ```
 
 Behaviors execute in registration order, outermost first. The handler is the innermost call.
+
+## Streams
+
+Stream requests implement `IStreamRequest<TResponse>` and return `IAsyncEnumerable<TResponse>` — items are yielded lazily, one at a time. Like standard requests, streams are not persisted to the database.
+
+### Define a stream request
+
+```csharp
+public class GetUsers : IStreamRequest<UserDto>
+{
+    public string Role { get; set; }
+}
+
+public class GetUsersHandler : IStreamRequestHandler<GetUsers, UserDto>
+{
+    private readonly AppDbContext _db;
+
+    public GetUsersHandler(AppDbContext db) => _db = db;
+
+    public async IAsyncEnumerable<UserDto> HandleAsync(GetUsers request, [EnumeratorCancellation] CancellationToken ct)
+    {
+        await foreach (var user in _db.Users.Where(x => x.Role == request.Role).AsAsyncEnumerable().WithCancellation(ct))
+        {
+            yield return new UserDto { Id = user.Id, Name = user.Name };
+        }
+    }
+}
+```
+
+### CreateStream
+
+Inject `IMediator` and call `CreateStream()`:
+
+```csharp
+await foreach (var user in mediator.CreateStream(new GetUsers { Role = "Admin" }))
+{
+    Console.WriteLine(user.Name);
+}
+```
+
+### Stream pipeline behaviors
+
+Streams use a separate pipeline — `IStreamPipelineBehavior<TRequest, TResponse>`:
+
+```csharp
+public class StreamTimingBehavior<T, TResponse> : IStreamPipelineBehavior<T, TResponse>
+    where T : IStreamRequest<TResponse>
+{
+    public async IAsyncEnumerable<TResponse> HandleAsync(T request, StreamHandlerDelegate<T, TResponse> next, [EnumeratorCancellation] CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        await foreach (var item in next(request, ct).WithCancellation(ct))
+        {
+            yield return item;
+        }
+
+        _logger.LogInformation("Streamed {Type} in {Ms}ms", typeof(T).Name, sw.ElapsedMilliseconds);
+    }
+}
+```
+
+### Key differences from Requests
+
+| | Requests | Streams |
+|---|---|---|
+| Interface | `IRequest<T>` | `IStreamRequest<T>` |
+| Handler | `IRequestHandler<TReq, T>` | `IStreamRequestHandler<TReq, T>` |
+| Return type | `Task<T>` | `IAsyncEnumerable<T>` |
+| Pipeline | `IPipelineBehavior` | `IStreamPipelineBehavior` |
+| Dispatch | `mediator.Send()` | `mediator.CreateStream()` |
+| Execution | Eager — single result | Lazy — items yielded on demand |
