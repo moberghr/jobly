@@ -43,6 +43,7 @@ export default function RecurringPage() {
               <TableHead>Name</TableHead>
               <TableHead>Cron</TableHead>
               <TableHead>Type</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Next Execution</TableHead>
               <TableHead>Last Execution</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -51,7 +52,7 @@ export default function RecurringPage() {
           <TableBody>
             {data.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   No recurring jobs found
                 </TableCell>
               </TableRow>
@@ -61,6 +62,13 @@ export default function RecurringPage() {
                   <TableCell className="font-medium"><Link to={`/recurring/${rj.id}`} className="text-primary hover:underline">{rj.name}</Link></TableCell>
                   <TableCell className="font-mono text-xs">{rj.cron}</TableCell>
                   <TableCell>{rj.type.split(',')[0].split('.').pop()}</TableCell>
+                  <TableCell>
+                    {rj.disabledAt ? (
+                      <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">Disabled</span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">Enabled</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-sm">
                     {rj.nextExecution ? <RelativeTime date={rj.nextExecution} /> : 'N/A'}
                   </TableCell>
@@ -68,6 +76,15 @@ export default function RecurringPage() {
                     {rj.lastExecution ? <RelativeTime date={rj.lastExecution} /> : 'Never'}
                   </TableCell>
                   <TableCell className="text-right">
+                    {rj.disabledAt ? (
+                      <Button variant="ghost" size="sm" onClick={() => { api.enableRecurringJob(rj.id).then(fetchData); }}>
+                        Enable
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="sm" onClick={() => { api.disableRecurringJob(rj.id).then(fetchData); }}>
+                        Disable
+                      </Button>
+                    )}
                     <Button variant="ghost" size="sm" onClick={() => { api.triggerRecurringJob(rj.id).then(fetchData); }}>
                       Trigger
                     </Button>

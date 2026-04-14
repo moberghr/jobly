@@ -25,6 +25,8 @@ public class RecurringJob : IConcurrencyToken
 
     public DateTime? LastExecution { get; set; }
 
+    public DateTime? DisabledAt { get; set; }
+
     [ConcurrencyCheck]
     public Guid Version { get; set; }
 }

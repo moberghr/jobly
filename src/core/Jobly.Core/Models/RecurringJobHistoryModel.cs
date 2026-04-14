@@ -13,4 +13,6 @@ public class RecurringJobHistoryModel
     public string? Type { get; set; }
 
     public State? CurrentState { get; set; }
+
+    public bool Skipped { get; set; }
 }

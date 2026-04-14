@@ -52,6 +52,38 @@ var svc = serviceProvider.GetRequiredService<IRecurringJobService>();
 await svc.TriggerRecurringJob(id);
 ```
 
+## Enable / Disable
+
+Disable a recurring job to temporarily stop it from creating new jobs. The scheduler still fires on schedule, but instead of creating a real job, it records a **skipped** entry in the execution history. This keeps the cron schedule in sync — when you re-enable, the job resumes from the next natural cron occurrence with no catchup burst.
+
+```
+POST /api/recurring/{id}/disable
+POST /api/recurring/{id}/enable
+```
+
+Or use the Enable/Disable button on the dashboard.
+
+### How It Works
+
+1. **Disable** sets `DisabledAt` timestamp on the recurring job
+2. **Scheduler** still picks up the job when `NextExecution <= now`, but sees `DisabledAt != null`
+3. Instead of creating a job, it creates a `RecurringJobLog` entry with `Skipped = true` and `JobId = null`
+4. `NextExecution` and `LastExecution` advance normally
+5. **Enable** clears `DisabledAt` — next cron tick creates a real job again
+
+### Behavior
+
+| Scenario | What happens |
+|----------|-------------|
+| Disable | Scheduler creates "Skipped" log entries instead of jobs |
+| Enable | Next cron tick creates a real job as normal |
+| Manual Trigger while disabled | Creates a real job — explicit trigger ignores disabled state |
+| `AddOrUpdateRecurringJob` while disabled | Updates the definition (cron, payload) but does not change disabled state |
+
+### Execution History
+
+Skipped executions appear in the dashboard history with an orange **Skipped** badge, giving full visibility into what would have run. This is useful for auditing and confirming the schedule is correct before re-enabling.
+
 ## Updating a Recurring Job
 
 Call `AddOrUpdateRecurringJob` again with the same name. The cron expression, payload, and type are updated. `NextExecution` is recalculated.

@@ -15,6 +15,8 @@ public class RecurringJobModel
     public DateTime? LastExecution { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    public DateTime? DisabledAt { get; set; }
 }
 
 public class RecurringJobDetailModel : RecurringJobModel
