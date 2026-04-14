@@ -6,7 +6,7 @@ const traceIdForUrl = DEMO_IDS.traceId.replace(/-/g, '');
 const SCREENSHOTS_DIR = '../../website/static/img/screenshots';
 
 const pages = [
-  { name: '01-dashboard', path: '/' },
+  { name: '01-dashboard', path: '/', fullPage: true },
   { name: '02-jobs-failed', path: '/jobs/failed' },
   { name: '03-job-detail-trace', path: `/detail/${DEMO_IDS.completedJobWithTrace}` },
   { name: '04-jobs-completed', path: '/jobs/completed' },
@@ -61,7 +61,7 @@ for (const pg of pages) {
 
       await page.screenshot({
         path: `${SCREENSHOTS_DIR}/${pg.name}${suffix}.png`,
-        fullPage: false,
+        fullPage: pg.fullPage ?? false,
       });
     });
   }
