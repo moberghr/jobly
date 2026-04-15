@@ -222,6 +222,188 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         rj.LastExecution.ShouldNotBeNull();
         rj.LastExecution.Value.ShouldBe(pastTime, TimeSpan.FromSeconds(1));
     }
+
+    [Fact]
+    public async Task ScheduleRecurringJobs_DisabledJob_CreatesSkippedLogEntry()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var pastTime = DateTime.UtcNow.AddMinutes(-5);
+        var recurringJob = new RecurringJob
+        {
+            Name = "disabled-skip-test",
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new UnitRequest()),
+            Cron = "* * * * *",
+            CreatedAt = DateTime.UtcNow.AddMinutes(-10),
+            NextExecution = pastTime,
+            DisabledAt = DateTime.UtcNow.AddMinutes(-20),
+        };
+        ctx.Set<RecurringJob>().Add(recurringJob);
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var schedCtx = _fixture.CreateContext();
+        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+
+        // Assert
+        count.ShouldBe(1);
+
+        var readCtx = _fixture.CreateContext();
+        var log = await readCtx.Set<RecurringJobLog>()
+            .Where(l => l.RecurringJobId == recurringJob.Id)
+            .FirstOrDefaultAsync();
+        log.ShouldNotBeNull();
+        log.Skipped.ShouldBeTrue();
+        log.JobId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ScheduleRecurringJobs_DisabledJob_DoesNotCreateJob()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var pastTime = DateTime.UtcNow.AddMinutes(-5);
+        ctx.Set<RecurringJob>().Add(new RecurringJob
+        {
+            Name = "disabled-no-job-test",
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new UnitRequest()),
+            Cron = "* * * * *",
+            CreatedAt = DateTime.UtcNow.AddMinutes(-10),
+            NextExecution = pastTime,
+            DisabledAt = DateTime.UtcNow.AddMinutes(-20),
+        });
+        await ctx.SaveChangesAsync();
+
+        var jobCountBefore = await _fixture.CreateContext().Set<Job>().CountAsync();
+
+        // Act
+        var schedCtx = _fixture.CreateContext();
+        await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+
+        // Assert
+        var jobCountAfter = await _fixture.CreateContext().Set<Job>().CountAsync();
+        jobCountAfter.ShouldBe(jobCountBefore);
+    }
+
+    [Fact]
+    public async Task ScheduleRecurringJobs_DisabledJob_AdvancesNextExecution()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var pastTime = DateTime.UtcNow.AddMinutes(-5);
+        ctx.Set<RecurringJob>().Add(new RecurringJob
+        {
+            Name = "disabled-next-exec-test",
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new UnitRequest()),
+            Cron = "* * * * *",
+            CreatedAt = DateTime.UtcNow.AddMinutes(-10),
+            NextExecution = pastTime,
+            DisabledAt = DateTime.UtcNow.AddMinutes(-20),
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var schedCtx = _fixture.CreateContext();
+        await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "disabled-next-exec-test");
+        rj.NextExecution.ShouldNotBeNull();
+        rj.NextExecution.Value.ShouldBeGreaterThan(DateTime.UtcNow);
+    }
+
+    [Fact]
+    public async Task ScheduleRecurringJobs_DisabledJob_AdvancesLastExecution()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var pastTime = DateTime.UtcNow.AddMinutes(-5);
+        ctx.Set<RecurringJob>().Add(new RecurringJob
+        {
+            Name = "disabled-last-exec-test",
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new UnitRequest()),
+            Cron = "* * * * *",
+            CreatedAt = DateTime.UtcNow.AddMinutes(-10),
+            NextExecution = pastTime,
+            DisabledAt = DateTime.UtcNow.AddMinutes(-20),
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var schedCtx = _fixture.CreateContext();
+        await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "disabled-last-exec-test");
+        rj.LastExecution.ShouldNotBeNull();
+        rj.LastExecution.Value.ShouldBe(pastTime, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task ScheduleRecurringJobs_EnabledJob_CreatesJobNormally()
+    {
+        // Arrange — enabled recurring job (DisabledAt = null) with completed previous job
+        var ctx = _fixture.CreateContext();
+        var nextJobId = Guid.NewGuid();
+        var pastTime = DateTime.UtcNow.AddMinutes(-5);
+
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = nextJobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Completed,
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new UnitRequest()),
+            CreateTime = pastTime,
+            ScheduleTime = pastTime,
+            Queue = "default",
+        });
+        var recurringJob = new RecurringJob
+        {
+            Name = "enabled-regression-test",
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new UnitRequest()),
+            Cron = "* * * * *",
+            CreatedAt = DateTime.UtcNow.AddMinutes(-10),
+            NextExecution = pastTime,
+            DisabledAt = null,
+        };
+        ctx.Set<RecurringJob>().Add(recurringJob);
+        await ctx.SaveChangesAsync();
+
+        ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
+        {
+            RecurringJobId = recurringJob.Id,
+            JobId = nextJobId,
+            CreatedAt = DateTime.UtcNow,
+        });
+        await ctx.SaveChangesAsync();
+
+        var jobCountBefore = await _fixture.CreateContext().Set<Job>().CountAsync();
+
+        // Act
+        var schedCtx = _fixture.CreateContext();
+        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+
+        // Assert — should create a real job
+        count.ShouldBe(1);
+
+        var jobCountAfter = await _fixture.CreateContext().Set<Job>().CountAsync();
+        jobCountAfter.ShouldBe(jobCountBefore + 1);
+
+        var log = await _fixture.CreateContext().Set<RecurringJobLog>()
+            .Where(l => l.RecurringJobId == recurringJob.Id)
+            .OrderByDescending(l => l.CreatedAt)
+            .FirstAsync();
+        log.Skipped.ShouldBeFalse();
+        log.JobId.ShouldNotBeNull();
+    }
 }
 
 [Collection("PostgreSql")]

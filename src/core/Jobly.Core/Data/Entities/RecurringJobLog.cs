@@ -12,5 +12,7 @@ public class RecurringJobLog
 
     public Job? Job { get; set; }
 
+    public bool Skipped { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

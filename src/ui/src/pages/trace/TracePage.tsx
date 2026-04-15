@@ -78,12 +78,12 @@ function GroupNode({ data }: NodeProps) {
   const d = data as unknown as { label: string; id: string; kind: number; state: State; highlighted?: boolean };
   return (
     <div
-      className={`border-2 border-dashed border-muted-foreground/30 rounded-xl ${d.highlighted ? 'ring-2 ring-primary border-primary' : ''}`}
+      className={`border-2 border-dashed border-muted-foreground/30 rounded-xl ${d.highlighted ? 'border-primary bg-primary/5' : ''}`}
       style={{ width: '100%', height: '100%', position: 'relative' }}
     >
       <Handle type="target" position={Position.Left} className="!bg-transparent !border-0 !w-0 !h-0" />
       <span
-        className="absolute -top-3 left-3 px-2 text-xs font-medium cursor-pointer text-primary hover:underline whitespace-nowrap flex items-center gap-1"
+        className="absolute -top-3 left-3 bg-card px-2 text-xs font-medium cursor-pointer text-primary hover:underline whitespace-nowrap flex items-center gap-1"
         onClick={() => navigate(`/detail/${d.id}`)}
       >
         {kindIcon(d.kind)} {d.label} <StateBadge state={d.state} />
@@ -151,7 +151,7 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
       && !container.parentJobId) {
       edges.push({
         id: `s-${containerId}`,
-        source: resolveId(container.spawnedByJobId),
+        source: containerGroupId.get(container.spawnedByJobId) ?? container.spawnedByJobId,
         target: groupId,
         type: 'smoothstep',
         style: { strokeDasharray: '5,5', stroke: '#94a3b8', strokeWidth: 1 },
@@ -182,14 +182,14 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
       }
     }
 
-    // SpawnedBy edge
+    // SpawnedBy edge — use child ID directly so edge connects to the specific child inside the group
     if (job.spawnedByJobId && jobMap.has(job.spawnedByJobId)
       && job.spawnedByJobId !== job.parentJobId
       && !job.parentJobId
       && !childrenInContainer.has(job.id)) {
       edges.push({
         id: `s-${job.id}`,
-        source: resolveId(job.spawnedByJobId),
+        source: containerGroupId.get(job.spawnedByJobId) ?? job.spawnedByJobId,
         target: job.id,
         type: 'smoothstep',
         style: { strokeDasharray: '5,5', stroke: '#94a3b8', strokeWidth: 1 },
@@ -276,7 +276,10 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
       type: 'group',
       data: { label, id: parentId, kind: parent.kind, state: parent.currentState, highlighted: parentId === highlightId },
       position: { x: minX, y: minY2 },
-      style: { width: maxX - minX, height: maxY - minY2, zIndex: -1, backgroundColor: 'transparent' },
+      className: '!border-0 !p-0',
+      selectable: false,
+      focusable: false,
+      style: { width: maxX - minX, height: maxY - minY2, zIndex: -1, backgroundColor: 'transparent', pointerEvents: 'all' },
     });
 
     // Make child nodes relative to group
@@ -327,6 +330,18 @@ export default function TracePage() {
 
     const connectedNodeIds = new Set([edge.source, edge.target]);
 
+    // If edge connects to a group, highlight all children; if to a child, keep group visible but not siblings
+    for (const nodeId of [...connectedNodeIds]) {
+      const node = nodes.find(n => n.id === nodeId);
+      if (node?.type === 'group') {
+        for (const n of nodes) {
+          if (n.parentId === nodeId) connectedNodeIds.add(n.id);
+        }
+      } else if (node?.parentId) {
+        connectedNodeIds.add(node.parentId);
+      }
+    }
+
     return {
       styledNodes: nodes.map(n => ({
         ...n,
@@ -370,6 +385,8 @@ export default function TracePage() {
           nodesDraggable={false}
           onEdgeMouseEnter={(_, edge) => setHoveredEdge(edge.id)}
           onEdgeMouseLeave={() => setHoveredEdge(null)}
+          onNodeMouseEnter={() => setHoveredEdge(null)}
+          onPaneClick={() => setHoveredEdge(null)}
           proOptions={{ hideAttribution: true }}
         >
           <Controls className="!bg-card !border !border-border !shadow-sm [&>button]:!bg-card [&>button]:!border-border [&>button]:!fill-foreground [&>button:hover]:!bg-accent" />

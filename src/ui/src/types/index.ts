@@ -144,6 +144,7 @@ export interface RecurringJobModel {
   nextExecution: string | null;
   lastExecution: string | null;
   createdAt: string;
+  disabledAt: string | null;
 }
 
 export interface RecurringJobDetailModel extends RecurringJobModel {
@@ -157,6 +158,7 @@ export interface RecurringJobHistoryModel {
   jobExists: boolean;
   type: string | null;
   currentState: State | null;
+  skipped: boolean;
 }
 
 export interface ServerModel {
