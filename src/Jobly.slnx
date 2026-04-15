@@ -1,0 +1,22 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Benchmarks/">
+    <Project Path="benchmarks/Jobly.Benchmarks/Jobly.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/core/">
+    <Project Path="core/Jobly.SourceGenerator/Jobly.SourceGenerator.csproj" />
+  </Folder>
+  <Folder Name="/TestProjects/">
+    <Project Path="tests/Jobly.Test.Shared/Jobly.Test.Shared.csproj" />
+    <Project Path="tests/Jobly.TestApp/Jobly.Test.App.csproj" />
+    <Project Path="tests/Jobly.TestWorker/Jobly.Test.Worker.csproj" />
+  </Folder>
+  <Project Path="core/Jobly.Core/Jobly.Core.csproj" />
+  <Project Path="core/Jobly.Tests/Jobly.Tests.csproj" />
+  <Project Path="core/Jobly.UI/Jobly.UI.csproj" />
+  <Project Path="core/Jobly.Worker/Jobly.Worker.csproj" />
+</Solution>
