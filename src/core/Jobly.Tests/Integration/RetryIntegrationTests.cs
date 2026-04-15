@@ -1,5 +1,5 @@
-using System.Text.Json;
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Handlers;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Helper;
@@ -24,10 +24,10 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
             return 0;
         }
 
-        var meta = JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata);
-        if (meta != null && meta.TryGetValue("$retriedTimes", out var value) && int.TryParse(value, out var result))
+        var meta = MetadataSerializer.Deserialize(job.Metadata);
+        if (meta.TryGetValue("RetriedTimes", out var value))
         {
-            return result;
+            return Convert.ToInt32(value);
         }
 
         return 0;
@@ -72,7 +72,7 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
         var jobId = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters
         {
             MaxRetries = 0,
-            Metadata = new Dictionary<string, string> { ["$maxRetries"] = "0" },
+            Metadata = new Dictionary<string, object> { ["MaxRetries"] = 0 },
         });
         await publisher.SaveChangesAsync();
 
@@ -108,7 +108,7 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
         var jobId = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters
         {
             MaxRetries = 1,
-            Metadata = new Dictionary<string, string> { ["$maxRetries"] = "1" },
+            Metadata = new Dictionary<string, object> { ["MaxRetries"] = 1 },
         });
         await publisher.SaveChangesAsync();
 

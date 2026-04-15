@@ -8,14 +8,14 @@ public class MetadataCommand(IJobContext jobContext, MetadataCapture capture) : 
 {
     public Task HandleAsync(MetadataRequest message, CancellationToken cancellationToken)
     {
-        capture.CapturedMetadata = new Dictionary<string, string>(jobContext.Metadata);
+        capture.CapturedMetadata = new Dictionary<string, object>(jobContext.Metadata);
         return Task.CompletedTask;
     }
 }
 
 public class MetadataCapture
 {
-    public Dictionary<string, string>? CapturedMetadata { get; set; }
+    public Dictionary<string, object>? CapturedMetadata { get; set; }
 }
 
 public class TestMetadataPublishBehavior<T> : IPublishPipelineBehavior<T>

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Microsoft.Extensions.Options;
@@ -8,11 +7,11 @@ namespace Jobly.Worker.Retry;
 public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
-    private readonly IJobContext _jobContext;
+    private readonly IJobContext<IRetryMetadata> _jobContext;
     private readonly IOptions<RetryOptions> _options;
     private readonly TimeProvider _timeProvider;
 
-    public RetryPipelineBehavior(IJobContext jobContext, IOptions<RetryOptions> options, TimeProvider timeProvider)
+    public RetryPipelineBehavior(IJobContext<IRetryMetadata> jobContext, IOptions<RetryOptions> options, TimeProvider timeProvider)
     {
         _jobContext = jobContext;
         _options = options;
@@ -27,14 +26,13 @@ public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
         }
         catch (Exception) when (request is IJob)
         {
-            var metadata = _jobContext.Metadata;
-            var maxRetries = TryGetInt(metadata, "$maxRetries") ?? _options.Value.MaxRetries;
-            var retriedTimes = TryGetInt(metadata, "$retriedTimes") ?? 0;
+            var meta = _jobContext.Metadata;
+            var maxRetries = meta.MaxRetries ?? _options.Value.MaxRetries;
+            var retriedTimes = meta.RetriedTimes;
 
             if (retriedTimes < maxRetries)
             {
-                var newRetriedTimes = retriedTimes + 1;
-                var delays = TryGetIntArray(metadata, "$retryDelays") ?? _options.Value.Delays;
+                var delays = meta.RetryDelays ?? _options.Value.Delays;
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
                 DateTime? scheduleTime = null;
 
@@ -44,7 +42,7 @@ public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
                     scheduleTime = now + TimeSpan.FromSeconds(delays[idx]);
                 }
 
-                _jobContext.Metadata["$retriedTimes"] = newRetriedTimes.ToString();
+                meta.RetriedTimes = retriedTimes + 1;
 
                 _jobContext.FailureOutcome = new JobFailureOutcome
                 {
@@ -56,32 +54,5 @@ public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
 
             throw;
         }
-    }
-
-    private static int? TryGetInt(Dictionary<string, string> metadata, string key)
-    {
-        if (metadata.TryGetValue(key, out var value) && int.TryParse(value, out var result))
-        {
-            return result;
-        }
-
-        return null;
-    }
-
-    private static int[]? TryGetIntArray(Dictionary<string, string> metadata, string key)
-    {
-        if (metadata.TryGetValue(key, out var value))
-        {
-            try
-            {
-                return JsonSerializer.Deserialize<int[]>(value);
-            }
-            catch (JsonException)
-            {
-                return null;
-            }
-        }
-
-        return null;
     }
 }

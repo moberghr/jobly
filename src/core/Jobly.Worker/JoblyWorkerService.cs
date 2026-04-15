@@ -171,9 +171,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             jobContext = handlerScope.ServiceProvider.GetRequiredService<JobContext>();
             jobContext.JobId = job.Id;
             jobContext.TraceId = job.TraceId ?? job.Id;
-            jobContext.Metadata = job.Metadata != null
-                ? JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata) ?? []
-                : [];
+            jobContext.Metadata = MetadataSerializer.Deserialize(job.Metadata);
 
             handlerStopwatch = Stopwatch.StartNew();
             await ExecuteJob(job, handlerScope.ServiceProvider, jobCts.Token);

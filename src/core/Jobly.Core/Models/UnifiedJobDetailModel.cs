@@ -60,10 +60,10 @@ public class UnifiedJobDetailModel
     [JsonIgnore]
     public string? MetadataJson { get; set; }
 
-    private Dictionary<string, string>? _metadata;
+    private Dictionary<string, object>? _metadata;
 
-    public Dictionary<string, string>? Metadata => _metadata ??= MetadataJson != null
-        ? JsonSerializer.Deserialize<Dictionary<string, string>>(MetadataJson)
+    public Dictionary<string, object>? Metadata => _metadata ??= MetadataJson != null
+        ? JsonSerializer.Deserialize<Dictionary<string, object>>(MetadataJson)
         : null;
 
     // History

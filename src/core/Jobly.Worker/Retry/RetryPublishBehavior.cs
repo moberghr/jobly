@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Jobly.Core.Handlers;
 using Microsoft.Extensions.Options;
 
@@ -15,14 +14,14 @@ public class RetryPublishBehavior<T> : IPublishPipelineBehavior<T>
 
     public Task PublishAsync(PublishContext<T> context, PublishDelegate next, CancellationToken ct)
     {
-        if (!context.Metadata.ContainsKey("$maxRetries"))
+        if (!context.Metadata.ContainsKey("MaxRetries"))
         {
-            context.Metadata["$maxRetries"] = _options.Value.MaxRetries.ToString();
+            context.Metadata["MaxRetries"] = _options.Value.MaxRetries;
         }
 
-        if (_options.Value.Delays.Length > 0 && !context.Metadata.ContainsKey("$retryDelays"))
+        if (_options.Value.Delays.Length > 0 && !context.Metadata.ContainsKey("RetryDelays"))
         {
-            context.Metadata["$retryDelays"] = JsonSerializer.Serialize(_options.Value.Delays);
+            context.Metadata["RetryDelays"] = _options.Value.Delays;
         }
 
         return next();

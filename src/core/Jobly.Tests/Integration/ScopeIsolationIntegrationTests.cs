@@ -23,7 +23,7 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new AddEntityThenThrowRequest(), new JobParameters
         {
-            Metadata = new Dictionary<string, string> { ["$maxRetries"] = "0" },
+            Metadata = new Dictionary<string, object> { ["MaxRetries"] = 0 },
         });
         await publisher.SaveChangesAsync();
 
@@ -42,7 +42,7 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new AddEntitySaveThenThrowRequest(), new JobParameters
         {
-            Metadata = new Dictionary<string, string> { ["$maxRetries"] = "0" },
+            Metadata = new Dictionary<string, object> { ["MaxRetries"] = 0 },
         });
         await publisher.SaveChangesAsync();
 
@@ -61,10 +61,10 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new AddEntityThenThrowRequest(), new JobParameters
         {
-            Metadata = new Dictionary<string, string>
+            Metadata = new Dictionary<string, object>
             {
-                ["$maxRetries"] = "1",
-                ["$retryDelays"] = "[1]",
+                ["MaxRetries"] = 1,
+                ["RetryDelays"] = new[] { 1 },
             },
         });
         await publisher.SaveChangesAsync();
@@ -117,9 +117,9 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
 
         // Metadata should be persisted even on success (RetryPublishBehavior injects $maxRetries)
         job.Metadata.ShouldNotBeNull();
-        var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata);
+        var metadata = JsonSerializer.Deserialize<Dictionary<string, object>>(job.Metadata);
         metadata.ShouldNotBeNull();
-        metadata.ShouldContainKey("$maxRetries");
+        metadata.ShouldContainKey("MaxRetries");
     }
 }
 

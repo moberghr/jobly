@@ -1,5 +1,5 @@
-using System.Text.Json;
 using Jobly.Core;
+using Jobly.Core.Handlers;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
@@ -53,7 +53,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
 
         var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
         job!.Metadata.ShouldNotBeNull();
-        var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata)!;
+        var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
         metadata["key-a"].ShouldBe("value-a");
         metadata["key-b"].ShouldBe("value-b");
     }
@@ -71,7 +71,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
 
         var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
         job!.Metadata.ShouldNotBeNull();
-        var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata)!;
+        var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
         metadata["msg-key-a"].ShouldBe("msg-val-a");
         metadata["msg-key-b"].ShouldBe("msg-val-b");
     }
@@ -116,13 +116,13 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
 
         var id = await publisher.Enqueue(new UnitRequest(), new JobParameters
         {
-            Metadata = new Dictionary<string, string> { ["ad-hoc"] = "value" },
+            Metadata = new Dictionary<string, object> { ["ad-hoc"] = "value" },
         });
         await ctx.SaveChangesAsync();
 
         var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
         job!.Metadata.ShouldNotBeNull();
-        var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata)!;
+        var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
         metadata["ad-hoc"].ShouldBe("value");
     }
 
@@ -135,13 +135,13 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
 
         var id = await publisher.Enqueue(new UnitRequest(), new JobParameters
         {
-            Metadata = new Dictionary<string, string> { ["ad-hoc"] = "value" },
+            Metadata = new Dictionary<string, object> { ["ad-hoc"] = "value" },
         });
         await ctx.SaveChangesAsync();
 
         var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
         job!.Metadata.ShouldNotBeNull();
-        var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata)!;
+        var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
         metadata["pipeline-key"].ShouldBe("pipeline-val");
         metadata["ad-hoc"].ShouldBe("value");
     }
@@ -210,7 +210,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
         foreach (var child in children)
         {
             child.Metadata.ShouldNotBeNull();
-            var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(child.Metadata)!;
+            var metadata = MetadataSerializer.Deserialize(child.Metadata)!;
             metadata["batch-key"].ShouldBe("batch-val");
         }
     }
@@ -237,7 +237,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
 
             var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
             job!.Metadata.ShouldNotBeNull();
-            var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata)!;
+            var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
             metadata["inherited"].ShouldBe("from-parent");
         }
         finally
@@ -254,7 +254,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
         var publisher = new BatchPublisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
 
         var jobs = new List<UnitRequest> { new(), new() };
-        var batchId = await publisher.StartNew(jobs, metadata: new Dictionary<string, string> { ["ad-hoc-batch"] = "yes" });
+        var batchId = await publisher.StartNew(jobs, metadata: new Dictionary<string, object> { ["ad-hoc-batch"] = "yes" });
         await ctx.SaveChangesAsync();
 
         var children = await _fixture.CreateContext().Set<Job>()
@@ -265,7 +265,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
         foreach (var child in children)
         {
             child.Metadata.ShouldNotBeNull();
-            var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(child.Metadata)!;
+            var metadata = MetadataSerializer.Deserialize(child.Metadata)!;
             metadata["ad-hoc-batch"].ShouldBe("yes");
         }
     }
@@ -283,7 +283,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
 
         var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
         job!.Metadata.ShouldNotBeNull();
-        var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata)!;
+        var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
         metadata["post-next"].ShouldBe("written-after");
     }
 
@@ -300,7 +300,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
 
         var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
         job!.Metadata.ShouldNotBeNull();
-        var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata)!;
+        var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
         metadata["short-circuit"].ShouldBe("yes");
     }
 
@@ -355,13 +355,13 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
 
             var id = await publisher.Enqueue(new UnitRequest(), new JobParameters
             {
-                Metadata = new Dictionary<string, string> { ["shared"] = "ad-hoc-value" },
+                Metadata = new Dictionary<string, object> { ["shared"] = "ad-hoc-value" },
             });
             await ctx.SaveChangesAsync();
 
             var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
             job!.Metadata.ShouldNotBeNull();
-            var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata)!;
+            var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
             metadata["shared"].ShouldBe("ad-hoc-value", "Ad-hoc should override inherited");
             metadata["inherited-only"].ShouldBe("stays", "Non-conflicting inherited key should survive");
         }

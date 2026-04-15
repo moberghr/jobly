@@ -59,10 +59,10 @@ public abstract class RetryTestsBase : IAsyncLifetime
             return 0;
         }
 
-        var meta = JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata);
-        if (meta != null && meta.TryGetValue("$retriedTimes", out var value) && int.TryParse(value, out var result))
+        var meta = MetadataSerializer.Deserialize(job.Metadata);
+        if (meta.TryGetValue("RetriedTimes", out var value))
         {
-            return result;
+            return Convert.ToInt32(value);
         }
 
         return 0;
@@ -415,9 +415,9 @@ public abstract class RetryTestsBase : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         var jobId = Guid.NewGuid();
         var now = DateTime.UtcNow;
-        var metadata = JsonSerializer.Serialize(new Dictionary<string, string>
+        var metadata = JsonSerializer.Serialize(new Dictionary<string, object>
         {
-            ["$retryDelays"] = "[7200]",
+            ["RetryDelays"] = new int[] { 7200 },
         });
         ctx.Set<Job>().Add(new Job
         {
@@ -452,9 +452,9 @@ public abstract class RetryTestsBase : IAsyncLifetime
         // Arrange — job has per-job $maxRetries in metadata
         var ctx = _fixture.CreateContext();
         var jobId = Guid.NewGuid();
-        var metadata = JsonSerializer.Serialize(new Dictionary<string, string>
+        var metadata = JsonSerializer.Serialize(new Dictionary<string, object>
         {
-            ["$maxRetries"] = "2",
+            ["MaxRetries"] = 2,
         });
         ctx.Set<Job>().Add(new Job
         {

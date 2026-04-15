@@ -229,7 +229,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
-            Metadata = JsonSerializer.Serialize(new Dictionary<string, string> { ["$maxRetries"] = "0" }),
+            Metadata = JsonSerializer.Serialize(new Dictionary<string, object> { ["MaxRetries"] = 0 }),
         });
         await ctx.SaveChangesAsync();
 

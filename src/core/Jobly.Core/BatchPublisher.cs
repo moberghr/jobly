@@ -14,10 +14,10 @@ namespace Jobly.Core;
 
 public interface IBatchPublisher
 {
-    Task<Guid> StartNew<T>(List<T> batchJobMessages, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded, Dictionary<string, string>? metadata = null)
+    Task<Guid> StartNew<T>(List<T> batchJobMessages, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded, Dictionary<string, object>? metadata = null)
         where T : class, IJob;
 
-    Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded, Dictionary<string, string>? metadata = null)
+    Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded, Dictionary<string, object>? metadata = null)
         where T : class, IJob;
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
@@ -39,19 +39,19 @@ public class BatchPublisher<TContext> : IBatchPublisher
         _serviceProvider = serviceProvider;
     }
 
-    public async Task<Guid> StartNew<T>(List<T> batchJobMessages, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded, Dictionary<string, string>? metadata = null)
+    public async Task<Guid> StartNew<T>(List<T> batchJobMessages, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded, Dictionary<string, object>? metadata = null)
         where T : class, IJob
     {
         return await BaseCreateBatch(batchJobMessages, State.Enqueued, null, name, options, metadata);
     }
 
-    public async Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded, Dictionary<string, string>? metadata = null)
+    public async Task<Guid> ContinueBatchWith<T>(List<T> batchJobMessages, Guid parentId, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded, Dictionary<string, object>? metadata = null)
         where T : class, IJob
     {
         return await BaseCreateBatch(batchJobMessages, State.Awaiting, parentId, name, options, metadata);
     }
 
-    private async Task<Guid> BaseCreateBatch<T>(List<T> batchJobMessages, State batchJobsState, Guid? parentId, string? name, ContinuationOptions options, Dictionary<string, string>? adHocMetadata = null)
+    private async Task<Guid> BaseCreateBatch<T>(List<T> batchJobMessages, State batchJobsState, Guid? parentId, string? name, ContinuationOptions options, Dictionary<string, object>? adHocMetadata = null)
         where T : class, IJob
     {
         if (batchJobMessages == null || batchJobMessages.Count == 0)
@@ -163,15 +163,15 @@ public class BatchPublisher<TContext> : IBatchPublisher
         return _context.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<Dictionary<string, string>> RunPublishPipeline<T>(T job, Dictionary<string, string>? seed = null, CancellationToken ct = default)
+    private async Task<Dictionary<string, object>> RunPublishPipeline<T>(T job, Dictionary<string, object>? seed = null, CancellationToken ct = default)
     {
-        var metadata = new Dictionary<string, string>();
+        var metadata = new Dictionary<string, object>();
 
         // Seed with inherited metadata from parent execution context
         var executionContext = JobExecutionContext.Current;
         if (executionContext?.MetadataJson != null)
         {
-            var inherited = JsonSerializer.Deserialize<Dictionary<string, string>>(executionContext.MetadataJson);
+            var inherited = JsonSerializer.Deserialize<Dictionary<string, object>>(executionContext.MetadataJson);
             if (inherited != null)
             {
                 foreach (var kvp in inherited)

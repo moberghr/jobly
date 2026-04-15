@@ -226,7 +226,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = queue,
-            Metadata = JsonSerializer.Serialize(new Dictionary<string, string> { ["$maxRetries"] = "0" }),
+            Metadata = JsonSerializer.Serialize(new Dictionary<string, object> { ["MaxRetries"] = 0 }),
         });
         await ctx.SaveChangesAsync();
 
