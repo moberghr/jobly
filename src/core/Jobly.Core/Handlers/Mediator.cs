@@ -13,13 +13,13 @@ public class Mediator : IMediator
     {
         var requestType = request.GetType();
 
-        return JobDispatcher.ExecuteRequestHandler<TResponse>(request, requestType, _provider, cancellationToken);
+        return MediatorDispatcher.ExecuteRequestHandler<TResponse>(request, requestType, _provider, cancellationToken);
     }
 
     public IAsyncEnumerable<TResponse> CreateStream<TResponse>(IStreamRequest<TResponse> request, CancellationToken cancellationToken = default)
     {
         var requestType = request.GetType();
 
-        return JobDispatcher.ExecuteStreamHandler<TResponse>(request, requestType, _provider, cancellationToken);
+        return MediatorDispatcher.ExecuteStreamHandler<TResponse>(request, requestType, _provider, cancellationToken);
     }
 }
