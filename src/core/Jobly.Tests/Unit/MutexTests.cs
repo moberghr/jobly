@@ -21,9 +21,9 @@ public abstract class MutexTestsBase : IAsyncLifetime
 
     protected MutexTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private static readonly Guid WorkerId = Guid.NewGuid();
     private static readonly Guid ServerId = Guid.NewGuid();
@@ -229,7 +229,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class MutexTests_PostgreSql : MutexTestsBase
 {
     public MutexTests_PostgreSql(PostgreSqlFixture fixture)
@@ -238,7 +238,7 @@ public class MutexTests_PostgreSql : MutexTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class MutexTests_SqlServer : MutexTestsBase
 {

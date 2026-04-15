@@ -27,7 +27,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
 
     protected HandlerLogTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _fixture.ResetAsync();
 
@@ -49,7 +49,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private JoblyWorkerService<TestContext> CreateWorker(bool enableHandlerLogging = true)
     {
@@ -329,7 +329,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class HandlerLogTests_PostgreSql : HandlerLogTestsBase
 {
     public HandlerLogTests_PostgreSql(PostgreSqlFixture fixture)
@@ -338,7 +338,7 @@ public class HandlerLogTests_PostgreSql : HandlerLogTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class HandlerLogTests_SqlServer : HandlerLogTestsBase
 {

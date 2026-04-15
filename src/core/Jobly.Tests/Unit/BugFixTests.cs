@@ -18,9 +18,9 @@ public abstract class BugFixTestsBase : IAsyncLifetime
 
     protected BugFixTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>
     /// BUG: Expiration cleanup fails with FK violation when parent job has ExpireAt
@@ -154,7 +154,7 @@ public abstract class BugFixTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class BugFixTests_PostgreSql : BugFixTestsBase
 {
     public BugFixTests_PostgreSql(PostgreSqlFixture fixture)
@@ -163,7 +163,7 @@ public class BugFixTests_PostgreSql : BugFixTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class BugFixTests_SqlServer : BugFixTestsBase
 {

@@ -148,7 +148,7 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
     }
 }
 
-[Collection("PostgreSql-Integration")]
+[Collection<PostgreSqlIntegrationCollection>]
 public class MetadataPropagationIntegrationTests_PostgreSql : MetadataPropagationIntegrationTestsBase
 {
     public MetadataPropagationIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
@@ -157,7 +157,7 @@ public class MetadataPropagationIntegrationTests_PostgreSql : MetadataPropagatio
     }
 }
 
-[Collection("SqlServer-Integration")]
+[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
 public class MetadataPropagationIntegrationTests_SqlServer : MetadataPropagationIntegrationTestsBase
 {

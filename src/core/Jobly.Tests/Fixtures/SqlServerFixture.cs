@@ -22,7 +22,7 @@ public class SqlServerFixture : IAsyncLifetime, IDatabaseFixture
 
     public SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _container.StartAsync();
         _connectionString = _container.GetConnectionString() + ";Encrypt=False;";
@@ -51,11 +51,11 @@ public class SqlServerFixture : IAsyncLifetime, IDatabaseFixture
             .Options);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await _container.DisposeAsync();
     }
 }
 
-[CollectionDefinition("SqlServer")]
+[CollectionDefinition]
 public class SqlServerCollection : ICollectionFixture<SqlServerFixture>;

@@ -16,9 +16,9 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 
     protected MessageRoutingErrorTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private static IServiceScopeFactory BuildScopeFactoryWithHandlers()
     {
@@ -173,7 +173,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class MessageRoutingErrorTests_PostgreSql : MessageRoutingErrorTestsBase
 {
     public MessageRoutingErrorTests_PostgreSql(PostgreSqlFixture fixture)
@@ -182,7 +182,7 @@ public class MessageRoutingErrorTests_PostgreSql : MessageRoutingErrorTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class MessageRoutingErrorTests_SqlServer : MessageRoutingErrorTestsBase
 {

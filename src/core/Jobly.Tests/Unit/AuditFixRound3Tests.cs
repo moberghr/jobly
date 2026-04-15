@@ -17,9 +17,9 @@ public abstract class AuditFixRound3TestsBase : IAsyncLifetime
 
     protected AuditFixRound3TestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>
     /// Count-based cleanup must not delete parents whose children haven't expired.
@@ -148,7 +148,7 @@ public abstract class AuditFixRound3TestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class AuditFixRound3Tests_PostgreSql : AuditFixRound3TestsBase
 {
     public AuditFixRound3Tests_PostgreSql(PostgreSqlFixture fixture)
@@ -157,7 +157,7 @@ public class AuditFixRound3Tests_PostgreSql : AuditFixRound3TestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class AuditFixRound3Tests_SqlServer : AuditFixRound3TestsBase
 {

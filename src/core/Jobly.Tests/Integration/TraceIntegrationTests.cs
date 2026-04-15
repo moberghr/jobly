@@ -113,7 +113,7 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql-Integration")]
+[Collection<PostgreSqlIntegrationCollection>]
 public class TraceIntegrationTests_PostgreSql : TraceIntegrationTestsBase
 {
     public TraceIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
@@ -122,7 +122,7 @@ public class TraceIntegrationTests_PostgreSql : TraceIntegrationTestsBase
     }
 }
 
-[Collection("SqlServer-Integration")]
+[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
 public class TraceIntegrationTests_SqlServer : TraceIntegrationTestsBase
 {

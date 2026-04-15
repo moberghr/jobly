@@ -117,7 +117,7 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql-Integration")]
+[Collection<PostgreSqlIntegrationCollection>]
 public class ContinuationIntegrationTests_PostgreSql : ContinuationIntegrationTestsBase
 {
     public ContinuationIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
@@ -126,7 +126,7 @@ public class ContinuationIntegrationTests_PostgreSql : ContinuationIntegrationTe
     }
 }
 
-[Collection("SqlServer-Integration")]
+[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
 public class ContinuationIntegrationTests_SqlServer : ContinuationIntegrationTestsBase
 {

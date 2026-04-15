@@ -4,8 +4,14 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<OutputType>Exe</OutputType>
 
 		<IsPackable>false</IsPackable>
+
+		<UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+
+		<!-- Suppress xUnit v3 CancellationToken advisory warnings (bulk fix is a separate task) -->
+		<NoWarn>$(NoWarn);xUnit1051;CA1816;MA0040</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -22,7 +28,6 @@
 		<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.5" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.5" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.5" />
-		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
 		<PackageReference Include="Moq" Version="4.20.72" />
 		<PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
@@ -31,15 +36,7 @@
 		<PackageReference Include="Testcontainers" Version="4.11.0" />
 		<PackageReference Include="Testcontainers.MsSql" Version="4.11.0" />
 		<PackageReference Include="Testcontainers.PostgreSql" Version="4.11.0" />
-		<PackageReference Include="xunit" Version="2.9.3" />
-		<PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-			<PrivateAssets>all</PrivateAssets>
-		</PackageReference>
-		<PackageReference Include="coverlet.collector" Version="6.0.4">
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-			<PrivateAssets>all</PrivateAssets>
-		</PackageReference>
+		<PackageReference Include="xunit.v3.mtp-v2" Version="3.2.2" />
 	</ItemGroup>
 
 	<ItemGroup>

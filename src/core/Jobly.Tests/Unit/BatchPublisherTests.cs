@@ -16,9 +16,9 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
 
     protected BatchPublisherUnitTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private static BatchPublisher<TestContext> CreateBatchPublisher(TestContext ctx)
     {
@@ -230,7 +230,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class BatchPublisherUnitTests_PostgreSql : BatchPublisherUnitTestsBase
 {
     public BatchPublisherUnitTests_PostgreSql(PostgreSqlFixture fixture)
@@ -239,7 +239,7 @@ public class BatchPublisherUnitTests_PostgreSql : BatchPublisherUnitTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class BatchPublisherUnitTests_SqlServer : BatchPublisherUnitTestsBase
 {

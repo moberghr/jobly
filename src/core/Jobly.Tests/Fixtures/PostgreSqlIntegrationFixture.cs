@@ -19,7 +19,7 @@ public class PostgreSqlIntegrationFixture : IAsyncLifetime, IDatabaseFixture
 
     public JoblyTestServer TestServer { get; private set; } = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _container.StartAsync();
         _connectionString = _container.GetConnectionString();
@@ -54,12 +54,12 @@ public class PostgreSqlIntegrationFixture : IAsyncLifetime, IDatabaseFixture
             .Options);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await TestServer.DisposeAsync();
         await _container.DisposeAsync();
     }
 }
 
-[CollectionDefinition("PostgreSql-Integration")]
+[CollectionDefinition]
 public class PostgreSqlIntegrationCollection : ICollectionFixture<PostgreSqlIntegrationFixture>;

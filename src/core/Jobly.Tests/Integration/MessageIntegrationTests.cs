@@ -156,7 +156,7 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql-Integration")]
+[Collection<PostgreSqlIntegrationCollection>]
 public class MessageIntegrationTests_PostgreSql : MessageIntegrationTestsBase
 {
     public MessageIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
@@ -165,7 +165,7 @@ public class MessageIntegrationTests_PostgreSql : MessageIntegrationTestsBase
     }
 }
 
-[Collection("SqlServer-Integration")]
+[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
 public class MessageIntegrationTests_SqlServer : MessageIntegrationTestsBase
 {

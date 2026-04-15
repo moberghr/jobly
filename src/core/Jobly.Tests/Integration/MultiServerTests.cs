@@ -436,7 +436,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
     }
 }
 
-[Collection("PostgreSql-MultiServer")]
+[Collection<PostgreSqlMultiServerCollection>]
 public class MultiServerTests_PostgreSql : MultiServerTestsBase
 {
     public MultiServerTests_PostgreSql(PostgreSqlMultiServerFixture fixture)
@@ -445,7 +445,7 @@ public class MultiServerTests_PostgreSql : MultiServerTestsBase
     }
 }
 
-[Collection("SqlServer-MultiServer")]
+[Collection<SqlServerMultiServerCollection>]
 [Trait("Category", "SqlServer")]
 public class MultiServerTests_SqlServer : MultiServerTestsBase
 {

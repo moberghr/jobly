@@ -12,9 +12,9 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
 
     protected ServerCommandServiceTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task PauseServer_SetsPausedAt()
@@ -195,7 +195,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class ServerCommandServiceTests_PostgreSql : ServerCommandServiceTestsBase
 {
     public ServerCommandServiceTests_PostgreSql(PostgreSqlFixture fixture)
@@ -204,7 +204,7 @@ public class ServerCommandServiceTests_PostgreSql : ServerCommandServiceTestsBas
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class ServerCommandServiceTests_SqlServer : ServerCommandServiceTestsBase
 {

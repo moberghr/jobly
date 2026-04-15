@@ -102,7 +102,7 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql-Integration")]
+[Collection<PostgreSqlIntegrationCollection>]
 public class RealTimeLogIntegrationTests_PostgreSql : RealTimeLogIntegrationTestsBase
 {
     public RealTimeLogIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
@@ -111,7 +111,7 @@ public class RealTimeLogIntegrationTests_PostgreSql : RealTimeLogIntegrationTest
     }
 }
 
-[Collection("SqlServer-Integration")]
+[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
 public class RealTimeLogIntegrationTests_SqlServer : RealTimeLogIntegrationTestsBase
 {

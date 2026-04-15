@@ -23,7 +23,7 @@ public class PostgreSqlMultiServerFixture : IAsyncLifetime, IMultiServerDatabase
     // IDatabaseFixture.TestServer — not used, but required by the interface for CreateContext reuse
     JoblyTestServer? IDatabaseFixture.TestServer => Server1;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _container.StartAsync();
         _connectionString = _container.GetConnectionString();
@@ -59,7 +59,7 @@ public class PostgreSqlMultiServerFixture : IAsyncLifetime, IMultiServerDatabase
             .Options);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await Server2.DisposeAsync();
         await Server1.DisposeAsync();
@@ -67,5 +67,5 @@ public class PostgreSqlMultiServerFixture : IAsyncLifetime, IMultiServerDatabase
     }
 }
 
-[CollectionDefinition("PostgreSql-MultiServer")]
+[CollectionDefinition]
 public class PostgreSqlMultiServerCollection : ICollectionFixture<PostgreSqlMultiServerFixture>;

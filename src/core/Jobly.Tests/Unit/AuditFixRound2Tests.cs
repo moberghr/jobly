@@ -20,9 +20,9 @@ public abstract class AuditFixRound2TestsBase : IAsyncLifetime
 
     protected AuditFixRound2TestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>
     /// RequeueJob on a Processing job should not set it to Enqueued (would cause double execution).
@@ -180,7 +180,7 @@ public abstract class AuditFixRound2TestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class AuditFixRound2Tests_PostgreSql : AuditFixRound2TestsBase
 {
     public AuditFixRound2Tests_PostgreSql(PostgreSqlFixture fixture)
@@ -189,7 +189,7 @@ public class AuditFixRound2Tests_PostgreSql : AuditFixRound2TestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class AuditFixRound2Tests_SqlServer : AuditFixRound2TestsBase
 {

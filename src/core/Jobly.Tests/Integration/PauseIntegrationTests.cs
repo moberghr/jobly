@@ -140,7 +140,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql-Integration")]
+[Collection<PostgreSqlIntegrationCollection>]
 public class PauseIntegrationTests_PostgreSql : PauseIntegrationTestsBase
 {
     public PauseIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
@@ -149,7 +149,7 @@ public class PauseIntegrationTests_PostgreSql : PauseIntegrationTestsBase
     }
 }
 
-[Collection("SqlServer-Integration")]
+[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
 public class PauseIntegrationTests_SqlServer : PauseIntegrationTestsBase
 {

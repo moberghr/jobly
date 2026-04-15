@@ -16,9 +16,9 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
 
     protected RequeueEdgeCaseTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task RequeueJob_AlreadyEnqueued_NoOpReturnsEarly()
@@ -146,7 +146,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class RequeueEdgeCaseTests_PostgreSql : RequeueEdgeCaseTestsBase
 {
     public RequeueEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture)
@@ -155,7 +155,7 @@ public class RequeueEdgeCaseTests_PostgreSql : RequeueEdgeCaseTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class RequeueEdgeCaseTests_SqlServer : RequeueEdgeCaseTestsBase
 {

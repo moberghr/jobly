@@ -27,7 +27,7 @@ public abstract class PipelineTestsBase : IAsyncLifetime
 
     protected PipelineTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _fixture.ResetAsync();
 
@@ -49,7 +49,7 @@ public abstract class PipelineTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private JoblyWorkerService<TestContext> CreateWorker()
     {
@@ -132,7 +132,7 @@ public abstract class PipelineTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class PipelineTests_PostgreSql : PipelineTestsBase
 {
     public PipelineTests_PostgreSql(PostgreSqlFixture fixture)
@@ -141,7 +141,7 @@ public class PipelineTests_PostgreSql : PipelineTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class PipelineTests_SqlServer : PipelineTestsBase
 {

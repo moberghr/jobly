@@ -14,9 +14,9 @@ public abstract class RecurringJobLogCascadeTestsBase : IAsyncLifetime
 
     protected RecurringJobLogCascadeTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task WhenJobIsDeleted_RecurringJobLog_JobIdSetToNull()
@@ -97,7 +97,7 @@ public abstract class RecurringJobLogCascadeTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class RecurringJobLogCascadeTests_PostgreSql : RecurringJobLogCascadeTestsBase
 {
     public RecurringJobLogCascadeTests_PostgreSql(PostgreSqlFixture fixture)
@@ -106,7 +106,7 @@ public class RecurringJobLogCascadeTests_PostgreSql : RecurringJobLogCascadeTest
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class RecurringJobLogCascadeTests_SqlServer : RecurringJobLogCascadeTestsBase
 {

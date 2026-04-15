@@ -12,9 +12,9 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
 
     protected ServerQueryTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task GetServerLogs_ReturnsPaginatedLogs()
@@ -189,7 +189,7 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class ServerQueryTests_PostgreSql : ServerQueryTestsBase
 {
     public ServerQueryTests_PostgreSql(PostgreSqlFixture fixture)
@@ -198,7 +198,7 @@ public class ServerQueryTests_PostgreSql : ServerQueryTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class ServerQueryTests_SqlServer : ServerQueryTestsBase
 {

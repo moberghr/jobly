@@ -13,7 +13,7 @@ public abstract class IntegrationTestBase : IAsyncLifetime
 
     protected JoblyTestServer Server => _fixture.TestServer!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         try
         {
@@ -26,5 +26,5 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         }
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

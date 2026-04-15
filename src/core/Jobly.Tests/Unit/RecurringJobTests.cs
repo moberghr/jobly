@@ -18,9 +18,9 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
 
     protected RecurringJobTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task AddOrUpdateRecurringJob_CreatesRecurringJobInDb()
@@ -335,7 +335,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class RecurringJobTests_PostgreSql : RecurringJobTestsBase
 {
     public RecurringJobTests_PostgreSql(PostgreSqlFixture fixture)
@@ -344,7 +344,7 @@ public class RecurringJobTests_PostgreSql : RecurringJobTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class RecurringJobTests_SqlServer : RecurringJobTestsBase
 {

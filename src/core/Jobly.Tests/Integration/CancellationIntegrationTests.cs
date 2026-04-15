@@ -107,7 +107,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql-Integration")]
+[Collection<PostgreSqlIntegrationCollection>]
 public class CancellationIntegrationTests_PostgreSql : CancellationIntegrationTestsBase
 {
     public CancellationIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
@@ -116,7 +116,7 @@ public class CancellationIntegrationTests_PostgreSql : CancellationIntegrationTe
     }
 }
 
-[Collection("SqlServer-Integration")]
+[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
 public class CancellationIntegrationTests_SqlServer : CancellationIntegrationTestsBase
 {

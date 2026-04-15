@@ -126,7 +126,7 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql-Integration")]
+[Collection<PostgreSqlIntegrationCollection>]
 public class RetryIntegrationTests_PostgreSql : RetryIntegrationTestsBase
 {
     public RetryIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
@@ -135,7 +135,7 @@ public class RetryIntegrationTests_PostgreSql : RetryIntegrationTestsBase
     }
 }
 
-[Collection("SqlServer-Integration")]
+[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
 public class RetryIntegrationTests_SqlServer : RetryIntegrationTestsBase
 {
