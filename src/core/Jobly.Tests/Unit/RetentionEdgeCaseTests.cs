@@ -8,10 +8,12 @@ using Jobly.Core.Services;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
+using Jobly.Worker.Retry;
 using Jobly.Worker.Services;
 using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Shouldly;
@@ -62,6 +64,12 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         services.AddSingleton<MultiHandlerCounter>();
         services.AddScoped<Jobly.Core.Handlers.JobContext>();
         services.AddScoped<Jobly.Core.Handlers.IJobContext>(x => x.GetRequiredService<Jobly.Core.Handlers.JobContext>());
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddJoblyRetry(o =>
+        {
+            o.MaxRetries = 3;
+            o.Delays = [];
+        });
 
         var workerConfig = new OptionsWrapper<JoblyWorkerConfiguration>(new JoblyWorkerConfiguration
         {
@@ -208,7 +216,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
     [Fact]
     public async Task RequeueJob_FailedJob_DecrementsFailedStat()
     {
-        // Arrange — create and process a failing job
+        // Arrange — create and process a failing job (no retries via metadata)
         var ctx = _fixture.CreateContext();
         var jobId = Guid.NewGuid();
         ctx.Set<Job>().Add(new Job
@@ -221,6 +229,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
+            Metadata = JsonSerializer.Serialize(new Dictionary<string, object> { ["MaxRetries"] = 0 }),
         });
         await ctx.SaveChangesAsync();
 

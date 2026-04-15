@@ -4,13 +4,11 @@ namespace Jobly.Core.Handlers;
 
 public delegate Task PublishDelegate();
 
-public class PublishContext<T> : IJobMetadata
+public class PublishContext<T>
 {
     public required T Job { get; init; }
 
-    public Dictionary<string, string> Metadata { get; init; } = [];
-
-    IReadOnlyDictionary<string, string> IJobMetadata.Metadata => Metadata;
+    public Dictionary<string, object> Metadata { get; init; } = [];
 }
 
 [SuppressMessage("Naming", "CA1716:Identifiers should not match keywords", Justification = "Public API")]

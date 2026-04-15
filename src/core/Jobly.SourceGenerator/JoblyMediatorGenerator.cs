@@ -185,7 +185,8 @@ public sealed class JoblyMediatorGenerator : IIncrementalGenerator
         {
             foreach (var type in GetAllTypes(compilation))
             {
-                if (type.IsAbstract || type.TypeKind == TypeKind.Interface)
+                if (type.IsAbstract || type.TypeKind == TypeKind.Interface || type.IsGenericType
+                    || type.ContainingType is not null || type.DeclaredAccessibility != Accessibility.Public)
                 {
                     continue;
                 }

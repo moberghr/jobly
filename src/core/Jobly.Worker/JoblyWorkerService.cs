@@ -47,17 +47,18 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     {
         PerfTrace.Begin();
 
-        using var scope = _serviceScopeFactory.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TContext>();
+        // Worker scope — owns Jobly state (Job, JobLog, Counter). Isolated from handler's DbContext.
+        using var workerScope = _serviceScopeFactory.CreateScope();
+        var workerContext = workerScope.ServiceProvider.GetRequiredService<TContext>();
 
         PerfTrace.Mark(PerfTrace.BeginTransaction1);
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await workerContext.Database.BeginTransactionAsync(cancellationToken);
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         // Fetch only Kind=Job (messages are routed by MessageRoutingTask)
         PerfTrace.Mark(PerfTrace.FetchJob);
-        var job = await context.Set<Job>()
+        var job = await workerContext.Set<Job>()
             .Where(x => x.Kind == JobKind.Job && x.CurrentState == State.Enqueued && x.ScheduleTime < now)
             .Where(x => _groupConfiguration.Queues.Contains(x.Queue))
             .OrderBy(x => x.Queue)
@@ -77,7 +78,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         job.CurrentWorkerId = _workerId;
         job.LastKeepAlive = now;
 
-        context.Set<JobLog>().Add(new JobLog
+        workerContext.Set<JobLog>().Add(new JobLog
         {
             JobId = job.Id,
             EventType = "Processing",
@@ -88,7 +89,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         });
 
         PerfTrace.Mark(PerfTrace.SaveProcessing);
-        await context.SaveChangesAsync(cancellationToken);
+        await workerContext.SaveChangesAsync(cancellationToken);
 
         PerfTrace.Mark(PerfTrace.CommitTransaction1);
         await transaction.CommitAsync(cancellationToken);
@@ -105,13 +106,13 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             if (mutexHandle == null)
             {
                 // Another worker holds this mutex — cancel this job
-                await using var cancelTx = await context.Database.BeginTransactionAsync(cancellationToken);
+                await using var cancelTx = await workerContext.Database.BeginTransactionAsync(cancellationToken);
                 job.CurrentState = State.Deleted;
                 job.ExpireAt = now.Add(_configuration.JobExpirationTimeout);
                 job.CurrentWorkerId = null;
                 job.LastKeepAlive = null;
-                context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
-                context.Set<JobLog>().Add(new JobLog
+                workerContext.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
+                workerContext.Set<JobLog>().Add(new JobLog
                 {
                     JobId = job.Id,
                     EventType = "Deleted",
@@ -120,7 +121,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
                     Message = $"Cancelled — mutex '{job.ConcurrencyKey}' held by another job",
                     WorkerId = _workerId,
                 });
-                await context.SaveChangesAsync(cancellationToken);
+                await workerContext.SaveChangesAsync(cancellationToken);
                 await cancelTx.CommitAsync(cancellationToken);
                 return true;
             }
@@ -144,6 +145,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         activity.SetTag("jobly.job.kind", job.Kind.ToString());
         JoblyTelemetry.JobsActive.Add(1, new KeyValuePair<string, object?>("queue", job.Queue));
         Stopwatch? handlerStopwatch = null;
+        IServiceScope? handlerScope = null;
+        JobContext? jobContext = null;
         try
         {
             PerfTrace.Mark(PerfTrace.ExecuteHandler);
@@ -161,16 +164,27 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
                 MetadataJson = job.Metadata,
             };
 
-            var jobContext = scope.ServiceProvider.GetRequiredService<JobContext>();
+            // Handler scope — isolated DbContext for handler + pipeline behaviors.
+            // Handler's change tracker is disposed with this scope, never leaking into worker saves.
+            handlerScope = _serviceScopeFactory.CreateScope();
+
+            jobContext = handlerScope.ServiceProvider.GetRequiredService<JobContext>();
             jobContext.JobId = job.Id;
             jobContext.TraceId = job.TraceId ?? job.Id;
-            jobContext.Metadata = job.Metadata != null
-                ? JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata) ?? []
-                : [];
+            jobContext.Metadata = MetadataSerializer.Deserialize(job.Metadata);
 
             handlerStopwatch = Stopwatch.StartNew();
-            await ExecuteJob(job, scope.ServiceProvider, jobCts.Token);
+            await ExecuteJob(job, handlerScope.ServiceProvider, jobCts.Token);
             handlerStopwatch.Stop();
+
+            // Commit handler's work (outbox: published jobs + business entities) before disposing
+            var handlerContext = handlerScope.ServiceProvider.GetRequiredService<TContext>();
+            await handlerContext.SaveChangesAsync(default);
+
+            // Read metadata from handler scope before disposing
+            job.Metadata = JsonSerializer.Serialize(jobContext.Metadata);
+            handlerScope.Dispose();
+            handlerScope = null;
 
             var durationMs = handlerStopwatch.Elapsed.TotalMilliseconds;
             activity.SetTag("jobly.job.status", "succeeded");
@@ -192,22 +206,26 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await monitorTask;
 
             PerfTrace.Mark(PerfTrace.BeginTransaction2);
-            await using var endTransaction = await context.Database.BeginTransactionAsync(default);
-            UpdateJobState(context, job, null, handlerStopwatch.Elapsed.TotalMilliseconds);
+            await using var endTransaction = await workerContext.Database.BeginTransactionAsync(default);
+            job.CurrentState = State.Completed;
+            FinalizeJobState(workerContext, job, null, handlerStopwatch.Elapsed.TotalMilliseconds);
             if (_configuration.EnableHandlerLogging)
             {
-                await SaveJobLogs(context, logCollector);
+                await SaveJobLogs(workerContext, logCollector);
             }
 
             PerfTrace.Mark(PerfTrace.SaveCompleted);
-            await context.SaveChangesAsync(default);
+            await workerContext.SaveChangesAsync(default);
 
             PerfTrace.Mark(PerfTrace.CommitTransaction2);
             await endTransaction.CommitAsync(default);
         }
         catch (OperationCanceledException) when (jobCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            // Job was cancelled (deleted while running)
+            // Job was cancelled (deleted while running) — dispose handler scope first
+            handlerScope?.Dispose();
+            handlerScope = null;
+
             handlerStopwatch?.Stop();
             activity.SetTag("jobly.job.status", "cancelled");
             activity.AddEvent(new ActivityEvent("jobly.job.cancelled"));
@@ -218,14 +236,14 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await monitorTask;
 
             var cancelNow = _timeProvider.GetUtcNow().UtcDateTime;
-            await using var endTransaction = await context.Database.BeginTransactionAsync(default);
+            await using var endTransaction = await workerContext.Database.BeginTransactionAsync(default);
             job.CurrentState = State.Deleted;
             job.ExpireAt = cancelNow.Add(_configuration.JobExpirationTimeout);
             job.CancellationMode = CancellationMode.None;
             job.CurrentWorkerId = null;
             job.LastKeepAlive = null;
-            context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
-            context.Set<JobLog>().Add(new JobLog
+            workerContext.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
+            workerContext.Set<JobLog>().Add(new JobLog
             {
                 JobId = job.Id,
                 EventType = "Cancelled",
@@ -237,32 +255,50 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             });
             if (_configuration.EnableHandlerLogging)
             {
-                await SaveJobLogs(context, logCollector);
+                await SaveJobLogs(workerContext, logCollector);
             }
 
-            await context.SaveChangesAsync(default);
+            await workerContext.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
         }
         catch (Exception e)
         {
             handlerStopwatch?.Stop();
-            var willRetry = job.RetriedTimes < job.MaxRetries;
-            var errorStatus = willRetry ? "retried" : "failed";
             var errorDurationMs = handlerStopwatch?.Elapsed.TotalMilliseconds;
+
+            // Read pipeline failure outcome from handler scope before disposing
+            var outcome = jobContext?.FailureOutcome;
+            if (outcome != null)
+            {
+                job.CurrentState = outcome.State;
+                if (outcome.ClearHandlerType)
+                {
+                    job.HandlerType = null;
+                }
+
+                if (outcome.ScheduleTime != null)
+                {
+                    job.ScheduleTime = outcome.ScheduleTime.Value;
+                }
+
+                job.Metadata = JsonSerializer.Serialize(jobContext!.Metadata);
+            }
+            else
+            {
+                job.CurrentState = State.Failed;
+            }
+
+            handlerScope?.Dispose();
+            handlerScope = null;
+
+            var willRetry = job.CurrentState == State.Enqueued;
+            var errorStatus = willRetry ? "retried" : "failed";
             activity.SetStatus(ActivityStatusCode.Error, Truncate(e.Message, 256));
             activity.SetTag("jobly.job.status", errorStatus);
-            if (job.RetriedTimes > 0 || willRetry)
-            {
-                activity.SetTag("jobly.job.retry_count", willRetry ? job.RetriedTimes + 1 : job.RetriedTimes);
-            }
 
             if (willRetry)
             {
-                activity.AddEvent(new ActivityEvent("jobly.job.retried", tags: new ActivityTagsCollection
-                {
-                    { "retry_count", job.RetriedTimes + 1 },
-                    { "max_retries", job.MaxRetries },
-                }));
+                activity.AddEvent(new ActivityEvent("jobly.job.retried"));
             }
             else
             {
@@ -281,18 +317,19 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await jobCts.CancelAsync();
             await monitorTask;
 
-            await using var endTransaction = await context.Database.BeginTransactionAsync(default);
-            UpdateJobState(context, job, e, errorDurationMs);
+            await using var endTransaction = await workerContext.Database.BeginTransactionAsync(default);
+            FinalizeJobState(workerContext, job, e, errorDurationMs);
             if (_configuration.EnableHandlerLogging)
             {
-                await SaveJobLogs(context, logCollector);
+                await SaveJobLogs(workerContext, logCollector);
             }
 
-            await context.SaveChangesAsync(default);
+            await workerContext.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
         }
         finally
         {
+            handlerScope?.Dispose();
             JoblyTelemetry.JobsActive.Add(-1, new KeyValuePair<string, object?>("queue", job.Queue));
             activity.Stop();
             activity.Dispose();
@@ -414,21 +451,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     }
 
     /// <summary>
-    /// Updates job state, counters, and creates the completion log.
-    /// Pure state update — no parent/child orchestration.
+    /// Finalizes job state: clears worker fields, adds counters and log entry.
+    /// State must be set on the job before calling this method.
     /// </summary>
-    private void UpdateJobState(TContext context, Job job, Exception? error, double? durationMs)
+    private void FinalizeJobState(TContext context, Job job, Exception? error, double? durationMs)
     {
-        var failed = error != null;
-        var state = failed ? State.Failed : State.Completed;
-        if (job.RetriedTimes < job.MaxRetries && failed)
-        {
-            state = State.Enqueued;
-            job.RetriedTimes += 1;
-            job.HandlerType = null;
-        }
-
-        job.CurrentState = state;
+        var state = job.CurrentState;
         job.CancellationMode = CancellationMode.None;
         job.CurrentWorkerId = null;
         job.LastKeepAlive = null;
@@ -440,7 +468,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             job.ExpireAt = now.Add(_configuration.JobExpirationTimeout);
             AddCounters(context, "stats:succeeded", $"stats:succeeded:{hourSuffix}");
         }
-        else if (state == State.Failed && job.RetriedTimes >= job.MaxRetries)
+        else if (state == State.Failed)
         {
             AddCounters(context, "stats:failed", $"stats:failed:{hourSuffix}");
         }

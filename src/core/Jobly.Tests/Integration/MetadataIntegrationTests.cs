@@ -1,5 +1,5 @@
-using System.Text.Json;
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Handlers;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Tests.Fixtures;
@@ -28,7 +28,7 @@ public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
         // Verify metadata was persisted to DB
         var job = await Server.GetJob(jobId);
         job.Metadata.ShouldNotBeNull();
-        var metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(job.Metadata)!;
+        var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
         metadata["test-key"].ShouldBe("test-value");
         metadata["source"].ShouldBe("publish-pipeline");
 
@@ -58,7 +58,7 @@ public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
         foreach (var child in childJobs)
         {
             child.Metadata.ShouldNotBeNull();
-            var childMetadata = JsonSerializer.Deserialize<Dictionary<string, string>>(child.Metadata)!;
+            var childMetadata = MetadataSerializer.Deserialize(child.Metadata)!;
             childMetadata["test-key"].ShouldBe("test-value");
         }
     }
@@ -82,7 +82,7 @@ public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
         foreach (var child in childJobs)
         {
             child.Metadata.ShouldNotBeNull();
-            var childMetadata = JsonSerializer.Deserialize<Dictionary<string, string>>(child.Metadata)!;
+            var childMetadata = MetadataSerializer.Deserialize(child.Metadata)!;
             childMetadata["test-key"].ShouldBe("test-value");
         }
     }

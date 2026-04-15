@@ -229,7 +229,7 @@ public class Publisher<TContext> : IPublisher
         string? queue,
         Guid? parentId,
         string? mutex = null,
-        Dictionary<string, string>? adHocMetadata = null)
+        Dictionary<string, object>? adHocMetadata = null)
         where T : class, IJob
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;
@@ -301,15 +301,15 @@ public class Publisher<TContext> : IPublisher
         return _context.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<PublishContext<T>> RunPublishPipeline<T>(T job, Dictionary<string, string>? seed, CancellationToken ct)
+    private async Task<PublishContext<T>> RunPublishPipeline<T>(T job, Dictionary<string, object>? seed, CancellationToken ct)
     {
-        var metadata = new Dictionary<string, string>();
+        var metadata = new Dictionary<string, object>();
 
         // Seed with inherited metadata from parent execution context
         var executionContext = JobExecutionContext.Current;
         if (executionContext?.MetadataJson != null)
         {
-            var inherited = JsonSerializer.Deserialize<Dictionary<string, string>>(executionContext.MetadataJson);
+            var inherited = JsonSerializer.Deserialize<Dictionary<string, object>>(executionContext.MetadataJson);
             if (inherited != null)
             {
                 foreach (var kvp in inherited)
@@ -348,7 +348,7 @@ public class Publisher<TContext> : IPublisher
         return context;
     }
 
-    private static string? SerializeMetadata(Dictionary<string, string> metadata)
+    private static string? SerializeMetadata(Dictionary<string, object> metadata)
     {
         return metadata.Count > 0 ? JsonSerializer.Serialize(metadata) : null;
     }
