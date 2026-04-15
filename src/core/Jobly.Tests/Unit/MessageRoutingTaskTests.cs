@@ -23,7 +23,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
     private static IServiceScopeFactory BuildScopeFactory()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(MessageRoutingTaskTestsBase).Assembly);
+        services.AddHandlers(typeof(MessageRoutingTaskTestsBase).Assembly);
         services.AddSingleton<MultiHandlerCounter>();
         var provider = services.BuildServiceProvider();
         return provider.GetRequiredService<IServiceScopeFactory>();

@@ -72,7 +72,7 @@ await context.Database.EnsureCreatedAsync();
 ```csharp
 // Publisher only — for apps that create jobs but don't process them
 builder.Services.AddJobly<AppDbContext>();
-builder.Services.AddJobHandlers(typeof(Program).Assembly);
+builder.Services.AddHandlers(typeof(Program).Assembly);
 ```
 
 :::tip TimeProvider

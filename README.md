@@ -58,7 +58,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 });
 
 // Scan assembly for IJobHandler<T> and IMessageHandler<T> implementations
-builder.Services.AddJobHandlers(typeof(Program).Assembly);
+builder.Services.AddHandlers(typeof(Program).Assembly);
 
 var app = builder.Build();
 

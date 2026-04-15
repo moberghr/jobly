@@ -54,7 +54,7 @@ public abstract class PipelineTestsBase : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(PipelineTestsBase).Assembly);
+        services.AddHandlers(typeof(PipelineTestsBase).Assembly);
         services.AddPipelineBehaviors(typeof(PipelineTestsBase).Assembly);
         services.AddLogging(builder => builder.AddProvider(new JobLoggerProvider()));
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
