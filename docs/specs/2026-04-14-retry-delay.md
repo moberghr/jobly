@@ -1,129 +1,55 @@
-# Spec: Retry as External Pipeline Module
+# Spec: Retry as External Pipeline Module + Typed Metadata
 
-## Problem
+## Delivered
 
-1. Retry logic is hardcoded in the worker. Not configurable, composable, or extensible.
-2. When a job fails with retries, `ScheduleTime` isn't updated — same worker retries immediately.
+### Problem
+1. Retry logic was hardcoded in the worker — not configurable, composable, or extensible.
+2. Failed jobs retried immediately on the same worker with no delay.
+3. Metadata was `Dictionary<string, string>` — stringly typed, no type safety.
+4. Handler and worker shared a DbContext — handler's partial changes leaked on failure.
 
-## Solution
+### Solution
 
-Retries become an opt-in module built on generic Jobly primitives. Jobly Core has zero retry knowledge.
+**Retry as pipeline module:** `AddJoblyRetry()` registers `RetryPipelineBehavior` (catches failures, reads typed metadata, sets `FailureOutcome`) and `RetryPublishBehavior` (injects retry config at publish time). Jobly Core has zero retry knowledge.
 
-### Jobly Core: Generic Failure Outcome
+**Typed metadata:** `IJobMetadata` marker interface + source generator produces `Dictionary<string, object>` subclasses with typed property accessors. `IJobContext<T>` provides typed access via open generic DI. `MetadataSerializer` uses a custom `JsonConverter` for native types.
 
-Core provides a generic mechanism for pipeline behaviors to influence failure handling:
+**Worker scope isolation:** Worker and handler use separate DI scopes. Handler's DbContext changes are committed on success (outbox), discarded on failure.
 
-```csharp
-public class JobFailureOutcome
-{
-    public State State { get; init; }
-    public DateTime? ScheduleTime { get; init; }
-    public int RetriedTimesIncrement { get; init; }
-    public bool ClearHandlerType { get; init; }
-}
+### Architecture
 
-// Added to existing IJobContext
-public interface IJobContext : IJobMetadata
-{
-    Guid JobId { get; }
-    Guid TraceId { get; }
-    int RetriedTimes { get; }                          // NEW
-    JobFailureOutcome? FailureOutcome { get; set; }    // NEW
-}
+```
+Publish: RetryPublishBehavior → metadata["MaxRetries"] = 3
+
+Execute: workerScope creates handlerScope
+  → RetryPipelineBehavior wraps handler (IJobContext<IRetryMetadata>)
+    → Handler runs
+    ← Handler throws
+  ← RetryPipelineBehavior: meta.RetriedTimes++, sets FailureOutcome
+  Worker reads FailureOutcome, serializes metadata, saves
+  handlerScope disposed
 ```
 
-Worker reads `FailureOutcome` after handler failure and applies it mechanically. No retry concepts.
-
-### Retry Module: Opt-in via `AddJoblyRetry`
+### User API
 
 ```csharp
+// Registration
 services.AddJoblyWorker<AppDbContext>();
-services.AddJoblyRetry(config =>
+services.AddJoblyRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; });
+
+// Custom typed metadata (source-generated)
+public partial interface IOrderMetadata : IJobMetadata
 {
-    config.MaxRetries = 3;
-    config.Delays = [15, 60, 300];
-});
-```
+    string CustomerName { get; set; }
+    int Priority { get; set; }
+}
 
-The module provides:
-- **`RetryOptions`** — `MaxRetries`, `Delays` (int[] of seconds, last reused)
-- **`RetryPublishBehavior<T>`** — `IPublishPipelineBehavior<T>` that injects `$maxRetries` and `$retryDelays` into metadata from `RetryOptions`
-- **`RetryPipelineBehavior<TReq, TRes>`** — `IPipelineBehavior` that catches handler failures, reads metadata, sets `FailureOutcome`
-- **`AddJoblyRetry()`** — extension method registering both behaviors + options
-
-### Metadata Convention
-
-| Key | Type | Set by |
-|-----|------|--------|
-| `$maxRetries` | string (int) | RetryPublishBehavior or user's publish pipeline |
-| `$retryDelays` | string (JSON int[]) | RetryPublishBehavior or user's publish pipeline |
-
-`$`-prefixed keys are not inherited by child jobs (Publisher skips them in `RunPublishPipeline`).
-
-### User Customization
-
-**Per job type (override global config):**
-```csharp
-public class OrderRetryPolicy : IPublishPipelineBehavior<ProcessOrder>
+// Handler with typed access
+public class MyHandler(IJobContext<IOrderMetadata> ctx) : IJobHandler<MyJob>
 {
-    public Task HandleAsync(PublishContext<ProcessOrder> ctx,
-        PublishPipelineDelegate next, CancellationToken ct)
+    public Task HandleAsync(MyJob msg, CancellationToken ct)
     {
-        ctx.Metadata["$maxRetries"] = "5";
-        ctx.Metadata["$retryDelays"] = "[10, 30, 60]";
-        return next();
+        ctx.Metadata.CustomerName = "John";  // typed, writes to dict
     }
 }
 ```
-
-**Custom failure handling (replace retry behavior entirely):**
-```csharp
-public class MyFailureHandler<TReq, TRes> : IPipelineBehavior<TReq, TRes>
-    where TReq : IRequest<TRes>
-{
-    private readonly IJobContext _ctx;
-    public async Task<TRes> HandleAsync(TReq req, RequestHandlerDelegate<TRes> next, CancellationToken ct)
-    {
-        try { return await next(); }
-        catch (Exception) when (req is IJob)
-        {
-            _ctx.FailureOutcome = new JobFailureOutcome
-            {
-                State = State.Enqueued,
-                ScheduleTime = DateTime.UtcNow.AddMinutes(5),
-                RetriedTimesIncrement = 1,
-                ClearHandlerType = true,
-            };
-            throw;
-        }
-    }
-}
-```
-
-### Worker Changes
-
-- Remove hardcoded retry logic from `UpdateJobState` (the `RetriedTimes < MaxRetries` block)
-- In catch block: read `jobContext.FailureOutcome`, apply or default to Failed
-- Set `jobContext.RetriedTimes` before handler execution
-- `UpdateJobState` becomes pure finalization (counters, logs, cleanup based on resulting state)
-
-### Breaking Change
-
-Existing users with `RetryCount > 0` on `JoblyConfiguration` will need to add `AddJoblyRetry()` for retries to work. The `MaxRetries` column is still written by the publisher but no longer read by the worker for retry decisions.
-
-## Change Manifest
-
-| File | Change | New? |
-|------|--------|------|
-| `src/core/Jobly.Core/Handlers/JobFailureOutcome.cs` | Generic failure outcome POCO | Yes |
-| `src/core/Jobly.Core/Handlers/IJobContext.cs` | Add `RetriedTimes`, `FailureOutcome` | |
-| `src/core/Jobly.Core/Publisher.cs` | Skip `$` keys during metadata inheritance | |
-| `src/core/Jobly.Worker/Retry/RetryOptions.cs` | Retry configuration | Yes |
-| `src/core/Jobly.Worker/Retry/RetryPublishBehavior.cs` | Injects metadata from config | Yes |
-| `src/core/Jobly.Worker/Retry/RetryPipelineBehavior.cs` | Catches failures, sets FailureOutcome | Yes |
-| `src/core/Jobly.Worker/Retry/RetryServiceConfiguration.cs` | `AddJoblyRetry()` extension | Yes |
-| `src/core/Jobly.Worker/JoblyWorkerService.cs` | Read outcome; remove retry logic; refactor UpdateJobState | |
-| `src/core/Jobly.Worker/JoblyDispatcherWorker.cs` | Same | |
-| `src/core/Jobly.Tests/Unit/RetryTests.cs` | Register retry module; update + add tests | |
-| `src/core/Jobly.Tests/Integration/RetryIntegrationTests.cs` | New tests | |
-| `src/core/Jobly.Tests/Integration/JoblyTestServer.cs` | Register retry module | |

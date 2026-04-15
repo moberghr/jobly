@@ -8,44 +8,107 @@ Jobly provides three extension points for addons:
 
 1. **`IPublishPipelineBehavior<T>`** — runs at publish time, can modify job metadata
 2. **`IPipelineBehavior<TRequest, TResponse>`** — wraps handler execution, can catch exceptions and influence failure handling
-3. **`IJobContext.Metadata`** — mutable dictionary available during handler execution, persisted back to the database on failure
+3. **`IJobContext` / `IJobContext<T>`** — mutable metadata dictionary available during handler execution, with optional typed views via source-generated interfaces
 
 The worker is a generic state machine. On handler failure, it reads `IJobContext.FailureOutcome` and applies whatever state the pipeline decided. If no pipeline set an outcome, the job is marked as `Failed`.
 
 ```
 Publish time:                         Execution time:
-  Publisher                             Worker
-    → IPublishPipelineBehavior<T>         → IPipelineBehavior<TReq, TRes>
-    → Metadata persisted to DB                → Handler
-                                              ← Exception
-                                          ← Behavior sets FailureOutcome + modifies Metadata
-                                        Worker reads FailureOutcome, serializes Metadata, saves
+  Publisher                             Worker (workerScope)
+    → IPublishPipelineBehavior<T>         creates handlerScope
+    → Metadata persisted to DB              → IPipelineBehavior<TReq, TRes>
+                                                → Handler
+                                                ← Exception
+                                            ← Behavior sets FailureOutcome + modifies Metadata
+                                          Worker reads FailureOutcome, serializes Metadata, saves
+                                          handlerScope disposed (handler's DbContext changes discarded on failure)
+```
+
+Metadata is always serialized back — on both success and failure paths. Any changes made to `IJobContext.Metadata` by pipeline behaviors or handlers are persisted to the database.
+
+## Metadata System
+
+### Raw Dictionary Access
+
+`IJobContext.Metadata` is a `Dictionary<string, object>` with native types:
+
+```csharp
+// Writing
+ctx.Metadata["Priority"] = 5;           // int
+ctx.Metadata["CustomerName"] = "John";   // string
+ctx.Metadata["Tags"] = new[] { "vip" };  // int[]
+
+// Reading
+var priority = (int)(long)ctx.Metadata["Priority"];  // JSON numbers are long
+```
+
+The `MetadataSerializer` uses a custom `JsonConverter` that deserializes JSON values as native .NET types (`string`, `long`, `double`, `bool`, `List<object>`, `Dictionary<string, object>`). No `JsonElement` anywhere.
+
+### Typed Metadata via Source Generator
+
+Define an interface extending `IJobMetadata`. The source generator produces an implementation class that extends `Dictionary<string, object>` with typed property accessors:
+
+```csharp
+// Define the interface — source generator produces the implementation
+public partial interface IOrderMetadata : IJobMetadata
+{
+    string CustomerName { get; set; }
+    int Priority { get; set; }
+}
+
+// Handler injects typed context
+public class ProcessOrderHandler(IJobContext<IOrderMetadata> ctx) : IJobHandler<ProcessOrder>
+{
+    public Task HandleAsync(ProcessOrder msg, CancellationToken ct)
+    {
+        ctx.Metadata.CustomerName = "John";   // typed property → writes to dict
+        ctx.Metadata["Priority"];              // raw dict access → same value
+    }
+}
+```
+
+The typed view IS the dictionary — property writes go directly to the underlying `Dictionary<string, object>`. No sync, no flush, no copy.
+
+**Registration:** `IJobContext<T>` is registered as an open generic in `AddJobly()`. No per-type registration needed. Just inject `IJobContext<IYourMetadata>` and it works.
+
+**Nullable properties:** Use `int?` for properties where "not set" must be distinguishable from `0`:
+
+```csharp
+public partial interface IMyMetadata : IJobMetadata
+{
+    int? MaxRetries { get; set; }  // null = not set, 0 = explicitly zero
+}
 ```
 
 ## How Retries Are Implemented
 
 The retry module (`AddJoblyRetry`) is built entirely on these primitives. No Jobly core code knows about retries.
 
+### IRetryMetadata
+
+```csharp
+public partial interface IRetryMetadata : IJobMetadata
+{
+    int? MaxRetries { get; set; }
+    int RetriedTimes { get; set; }
+    int[]? RetryDelays { get; set; }
+}
+```
+
 ### Publish Pipeline: RetryPublishBehavior
 
-At publish time, injects `$maxRetries` and `$retryDelays` into the job's metadata from `RetryOptions`:
+At publish time, injects `MaxRetries` and `RetryDelays` into the job's metadata from `RetryOptions`:
 
 ```csharp
 public class RetryPublishBehavior<T> : IPublishPipelineBehavior<T>
 {
-    private readonly IOptions<RetryOptions> _options;
-
     public Task PublishAsync(PublishContext<T> context, PublishDelegate next, CancellationToken ct)
     {
-        if (!context.Metadata.ContainsKey("$maxRetries"))
-        {
-            context.Metadata["$maxRetries"] = _options.Value.MaxRetries.ToString();
-        }
+        if (!context.Metadata.ContainsKey("MaxRetries"))
+            context.Metadata["MaxRetries"] = _options.Value.MaxRetries;
 
-        if (_options.Value.Delays.Length > 0 && !context.Metadata.ContainsKey("$retryDelays"))
-        {
-            context.Metadata["$retryDelays"] = JsonSerializer.Serialize(_options.Value.Delays);
-        }
+        if (_options.Value.Delays.Length > 0 && !context.Metadata.ContainsKey("RetryDelays"))
+            context.Metadata["RetryDelays"] = _options.Value.Delays;
 
         return next();
     }
@@ -56,40 +119,34 @@ Uses `ContainsKey` so user-registered `IPublishPipelineBehavior<T>` can override
 
 ### Handler Pipeline: RetryPipelineBehavior
 
-Wraps handler execution. On failure, reads retry config from metadata and decides whether to re-enqueue:
+Wraps handler execution. On failure, reads retry config from typed metadata and decides whether to re-enqueue:
 
 ```csharp
-public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IRequest<TResponse>
+public class RetryPipelineBehavior<TRequest, TResponse>(
+    IJobContext<IRetryMetadata> jobContext,
+    IOptions<RetryOptions> options,
+    TimeProvider timeProvider) : IPipelineBehavior<TRequest, TResponse>
 {
     public async Task<TResponse> HandleAsync(TRequest request,
-        RequestHandlerDelegate<TRequest, TResponse> next, CancellationToken cancellationToken)
+        RequestHandlerDelegate<TRequest, TResponse> next, CancellationToken ct)
     {
-        try
-        {
-            return await next(request, cancellationToken);
-        }
+        try { return await next(request, ct); }
         catch (Exception) when (request is IJob)
         {
-            var metadata = _jobContext.Metadata;
-            var maxRetries = TryGetInt(metadata, "$maxRetries") ?? _options.Value.MaxRetries;
-            var retriedTimes = TryGetInt(metadata, "$retriedTimes") ?? 0;
+            var meta = jobContext.Metadata;
+            var maxRetries = meta.MaxRetries ?? options.Value.MaxRetries;
 
-            if (retriedTimes < maxRetries)
+            if (meta.RetriedTimes < maxRetries)
             {
-                // Write updated count directly to metadata
-                _jobContext.Metadata["$retriedTimes"] = (retriedTimes + 1).ToString();
-
-                // Tell the worker to re-enqueue with a delay
-                _jobContext.FailureOutcome = new JobFailureOutcome
+                meta.RetriedTimes++;
+                jobContext.FailureOutcome = new JobFailureOutcome
                 {
                     State = State.Enqueued,
-                    ScheduleTime = ComputeScheduleTime(retriedTimes),
+                    ScheduleTime = ComputeScheduleTime(meta),
                     ClearHandlerType = true,
                 };
             }
-
-            throw; // always re-throw — worker reads FailureOutcome
+            throw;
         }
     }
 }
@@ -97,7 +154,7 @@ public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
 
 Key points:
 - `when (request is IJob)` — only runs for persistent jobs, not in-memory requests
-- Writes `$retriedTimes` directly to `_jobContext.Metadata` — the worker serializes it back
+- Modifies `meta.RetriedTimes` directly — writes to the underlying dictionary
 - Sets `FailureOutcome` — the worker applies state, schedule time, and metadata changes
 - Always re-throws — the worker's catch block handles persistence
 
@@ -106,125 +163,100 @@ Key points:
 The worker has zero retry knowledge. On exception:
 
 ```csharp
-catch (Exception e)
+var outcome = jobContext.FailureOutcome;
+if (outcome != null)
 {
-    var jobCtx = scope.ServiceProvider.GetRequiredService<JobContext>();
-    var outcome = jobCtx.FailureOutcome;
-
-    if (outcome != null)
-    {
-        job.CurrentState = outcome.State;
-        if (outcome.ClearHandlerType) job.HandlerType = null;
-        if (outcome.ScheduleTime != null) job.ScheduleTime = outcome.ScheduleTime.Value;
-        job.Metadata = JsonSerializer.Serialize(jobCtx.Metadata); // persist metadata changes
-    }
-    else
-    {
-        job.CurrentState = State.Failed;
-    }
-
-    FinalizeJobState(context, job, e, durationMs); // counters, logs, cleanup
+    job.CurrentState = outcome.State;
+    if (outcome.ClearHandlerType) job.HandlerType = null;
+    if (outcome.ScheduleTime != null) job.ScheduleTime = outcome.ScheduleTime.Value;
+    job.Metadata = JsonSerializer.Serialize(jobCtx.Metadata);
+}
+else
+{
+    job.CurrentState = State.Failed;
 }
 ```
 
 The worker applies whatever the pipeline decided. It doesn't know if the outcome came from retry, circuit breaking, rate limiting, or any other addon.
 
-Metadata is always serialized back — on both success and failure paths. Any changes made to `IJobContext.Metadata` by pipeline behaviors or handlers are persisted to the database.
+### Worker Scope Isolation
+
+The worker and handler use separate DI scopes:
+- **Worker scope** — owns Jobly state (Job entity, JobLog, Counter). Only Jobly entities are saved here.
+- **Handler scope** — handler + pipeline behaviors get their own DbContext. If the handler throws, the scope is disposed and its change tracker is discarded. No partial handler work leaks into the worker's save.
+
+On success, the worker commits the handler's DbContext (outbox pattern: business entities + published child jobs), then commits Jobly state.
 
 ## Building Your Own Addon
 
 ### Example: Dead Letter Queue
 
-An addon that moves permanently failed jobs to a dead letter queue instead of marking them as Failed:
-
 ```csharp
-// 1. Options
-public class DeadLetterOptions
+// 1. Typed metadata
+public partial interface IDeadLetterMetadata : IJobMetadata
 {
-    public string Queue { get; set; } = "dead-letter";
+    string? DeadLetterQueue { get; set; }
+    string? OriginalQueue { get; set; }
 }
 
-// 2. Publish behavior — tag jobs for dead letter processing
-public class DeadLetterPublishBehavior<T> : IPublishPipelineBehavior<T>
-{
-    public Task PublishAsync(PublishContext<T> context, PublishDelegate next, CancellationToken ct)
-    {
-        context.Metadata["$deadLetterQueue"] = _options.Value.Queue;
-        return next();
-    }
-}
-
-// 3. Handler behavior — on permanent failure, re-enqueue to dead letter queue
-public class DeadLetterBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IRequest<TResponse>
+// 2. Handler behavior — on permanent failure, re-enqueue to dead letter queue
+public class DeadLetterBehavior<TRequest, TResponse>(
+    IJobContext<IDeadLetterMetadata> ctx,
+    TimeProvider timeProvider) : IPipelineBehavior<TRequest, TResponse>
 {
     public async Task<TResponse> HandleAsync(TRequest request,
-        RequestHandlerDelegate<TRequest, TResponse> next, CancellationToken cancellationToken)
+        RequestHandlerDelegate<TRequest, TResponse> next, CancellationToken ct)
     {
-        try { return await next(request, cancellationToken); }
-        catch (Exception) when (request is IJob && _jobContext.FailureOutcome == null)
+        try { return await next(request, ct); }
+        catch (Exception) when (request is IJob && ctx.FailureOutcome == null)
         {
-            // Only act if no other behavior (e.g. retry) already handled it
-            var dlq = _jobContext.Metadata.GetValueOrDefault("$deadLetterQueue");
+            var dlq = ctx.Metadata.DeadLetterQueue;
             if (dlq != null)
             {
-                _jobContext.FailureOutcome = new JobFailureOutcome
+                ctx.Metadata.OriginalQueue = "default";
+                ctx.FailureOutcome = new JobFailureOutcome
                 {
                     State = State.Enqueued,
-                    ScheduleTime = _timeProvider.GetUtcNow().UtcDateTime,
+                    ScheduleTime = timeProvider.GetUtcNow().UtcDateTime,
                     ClearHandlerType = true,
                 };
-                _jobContext.Metadata["$originalQueue"] = _jobContext.Metadata.GetValueOrDefault("queue", "default");
-                // Worker will serialize this metadata back and re-enqueue
             }
             throw;
         }
     }
 }
 
-// 4. Registration
-public static IServiceCollection AddDeadLetterQueue(this IServiceCollection services,
-    Action<DeadLetterOptions>? configure = null)
+// 3. Registration
+public static IServiceCollection AddDeadLetterQueue(this IServiceCollection services)
 {
-    if (configure != null) services.Configure(configure);
-    else services.AddOptions<DeadLetterOptions>();
-
-    services.AddTransient(typeof(IPublishPipelineBehavior<>), typeof(DeadLetterPublishBehavior<>));
+    services.TryAddScoped(typeof(IJobContext<>), typeof(JobContext<>));
     services.AddTransient(typeof(IPipelineBehavior<,>), typeof(DeadLetterBehavior<,>));
     return services;
 }
 ```
 
-### Metadata Conventions
-
-| Convention | Meaning |
-|-----------|---------|
-| `$` prefix | Reserved for infrastructure/addon metadata. Not inherited by child jobs. |
-| `ContainsKey` check | Publish behaviors use `ContainsKey` before setting — lets per-type behaviors override. |
-| `FailureOutcome == null` check | Handler behaviors check if another behavior already set an outcome before overriding. |
-
 ### FailureOutcome Properties
 
 | Property | Type | Purpose |
 |----------|------|---------|
-| `State` | `State` | Target state for the job (e.g., `Enqueued` for retry, `Failed` for permanent failure) |
-| `ScheduleTime` | `DateTime?` | When the job should become eligible for execution again. Null = keep current. |
+| `State` | `State` | Target state (e.g., `Enqueued` for retry/DLQ, `Failed` for permanent failure) |
+| `ScheduleTime` | `DateTime?` | When the job becomes eligible for execution again. Null = keep current. |
 | `ClearHandlerType` | `bool` | Whether to clear the cached handler type (needed for re-dispatch). |
 
 ### Pipeline Ordering
 
-Pipeline behaviors execute as nested middleware (onion model). The last registered behavior is the outermost wrapper. For addons that compose (e.g., retry + dead letter):
+Pipeline behaviors execute as nested middleware (onion model). The last registered behavior is the outermost wrapper:
 
 ```csharp
 // Dead letter wraps retry — catches permanent failures after retry gives up
 services.AddJoblyRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; });
-services.AddDeadLetterQueue(o => { o.Queue = "dead-letter"; });
+services.AddDeadLetterQueue();
 ```
 
-The dead letter behavior checks `_jobContext.FailureOutcome == null` before acting, so it only kicks in when retry didn't handle the failure.
+The dead letter behavior checks `ctx.FailureOutcome == null` before acting, so it only kicks in when retry didn't handle the failure.
 
 ### Performance Notes
 
 - **Success path**: Pipeline behaviors add zero overhead. The `try { return await next(...); }` pattern has no allocations. The `catch (Exception) when (request is IJob)` filter is only evaluated when an exception is thrown.
-- **Failure path**: Metadata reads are dictionary lookups (nanoseconds). JSON deserialization of `$retryDelays` only happens if the key exists. The worker serializes metadata back once per failure.
+- **Failure path**: Typed metadata property access is a dictionary lookup + type conversion (nanoseconds). The worker serializes metadata back once per failure.
 - **No hot path impact**: The worker's fetch-execute-complete cycle is unchanged. Pipeline behaviors run inside `ExecuteJob`, not in the fetch or commit phases.
