@@ -28,7 +28,7 @@ public abstract class AuditFixRound2TestsBase : IAsyncLifetime
     /// RequeueJob on a Processing job should not set it to Enqueued (would cause double execution).
     /// It should either refuse or treat it as cancellation.
     /// </summary>
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_WhenProcessing_DoesNotSetEnqueued()
     {
         var ctx = _fixture.CreateContext();
@@ -60,7 +60,7 @@ public abstract class AuditFixRound2TestsBase : IAsyncLifetime
     /// When a parent is Deleted, its Awaiting children should be cleaned up (Deleted).
     /// Otherwise they can never run.
     /// </summary>
-    [Fact]
+    [TimedFact]
     public async Task Orchestration_WhenParentDeleted_AwaitingChildrenAreFailed()
     {
         var ctx = _fixture.CreateContext();
@@ -103,7 +103,7 @@ public abstract class AuditFixRound2TestsBase : IAsyncLifetime
     /// When a parent fails with OnlyOnSucceeded, Awaiting continuations stay Awaiting.
     /// The parent could be requeued and succeed later.
     /// </summary>
-    [Fact]
+    [TimedFact]
     public async Task Orchestration_WhenParentFailedOnlyOnSucceeded_AwaitingContinuationsAreDeleted()
     {
         var ctx = _fixture.CreateContext();

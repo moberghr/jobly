@@ -34,7 +34,7 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
         return 0;
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenFailingJobWithThreeRetries_WhenProcessed_ThenRetriesThreeTimesThenFails()
     {
         var publisher = Server.CreatePublisher();
@@ -65,7 +65,7 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
         failedLogs.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenFailingJobWithZeroRetries_WhenProcessed_ThenFailsImmediately()
     {
         var publisher = Server.CreatePublisher();
@@ -99,7 +99,7 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
         failedLogs.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenFailingJobWithRetries_WhenProcessed_ThenScheduleTimeUpdatedOnRetry()
     {
         var publisher = Server.CreatePublisher();

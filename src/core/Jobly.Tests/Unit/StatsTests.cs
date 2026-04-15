@@ -18,7 +18,7 @@ public abstract class StatsTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task GetStatsHistory_ReturnsHourlyData()
     {
         // Arrange
@@ -36,7 +36,7 @@ public abstract class StatsTestsBase : IAsyncLifetime
         history.ShouldContain(p => p.Succeeded >= 5);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJoblyStatus_ReturnsCorrectCounts()
     {
         // Arrange
@@ -90,7 +90,7 @@ public abstract class StatsTestsBase : IAsyncLifetime
         status.Total.ShouldBe(6);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetServers_ReturnsRegisteredServers()
     {
         // Arrange

@@ -7,7 +7,7 @@ namespace Jobly.Tests.Unit;
 
 public class MediatorTests
 {
-    [Fact]
+    [TimedFact]
     public async Task Send_WithRequestHandler_ReturnsResponse()
     {
         var services = new ServiceCollection();
@@ -21,7 +21,7 @@ public class MediatorTests
         result.ShouldBe("Hello, Jobly!");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Send_WithNoHandler_ThrowsInvalidOperationException()
     {
         var services = new ServiceCollection();
@@ -34,7 +34,7 @@ public class MediatorTests
             () => mediator.Send(new GetGreetingRequest { Name = "Jobly" }));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Send_WithPipelineBehavior_ExecutesPipeline()
     {
         var log = new List<string>();
@@ -53,7 +53,7 @@ public class MediatorTests
         log.ShouldBe(["before", "after"]);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CreateStream_WithStreamHandler_ReturnsItems()
     {
         var services = new ServiceCollection();
@@ -71,7 +71,7 @@ public class MediatorTests
         items.ShouldBe([0, 1, 2, 3, 4]);
     }
 
-    [Fact]
+    [TimedFact]
     public void CreateStream_WithNoHandler_ThrowsInvalidOperationException()
     {
         var services = new ServiceCollection();
@@ -84,7 +84,7 @@ public class MediatorTests
             () => mediator.CreateStream(new GetNumbersStreamRequest { Count = 1 }));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CreateStream_WithPipelineBehavior_ExecutesPipeline()
     {
         var log = new List<string>();
@@ -107,7 +107,7 @@ public class MediatorTests
         log.ShouldBe(["before", "after"]);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CreateStream_WithCancellation_StopsEnumeration()
     {
         var services = new ServiceCollection();
@@ -134,7 +134,7 @@ public class MediatorTests
         items.Count.ShouldBe(3);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CreateStream_WithEmptyStream_ReturnsNoItems()
     {
         var services = new ServiceCollection();
@@ -152,7 +152,7 @@ public class MediatorTests
         items.ShouldBeEmpty();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CreateStream_WithMultipleBehaviors_ExecutesInOrder()
     {
         var log = new List<string>();
@@ -177,7 +177,7 @@ public class MediatorTests
         log.ShouldBe(["outer:before", "inner:before", "inner:after", "outer:after"]);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CreateStream_WithHandlerException_PropagatesException()
     {
         var services = new ServiceCollection();
@@ -199,7 +199,7 @@ public class MediatorTests
         items.ShouldBe([0, 1]);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CreateStream_WithRequestPipelineBehavior_ExecutesBehavior()
     {
         var log = new List<string>();

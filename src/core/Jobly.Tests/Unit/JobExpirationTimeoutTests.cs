@@ -20,7 +20,7 @@ public abstract class JobExpirationTimeoutTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_UsesConfiguredExpirationTimeout()
     {
         // Arrange
@@ -54,7 +54,7 @@ public abstract class JobExpirationTimeoutTestsBase : IAsyncLifetime
         job.ExpireAt.Value.ShouldBeLessThanOrEqualTo(after.AddHours(2).AddSeconds(1));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_DefaultTimeout_ExpiresInOneDay()
     {
         // Arrange

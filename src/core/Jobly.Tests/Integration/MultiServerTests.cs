@@ -18,7 +18,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenManyJobs_WithTwoServers_ThenEachJobProcessedExactlyOnce()
     {
         var publisher = Server1.CreatePublisher();
@@ -67,7 +67,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenMessages_WithTwoServers_ThenEachRoutedExactlyOnce()
     {
         var publisher = Server1.CreatePublisher();
@@ -102,7 +102,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenMultiHandlerMessage_WithTwoServers_ThenCorrectChildCount()
     {
         var publisher = Server1.CreatePublisher();
@@ -135,7 +135,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenBatch_WithTwoServers_ThenBatchCompletesCorrectly()
     {
         var batchPublisher = Server1.CreateBatchPublisher();
@@ -186,7 +186,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         continuationChildren.ShouldAllBe(x => x.CurrentState == State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenContinuations_WithTwoServers_ThenContinuationsActivateAndExecute()
     {
         var publisher = Server1.CreatePublisher();
@@ -223,7 +223,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenMutexJobs_WithTwoServers_ThenMutexEnforcedAcrossServers()
     {
         // Enqueue a slow job that holds the mutex — published via Server1
@@ -256,7 +256,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         await Server1.WaitForJobState(job1Id, State.Deleted, timeout: TimeSpan.FromSeconds(15));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenComplexWorkload_WithTwoServers_ThenAllReachTerminalState()
     {
         var publisher = Server1.CreatePublisher();
@@ -377,7 +377,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         statsFailed.ShouldBe(failedJobs, "stats:failed should match failed job count");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenPausedServer_WithTwoServers_ThenOtherServerProcessesJobs()
     {
         // Get Server1's worker group and pause it

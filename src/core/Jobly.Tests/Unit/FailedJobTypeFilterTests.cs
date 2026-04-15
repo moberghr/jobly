@@ -21,7 +21,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task GetFailedJobTypeCounts_ReturnsCorrectGroupings()
     {
         // Arrange
@@ -80,7 +80,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
         result[2].Count.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetFailedJobTypeCounts_ExcludesNonFailedJobs()
     {
         // Arrange
@@ -131,7 +131,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
         result[0].Count.ShouldBe(3);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetFailedJobsByType_ReturnsOnlyMatchingType()
     {
         // Arrange
@@ -176,7 +176,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
         result.Items.ShouldAllBe(j => j.Type == "TypeA");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteFailedJobsByType_DeletesAllMatchingJobs()
     {
         // Arrange
@@ -230,7 +230,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
         remainingTypeB.ShouldBe(3);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueFailedJobsByType_RequeuesAllMatchingJobs()
     {
         // Arrange

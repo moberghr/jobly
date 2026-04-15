@@ -15,7 +15,7 @@ public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenFiftyCounterJobs_WithFiveWorkers_ThenAllProcessedExactlyOnce()
     {
         // The test server runs with 5 workers. Enqueue 50 counter jobs.
@@ -55,7 +55,7 @@ public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenSingleJob_WithFiveWorkers_ThenOnlyOneProcessesIt()
     {
         var publisher = Server.CreatePublisher();
@@ -79,7 +79,7 @@ public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
         completedLogs.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenFiveMessages_WithFiveWorkers_ThenAllRoutedExactlyOnce()
     {
         var publisher = Server.CreatePublisher();

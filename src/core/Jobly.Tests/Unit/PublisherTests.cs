@@ -27,7 +27,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         return new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Publish_CreatesMessageKindJobWithEnqueuedState()
     {
         // Arrange
@@ -46,7 +46,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Publish_WithQueue_SetsQueueOnJob()
     {
         // Arrange
@@ -64,7 +64,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.Queue.ShouldBe("critical");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Publish_SetsTraceIdToJobId()
     {
         // Arrange
@@ -82,7 +82,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.TraceId.ShouldBe(job.Id);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_CreatesJobKindJobWithEnqueuedState()
     {
         // Arrange
@@ -101,7 +101,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_WithParentId_SetsParentAndAwaitingState()
     {
         // Arrange
@@ -133,7 +133,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Awaiting);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_CreatesJobLog()
     {
         // Arrange
@@ -151,7 +151,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         logs[0].EventType.ShouldBe("Created");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Schedule_SetsScheduleTime()
     {
         // Arrange
@@ -170,7 +170,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.ScheduleTime.ShouldBeGreaterThan(DateTime.UtcNow.AddHours(1));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_WithParent_InheritsParentTrace_SameContext()
     {
         // Arrange: parent and child created in same context before SaveChanges
@@ -191,7 +191,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         child.TraceId.ShouldBe(parent.TraceId);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_WithParent_InheritsParentTrace_SeparateContext()
     {
         // Arrange: parent already committed to DB
@@ -215,7 +215,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         child.TraceId.ShouldBe(parent.TraceId);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_WithoutParent_GetsOwnTrace()
     {
         // Arrange

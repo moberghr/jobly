@@ -25,7 +25,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
         return new BatchPublisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
     }
 
-    [Fact]
+    [TimedFact]
     public async Task StartNew_CreatesBatchKindJobWithProcessingState()
     {
         // Arrange
@@ -45,7 +45,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
         batch.CurrentState.ShouldBe(State.Processing);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task StartNew_CreatesChildJobsWithEnqueuedState()
     {
         // Arrange
@@ -66,7 +66,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
         children.ShouldAllBe(c => c.CurrentState == State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task StartNew_SetsJobCountOnBatch()
     {
         // Arrange
@@ -85,7 +85,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
         batch.JobCount.ShouldBe(3);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ContinueBatchWith_CreatesBatchWithParentId()
     {
         // Arrange
@@ -110,7 +110,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
         continuation.Kind.ShouldBe(JobKind.Batch);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ContinueBatchWith_ChildrenAreAwaiting()
     {
         // Arrange
@@ -135,7 +135,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
         children.ShouldAllBe(c => c.CurrentState == State.Awaiting);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task StartNew_WithName_SetsTypeField()
     {
         // Arrange
@@ -154,7 +154,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
         batch.Type.ShouldBe("MyBatchName");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ContinueBatchWith_InheritsParentTrace_SameContext()
     {
         // Arrange: parent and continuation batch in same context (not committed yet)
@@ -179,7 +179,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
         children.ShouldAllBe(c => c.TraceId == parent.TraceId);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ContinueBatchWith_InheritsParentTrace_SeparateContext()
     {
         // Arrange: parent already committed
@@ -207,7 +207,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
         children.ShouldAllBe(c => c.TraceId == parent.TraceId);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task StartNew_GetsOwnTrace()
     {
         // Arrange

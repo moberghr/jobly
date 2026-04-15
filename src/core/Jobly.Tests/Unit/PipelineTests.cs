@@ -91,7 +91,7 @@ public abstract class PipelineTestsBase : IAsyncLifetime
             new FakeLockProvider());
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_WithPipelineBehavior_PipelineLogsAppearInJobLogs()
     {
         // Arrange — UnitRequest has LoggingPipelineBehavior registered

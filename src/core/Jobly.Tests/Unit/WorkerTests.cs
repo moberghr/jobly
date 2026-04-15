@@ -94,7 +94,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
         return (worker, scopeFactory);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_EmptyQueue_ReturnsFalse()
     {
         // Arrange
@@ -107,7 +107,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
         result.ShouldBeFalse();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_CompletesJob()
     {
         // Arrange
@@ -140,7 +140,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
         job.HandlerType.ShouldNotBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_FailingJob_MarksFailed()
     {
         // Arrange
@@ -172,7 +172,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Failed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_SkipsFutureScheduledJob()
     {
         // Arrange
@@ -200,7 +200,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
         result.ShouldBeFalse();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_SkipsNonSubscribedQueue()
     {
         // Arrange
@@ -228,7 +228,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
         result.ShouldBeFalse();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_OnlyPicksJobKind()
     {
         // Arrange

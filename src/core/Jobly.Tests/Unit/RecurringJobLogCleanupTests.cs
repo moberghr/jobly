@@ -16,7 +16,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task CleanupRecurringJobLogs_KeepsLast100PerRecurringJob()
     {
         // Arrange: 150 logs for recurring job 1, 50 for recurring job 2
@@ -60,7 +60,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
         rj2Count.ShouldBe(50, "Should keep all 50 for rj2 (under limit)");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CleanupRecurringJobLogs_DeletesOldestEntries()
     {
         // Arrange: 110 logs, verify the 10 oldest are deleted
@@ -103,7 +103,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
         oldest.ShouldBeGreaterThan(newestBefore.AddMinutes(-100), "Oldest surviving entry should be within the last 100");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CleanupRecurringJobLogs_NoLogsDoesNothing()
     {
         var cleanCtx = _fixture.CreateContext();

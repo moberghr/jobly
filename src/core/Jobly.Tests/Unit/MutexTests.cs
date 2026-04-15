@@ -29,7 +29,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
     private static readonly Guid ServerId = Guid.NewGuid();
     private static readonly string[] DefaultQueues = ["default"];
 
-    [Fact]
+    [TimedFact]
     public async Task MutexHeld_SecondJobCancelled()
     {
         // Arrange: two jobs with same concurrency key, first already processing
@@ -87,7 +87,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
         log.Message.ShouldContain("payment:123");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DifferentMutexKeys_BothProcess()
     {
         // Arrange: two jobs with different concurrency keys
@@ -129,7 +129,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
         job2.CurrentState.ShouldNotBe(State.Deleted);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task NoConcurrencyKey_NoMutexCheck()
     {
         // Arrange: job without concurrency key
@@ -159,7 +159,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task MutexFree_JobProcessesNormally()
     {
         // Arrange: job with concurrency key but no other job holds it

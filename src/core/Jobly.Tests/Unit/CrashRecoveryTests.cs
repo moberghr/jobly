@@ -18,7 +18,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueStaleJobs_MultipleStaleJobs_AllRequeued()
     {
         // Arrange — insert 5 stale Processing jobs
@@ -56,7 +56,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueStaleJobs_NonProcessingJobs_NotAffected()
     {
         // Arrange — insert jobs in Completed, Failed, and Enqueued states with old keepalive
@@ -113,7 +113,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         (await readCtx.Set<Job>().FirstAsync(j => j.Id == enqueuedId)).CurrentState.ShouldBe(State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueStaleJobs_StaleJob_RetriedTimesNotIncremented()
     {
         // Arrange
@@ -144,7 +144,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         job.RetriedTimes.ShouldBe(2); // Unchanged
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueStaleJobs_ConcurrentCalls_OnlyOnceRequeued()
     {
         // Arrange
@@ -179,7 +179,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         logs.Count.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CleanUpServers_DeadServerWithProcessingJob_JobStateUnchanged()
     {
         // Arrange
@@ -226,7 +226,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Processing); // Unchanged — StaleJobRecovery handles this
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CleanUpServers_CombinedRecovery_JobsRequeuedAndServerCleaned()
     {
         // Arrange

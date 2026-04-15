@@ -11,7 +11,7 @@ namespace Jobly.Tests.Unit;
 
 public class DistributedLockRegistrationTests
 {
-    [Fact]
+    [TimedFact]
     public void AddJoblyWorker_PostgreSql_ResolvesPostgresLockProvider()
     {
         var services = new ServiceCollection();
@@ -24,7 +24,7 @@ public class DistributedLockRegistrationTests
         provider.ShouldBeOfType<PostgresDistributedSynchronizationProvider>();
     }
 
-    [Fact]
+    [TimedFact]
     public void AddJoblyWorker_SqlServer_ResolvesSqlServerLockProvider()
     {
         var services = new ServiceCollection();
@@ -46,7 +46,7 @@ public class DistributedLockRegistrationTests
     /// Poison the TestContext registration so any attempt to resolve it throws.
     /// The fix must succeed without ever resolving a DbContext.
     /// </summary>
-    [Fact]
+    [TimedFact]
     public void AddJoblyWorker_PostgreSql_ResolvesFromOptionsExtension_NotFromContext()
     {
         var services = new ServiceCollection();
@@ -65,7 +65,7 @@ public class DistributedLockRegistrationTests
     /// <summary>
     /// Same as above but for SQL Server.
     /// </summary>
-    [Fact]
+    [TimedFact]
     public void AddJoblyWorker_SqlServer_ResolvesFromOptionsExtension_NotFromContext()
     {
         var services = new ServiceCollection();
@@ -81,7 +81,7 @@ public class DistributedLockRegistrationTests
         provider.ShouldBeOfType<SqlDistributedSynchronizationProvider>();
     }
 
-    [Fact]
+    [TimedFact]
     public void AddJoblyWorker_OptionsExtensionPreservesPassword_AfterJoblyWrapsOptions()
     {
         const string connectionString = "Host=localhost;Database=test;Username=user;Password=secret123";
@@ -98,7 +98,7 @@ public class DistributedLockRegistrationTests
         extension.ConnectionString.ShouldBe(connectionString);
     }
 
-    [Fact]
+    [TimedFact]
     public void AddJoblyWorker_PostgreSql_LockProviderCreatesLock()
     {
         var services = new ServiceCollection();

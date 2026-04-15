@@ -114,7 +114,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             new FakeLockProvider());
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_WithMaxRetries3_RetriesThreeTimesThenFails()
     {
         // Arrange
@@ -148,7 +148,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         GetRetriedTimes(job).ShouldBe(3);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_WithMaxRetries0_FailsImmediately()
     {
         // Arrange
@@ -180,7 +180,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         GetRetriedTimes(job).ShouldBe(0);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_RetryDoesNotIncrementFailedStat()
     {
         // Arrange
@@ -222,7 +222,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         GetRetriedTimes(job).ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_RetryThenSucceed_CompletesNormally()
     {
         // Arrange
@@ -266,7 +266,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         GetRetriedTimes(job).ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_WithRetryDelays_SetsScheduleTimeInFuture()
     {
         // Arrange
@@ -299,7 +299,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         job.ScheduleTime.ShouldBeGreaterThan(now.AddSeconds(3500));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_WithRetryDelays_LastDelayReusedWhenArrayShorter()
     {
         // Arrange
@@ -341,7 +341,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         job.ScheduleTime.ShouldBeGreaterThan(DateTime.UtcNow.AddSeconds(15));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_WithEmptyRetryDelays_RetriesImmediately()
     {
         // Arrange
@@ -374,7 +374,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         job.ScheduleTime.ShouldBeLessThanOrEqualTo(TimeProvider.System.GetUtcNow().UtcDateTime);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_WithRetryDelays_JobNotPickedUpBeforeDelay()
     {
         // Arrange
@@ -406,7 +406,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         didProcess.ShouldBeFalse();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_WithPerJobRetryDelays_OverridesGlobalConfig()
     {
         // Arrange — job has per-job $retryDelays in metadata
@@ -444,7 +444,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         job.ScheduleTime.ShouldBeGreaterThan(now.AddSeconds(7000));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_WithMaxRetriesInMetadata_UsesMetadataValue()
     {
         // Arrange — job has per-job $maxRetries in metadata
@@ -485,7 +485,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         GetRetriedTimes(job).ShouldBe(2);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_WithRetryAttributeOnHandler_UsesAttributeMaxRetries()
     {
         // Arrange — handler has [Retry(5)], global has 0
@@ -516,7 +516,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         GetRetriedTimes(job).ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_WithRetryAttributeOnJob_UsesAttributeMaxRetries()
     {
         // Arrange — job class has [Retry(4)], global has 0
@@ -547,7 +547,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         GetRetriedTimes(job).ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_WithRetryAttributeOnBothHandlerAndJob_HandlerWins()
     {
         // Arrange — handler has [Retry(7)], job has [Retry(2)], global has 0
@@ -587,7 +587,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         GetRetriedTimes(job).ShouldBe(7);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_MetadataOverridesRetryAttribute()
     {
         // Arrange — handler has [Retry(5)], but metadata overrides to 1
@@ -626,7 +626,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         GetRetriedTimes(job).ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_WithRetryAttributeDelays_UsesAttributeDelays()
     {
         // Arrange — handler has [Retry(3, Delays = [100, 200, 300])]

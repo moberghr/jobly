@@ -116,7 +116,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
         return false;
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_Completed_RecordsDurationMetric()
     {
         // Arrange — unique queue isolates from parallel tests
@@ -163,7 +163,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
         recordedDuration.ShouldBeGreaterThanOrEqualTo(0);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_Completed_RecordsCompletedMetricWithSucceededStatus()
     {
         // Arrange
@@ -210,7 +210,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
         completedCount.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_Failed_RecordsCompletedMetricWithFailedStatus()
     {
         // Arrange
@@ -258,7 +258,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
         failedCount.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_RecordsEnqueuedMetric()
     {
         // Arrange — publisher uses unique queue, no worker needed
@@ -292,7 +292,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
         enqueuedCount.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_IncrementsAndDecrementsActiveMetric()
     {
         // Arrange
@@ -339,7 +339,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
         activeNet.ShouldBe(0);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_TwoWorkersConcurrently_ActiveMetricReachesTwo()
     {
         // Arrange — two barrier jobs on same queue
@@ -417,7 +417,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
         Interlocked.Read(ref currentActive).ShouldBe(0);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_FailedWithRetries_RecordsRetriedStatus()
     {
         // Arrange
@@ -466,7 +466,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
         retriedCount.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task StartBatch_RecordsEnqueuedMetricForBatchAndChildren()
     {
         // Arrange

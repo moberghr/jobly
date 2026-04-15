@@ -20,7 +20,7 @@ public abstract class WorkerIdLogTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_LogHasNullWorkerId()
     {
         // Arrange
@@ -48,7 +48,7 @@ public abstract class WorkerIdLogTestsBase : IAsyncLifetime
         deletedLog.WorkerId.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_LogHasNullWorkerId()
     {
         // Arrange

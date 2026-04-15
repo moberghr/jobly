@@ -35,7 +35,7 @@ public abstract class AuditFixTestsBase : IAsyncLifetime
     /// If a job has CancellationMode=Graceful (user called DeleteJob), stale recovery
     /// should set it to Deleted, NOT requeue it.
     /// </summary>
-    [Fact]
+    [TimedFact]
     public async Task StaleRecovery_WithCancellationModeGraceful_SetsDeletedNotEnqueued()
     {
         // Arrange: a processing job with CancellationMode=Graceful and stale keep-alive
@@ -72,7 +72,7 @@ public abstract class AuditFixTestsBase : IAsyncLifetime
     /// The real race is hard to reproduce in a unit test, but we can verify the parent's
     /// state is correctly set after requeue of a child whose parent was already finalized.
     /// </summary>
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_WhenParentIsCompleted_SetsParentBackToAwaitingOrProcessing()
     {
         // Arrange: a batch with one completed child and a finalized parent
@@ -124,7 +124,7 @@ public abstract class AuditFixTestsBase : IAsyncLifetime
     /// HIGH: No JobLog when message routing finds 0 handlers.
     /// Messages marked Failed should have a log explaining why.
     /// </summary>
-    [Fact]
+    [TimedFact]
     public async Task MessageRouting_NoHandlers_CreatesFailedLogEntry()
     {
         // Arrange: a message with a type that has no registered handlers

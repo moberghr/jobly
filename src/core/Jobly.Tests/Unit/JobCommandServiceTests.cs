@@ -20,7 +20,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_SetsStateToDeleted()
     {
         // Arrange
@@ -48,7 +48,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Deleted);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_SetsExpireAt()
     {
         // Arrange
@@ -76,7 +76,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         job.ExpireAt.ShouldNotBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_CreatesDeletedLog()
     {
         // Arrange
@@ -103,7 +103,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         logs.ShouldContain(l => l.EventType == "Deleted");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_AlreadyDeleted_NoOp()
     {
         // Arrange
@@ -131,7 +131,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Deleted);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_SetsStateToEnqueued()
     {
         // Arrange
@@ -159,7 +159,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_ClearsExpireAt()
     {
         // Arrange
@@ -188,7 +188,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         job.ExpireAt.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_WithMessageParent_ResetsParentToProcessing()
     {
         // Arrange
@@ -230,7 +230,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         parent.CurrentState.ShouldBe(State.Processing);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_WithBatchParent_ResetsParentToAwaiting()
     {
         // Arrange
@@ -273,7 +273,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         parent.CurrentState.ShouldBe(State.Awaiting);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_MessageSpawnedJob_KeepsHandlerType()
     {
         // Arrange
@@ -315,7 +315,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         job.HandlerType.ShouldBe(handlerType);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_DirectJob_ClearsHandlerType()
     {
         // Arrange
@@ -345,7 +345,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         job.HandlerType.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task BulkDeleteJobs_DeletesMultiple()
     {
         // Arrange
@@ -377,7 +377,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         jobs.ShouldAllBe(j => j.CurrentState == State.Deleted);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task BulkRequeueJobs_RequeuesMultiple()
     {
         // Arrange

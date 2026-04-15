@@ -15,7 +15,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenBatchOfFive_WhenAllComplete_ThenBatchFinalizes()
     {
         var batchPublisher = Server.CreateBatchPublisher();
@@ -41,7 +41,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         childJobs.ShouldAllBe(j => j.CurrentState == State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenBatchWithContinuation_WhenFirstBatchCompletes_ThenContinuationActivatesAndCompletes()
     {
         var batchPublisher = Server.CreateBatchPublisher();
@@ -75,7 +75,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         continuationChildren.ShouldAllBe(j => j.CurrentState == State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenThreeChainedBatches_WhenProcessed_ThenAllComplete()
     {
         var batchPublisher = Server.CreateBatchPublisher();
@@ -107,7 +107,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         batch3.CurrentState.ShouldBe(State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenBatchWithOnAnyFinishedState_WhenSomeJobsFail_ThenContinuationStillFires()
     {
         var batchPublisher = Server.CreateBatchPublisher();
@@ -144,7 +144,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         continuationChildren.ShouldAllBe(j => j.CurrentState == State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenBatchWithOnlyOnSucceeded_WhenJobFails_ThenContinuationStaysAwaiting()
     {
         var batchPublisher = Server.CreateBatchPublisher();
@@ -185,7 +185,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         continuationChildren.ShouldAllBe(j => j.CurrentState == State.Awaiting);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenBatchWithRetryJobs_WhenRetriesExhausted_ThenBatchReflectsOutcome()
     {
         var batchPublisher = Server.CreateBatchPublisher();
