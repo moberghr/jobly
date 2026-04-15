@@ -50,7 +50,37 @@ public class ProcessOrderHandler : IJobHandler<ProcessOrder>
 |----------|------|-------------|
 | `JobId` | `Guid` | The current job's ID |
 | `TraceId` | `Guid` | The trace ID (shared across related jobs) |
-| `Metadata` | `IReadOnlyDictionary<string, string>` | Key-value metadata attached to the job |
+| `Metadata` | `Dictionary<string, object>` | Mutable metadata dictionary attached to the job |
+
+### Typed metadata
+
+For type-safe access, define an interface extending `IJobMetadata`. The source generator produces a dictionary-backed implementation:
+
+```csharp
+public partial interface IOrderMetadata : IJobMetadata
+{
+    string CustomerName { get; set; }
+    int Priority { get; set; }
+    int? MaxRetries { get; set; }  // nullable for "not set" vs 0
+}
+```
+
+Inject `IJobContext<IOrderMetadata>` in handlers:
+
+```csharp
+public class ProcessOrderHandler(IJobContext<IOrderMetadata> ctx) : IJobHandler<ProcessOrder>
+{
+    public Task HandleAsync(ProcessOrder msg, CancellationToken ct)
+    {
+        var name = ctx.Metadata.CustomerName;   // typed property → reads from dict
+        ctx.Metadata.Priority = 5;              // typed write → writes to dict
+        _ = ctx.Metadata["Priority"];           // raw dict access → same value
+        return Task.CompletedTask;
+    }
+}
+```
+
+The typed view IS the dictionary — property writes go directly to the underlying `Dictionary<string, object>`. `IJobContext<T>` is registered as an open generic by `AddJobly()`, so no per-type registration is needed.
 
 ## Publish Pipeline Behaviors
 

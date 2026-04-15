@@ -37,11 +37,23 @@ await publisher.Schedule(new GenerateReport { ReportId = 1 }, DateTime.UtcNow.Ad
 
 ## Retries
 
+Retry is an opt-in pipeline module. Register it to enable automatic retries with exponential backoff:
+
 ```csharp
-await publisher.Enqueue(new GenerateReport { ReportId = 1 }, maxRetries: 3);
+services.AddJoblyRetry(options =>
+{
+    options.MaxRetries = 3;
+    options.Delays = [15, 60, 300]; // seconds between retries
+});
 ```
 
-Failed jobs are retried automatically. Crash requeues (server died mid-execution) do **not** count against the retry limit.
+You can also set max retries per job at publish time:
+
+```csharp
+await publisher.Enqueue(new GenerateReport { ReportId = 1 }, maxRetries: 5);
+```
+
+Failed jobs are re-enqueued with a future `ScheduleTime` based on the delay array. Crash requeues (server died mid-execution) do **not** count against the retry limit. Without `AddJoblyRetry()`, failed jobs go directly to `Failed` state.
 
 ## Named Queues
 

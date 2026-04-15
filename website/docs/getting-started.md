@@ -89,6 +89,13 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     options.WorkerCount = 10;
     options.Queues = ["default", "critical"];
 });
+
+// Enable automatic retries with backoff delays
+builder.Services.AddJoblyRetry(options =>
+{
+    options.MaxRetries = 3;
+    options.Delays = [15, 60, 300]; // seconds
+});
 ```
 
 ### 5. Add the dashboard (optional)

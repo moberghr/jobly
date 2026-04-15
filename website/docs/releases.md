@@ -6,11 +6,35 @@ sidebar_position: 6
 
 ## 0.7.0
 
-*2026-04-14*
+*2026-04-15*
 
 ### New Features
 
-- **Stream Requests** — New `IStreamRequest<TResponse>` pattern for lazy, item-by-item streaming via `IAsyncEnumerable<TResponse>`. Extends `IRequest<IAsyncEnumerable<TResponse>>` to preserve the unified type hierarchy — `IPipelineBehavior` applies automatically at the request level. `IStreamPipelineBehavior<TRequest, TResponse>` wraps the actual enumeration. Resolved via `IMediator.CreateStream()`. Source generator provides zero-allocation dispatch.
+- **Stream Requests** — New `IStreamRequest<TResponse>` pattern for lazy, item-by-item streaming via `IAsyncEnumerable<TResponse>`. Extends `IRequest<IAsyncEnumerable<TResponse>>` to preserve the unified type hierarchy — `IPipelineBehavior` applies automatically at the request level. New `IStreamPipelineBehavior<TRequest, TResponse>` wraps the actual enumeration for per-item concerns (timing, transforms). Resolved via `IMediator.CreateStream()`. Source generator provides zero-allocation dispatch.
+- **Retry as Pipeline Module** — Retry logic extracted from the worker into a composable pipeline module. Register with `services.AddJoblyRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; })`. Built on the new addon architecture: `RetryPublishBehavior` injects retry config into metadata at publish time, `RetryPipelineBehavior` catches handler failures and sets `FailureOutcome` to re-enqueue with backoff. The worker applies whatever the pipeline decides — it has zero retry knowledge. See [Building Addons](https://github.com/moberghr/jobly/blob/main/docs/guides/building-addons.md) for the full architecture.
+- **Typed Metadata** — Job metadata (`Dictionary<string, object>`) can now be accessed via strongly-typed interfaces. Define an interface extending `IJobMetadata` with typed properties — the source generator produces a dictionary-backed implementation. Inject `IJobContext<IMyMetadata>` in handlers for typed access. `MetadataSerializer` uses native JSON deserialization for round-trip fidelity (integers stay as `long`, arrays as `List<object>`).
+- **Recurring Job Enable/Disable** — Disable a recurring job to temporarily stop it from creating new jobs. The scheduler still fires on schedule but records a "Skipped" entry in the execution history. Re-enabling resumes from the next natural cron occurrence with no catchup burst. API: `POST /api/recurring/{id}/enable|disable`. Dashboard shows Enabled/Disabled badges and Skipped entries in history.
+- **Worker Scope Isolation** — Worker and handler now use separate DI scopes. The handler's DbContext lives in its own scope — on failure, the scope is disposed and tracked entities are discarded. No partial handler work leaks into the worker's save. On success, handler changes are committed first (outbox pattern), then Jobly state.
+- **Addon Architecture** — New `JobFailureOutcome` and `IJobContext.FailureOutcome` allow pipeline behaviors to control what happens when a handler fails. The worker is a generic state machine that applies the pipeline's decision. Combined with typed metadata and publish pipeline behaviors, this enables building composable addons (retry, dead letter queue, circuit breaker) without modifying Jobly core.
+
+### Improvements
+
+- **Handler Registration Split** — `AddHandlers(assembly)` replaces the old `AddJobHandlers`. New granular methods: `AddJobHandlers` (job + message handlers only), `AddMediatorHandlers` (request + stream handlers only). `AddHandlers` calls both.
+- **Dispatcher Split** — `JobDispatcher` (worker job execution) and `MediatorDispatcher` (in-memory request/stream dispatch) are now separate classes with independent method caches.
+- **xUnit v3 + Microsoft Testing Platform** — Test suite migrated to xUnit v3 with `UseMicrosoftTestingPlatformRunner`.
+
+### Bug Fixes
+
+- **Trace page group node highlighting** — Fixed group node highlighting and edge behavior in the trace visualization page.
+
+### Migration
+
+- **Retry module opt-in** — Retry is no longer built into the worker. Add `services.AddJoblyRetry()` to opt in. Without it, failed jobs go directly to `Failed` state with no retries. The `publisher.Enqueue(job, maxRetries: 3)` API still works — the retry module reads from both the entity column and metadata.
+- **Database migration required** — New `DisabledAt` column on `RecurringJob` and `Skipped` column on `RecurringJobLog`. Run an EF Core migration after upgrading.
+
+### Stats
+
+- 764 tests (382 PostgreSQL + 382 SQL Server)
 
 ---
 
