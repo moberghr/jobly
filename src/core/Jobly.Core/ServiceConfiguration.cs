@@ -223,6 +223,8 @@ public static class ServiceConfiguration
         recurringJob.Property(p => p.NextExecution);
         recurringJob.Property(p => p.LastExecution);
 
+        recurringJob.Property(p => p.DisabledAt);
+
         recurringJob.Property(p => p.Version).IsConcurrencyToken();
 
         recurringJob.Metadata.SetSchema(schema);
@@ -237,6 +239,7 @@ public static class ServiceConfiguration
 
         log.Property(p => p.RecurringJobId);
         log.Property(p => p.JobId);
+        log.Property(p => p.Skipped);
         log.Property(p => p.CreatedAt);
 
         log.HasIndex(p => p.RecurringJobId);

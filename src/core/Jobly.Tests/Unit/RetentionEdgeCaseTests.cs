@@ -56,7 +56,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(RetentionEdgeCaseTestsBase).Assembly);
+        services.AddHandlers(typeof(RetentionEdgeCaseTestsBase).Assembly);
         services.AddPipelineBehaviors(typeof(RetentionEdgeCaseTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());

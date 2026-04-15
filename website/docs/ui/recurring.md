@@ -12,11 +12,15 @@ Cron-based scheduled jobs with name, cron expression, type, next/last execution 
 
 ## Execution History
 
-Each recurring job tracks its executions via `RecurringJobLog` entries. The history table shows the outcome of each scheduled run. If the underlying job has been deleted, the history entry displays **"Cleaned up"** instead of linking to the job.
+Each recurring job tracks its executions via `RecurringJobLog` entries. The history table shows the outcome of each scheduled run:
+- Normal executions link to the job and show its current state
+- If the underlying job has been deleted, the entry displays **"Cleaned up"**
+- If the recurring job was disabled at the time, the entry displays an orange **"Skipped"** badge
 
 ## Dashboard Actions
 
-- **Trigger** — immediately creates and enqueues a new job instance, regardless of the cron schedule
+- **Enable / Disable** — toggle whether the scheduler creates real jobs or skips. Disabled jobs still fire on schedule but record "Skipped" entries in the history instead. The recurring job list shows an **Enabled** or **Disabled** badge per row.
+- **Trigger** — immediately creates and enqueues a new job instance, regardless of the cron schedule or disabled state
 - **Delete** — removes the recurring job definition (existing job instances are not affected)
 
 For full documentation on configuring and using recurring jobs, see [Recurring Jobs](/docs/features/recurring-jobs).

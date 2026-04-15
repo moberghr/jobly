@@ -4,11 +4,12 @@ sidebar_position: 1
 
 # Getting Started
 
-Jobly is a distributed job processing and message queue library for .NET 10. It provides three patterns:
+Jobly is a distributed job processing and message queue library for .NET 10. It provides four patterns:
 
 - **[Messages](./patterns/messages.md)** (`IMessage`) — Pub/sub queue. Multiple handlers per message, each becomes an independent job.
 - **[Jobs](./patterns/jobs.md)** (`IJob`) — Orchestrated background work. Single handler, scheduling, retries, continuations, batches.
 - **[Requests](./patterns/requests.md)** (`IRequest<TResponse>`) — In-memory request/response. Single handler, no persistence, returns a typed response via `IMediator.Send()`.
+- **[Streams](./patterns/requests.md#streams)** (`IStreamRequest<TResponse>`) — In-memory streaming. Single handler, no persistence, returns `IAsyncEnumerable<TResponse>` via `IMediator.CreateStream()`.
 
 ## Installation
 
@@ -71,7 +72,7 @@ await context.Database.EnsureCreatedAsync();
 ```csharp
 // Publisher only — for apps that create jobs but don't process them
 builder.Services.AddJobly<AppDbContext>();
-builder.Services.AddJobHandlers(typeof(Program).Assembly);
+builder.Services.AddHandlers(typeof(Program).Assembly);
 ```
 
 :::tip TimeProvider
@@ -135,7 +136,21 @@ public class GetUserHandler : IRequestHandler<GetUser, UserDto>
 }
 ```
 
-### 8. Publish & Send
+### 8. Define a stream (optional)
+
+```csharp
+public class GetUsers : IStreamRequest<UserDto> { public string Role { get; set; } }
+
+public class GetUsersHandler : IStreamRequestHandler<GetUsers, UserDto>
+{
+    public async IAsyncEnumerable<UserDto> HandleAsync(GetUsers request, [EnumeratorCancellation] CancellationToken ct)
+    {
+        // Yield items one at a time
+    }
+}
+```
+
+### 9. Publish & Send
 
 ```csharp
 public class OrderController : ControllerBase

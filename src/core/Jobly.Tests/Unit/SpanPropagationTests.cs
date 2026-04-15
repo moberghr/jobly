@@ -38,7 +38,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
     private static IServiceScopeFactory BuildScopeFactory()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(SpanPropagationTestsBase).Assembly);
+        services.AddHandlers(typeof(SpanPropagationTestsBase).Assembly);
         services.AddSingleton<MultiHandlerCounter>();
         var provider = services.BuildServiceProvider();
 

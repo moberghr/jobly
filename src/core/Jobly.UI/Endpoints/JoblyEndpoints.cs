@@ -99,6 +99,10 @@ public static class JoblyEndpoints
 
         apiGroup.MapPost("recurring/{id}/trigger", async ([FromServices] IRecurringJobService recurringJobService, int id) => await recurringJobService.TriggerRecurringJob(id));
 
+        apiGroup.MapPost("recurring/{id}/enable", async ([FromServices] IRecurringJobService recurringJobService, int id) => await recurringJobService.EnableRecurringJob(id));
+
+        apiGroup.MapPost("recurring/{id}/disable", async ([FromServices] IRecurringJobService recurringJobService, int id) => await recurringJobService.DisableRecurringJob(id));
+
         apiGroup.MapDelete("recurring/{id}", async ([FromServices] IRecurringJobService recurringJobService, int id) => await recurringJobService.DeleteRecurringJob(id));
 
         apiGroup.MapGet("batches", async ([FromServices] IJobGroupQueryService svc, [AsParameters] BaseListRequest request, string? state) => await svc.GetJobGroups(JobKind.Batch, request, state));

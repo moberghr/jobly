@@ -71,7 +71,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker(int maxRetries = 3, int[]? delays = null)
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(RetryTestsBase).Assembly);
+        services.AddHandlers(typeof(RetryTestsBase).Assembly);
         services.AddPipelineBehaviors(typeof(RetryTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());

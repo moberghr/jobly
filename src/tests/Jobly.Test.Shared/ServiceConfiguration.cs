@@ -10,7 +10,7 @@ public static class ServiceConfiguration
 {
     public static void AddServices(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddJobHandlers(typeof(ServiceConfiguration).Assembly);
+        services.AddHandlers(typeof(ServiceConfiguration).Assembly);
 
         services.AddDbContextPool<TestContext>(options => options
             .UseNpgsql(configuration.GetConnectionString(nameof(TestContext))!)
