@@ -44,13 +44,14 @@ public class ProcessOrderHandler : IJobHandler<ProcessOrder>
 }
 ```
 
-`IJobContext` extends `IJobMetadata` and provides:
+`IJobContext` provides:
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `JobId` | `Guid` | The current job's ID |
 | `TraceId` | `Guid` | The trace ID (shared across related jobs) |
-| `Metadata` | `IReadOnlyDictionary<string, string>` | Key-value metadata attached to the job |
+| `Metadata` | `Dictionary<string, object>` | Key-value metadata attached to the job |
+| `GetMetadata<T>()` | `T` | Returns a typed metadata view (T must implement IJobMetadata) |
 
 ## Publish Pipeline Behaviors
 
@@ -84,7 +85,8 @@ The `PublishContext<T>` passed to publish pipeline behaviors contains:
 | Property | Type | Description |
 |----------|------|-------------|
 | `Job` | `T` | The job/message being published |
-| `Metadata` | `Dictionary<string, string>` | Mutable metadata dictionary — add or modify entries here |
+| `Metadata` | `Dictionary<string, object>` | Mutable metadata dictionary — add or modify entries here |
+| `GetMetadata<TMeta>()` | `TMeta` | Returns a typed metadata view for strongly-typed writes |
 
 ## Metadata Inheritance
 

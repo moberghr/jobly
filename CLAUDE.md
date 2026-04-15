@@ -119,7 +119,7 @@ await foreach (var user in mediator.CreateStream(new GetUsers { Role = "Admin" }
 
 Single table with `Kind` enum. Key fields:
 - **Shared**: Id, Kind, Type, Message (payload), CreateTime, CurrentState, Queue, ExpireAt, ParentJobId, TraceId, SpawnedByJobId, CancellationMode, ConcurrencyKey
-- **Job-specific**: ScheduleTime, HandlerType, MaxRetries, RetriedTimes, CurrentWorkerId, LastKeepAlive
+- **Job-specific**: ScheduleTime, HandlerType, CurrentWorkerId, LastKeepAlive
 - **Batch-specific**: ContinuationOptions (generalized to all kinds — controls child activation on parent failure)
 - **JobLog** — Unified audit trail. EventType: Created, Processing, Completed, Failed, Requeued, Deleted, Cancelled, CancellationRequested, Log (ILogger output). Includes optional `WorkerId` (set by worker-produced entries, null for command/orchestration entries).
 

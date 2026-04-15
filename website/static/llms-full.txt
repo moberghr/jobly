@@ -218,11 +218,20 @@ await publisher.SaveChangesAsync();
 
 ### Retries
 
+Declare retry policy on the handler or job class:
+
 ```csharp
-await publisher.Enqueue(new GenerateReport { ReportId = 1 }, maxRetries: 3);
+[Retry(3, Delays = [15, 60, 300])]
+public class GenerateReportHandler : IJobHandler<GenerateReport> { ... }
 ```
 
-Failed jobs are retried automatically. Crash requeues (server died mid-execution) do NOT count against the retry limit.
+Or configure global defaults:
+
+```csharp
+services.AddJoblyRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; });
+```
+
+Priority: per-enqueue metadata > handler attribute > job attribute > global RetryOptions. Failed jobs are retried automatically. Crash requeues do NOT count against the retry limit.
 
 ### Named queues
 
@@ -688,7 +697,6 @@ The `RunJobMonitor` task runs alongside each handler execution, periodically dra
 builder.Services.AddJobly<AppDbContext>(options =>
 {
     options.Schema = "jobly";                                  // Database schema (default: "jobly", null for default)
-    options.RetryCount = 3;                                    // Default max retries (default: 0)
     options.DefaultQueue = "default";                          // Default queue name (default: "default")
     options.JobExpirationTimeout = TimeSpan.FromDays(1);       // Completed/deleted job retention (default: 1 day)
 });
@@ -736,7 +744,6 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     options.ExpirationCleanupInterval = TimeSpan.FromSeconds(60);
 
     // Inherited from JoblyConfiguration
-    options.RetryCount = 3;
     options.DefaultQueue = "default";
 });
 ```

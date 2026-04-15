@@ -1,7 +1,8 @@
 using System.Text.Json;
 using Jobly.Core.Handlers;
+using Jobly.Core.Helper;
 using Jobly.Tests.TestData.Handlers;
-using Jobly.Worker.Retry;
+using Jobly.Core.Retry;
 using Shouldly;
 
 namespace Jobly.Tests.Unit;
@@ -100,7 +101,7 @@ public class TypedMetadataTests
     }
 
     [Fact]
-    public void TypedView_ReplacesDictOnJobContext_SameObject()
+    public void JobContext_GetMetadata_WritesFlowToUnderlyingDictionary()
     {
         var jobContext = new JobContext
         {
@@ -108,14 +109,12 @@ public class TypedMetadataTests
             Metadata = new Dictionary<string, object> { ["MaxRetries"] = 5 },
         };
 
-        // Simulate what JobContext<T> does
-        var typed = MetadataFactory.Create<IRetryMetadata>(jobContext.Metadata);
-        jobContext.Metadata = (Dictionary<string, object>)(object)typed;
+        var typed = jobContext.GetMetadata<IRetryMetadata>();
 
-        // Typed and raw are the same object
+        // Typed view IS the underlying dictionary
         ReferenceEquals(jobContext.Metadata, typed).ShouldBeTrue();
 
-        // Read via typed
+        // Read existing value
         typed.MaxRetries.ShouldBe(5);
 
         // Write via typed, read via raw
@@ -125,6 +124,28 @@ public class TypedMetadataTests
         // Write via raw, read via typed
         jobContext.Metadata["MaxRetries"] = 10;
         typed.MaxRetries.ShouldBe(10);
+    }
+
+    [Fact]
+    public void PublishContext_GetMetadata_WritesFlowToUnderlyingDictionary()
+    {
+        var context = new PublishContext<object>
+        {
+            Job = new object(),
+            Metadata = new Dictionary<string, object> { ["TestKey"] = "existing" },
+        };
+
+        var typed = context.GetMetadata<ITestMetadata>();
+
+        // Typed view IS the underlying dictionary
+        ReferenceEquals(context.Metadata, typed).ShouldBeTrue();
+
+        // Existing value preserved
+        typed.TestKey.ShouldBe("existing");
+
+        // Write via typed, read via raw
+        typed.TestCount = 42;
+        context.Metadata["TestCount"].ShouldBe(42);
     }
 
     [Fact]
@@ -141,5 +162,37 @@ public class TypedMetadataTests
         json.ShouldContain("\"MaxRetries\":3");
         json.ShouldContain("\"RetriedTimes\":1");
         json.ShouldContain("\"RetryDelays\":[15,60]");
+    }
+
+    [Fact]
+    public void JobParameters_Configure_ChainedCalls_PreservesAllMetadata()
+    {
+        var parameters = new JobParameters()
+            .Configure<IRetryMetadata>(m => m.MaxRetries = 10)
+            .Configure<ITestMetadata>(m =>
+            {
+                m.TestKey = "hello";
+                m.TestCount = 42;
+            });
+
+        parameters.Metadata.ShouldNotBeNull();
+        parameters.Metadata["MaxRetries"].ShouldBe(10);
+        parameters.Metadata["TestKey"].ShouldBe("hello");
+        parameters.Metadata["TestCount"].ShouldBe(42);
+    }
+
+    [Fact]
+    public void JobParameters_Configure_SingleCall_SetsMetadata()
+    {
+        var parameters = new JobParameters()
+            .Configure<IRetryMetadata>(m =>
+            {
+                m.MaxRetries = 5;
+                m.RetryDelays = [15, 60];
+            });
+
+        parameters.Metadata.ShouldNotBeNull();
+        parameters.Metadata["MaxRetries"].ShouldBe(5);
+        parameters.Metadata["RetryDelays"].ShouldBe(new int[] { 15, 60 });
     }
 }

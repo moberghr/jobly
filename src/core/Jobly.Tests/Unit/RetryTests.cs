@@ -7,7 +7,7 @@ using Jobly.Core.Handlers;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
-using Jobly.Worker.Retry;
+using Jobly.Core.Retry;
 using Jobly.Worker.Services;
 using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
@@ -130,7 +130,6 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
-            MaxRetries = 3,
         });
         await ctx.SaveChangesAsync();
 
@@ -147,7 +146,6 @@ public abstract class RetryTestsBase : IAsyncLifetime
         var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
         job.CurrentState.ShouldBe(State.Failed);
         GetRetriedTimes(job).ShouldBe(3);
-        job.MaxRetries.ShouldBe(3);
     }
 
     [Fact]
@@ -166,7 +164,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
-            MaxRetries = 0,
+
         });
         await ctx.SaveChangesAsync();
 
@@ -198,7 +196,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
-            MaxRetries = 2,
+
         });
         await ctx.SaveChangesAsync();
 
@@ -240,7 +238,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
-            MaxRetries = 3,
+
         });
         await ctx.SaveChangesAsync();
 
@@ -285,7 +283,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = now,
             ScheduleTime = now,
             Queue = "default",
-            MaxRetries = 1,
+
         });
         await ctx.SaveChangesAsync();
 
@@ -317,7 +315,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
-            MaxRetries = 3,
+
         });
         await ctx.SaveChangesAsync();
 
@@ -360,7 +358,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = originalScheduleTime,
             ScheduleTime = originalScheduleTime,
             Queue = "default",
-            MaxRetries = 1,
+
         });
         await ctx.SaveChangesAsync();
 
@@ -392,7 +390,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
-            MaxRetries = 1,
+
         });
         await ctx.SaveChangesAsync();
 
@@ -429,7 +427,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = now,
             ScheduleTime = now,
             Queue = "default",
-            MaxRetries = 1,
+
             Metadata = metadata,
         });
         await ctx.SaveChangesAsync();
@@ -466,7 +464,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
-            MaxRetries = 0,
+
             Metadata = metadata,
         });
         await ctx.SaveChangesAsync();
@@ -485,6 +483,180 @@ public abstract class RetryTestsBase : IAsyncLifetime
         var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
         job.CurrentState.ShouldBe(State.Failed);
         GetRetriedTimes(job).ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task GetAndProcessJob_WithRetryAttributeOnHandler_UsesAttributeMaxRetries()
+    {
+        // Arrange — handler has [Retry(5)], global has 0
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            Type = typeof(RetryAttributeHandlerRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new RetryAttributeHandlerRequest()),
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+        await ctx.SaveChangesAsync();
+
+        var worker = CreateWorker(maxRetries: 0);
+
+        // Act — process once, should be requeued (attribute says 5 retries)
+        await worker.GetAndProcessJob(CancellationToken.None);
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        job.CurrentState.ShouldBe(State.Enqueued);
+        GetRetriedTimes(job).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task GetAndProcessJob_WithRetryAttributeOnJob_UsesAttributeMaxRetries()
+    {
+        // Arrange — job class has [Retry(4)], global has 0
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            Type = typeof(RetryAttributeJobRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new RetryAttributeJobRequest()),
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+        await ctx.SaveChangesAsync();
+
+        var worker = CreateWorker(maxRetries: 0);
+
+        // Act — process once, should be requeued (attribute says 4 retries)
+        await worker.GetAndProcessJob(CancellationToken.None);
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        job.CurrentState.ShouldBe(State.Enqueued);
+        GetRetriedTimes(job).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task GetAndProcessJob_WithRetryAttributeOnBothHandlerAndJob_HandlerWins()
+    {
+        // Arrange — handler has [Retry(7)], job has [Retry(2)], global has 0
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            Type = typeof(RetryAttributeBothRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new RetryAttributeBothRequest()),
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+        await ctx.SaveChangesAsync();
+
+        var worker = CreateWorker(maxRetries: 0);
+
+        // Act — exhaust all retries from handler attribute (7)
+        for (var i = 0; i < 8; i++)
+        {
+            var resetCtx = _fixture.CreateContext();
+            await resetCtx.Set<Job>()
+                .Where(x => x.Id == jobId)
+                .Where(x => x.CurrentState == State.Enqueued)
+                .ExecuteUpdateAsync(x => x.SetProperty(p => p.ScheduleTime, DateTime.UtcNow));
+
+            await worker.GetAndProcessJob(CancellationToken.None);
+        }
+
+        // Assert — should have used handler's 7 retries (not job's 2)
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        job.CurrentState.ShouldBe(State.Failed);
+        GetRetriedTimes(job).ShouldBe(7);
+    }
+
+    [Fact]
+    public async Task GetAndProcessJob_MetadataOverridesRetryAttribute()
+    {
+        // Arrange — handler has [Retry(5)], but metadata overrides to 1
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        var metadata = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["MaxRetries"] = 1,
+        });
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            Type = typeof(RetryAttributeHandlerRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new RetryAttributeHandlerRequest()),
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            Metadata = metadata,
+        });
+        await ctx.SaveChangesAsync();
+
+        var worker = CreateWorker(maxRetries: 0);
+
+        // Act — process twice (1 initial + 1 retry from metadata)
+        for (var i = 0; i < 2; i++)
+        {
+            await worker.GetAndProcessJob(CancellationToken.None);
+        }
+
+        // Assert — should have used metadata's 1 retry (not handler attribute's 5)
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        job.CurrentState.ShouldBe(State.Failed);
+        GetRetriedTimes(job).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task GetAndProcessJob_WithRetryAttributeDelays_UsesAttributeDelays()
+    {
+        // Arrange — handler has [Retry(3, Delays = [100, 200, 300])]
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            Type = typeof(RetryAttributeWithDelaysRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new RetryAttributeWithDelaysRequest()),
+            CreateTime = now,
+            ScheduleTime = now,
+            Queue = "default",
+        });
+        await ctx.SaveChangesAsync();
+
+        // Global has 10s delay, attribute has 100s
+        var worker = CreateWorker(maxRetries: 0, delays: [10]);
+
+        // Act
+        await worker.GetAndProcessJob(CancellationToken.None);
+
+        // Assert — should use attribute's 100s delay (not global 10s)
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        job.CurrentState.ShouldBe(State.Enqueued);
+        job.ScheduleTime.ShouldBeGreaterThan(now.AddSeconds(90));
     }
 }
 

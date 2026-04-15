@@ -1,4 +1,4 @@
-namespace Jobly.Worker.Retry;
+namespace Jobly.Core.Retry;
 
 public class RetryOptions
 {

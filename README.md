@@ -165,7 +165,6 @@ public class GenerateReportHandler : IJobHandler<GenerateReport>
 ```csharp
 await publisher.Enqueue(new GenerateReport { Month = 3 });
 await publisher.Schedule(new GenerateReport { Month = 3 }, tomorrow);
-await publisher.Enqueue(new GenerateReport { Month = 3 }, maxRetries: 3);
 await publisher.Enqueue(new GenerateReport { Month = 3 }, queue: "reports");
 await publisher.Enqueue(new FollowUp(), parentJobId: prepareId); // continuation
 ```

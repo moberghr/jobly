@@ -81,7 +81,6 @@ public static class ServiceConfiguration
 
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
-        services.AddScoped(typeof(IJobContext<>), typeof(JobContext<>));
 
         return services;
     }

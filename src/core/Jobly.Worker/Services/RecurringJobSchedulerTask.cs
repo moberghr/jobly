@@ -87,9 +87,7 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
             var newJob = JobHelper.CreateJob(
                 message: recurringJob.Message!,
                 type: recurringJob.Type!,
-                retries: 0,
                 scheduleTime: now,
-                maxRetries: 0,
                 queue: recurringJob.Queue,
                 parentId: null,
                 state: State.Enqueued,

@@ -27,10 +27,6 @@ public class UnifiedJobDetailModel
 
     public DateTime? ScheduleTime { get; set; }
 
-    public int RetriedTimes { get; set; }
-
-    public int MaxRetries { get; set; }
-
     public string? ConcurrencyKey { get; set; }
 
     // Batch-specific
