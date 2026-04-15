@@ -56,7 +56,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
     {
         var capture = new ActivityCapture();
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(ActivityTraceTestsBase).Assembly);
+        services.AddHandlers(typeof(ActivityTraceTestsBase).Assembly);
         services.AddPipelineBehaviors(typeof(ActivityTraceTestsBase).Assembly);
         services.AddLogging(builder => builder.AddProvider(new JobLoggerProvider()));
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());

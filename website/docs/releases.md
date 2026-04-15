@@ -4,6 +4,16 @@ sidebar_position: 6
 
 # Releases
 
+## 0.7.0
+
+*2026-04-14*
+
+### New Features
+
+- **Stream Requests** — New `IStreamRequest<TResponse>` pattern for lazy, item-by-item streaming via `IAsyncEnumerable<TResponse>`. Extends `IRequest<IAsyncEnumerable<TResponse>>` to preserve the unified type hierarchy — `IPipelineBehavior` applies automatically at the request level. `IStreamPipelineBehavior<TRequest, TResponse>` wraps the actual enumeration. Resolved via `IMediator.CreateStream()`. Source generator provides zero-allocation dispatch.
+
+---
+
 ## 0.6.1
 
 *2026-04-13*

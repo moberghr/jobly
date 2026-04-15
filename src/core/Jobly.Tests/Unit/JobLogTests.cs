@@ -54,7 +54,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(JobLogTestsBase).Assembly);
+        services.AddHandlers(typeof(JobLogTestsBase).Assembly);
         services.AddPipelineBehaviors(typeof(JobLogTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());

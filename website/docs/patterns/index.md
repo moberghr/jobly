@@ -4,23 +4,25 @@ sidebar_position: 1
 
 # Patterns
 
-Jobly provides three patterns for dispatching work. All share a unified pipeline and type hierarchy.
+Jobly provides four patterns for dispatching work. All share a unified pipeline and type hierarchy.
 
 | Pattern | Interface | Persistence | Handlers | Response |
 |---------|-----------|-------------|----------|----------|
 | [Messages](./messages.md) | `IMessage` | Database | Multiple | None (Unit) |
 | [Jobs](./jobs.md) | `IJob` | Database | Single | None (Unit) |
 | [Requests](./requests.md) | `IRequest<T>` | In-memory | Single | Typed `T` |
+| [Streams](./requests.md#streams) | `IStreamRequest<T>` | In-memory | Single | `IAsyncEnumerable<T>` |
 
 ## Type Hierarchy
 
 All types implement `IRequest<TResponse>`:
 
 ```csharp
-public interface IRequest<out TResponse>;     // Base
-public interface IJob : IRequest<Unit>;        // Persistent, single handler
-public interface IMessage : IRequest<Unit>;    // Persistent, multiple handlers
-// IRequest<TResponse> used directly           // In-memory, returns TResponse
+public interface IRequest<out TResponse>;                                        // Base
+public interface IJob : IRequest<Unit>;                                          // Persistent, single handler
+public interface IMessage : IRequest<Unit>;                                      // Persistent, multiple handlers
+// IRequest<TResponse> used directly                                            // In-memory, returns TResponse
+public interface IStreamRequest<out TResponse> : IRequest<IAsyncEnumerable<TResponse>>; // In-memory, streams TResponse
 ```
 
 ## Pipeline Behaviors
@@ -57,4 +59,23 @@ public class CacheBehavior : IPipelineBehavior<GetUser, UserDto> { ... }
 public class RetryBehavior<T> : IPipelineBehavior<T, Unit> where T : IJob { ... }
 ```
 
-For jobs and messages, `TResponse` is `Unit`. For requests, it's your custom response type. Logger output from pipeline behaviors appears in the job detail "Handler Output" section.
+For jobs and messages, `TResponse` is `Unit`. For requests, it's your custom response type. For streams, it's `IAsyncEnumerable<T>`. Logger output from pipeline behaviors appears in the job detail "Handler Output" section.
+
+Stream requests use a separate pipeline — `IStreamPipelineBehavior<TRequest, TResponse>`:
+
+```csharp
+public class StreamLoggingBehavior<T, TResponse> : IStreamPipelineBehavior<T, TResponse>
+    where T : IStreamRequest<TResponse>
+{
+    public async IAsyncEnumerable<TResponse> HandleAsync(T request, StreamHandlerDelegate<T, TResponse> next, [EnumeratorCancellation] CancellationToken ct)
+    {
+        _logger.LogInformation("Starting stream {Type}", typeof(T).Name);
+        await foreach (var item in next(request, ct).WithCancellation(ct))
+        {
+            yield return item;
+        }
+
+        _logger.LogInformation("Completed stream {Type}", typeof(T).Name);
+    }
+}
+```

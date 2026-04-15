@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is Jobly
 
-Jobly is a distributed job processing and message queue library for .NET 10. Three patterns:
+Jobly is a distributed job processing and message queue library for .NET 10. Four patterns:
 
 - **Messages** (`IMessage`) — Pub/sub queue. Multiple handlers per message, each an independent job.
 - **Jobs** (`IJob`) — Orchestrated background work. Single handler, scheduling, retries, continuations, batches, named queues.
 - **Requests** (`IRequest<TResponse>`) — In-memory request/response. Single handler, no database persistence, returns typed response immediately via `IMediator.Send()`.
+- **Streams** (`IStreamRequest<TResponse>`) — In-memory streaming. Single handler, no database persistence, returns `IAsyncEnumerable<TResponse>` via `IMediator.CreateStream()`.
 
 Ships as NuGet packages (Jobly.Core, Jobly.UI, Jobly.Worker). Supports PostgreSQL and SQL Server.
 
@@ -44,6 +45,7 @@ publisher.Enqueue(new Task(), queue: "critical");         // Named queue
 publisher.Enqueue(new FollowUp(), parentJobId: id);       // Continuation
 batchPublisher.StartNew(jobs);                            // Kind=Batch job, children linked via ParentJobId
 var user = await mediator.Send(new GetUser(id));          // IRequest<User> → in-memory, returns User
+await foreach (var item in mediator.CreateStream(new GetItems())) { } // IStreamRequest<Item> → in-memory, streams items
 ```
 
 ### Handler Interfaces
@@ -52,18 +54,21 @@ var user = await mediator.Send(new GetUser(id));          // IRequest<User> → 
 public interface IMessageHandler<in T> where T : IMessage { Task HandleAsync(T message, CancellationToken ct); }
 public interface IJobHandler<in T> where T : IJob { Task HandleAsync(T message, CancellationToken ct); }
 public interface IRequestHandler<in TRequest, TResponse> where TRequest : IRequest<TResponse> { Task<TResponse> HandleAsync(TRequest request, CancellationToken ct); }
+public interface IStreamRequestHandler<in TRequest, out TResponse> where TRequest : IStreamRequest<TResponse> { IAsyncEnumerable<TResponse> HandleAsync(TRequest request, CancellationToken ct); }
 public interface IPipelineBehavior<in TRequest, TResponse> where TRequest : IRequest<TResponse> { Task<TResponse> HandleAsync(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct); }
+public interface IStreamPipelineBehavior<TRequest, TResponse> where TRequest : IStreamRequest<TResponse> { IAsyncEnumerable<TResponse> HandleAsync(TRequest request, StreamHandlerDelegate<TResponse> next, CancellationToken ct); }
 ```
 
 ### Type Hierarchy
 
-All types implement `IRequest<TResponse>`. `IJob` and `IMessage` return `Unit` (void). `IRequest<TResponse>` returns a custom type.
+All types implement `IRequest<TResponse>`. `IStreamRequest<TResponse>` extends `IRequest<IAsyncEnumerable<TResponse>>` — streams are requests whose response is an async enumerable.
 
 ```csharp
-public interface IRequest<out TResponse>;              // Base — all types implement this
-public interface IJob : IRequest<Unit>;                 // Persistent, single handler
-public interface IMessage : IRequest<Unit>;             // Persistent, multiple handlers
-// IRequest<TResponse> used directly for in-memory     // In-memory, returns TResponse
+public interface IRequest<out TResponse>;                                        // Base — all types implement this
+public interface IJob : IRequest<Unit>;                                          // Persistent, single handler
+public interface IMessage : IRequest<Unit>;                                      // Persistent, multiple handlers
+// IRequest<TResponse> used directly for in-memory                              // In-memory, returns TResponse
+public interface IStreamRequest<out TResponse> : IRequest<IAsyncEnumerable<TResponse>>; // In-memory, streams TResponse
 ```
 
 ### In-Memory Requests (IMediator)
@@ -83,6 +88,31 @@ public class GetUserHandler : IRequestHandler<GetUser, UserDto>
 
 // Usage:
 var user = await mediator.Send(new GetUser { Id = 1 });
+```
+
+### In-Memory Streams (IMediator)
+
+Streams are NOT persisted to the database. They execute immediately in-process and return an async enumerable. Resolved via `IMediator.CreateStream()`. Since `IStreamRequest<T>` extends `IRequest<IAsyncEnumerable<T>>`, request-level `IPipelineBehavior` applies automatically (auth, logging, counting). For enumeration-level concerns (timing, per-item transforms), use `IStreamPipelineBehavior<TRequest, TResponse>`.
+
+```csharp
+public class GetUsers : IStreamRequest<UserDto> { public string Role { get; set; } }
+
+public class GetUsersHandler : IStreamRequestHandler<GetUsers, UserDto>
+{
+    public async IAsyncEnumerable<UserDto> HandleAsync(GetUsers request, [EnumeratorCancellation] CancellationToken ct)
+    {
+        await foreach (var user in _db.Users.Where(x => x.Role == request.Role).AsAsyncEnumerable().WithCancellation(ct))
+        {
+            yield return new UserDto { Id = user.Id, Name = user.Name };
+        }
+    }
+}
+
+// Usage:
+await foreach (var user in mediator.CreateStream(new GetUsers { Role = "Admin" }))
+{
+    Console.WriteLine(user.Name);
+}
 ```
 
 ### Job Entity
@@ -330,6 +360,7 @@ Workers can be split into groups with independent queues and polling intervals. 
 - **§2.4** Services expose interfaces (`IJobCommandService`, `IJobQueryService`, etc.). Generic implementations take `TContext : DbContext`.
 - **§2.5** `AddJobly<TContext>()` / `AddJoblyWorker<TContext>()` auto-configure the user's DbContext. Users register their DbContext normally — no manual Jobly configuration needed.
 - **§2.6** In-memory requests (`IRequest<TResponse>`) go through `IMediator.Send()` — same `IPipelineBehavior` pipeline as jobs/messages, but no database persistence.
+- **§2.7** In-memory streams (`IStreamRequest<TResponse>`) go through `IMediator.CreateStream()` — `IPipelineBehavior` applies at request level, `IStreamPipelineBehavior` wraps enumeration, returns `IAsyncEnumerable<TResponse>`, no database persistence.
 
 ### §3 — Coding Style
 

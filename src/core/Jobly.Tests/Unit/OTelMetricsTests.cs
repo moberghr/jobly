@@ -54,7 +54,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
     {
         var queues = new[] { queue };
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(OTelMetricsTestsBase).Assembly);
+        services.AddHandlers(typeof(OTelMetricsTestsBase).Assembly);
         services.AddPipelineBehaviors(typeof(OTelMetricsTestsBase).Assembly);
         services.AddLogging(builder => builder.AddProvider(new JobLoggerProvider()));
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());

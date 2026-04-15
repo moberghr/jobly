@@ -53,7 +53,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
         var effectiveQueues = queues ?? ["a-critical", "b-default", "default"];
 
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(PriorityTestsBase).Assembly);
+        services.AddHandlers(typeof(PriorityTestsBase).Assembly);
         services.AddPipelineBehaviors(typeof(PriorityTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());

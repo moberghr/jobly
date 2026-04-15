@@ -162,7 +162,7 @@ public abstract class AuditFixTestsBase : IAsyncLifetime
     private IServiceScopeFactory CreateScopeFactory()
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(AuditFixTestsBase).Assembly);
+        services.AddHandlers(typeof(AuditFixTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
 

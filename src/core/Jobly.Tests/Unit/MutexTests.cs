@@ -194,7 +194,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
     {
         lockProvider ??= new FakeLockProvider();
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(MutexTestsBase).Assembly);
+        services.AddHandlers(typeof(MutexTestsBase).Assembly);
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddScoped<Jobly.Core.Handlers.JobContext>();

@@ -54,7 +54,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker(bool enableHandlerLogging = true)
     {
         var services = new ServiceCollection();
-        services.AddJobHandlers(typeof(HandlerLogTestsBase).Assembly);
+        services.AddHandlers(typeof(HandlerLogTestsBase).Assembly);
         services.AddPipelineBehaviors(typeof(HandlerLogTestsBase).Assembly);
         services.AddLogging(builder => builder.AddProvider(new JobLoggerProvider()));
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());

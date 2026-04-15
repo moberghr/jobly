@@ -10,11 +10,7 @@ public static class JobDispatcher
     private static readonly ConcurrentDictionary<(Type HandlerType, Type MessageType), MethodInfo> _handleMethodCache = new();
     private static readonly ConcurrentDictionary<Type, Type> _jobHandlerTypeCache = new();
     private static readonly ConcurrentDictionary<Type, Type> _messageHandlerTypeCache = new();
-    private static readonly ConcurrentDictionary<Type, MethodInfo> _typedPipelineMethodCache = new();
     private static readonly ConcurrentDictionary<Type, MethodInfo> _typedHandlerCoreMethodCache = new();
-
-    private static readonly MethodInfo ExecuteTypedPipelineMethodInfo =
-        typeof(JobDispatcher).GetMethod(nameof(ExecuteTypedPipeline), BindingFlags.NonPublic | BindingFlags.Static)!;
 
     private static readonly MethodInfo ExecuteTypedHandlerCoreMethodInfo =
         typeof(JobDispatcher).GetMethod(nameof(ExecuteTypedHandlerCore), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -40,6 +36,7 @@ public static class JobDispatcher
             jobType,
             t => typeof(IJobHandler<>).MakeGenericType(t));
         var handler = provider.GetService(handlerInterfaceType);
+
         return handler?.GetType();
     }
 
@@ -67,11 +64,12 @@ public static class JobDispatcher
         CancellationToken cancellationToken)
     {
         var handlerInterfaceType = GetHandlerInterface(handlerType);
+
         return ExecuteHandlerCore(message, messageType, handlerType, handlerInterfaceType, provider, cancellationToken);
     }
 
     /// <summary>
-    /// Executes a job/message handler through the unified pipeline.
+    /// Executes a job/message handler through the pipeline.
     /// Wraps void-returning handlers to return Unit.
     /// Uses MakeGenericMethod to enter a fully-typed pipeline where direct calls replace reflection.
     /// </summary>
@@ -117,6 +115,7 @@ public static class JobDispatcher
         RequestHandlerDelegate<TRequest, Unit> innermost = async (req, ct) =>
         {
             await ((Task)handleMethod.Invoke(handler, [req, ct])!);
+
             return Unit.Value;
         };
 
@@ -133,50 +132,6 @@ public static class JobDispatcher
     }
 
     /// <summary>
-    /// Executes an IRequestHandler through the unified pipeline. Returns the typed response.
-    /// Uses MakeGenericMethod to enter a fully-typed pipeline where direct calls replace reflection.
-    /// </summary>
-    public static Task<TResponse> ExecuteRequestHandler<TResponse>(
-        object request,
-        Type requestType,
-        IServiceProvider provider,
-        CancellationToken cancellationToken)
-    {
-        var typedMethod = _typedPipelineMethodCache.GetOrAdd(
-            requestType,
-            t => ExecuteTypedPipelineMethodInfo.MakeGenericMethod(t, typeof(TResponse)));
-
-        return (Task<TResponse>)typedMethod.Invoke(null, [request, provider, cancellationToken])!;
-    }
-
-    /// <summary>
-    /// Fully-typed pipeline for IRequest types. Uses direct calls instead of MethodInfo.Invoke for
-    /// handler and behavior execution.
-    /// </summary>
-    private static async Task<TResponse> ExecuteTypedPipeline<TRequest, TResponse>(
-        object request,
-        IServiceProvider provider,
-        CancellationToken cancellationToken)
-        where TRequest : IRequest<TResponse>
-    {
-        var handler = provider.GetService<IRequestHandler<TRequest, TResponse>>()
-            ?? throw new InvalidOperationException($"No handler registered for {typeof(TRequest).Name}");
-
-        var typedRequest = (TRequest)request;
-        RequestHandlerDelegate<TRequest, TResponse> chain = handler.HandleAsync;
-
-        var behaviors = provider.GetServices<IPipelineBehavior<TRequest, TResponse>>().ToArray();
-        for (var i = behaviors.Length - 1; i >= 0; i--)
-        {
-            var b = behaviors[i];
-            var next = chain;
-            chain = (req, ct) => b.HandleAsync(req, next, ct);
-        }
-
-        return await chain(typedRequest, cancellationToken);
-    }
-
-    /// <summary>
     /// Execute a message handler (IMessageHandler&lt;T&gt;).
     /// </summary>
     public static Task ExecuteMessageHandler(
@@ -189,6 +144,7 @@ public static class JobDispatcher
         var handlerInterfaceType = _messageHandlerTypeCache.GetOrAdd(
             messageType,
             t => typeof(IMessageHandler<>).MakeGenericType(t));
+
         return ExecuteHandlerCore(message, messageType, handlerType, handlerInterfaceType, provider, ct);
     }
 
@@ -205,6 +161,7 @@ public static class JobDispatcher
         var handlerInterfaceType = _jobHandlerTypeCache.GetOrAdd(
             messageType,
             t => typeof(IJobHandler<>).MakeGenericType(t));
+
         return ExecuteHandlerCore(message, messageType, handlerType, handlerInterfaceType, provider, ct);
     }
 }
