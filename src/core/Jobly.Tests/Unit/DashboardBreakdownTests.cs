@@ -14,9 +14,9 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
 
     protected DashboardBreakdownTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private static Job CreateJob(JobKind kind, State state, string queue = "default")
     {
@@ -178,7 +178,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class DashboardBreakdownTests_PostgreSql : DashboardBreakdownTestsBase
 {
     public DashboardBreakdownTests_PostgreSql(PostgreSqlFixture fixture)
@@ -187,7 +187,7 @@ public class DashboardBreakdownTests_PostgreSql : DashboardBreakdownTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class DashboardBreakdownTests_SqlServer : DashboardBreakdownTestsBase
 {

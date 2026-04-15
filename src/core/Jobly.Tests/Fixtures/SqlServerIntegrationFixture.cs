@@ -18,7 +18,7 @@ public class SqlServerIntegrationFixture : IAsyncLifetime, IDatabaseFixture
 
     public JoblyTestServer TestServer { get; private set; } = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _container.StartAsync();
         _connectionString = _container.GetConnectionString() + ";Encrypt=False;";
@@ -52,12 +52,12 @@ public class SqlServerIntegrationFixture : IAsyncLifetime, IDatabaseFixture
             .Options);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await TestServer.DisposeAsync();
         await _container.DisposeAsync();
     }
 }
 
-[CollectionDefinition("SqlServer-Integration")]
+[CollectionDefinition]
 public class SqlServerIntegrationCollection : ICollectionFixture<SqlServerIntegrationFixture>;

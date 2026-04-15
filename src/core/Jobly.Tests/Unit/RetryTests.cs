@@ -28,7 +28,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
     protected RetryTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _fixture.ResetAsync();
 
@@ -50,7 +50,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private static int GetRetriedTimes(Job job)
     {
@@ -488,7 +488,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class RetryTests_PostgreSql : RetryTestsBase
 {
     public RetryTests_PostgreSql(PostgreSqlFixture fixture)
@@ -497,7 +497,7 @@ public class RetryTests_PostgreSql : RetryTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class RetryTests_SqlServer : RetryTestsBase
 {

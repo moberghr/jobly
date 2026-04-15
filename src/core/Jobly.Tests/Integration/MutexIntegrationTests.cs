@@ -49,7 +49,7 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql-Integration")]
+[Collection<PostgreSqlIntegrationCollection>]
 public class MutexIntegrationTests_PostgreSql : MutexIntegrationTestsBase
 {
     public MutexIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
@@ -58,7 +58,7 @@ public class MutexIntegrationTests_PostgreSql : MutexIntegrationTestsBase
     }
 }
 
-[Collection("SqlServer-Integration")]
+[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
 public class MutexIntegrationTests_SqlServer : MutexIntegrationTestsBase
 {

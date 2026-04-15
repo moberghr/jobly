@@ -26,9 +26,9 @@ public abstract class AuditFixTestsBase : IAsyncLifetime
 
     protected AuditFixTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>
     /// CRITICAL #1: Stale recovery must respect CancellationMode.
@@ -171,7 +171,7 @@ public abstract class AuditFixTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class AuditFixTests_PostgreSql : AuditFixTestsBase
 {
     public AuditFixTests_PostgreSql(PostgreSqlFixture fixture)
@@ -180,7 +180,7 @@ public class AuditFixTests_PostgreSql : AuditFixTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class AuditFixTests_SqlServer : AuditFixTestsBase
 {

@@ -28,7 +28,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
 
     protected OTelMetricsTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _fixture.ResetAsync();
 
@@ -50,7 +50,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private JoblyWorkerService<TestContext> CreateWorker(string queue, BarrierSignal? barrier = null)
     {
@@ -508,7 +508,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class OTelMetricsTests_PostgreSql : OTelMetricsTestsBase
 {
     public OTelMetricsTests_PostgreSql(PostgreSqlFixture fixture)
@@ -517,7 +517,7 @@ public class OTelMetricsTests_PostgreSql : OTelMetricsTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class OTelMetricsTests_SqlServer : OTelMetricsTestsBase
 {

@@ -14,9 +14,9 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
 
     protected JobGroupQueryServiceTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task GetJobGroups_Message_ReturnsMessageKindJobs()
@@ -270,7 +270,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class JobGroupQueryServiceTests_PostgreSql : JobGroupQueryServiceTestsBase
 {
     public JobGroupQueryServiceTests_PostgreSql(PostgreSqlFixture fixture)
@@ -279,7 +279,7 @@ public class JobGroupQueryServiceTests_PostgreSql : JobGroupQueryServiceTestsBas
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class JobGroupQueryServiceTests_SqlServer : JobGroupQueryServiceTestsBase
 {

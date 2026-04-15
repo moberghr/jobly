@@ -11,9 +11,9 @@ public abstract class ServerMonitoringTestsBase : IAsyncLifetime
 
     protected ServerMonitoringTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task GetServers_ReturnsServerWithWorkers()
@@ -103,7 +103,7 @@ public abstract class ServerMonitoringTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class ServerMonitoringTests_PostgreSql : ServerMonitoringTestsBase
 {
     public ServerMonitoringTests_PostgreSql(PostgreSqlFixture fixture)
@@ -112,7 +112,7 @@ public class ServerMonitoringTests_PostgreSql : ServerMonitoringTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class ServerMonitoringTests_SqlServer : ServerMonitoringTestsBase
 {

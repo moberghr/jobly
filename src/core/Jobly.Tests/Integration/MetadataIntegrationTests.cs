@@ -88,7 +88,7 @@ public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql-Integration")]
+[Collection<PostgreSqlIntegrationCollection>]
 public class MetadataIntegrationTests_PostgreSql : MetadataIntegrationTestsBase
 {
     public MetadataIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
@@ -97,7 +97,7 @@ public class MetadataIntegrationTests_PostgreSql : MetadataIntegrationTestsBase
     }
 }
 
-[Collection("SqlServer-Integration")]
+[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
 public class MetadataIntegrationTests_SqlServer : MetadataIntegrationTestsBase
 {

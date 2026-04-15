@@ -27,7 +27,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
 
     protected JobLogTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _fixture.ResetAsync();
 
@@ -49,7 +49,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private JoblyWorkerService<TestContext> CreateWorker()
     {
@@ -212,7 +212,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class JobLogTests_PostgreSql : JobLogTestsBase
 {
     public JobLogTests_PostgreSql(PostgreSqlFixture fixture)
@@ -221,7 +221,7 @@ public class JobLogTests_PostgreSql : JobLogTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class JobLogTests_SqlServer : JobLogTestsBase
 {

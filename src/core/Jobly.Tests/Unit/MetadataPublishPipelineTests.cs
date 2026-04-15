@@ -22,9 +22,9 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
 
     protected MetadataPublishPipelineTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private static ServiceProvider BuildProvider(params object[] behaviors)
     {
@@ -443,7 +443,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class MetadataPublishPipelineTests_PostgreSql : MetadataPublishPipelineTestsBase
 {
     public MetadataPublishPipelineTests_PostgreSql(PostgreSqlFixture fixture)
@@ -452,7 +452,7 @@ public class MetadataPublishPipelineTests_PostgreSql : MetadataPublishPipelineTe
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class MetadataPublishPipelineTests_SqlServer : MetadataPublishPipelineTestsBase
 {

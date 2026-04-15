@@ -209,7 +209,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql-Integration")]
+[Collection<PostgreSqlIntegrationCollection>]
 public class BatchIntegrationTests_PostgreSql : BatchIntegrationTestsBase
 {
     public BatchIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
@@ -218,7 +218,7 @@ public class BatchIntegrationTests_PostgreSql : BatchIntegrationTestsBase
     }
 }
 
-[Collection("SqlServer-Integration")]
+[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
 public class BatchIntegrationTests_SqlServer : BatchIntegrationTestsBase
 {

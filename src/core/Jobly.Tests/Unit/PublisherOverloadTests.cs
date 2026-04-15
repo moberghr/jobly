@@ -17,9 +17,9 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
 
     protected PublisherOverloadTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private static Publisher<TestContext> CreatePublisher(TestContext ctx)
     {
@@ -276,7 +276,7 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class PublisherOverloadTests_PostgreSql : PublisherOverloadTestsBase
 {
     public PublisherOverloadTests_PostgreSql(PostgreSqlFixture fixture)
@@ -285,7 +285,7 @@ public class PublisherOverloadTests_PostgreSql : PublisherOverloadTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class PublisherOverloadTests_SqlServer : PublisherOverloadTestsBase
 {

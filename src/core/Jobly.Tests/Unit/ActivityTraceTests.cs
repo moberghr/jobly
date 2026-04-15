@@ -28,7 +28,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
 
     protected ActivityTraceTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _fixture.ResetAsync();
 
@@ -50,7 +50,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private (JoblyWorkerService<TestContext> Worker, ActivityCapture Capture) CreateWorker()
     {
@@ -390,7 +390,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class ActivityTraceTests_PostgreSql : ActivityTraceTestsBase
 {
     public ActivityTraceTests_PostgreSql(PostgreSqlFixture fixture)
@@ -399,7 +399,7 @@ public class ActivityTraceTests_PostgreSql : ActivityTraceTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class ActivityTraceTests_SqlServer : ActivityTraceTestsBase
 {

@@ -16,9 +16,9 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
 
     protected StatCounterTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task DeleteJob_FromCompletedState_DecrementsSucceededCounter()
@@ -221,7 +221,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class StatCounterTests_PostgreSql : StatCounterTestsBase
 {
     public StatCounterTests_PostgreSql(PostgreSqlFixture fixture)
@@ -230,7 +230,7 @@ public class StatCounterTests_PostgreSql : StatCounterTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class StatCounterTests_SqlServer : StatCounterTestsBase
 {

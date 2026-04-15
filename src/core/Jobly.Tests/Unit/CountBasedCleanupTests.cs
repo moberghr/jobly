@@ -14,9 +14,9 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
 
     protected CountBasedCleanupTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task RunCountBasedCleanup_WhenOverThreshold_DeletesOldestByExpireAt()
@@ -253,7 +253,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class CountBasedCleanupTests_PostgreSql : CountBasedCleanupTestsBase
 {
     public CountBasedCleanupTests_PostgreSql(PostgreSqlFixture fixture)
@@ -262,7 +262,7 @@ public class CountBasedCleanupTests_PostgreSql : CountBasedCleanupTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class CountBasedCleanupTests_SqlServer : CountBasedCleanupTestsBase
 {

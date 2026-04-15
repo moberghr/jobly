@@ -16,9 +16,9 @@ public abstract class JobExpirationTimeoutTestsBase : IAsyncLifetime
 
     protected JobExpirationTimeoutTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task DeleteJob_UsesConfiguredExpirationTimeout()
@@ -87,7 +87,7 @@ public abstract class JobExpirationTimeoutTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class JobExpirationTimeoutTests_PostgreSql : JobExpirationTimeoutTestsBase
 {
     public JobExpirationTimeoutTests_PostgreSql(PostgreSqlFixture fixture)
@@ -96,7 +96,7 @@ public class JobExpirationTimeoutTests_PostgreSql : JobExpirationTimeoutTestsBas
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class JobExpirationTimeoutTests_SqlServer : JobExpirationTimeoutTestsBase
 {

@@ -27,7 +27,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
 
     protected RetentionTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _fixture.ResetAsync();
 
@@ -49,7 +49,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private JoblyWorkerService<TestContext> CreateWorker()
     {
@@ -332,7 +332,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class RetentionTests_PostgreSql : RetentionTestsBase
 {
     public RetentionTests_PostgreSql(PostgreSqlFixture fixture)
@@ -341,7 +341,7 @@ public class RetentionTests_PostgreSql : RetentionTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class RetentionTests_SqlServer : RetentionTestsBase
 {

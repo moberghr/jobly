@@ -111,7 +111,7 @@ public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql-Integration")]
+[Collection<PostgreSqlIntegrationCollection>]
 public class ConcurrencyIntegrationTests_PostgreSql : ConcurrencyIntegrationTestsBase
 {
     public ConcurrencyIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
@@ -120,7 +120,7 @@ public class ConcurrencyIntegrationTests_PostgreSql : ConcurrencyIntegrationTest
     }
 }
 
-[Collection("SqlServer-Integration")]
+[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
 public class ConcurrencyIntegrationTests_SqlServer : ConcurrencyIntegrationTestsBase
 {

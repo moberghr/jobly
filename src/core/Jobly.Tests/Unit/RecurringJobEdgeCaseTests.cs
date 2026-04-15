@@ -16,9 +16,9 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
     protected RecurringJobEdgeCaseTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task ScheduleRecurringJobs_JobStillPending_SkipsScheduling()
@@ -406,7 +406,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class RecurringJobEdgeCaseTests_PostgreSql : RecurringJobEdgeCaseTestsBase
 {
     public RecurringJobEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture)
@@ -415,7 +415,7 @@ public class RecurringJobEdgeCaseTests_PostgreSql : RecurringJobEdgeCaseTestsBas
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class RecurringJobEdgeCaseTests_SqlServer : RecurringJobEdgeCaseTestsBase
 {

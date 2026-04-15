@@ -18,12 +18,12 @@ Ships as NuGet packages (Jobly.Core, Jobly.UI, Jobly.Worker). Supports PostgreSQ
 ```bash
 # Backend (from src/)
 dotnet build Jobly.sln
-dotnet test Jobly.sln --filter "Category!=SqlServer"   # PostgreSQL only
-dotnet test Jobly.sln                                    # All databases (632 tests, ~30s)
+dotnet test --project core/Jobly.Tests/Jobly.Tests.csproj --filter-not-trait "Category=SqlServer"  # PostgreSQL only
+dotnet test --project core/Jobly.Tests/Jobly.Tests.csproj                                          # All databases (764 tests, ~2min)
 
 # Run specific test suites
-dotnet test Jobly.sln --filter "FullyQualifiedName~Jobly.Tests.Unit"         # Unit tests only
-dotnet test Jobly.sln --filter "FullyQualifiedName~Jobly.Tests.Integration"  # Integration tests only
+dotnet test --project core/Jobly.Tests/Jobly.Tests.csproj --filter-namespace "Jobly.Tests.Unit"         # Unit tests only
+dotnet test --project core/Jobly.Tests/Jobly.Tests.csproj --filter-namespace "Jobly.Tests.Integration"  # Integration tests only
 
 # Frontend (from src/ui/)
 npm install

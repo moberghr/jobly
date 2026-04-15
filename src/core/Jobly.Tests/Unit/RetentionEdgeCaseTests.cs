@@ -29,7 +29,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
 
     protected RetentionEdgeCaseTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _fixture.ResetAsync();
 
@@ -51,7 +51,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private JoblyWorkerService<TestContext> CreateWorker()
     {
@@ -259,7 +259,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class RetentionEdgeCaseTests_PostgreSql : RetentionEdgeCaseTestsBase
 {
     public RetentionEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture)
@@ -268,7 +268,7 @@ public class RetentionEdgeCaseTests_PostgreSql : RetentionEdgeCaseTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class RetentionEdgeCaseTests_SqlServer : RetentionEdgeCaseTestsBase
 {

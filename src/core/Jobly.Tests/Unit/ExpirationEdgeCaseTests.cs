@@ -15,7 +15,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
     protected ExpirationEdgeCaseTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _fixture.ResetAsync();
 
@@ -31,7 +31,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>
     /// Inserts an expired job so that RunCleanup has work to do and triggers the stats/log cleanup path.
@@ -204,7 +204,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class ExpirationEdgeCaseTests_PostgreSql : ExpirationEdgeCaseTestsBase
 {
     public ExpirationEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture)
@@ -213,7 +213,7 @@ public class ExpirationEdgeCaseTests_PostgreSql : ExpirationEdgeCaseTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class ExpirationEdgeCaseTests_SqlServer : ExpirationEdgeCaseTestsBase
 {

@@ -123,7 +123,7 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
     }
 }
 
-[Collection("PostgreSql-Integration")]
+[Collection<PostgreSqlIntegrationCollection>]
 public class ScopeIsolationIntegrationTests_PostgreSql : ScopeIsolationIntegrationTestsBase
 {
     public ScopeIsolationIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)
@@ -132,7 +132,7 @@ public class ScopeIsolationIntegrationTests_PostgreSql : ScopeIsolationIntegrati
     }
 }
 
-[Collection("SqlServer-Integration")]
+[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
 public class ScopeIsolationIntegrationTests_SqlServer : ScopeIsolationIntegrationTestsBase
 {

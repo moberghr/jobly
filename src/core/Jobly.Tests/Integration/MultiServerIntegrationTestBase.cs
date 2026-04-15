@@ -17,7 +17,7 @@ public abstract class MultiServerIntegrationTestBase : IAsyncLifetime
 
     protected TestContext CreateContext() => _fixture.CreateContext();
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         try
         {
@@ -30,5 +30,5 @@ public abstract class MultiServerIntegrationTestBase : IAsyncLifetime
         }
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

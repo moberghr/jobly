@@ -24,7 +24,7 @@ public class PostgreSqlFixture : IAsyncLifetime, IDatabaseFixture
 
     public SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _container.StartAsync();
         _connectionString = _container.GetConnectionString();
@@ -56,11 +56,11 @@ public class PostgreSqlFixture : IAsyncLifetime, IDatabaseFixture
             .Options);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await _container.DisposeAsync();
     }
 }
 
-[CollectionDefinition("PostgreSql")]
+[CollectionDefinition]
 public class PostgreSqlCollection : ICollectionFixture<PostgreSqlFixture>;

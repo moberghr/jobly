@@ -16,9 +16,9 @@ public abstract class WorkerIdLogTestsBase : IAsyncLifetime
 
     protected WorkerIdLogTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
 
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public async Task DeleteJob_LogHasNullWorkerId()
@@ -77,7 +77,7 @@ public abstract class WorkerIdLogTestsBase : IAsyncLifetime
     }
 }
 
-[Collection("PostgreSql")]
+[Collection<PostgreSqlCollection>]
 public class WorkerIdLogTests_PostgreSql : WorkerIdLogTestsBase
 {
     public WorkerIdLogTests_PostgreSql(PostgreSqlFixture fixture)
@@ -86,7 +86,7 @@ public class WorkerIdLogTests_PostgreSql : WorkerIdLogTestsBase
     }
 }
 
-[Collection("SqlServer")]
+[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
 public class WorkerIdLogTests_SqlServer : WorkerIdLogTestsBase
 {

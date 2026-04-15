@@ -23,7 +23,7 @@ public class SqlServerMultiServerFixture : IAsyncLifetime, IMultiServerDatabaseF
     // IDatabaseFixture.TestServer — not used, but required by the interface for CreateContext reuse
     JoblyTestServer? IDatabaseFixture.TestServer => Server1;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _container.StartAsync();
         _connectionString = _container.GetConnectionString() + ";Encrypt=False;";
@@ -58,7 +58,7 @@ public class SqlServerMultiServerFixture : IAsyncLifetime, IMultiServerDatabaseF
             .Options);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await Server2.DisposeAsync();
         await Server1.DisposeAsync();
@@ -66,5 +66,5 @@ public class SqlServerMultiServerFixture : IAsyncLifetime, IMultiServerDatabaseF
     }
 }
 
-[CollectionDefinition("SqlServer-MultiServer")]
+[CollectionDefinition]
 public class SqlServerMultiServerCollection : ICollectionFixture<SqlServerMultiServerFixture>;
