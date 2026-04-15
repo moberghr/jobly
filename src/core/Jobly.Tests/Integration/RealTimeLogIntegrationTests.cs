@@ -14,7 +14,7 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenProcessingJob_WhenHandlerLogs_ThenLogsAppearInDbBeforeCompletion()
     {
         var publisher = Server.CreatePublisher();
@@ -47,7 +47,7 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
         await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(15));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenProcessingJob_WhenHandlerLogs_ThenLogLevelsArePreserved()
     {
         var publisher = Server.CreatePublisher();
@@ -71,7 +71,7 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
         await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(15));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenProcessingJob_WhenCancelledBeforeFlush_ThenHandlerLogsArePreserved()
     {
         var publisher = Server.CreatePublisher();

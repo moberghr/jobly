@@ -17,7 +17,7 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenHandlerThatAddsEntityAndThrows_WhenProcessed_ThenEntityNotPersisted()
     {
         var publisher = Server.CreatePublisher();
@@ -36,7 +36,7 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
         leaked.ShouldBeFalse();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenHandlerThatAddsEntitySavesAndThrows_WhenProcessed_ThenEntityPersisted()
     {
         var publisher = Server.CreatePublisher();
@@ -55,7 +55,7 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
         committed.ShouldBeTrue();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenHandlerThatAddsEntityAndThrows_WithRetry_ThenEntityNotPersisted()
     {
         var publisher = Server.CreatePublisher();
@@ -83,7 +83,7 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
         job.CurrentState.ShouldBe(State.Failed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenSuccessfulHandler_WhenChildJobPublished_ThenChildJobPersisted()
     {
         var publisher = Server.CreatePublisher();
@@ -100,7 +100,7 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
         childJobs.Count.ShouldBeGreaterThan(0);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenSuccessfulHandler_WhenMetadataModifiedByPipeline_ThenMetadataPersisted()
     {
         var publisher = Server.CreatePublisher();

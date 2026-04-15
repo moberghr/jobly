@@ -17,7 +17,7 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenHandlerThatWritesMetadata_WhenCompleted_ThenHandlerMetadataPersisted()
     {
         var publisher = Server.CreatePublisher();
@@ -36,7 +36,7 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
         metadata["HandlerWrote"].ShouldBe("from-handler");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenPublishPipelineAndHandler_WhenCompleted_ThenBothMetadataKeysPersisted()
     {
         // RetryPublishBehavior sets MaxRetries at publish time
@@ -62,7 +62,7 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
         metadata["HandlerWrote"].ShouldBe("from-handler");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenUserMetadataAtPublishTime_WhenCompleted_ThenUserMetadataPreserved()
     {
         var publisher = Server.CreatePublisher();
@@ -92,7 +92,7 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
         metadata.ShouldContainKey("HandlerWrote");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenFailingJobWithRetry_WhenFailed_ThenRetryMetadataPersisted()
     {
         var publisher = Server.CreatePublisher();
@@ -119,7 +119,7 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
         Convert.ToInt32(metadata["RetriedTimes"]).ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenChildJobSpawnedByHandler_WhenCompleted_ThenChildInheritsParentMetadata()
     {
         var publisher = Server.CreatePublisher();

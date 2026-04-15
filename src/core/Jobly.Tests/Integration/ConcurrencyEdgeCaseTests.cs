@@ -15,7 +15,7 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenConcurrentDeleteOnSameJob_ThenOnlyOneDeleteRecorded()
     {
         // Arrange — enqueue a job and wait for it to complete
@@ -63,7 +63,7 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
         // Either way, there should be exactly 1 successful delete
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenConcurrentRequeueOnSameJob_ThenStateConsistent()
     {
         // Arrange — enqueue a job and wait for it to complete

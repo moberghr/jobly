@@ -23,7 +23,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         return group.Id;
     }
 
-    [Fact]
+    [TimedFact]
     public async Task PauseServer_PauseStateHolder_UpdatedByHeartbeat()
     {
         var groupId = await GetFirstGroupId();
@@ -38,7 +38,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         await Server.WaitForPauseState(groupId, expectedPaused: false);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task PauseServer_JobsStayEnqueued()
     {
         var groupId = await GetFirstGroupId();
@@ -67,7 +67,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         await Server.WaitForCompletion();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task PauseServer_Resume_JobsGetProcessed()
     {
         var groupId = await GetFirstGroupId();
@@ -89,7 +89,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         job.CurrentState.ShouldBe(State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task PauseWorkerGroup_JobsStayEnqueued()
     {
         var groupId = await GetFirstGroupId();
@@ -118,7 +118,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         await Server.WaitForCompletion();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task PauseWorkerGroup_Resume_JobsGetProcessed()
     {
         var groupId = await GetFirstGroupId();

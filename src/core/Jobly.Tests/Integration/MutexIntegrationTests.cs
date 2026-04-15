@@ -15,7 +15,7 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenTwoJobsWithSameMutex_WhenProcessed_ThenSecondIsCancelled()
     {
         var publisher = Server.CreatePublisher();

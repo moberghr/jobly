@@ -99,7 +99,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             new FakeLockProvider());
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_FailedJobWithRetries_StatNotIncrementedDuringRetry()
     {
         // Arrange
@@ -135,7 +135,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         failedStat.ShouldBe(0);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ExpirationCleanup_StatisticsSurviveCleanup()
     {
         // Arrange — insert expired job and add stats
@@ -168,7 +168,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         stat.Value.ShouldBe(10);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_CompletedJob_DecrementsSucceededAndIncrementsDeleted()
     {
         // Arrange — create a completed job with existing stats
@@ -213,7 +213,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         deletedAfter.ShouldBe(deletedBefore + 1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_FailedJob_DecrementsFailedStat()
     {
         // Arrange — create and process a failing job (no retries via metadata)

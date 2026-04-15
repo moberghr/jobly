@@ -20,7 +20,7 @@ public abstract class CancellationModeTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_WhenProcessing_SetsCancellationModeGraceful()
     {
         // Arrange
@@ -53,7 +53,7 @@ public abstract class CancellationModeTestsBase : IAsyncLifetime
         logs.ShouldContain(l => l.EventType == "CancellationRequested");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_WhenNotProcessing_SetsStateToDeleted()
     {
         // Arrange
@@ -83,7 +83,7 @@ public abstract class CancellationModeTestsBase : IAsyncLifetime
         job.ExpireAt.ShouldNotBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_WhenFailed_SetsStateToDeleted()
     {
         // Arrange

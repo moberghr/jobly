@@ -17,7 +17,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task RunOrchestration_BatchAllChildrenCompleted_FinalizesBatch()
     {
         // Arrange
@@ -61,7 +61,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
         batch.CurrentState.ShouldBe(State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunOrchestration_BatchSomeChildrenEnqueued_DoesNotFinalize()
     {
         // Arrange
@@ -111,7 +111,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
         batch.CurrentState.ShouldBe(State.Awaiting);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunOrchestration_BatchWithFailedChild_OnlyOnSucceeded_BatchFails()
     {
         // Arrange
@@ -162,7 +162,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
         batch.CurrentState.ShouldBe(State.Failed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunOrchestration_BatchWithFailedChild_OnAnyFinished_BatchCompletes()
     {
         // Arrange
@@ -213,7 +213,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
         batch.CurrentState.ShouldBe(State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunOrchestration_MessageAllChildrenCompleted_FinalizesMessage()
     {
         // Arrange
@@ -257,7 +257,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
         message.ExpireAt.ShouldNotBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunOrchestration_ActivatesContinuationChildren()
     {
         // Arrange: completed batch parent -> awaiting continuation batch child -> awaiting grandchildren
@@ -338,7 +338,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunOrchestration_FailedParentOnlyOnSucceeded_ContinuationStaysAwaiting()
     {
         // Arrange: failed batch parent (OnlyOnSucceeded) -> awaiting continuation child
@@ -397,7 +397,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
         continuation.CurrentState.ShouldBe(State.Awaiting);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunOrchestration_AlreadyFinalized_ReturnsNoWork()
     {
         // Arrange: completed batch + completed children

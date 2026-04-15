@@ -15,7 +15,7 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenSingleHandlerMessage_WhenPublished_ThenMessageCompletesAndHandlerExecutes()
     {
         var publisher = Server.CreatePublisher();
@@ -39,7 +39,7 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
         handlerJobs[0].CurrentState.ShouldBe(State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenMultiHandlerMessage_WhenPublished_ThenBothHandlersExecuteAndMessageCompletes()
     {
         var publisher = Server.CreatePublisher();
@@ -62,7 +62,7 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
         handlerJobs.ShouldAllBe(j => j.CurrentState == State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenMessageWithQueue_WhenPublished_ThenChildrenInheritQueue()
     {
         var publisher = Server.CreatePublisher();
@@ -83,7 +83,7 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
         handlerJobs[0].Queue.ShouldBe("a-critical");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenMultipleMessages_WhenPublished_ThenAllRouteAndComplete()
     {
         var publisher = Server.CreatePublisher();
@@ -112,7 +112,7 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenMessageWithFailingHandler_WhenProcessed_ThenMessageStillCompletesWithFailedJobs()
     {
         // MultiRequest has 2 handlers. We can't make only one fail easily,

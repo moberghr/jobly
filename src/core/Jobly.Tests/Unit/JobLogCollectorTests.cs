@@ -5,7 +5,7 @@ namespace Jobly.Tests.Unit;
 
 public class JobLogCollectorTests
 {
-    [Fact]
+    [TimedFact]
     public void Drain_ReturnsAllEntries_AndClearsQueue()
     {
         var collector = new JobLogCollector { JobId = Guid.NewGuid() };
@@ -22,7 +22,7 @@ public class JobLogCollectorTests
         collector.Drain().Count.ShouldBe(0);
     }
 
-    [Fact]
+    [TimedFact]
     public void Drain_ReturnsEmptyList_WhenQueueIsEmpty()
     {
         var collector = new JobLogCollector { JobId = Guid.NewGuid() };
@@ -32,7 +32,7 @@ public class JobLogCollectorTests
         entries.ShouldBeEmpty();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Drain_DoesNotLoseEntries_WhenAddAndDrainConcurrently()
     {
         var collector = new JobLogCollector { JobId = Guid.NewGuid() };

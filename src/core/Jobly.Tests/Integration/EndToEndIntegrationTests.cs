@@ -18,7 +18,7 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenComplexWorkload_WhenProcessedByRealWorkers_ThenAllJobsReachTerminalState()
     {
         var publisher = Server.CreatePublisher();

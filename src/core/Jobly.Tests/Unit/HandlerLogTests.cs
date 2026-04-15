@@ -92,7 +92,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
             new FakeLockProvider());
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_HandlerWithLogging_LogsAreCaptured()
     {
         // Arrange
@@ -127,7 +127,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
         logs.ShouldContain(l => l.Message.Contains("This is a warning", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_HandlerWithLogging_LogsHaveCorrectLevel()
     {
         // Arrange
@@ -164,7 +164,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
         warningLog.Level.ShouldBe("Warning");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_HandlerThatThrows_LogsBeforeErrorAreCaptured()
     {
         // Arrange
@@ -200,7 +200,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
         handlerLogs.ShouldContain(l => l.Message.Contains("About to fail", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_TwoJobs_LogsDoNotLeak()
     {
         // Arrange — create two logging jobs
@@ -260,7 +260,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
         logs2.ShouldContain(l => l.Message.Contains("About to fail", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_HandlerLoggingDisabled_HandlerLogsNotWritten()
     {
         // Arrange
@@ -294,7 +294,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
         handlerLogs.ShouldBeEmpty();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_HandlerLoggingDisabled_StateLogsStillWritten()
     {
         // Arrange

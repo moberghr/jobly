@@ -20,7 +20,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_FromCompletedState_DecrementsSucceededCounter()
     {
         // Arrange
@@ -49,7 +49,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
         counterSum.ShouldBe(-1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_FromFailedState_DecrementsFailedCounter()
     {
         // Arrange
@@ -78,7 +78,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
         counterSum.ShouldBe(-1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_FromDeletedState_NoOp()
     {
         // Arrange
@@ -106,7 +106,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
         counterCount.ShouldBe(0);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_AddsDeletedCounter()
     {
         // Arrange
@@ -135,7 +135,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
         deletedCounterSum.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_FromCompletedState_DecrementsSucceededCounter()
     {
         // Arrange
@@ -164,7 +164,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
         counterSum.ShouldBe(-1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_FromFailedState_DecrementsFailedCounter()
     {
         // Arrange
@@ -193,7 +193,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
         counterSum.ShouldBe(-1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_AlreadyEnqueued_NoOp()
     {
         // Arrange

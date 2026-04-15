@@ -91,7 +91,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
             new FakeLockProvider());
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_CompletedJob_SetsExpireAt()
     {
         // Arrange
@@ -114,7 +114,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         job.ExpireAt.Value.ShouldBeGreaterThan(DateTime.UtcNow);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_FailedJob_ExpireAtIsNull()
     {
         // Arrange
@@ -146,7 +146,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         job.ExpireAt.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_CompletedJob_IncrementsSucceededStat()
     {
         // Arrange
@@ -177,7 +177,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         statAfter.ShouldBe(statBefore + 1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_FailedJob_IncrementsFailedStat()
     {
         // Arrange
@@ -218,7 +218,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         statAfter.ShouldBe(statBefore + 1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_IncrementsDeletedStat()
     {
         // Arrange
@@ -255,7 +255,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         statAfter.ShouldBe(statBefore + 1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_DecrementsSucceededStat()
     {
         // Arrange — enqueue and process a job so stats:succeeded is incremented
@@ -289,7 +289,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         succeededAfter.ShouldBe(succeededBefore - 1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ExpirationCleanup_DeletesExpiredJobAndLogs()
     {
         // Arrange

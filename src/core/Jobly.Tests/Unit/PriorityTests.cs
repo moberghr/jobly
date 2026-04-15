@@ -90,7 +90,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
             new FakeLockProvider());
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_MultipleQueues_ProcessesAlphabeticalFirst()
     {
         // Arrange — insert jobs in "b-default" and "a-critical"
@@ -139,7 +139,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
         defaultJob.CurrentState.ShouldBe(State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_SameQueue_ProcessesEarlierScheduledFirst()
     {
         // Arrange — insert 2 jobs same queue, different ScheduleTime
@@ -186,7 +186,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
         laterJob.CurrentState.ShouldBe(State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_DefaultQueue_Processed()
     {
         // Arrange
@@ -217,7 +217,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_PastScheduledJob_Processed()
     {
         // Arrange

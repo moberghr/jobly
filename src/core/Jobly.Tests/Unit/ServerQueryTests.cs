@@ -16,7 +16,7 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task GetServerLogs_ReturnsPaginatedLogs()
     {
         // Arrange
@@ -66,7 +66,7 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
         logs.PageCount.ShouldBe(2);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetServerLogs_FilteredByTaskName()
     {
         // Arrange
@@ -135,7 +135,7 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
         logs.Items.ShouldAllBe(l => string.Equals(l.TaskName, "StaleJobRecovery", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetServerTaskSummaries_ReturnsRegisteredTasks()
     {
         // Arrange

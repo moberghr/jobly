@@ -91,7 +91,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
             new FakeLockProvider());
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_CompletedJob_IncrementsHourlySucceededStat()
     {
         // Arrange
@@ -126,7 +126,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         stat.Value.ShouldBeGreaterThanOrEqualTo(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_FailedJob_IncrementsHourlyFailedStat()
     {
         // Arrange
@@ -161,7 +161,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         stat.Value.ShouldBeGreaterThanOrEqualTo(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_MultipleJobs_HourlyStatsAccumulate()
     {
         // Arrange — create 3 jobs
@@ -201,7 +201,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         stat.Value.ShouldBe(3);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJoblyStatus_IncludesHistoricalTotals()
     {
         // Arrange — insert stats

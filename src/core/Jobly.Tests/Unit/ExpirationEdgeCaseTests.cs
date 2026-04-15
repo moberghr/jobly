@@ -51,7 +51,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCleanup_OldHourlyStats_Deleted()
     {
         // Arrange — use stats:failed: prefix because the cleanup uses a lexicographic comparison
@@ -73,7 +73,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         stat.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCleanup_RecentHourlyStats_Kept()
     {
         // Arrange
@@ -95,7 +95,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         stat.Value.ShouldBe(7);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCleanup_OldServerLogs_DeletedBasedOnTaskInterval()
     {
         // Arrange — insert a ServerTask with 60s interval, retention = 60 * 300 = 18000 seconds
@@ -134,7 +134,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         log.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCleanup_RecentServerLogs_Kept()
     {
         // Arrange
@@ -173,7 +173,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         log.ShouldNotBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCleanup_OrphanedServerLogs_DeletedAfterOneDay()
     {
         // Arrange

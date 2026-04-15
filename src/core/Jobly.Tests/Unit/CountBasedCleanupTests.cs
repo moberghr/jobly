@@ -18,7 +18,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task RunCountBasedCleanup_WhenOverThreshold_DeletesOldestByExpireAt()
     {
         // Arrange
@@ -51,7 +51,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         remaining.ShouldBe(20);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCountBasedCleanup_WhenUnderThreshold_DeletesNothing()
     {
         // Arrange
@@ -84,7 +84,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         remaining.ShouldBe(15);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCountBasedCleanup_BatchesCorrectly()
     {
         // Arrange
@@ -122,7 +122,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         earliestRemaining.Value.ShouldBeGreaterThanOrEqualTo(DateTime.UtcNow.AddHours(9));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCountBasedCleanup_ExcludesJobsWithNullExpireAt()
     {
         // Arrange
@@ -183,7 +183,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         totalRemaining.ShouldBe(30);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCountBasedCleanup_DeletesAssociatedJobLogs()
     {
         // Arrange — insert 25 jobs (5 over threshold of 20), with logs on the 5 oldest

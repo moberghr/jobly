@@ -20,7 +20,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_JobStillPending_SkipsScheduling()
     {
         // Arrange — recurring job with NextJobId pointing to an Enqueued (pending) job
@@ -72,7 +72,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         jobCountAfter.ShouldBe(jobCountBefore);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_MultipleDueJobs_SchedulesAll()
     {
         // Arrange — insert 3 recurring jobs with past NextExecution, each with a completed next job
@@ -123,7 +123,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         count.ShouldBe(3);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_UpdatesNextExecution()
     {
         // Arrange
@@ -173,7 +173,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         rj.NextExecution.Value.ShouldBeGreaterThan(DateTime.UtcNow);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_UpdatesLastExecution()
     {
         // Arrange
@@ -223,7 +223,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         rj.LastExecution.Value.ShouldBe(pastTime, TimeSpan.FromSeconds(1));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_DisabledJob_CreatesSkippedLogEntry()
     {
         // Arrange
@@ -258,7 +258,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         log.JobId.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_DisabledJob_DoesNotCreateJob()
     {
         // Arrange
@@ -287,7 +287,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         jobCountAfter.ShouldBe(jobCountBefore);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_DisabledJob_AdvancesNextExecution()
     {
         // Arrange
@@ -316,7 +316,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         rj.NextExecution.Value.ShouldBeGreaterThan(DateTime.UtcNow);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_DisabledJob_AdvancesLastExecution()
     {
         // Arrange
@@ -345,7 +345,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         rj.LastExecution.Value.ShouldBe(pastTime, TimeSpan.FromSeconds(1));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_EnabledJob_CreatesJobNormally()
     {
         // Arrange — enabled recurring job (DisabledAt = null) with completed previous job

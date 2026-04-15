@@ -15,7 +15,7 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenParentJob_WhenCompletes_ThenChildActivatesAndCompletes()
     {
         var publisher = Server.CreatePublisher();
@@ -35,7 +35,7 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
         child.ParentJobId.ShouldBe(parentId);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenParentJobThatFails_WhenDefaultOnlyOnSucceeded_ThenChildStaysAwaiting()
     {
         var publisher = Server.CreatePublisher();
@@ -59,7 +59,7 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
         child.CurrentState.ShouldBe(State.Awaiting);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenParentJobThatFails_WithOnAnyFinishedState_ThenChildStillActivates()
     {
         // Use batch publisher to create a batch with OnAnyFinishedState continuation,
@@ -93,7 +93,7 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
         continuationChildren.ShouldAllBe(j => j.CurrentState == State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenThreeLevelContinuationChain_WhenProcessed_ThenAllComplete()
     {
         var publisher = Server.CreatePublisher();

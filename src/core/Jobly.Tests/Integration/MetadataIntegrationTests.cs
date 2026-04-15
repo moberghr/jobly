@@ -16,7 +16,7 @@ public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task PublishJob_WithPublishPipeline_MetadataPersistedAndAvailableInHandler()
     {
         var publisher = Server.CreatePublisher();
@@ -39,7 +39,7 @@ public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
         capture.CapturedMetadata["source"].ShouldBe("publish-pipeline");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task PublishMessage_MetadataInheritedByRoutedChildJobs()
     {
         var publisher = Server.CreatePublisher();
@@ -63,7 +63,7 @@ public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task BatchPublish_AllChildrenGetSameMetadata()
     {
         var batchPublisher = Server.CreateBatchPublisher();

@@ -40,7 +40,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Fix #1: Multiple behaviors per type all run ---
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_MultipleBehaviors_AllBehaviorsRun()
     {
         var ctx = _fixture.CreateContext();
@@ -58,7 +58,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
         metadata["key-b"].ShouldBe("value-b");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Publish_MultipleBehaviors_AllBehaviorsRunForMessage()
     {
         var ctx = _fixture.CreateContext();
@@ -77,7 +77,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Fix #2: CancellationToken flows to behaviors ---
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_CancellationToken_FlowsToBehavior()
     {
         var ctx = _fixture.CreateContext();
@@ -94,7 +94,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Fix #3: No behaviors → null metadata (not empty JSON) ---
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_NoBehaviors_MetadataIsNull()
     {
         var ctx = _fixture.CreateContext();
@@ -108,7 +108,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Ad-hoc metadata via JobParameters ---
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_WithJobParametersMetadata_MetadataPersisted()
     {
         var ctx = _fixture.CreateContext();
@@ -126,7 +126,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
         metadata["ad-hoc"].ShouldBe("value");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_BehaviorAndAdHocMetadata_BothPresent()
     {
         var ctx = _fixture.CreateContext();
@@ -147,7 +147,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Fix #5: Model metadata caching ---
-    [Fact]
+    [TimedFact]
     public void UnifiedJobDetailModel_Metadata_CachedAcrossAccesses_1()
     {
         var model = new UnifiedJobDetailModel { MetadataJson = """{"key":"value"}""" };
@@ -160,7 +160,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
         ReferenceEquals(first, second).ShouldBeTrue("Metadata should be the same instance on repeated access");
     }
 
-    [Fact]
+    [TimedFact]
     public void UnifiedJobDetailModel_Metadata_CachedAcrossAccesses_WithMultipleKeys()
     {
         var model = new UnifiedJobDetailModel { MetadataJson = """{"key1":"value1","key2":"value2"}""" };
@@ -174,7 +174,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
         ReferenceEquals(first, second).ShouldBeTrue("Metadata should be the same instance on repeated access");
     }
 
-    [Fact]
+    [TimedFact]
     public void UnifiedJobDetailModel_NullMetadataJson_ReturnsNull()
     {
         var model = new UnifiedJobDetailModel { MetadataJson = null };
@@ -182,7 +182,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Edge case: JobContext with null metadata → Metadata is empty dict, not null ---
-    [Fact]
+    [TimedFact]
     public void JobContext_DefaultMetadata_IsEmptyDictionaryNotNull()
     {
         var ctx = new JobContext();
@@ -191,7 +191,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Batch: pipeline runs once, all children get metadata ---
-    [Fact]
+    [TimedFact]
     public async Task BatchPublisher_WithBehavior_AllChildrenGetMetadata()
     {
         var ctx = _fixture.CreateContext();
@@ -216,7 +216,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Metadata inheritance from execution context ---
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_InsideExecutionContext_InheritsParentMetadata()
     {
         // Simulate a handler publishing a child job
@@ -247,7 +247,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Batch: ad-hoc metadata via StartNew ---
-    [Fact]
+    [TimedFact]
     public async Task BatchPublisher_WithAdHocMetadata_AllChildrenGetIt()
     {
         var ctx = _fixture.CreateContext();
@@ -271,7 +271,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Edge case: behavior modifies metadata AFTER next() ---
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_BehaviorWritesAfterNext_MetadataPersisted()
     {
         var ctx = _fixture.CreateContext();
@@ -288,7 +288,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Edge case: behavior short-circuits (never calls next()) ---
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_BehaviorShortCircuits_MetadataFromBehaviorStillPersisted()
     {
         var ctx = _fixture.CreateContext();
@@ -305,7 +305,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Edge case: behavior throws → exception propagates, job not created ---
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_BehaviorThrows_ExceptionPropagatesAndJobNotCreated()
     {
         var ctx = _fixture.CreateContext();
@@ -321,7 +321,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Edge case: pipeline execution order (first registered = outermost, runs first) ---
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_BehaviorOrder_FirstRegisteredIsOutermost()
     {
         var ctx = _fixture.CreateContext();
@@ -338,7 +338,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     }
 
     // --- Edge case: ad-hoc metadata overrides inherited metadata on key conflict ---
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_AdHocOverridesInherited_OnKeyConflict()
     {
         JobExecutionContext.Current = new JobExecutionInfo

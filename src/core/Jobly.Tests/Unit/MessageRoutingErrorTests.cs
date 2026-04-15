@@ -36,7 +36,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
         return provider.GetRequiredService<IServiceScopeFactory>();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunMessageRouting_UnknownMessageType_SetsMessageToFailed()
     {
         // Arrange
@@ -68,7 +68,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
         message.CurrentState.ShouldBe(State.Failed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunMessageRouting_NoHandlersRegistered_SetsMessageToFailed()
     {
         // Arrange — use a valid type that exists but has no handler registered
@@ -101,7 +101,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
         message.CurrentState.ShouldBe(State.Failed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunMessageRouting_MultipleHandlers_CreatesOneJobPerHandler()
     {
         // Arrange
@@ -134,7 +134,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
         children.Count.ShouldBe(2);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunMessageRouting_SetsHandlerTypeOnChildJobs()
     {
         // Arrange

@@ -19,7 +19,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     // --- CounterAggregatorTask ---
-    [Fact]
+    [TimedFact]
     public async Task AggregateCounters_SumsCountersIntoStatistics()
     {
         // Arrange
@@ -44,7 +44,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         failed.Value.ShouldBe(2);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task AggregateCounters_DeletesProcessedCounters()
     {
         // Arrange
@@ -64,7 +64,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
     }
 
     // --- ExpirationCleanupTask ---
-    [Fact]
+    [TimedFact]
     public async Task ExpirationCleanup_DeletesExpiredJobs()
     {
         // Arrange
@@ -92,7 +92,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         job.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ExpirationCleanup_KeepsNonExpiredJobs()
     {
         // Arrange
@@ -120,7 +120,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         job.ShouldNotBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ExpirationCleanup_KeepsFailedJobsWithoutExpireAt()
     {
         // Arrange
@@ -149,7 +149,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
     }
 
     // --- StaleJobRecoveryTask ---
-    [Fact]
+    [TimedFact]
     public async Task StaleJobRecovery_RequeuesStaleJobs()
     {
         // Arrange
@@ -179,7 +179,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task StaleJobRecovery_KeepsFreshJobs()
     {
         // Arrange
@@ -210,7 +210,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
     }
 
     // --- ServerCleanupTask ---
-    [Fact]
+    [TimedFact]
     public async Task ServerCleanup_RemovesDeadServers()
     {
         // Arrange

@@ -9,7 +9,7 @@ namespace Jobly.Tests.Unit;
 /// </summary>
 public class JoblyTelemetryTests
 {
-    [Fact]
+    [TimedFact]
     public void GetShortTypeName_AssemblyQualifiedName_ReturnsNameWithoutAssembly()
     {
         var result = JoblyTelemetry.GetShortTypeName("MyApp.Handlers.SendReport, MyApp, Version=1.0.0.0");
@@ -17,7 +17,7 @@ public class JoblyTelemetryTests
         result.ShouldBe("MyApp.Handlers.SendReport");
     }
 
-    [Fact]
+    [TimedFact]
     public void GetShortTypeName_PlainTypeName_ReturnsAsIs()
     {
         var result = JoblyTelemetry.GetShortTypeName("MyApp.Handlers.SendReport");
@@ -25,7 +25,7 @@ public class JoblyTelemetryTests
         result.ShouldBe("MyApp.Handlers.SendReport");
     }
 
-    [Fact]
+    [TimedFact]
     public void GetShortTypeName_Null_ReturnsUnknown()
     {
         var result = JoblyTelemetry.GetShortTypeName(null);
@@ -33,7 +33,7 @@ public class JoblyTelemetryTests
         result.ShouldBe("unknown");
     }
 
-    [Fact]
+    [TimedFact]
     public void GetShortTypeName_EmptyString_ReturnsEmpty()
     {
         var result = JoblyTelemetry.GetShortTypeName(string.Empty);
@@ -41,7 +41,7 @@ public class JoblyTelemetryTests
         result.ShouldBe(string.Empty);
     }
 
-    [Fact]
+    [TimedFact]
     public void StartJobActivity_ValidParentSpanId_SetsParentId()
     {
         var traceId = Guid.NewGuid();
@@ -54,7 +54,7 @@ public class JoblyTelemetryTests
         activity.Dispose();
     }
 
-    [Fact]
+    [TimedFact]
     public void StartJobActivity_MalformedParentSpanId_DoesNotThrow()
     {
         var traceId = Guid.NewGuid();
@@ -67,7 +67,7 @@ public class JoblyTelemetryTests
         activity.Dispose();
     }
 
-    [Fact]
+    [TimedFact]
     public void StartJobActivity_TooShortParentSpanId_DoesNotThrow()
     {
         var traceId = Guid.NewGuid();
@@ -80,7 +80,7 @@ public class JoblyTelemetryTests
         activity.Dispose();
     }
 
-    [Fact]
+    [TimedFact]
     public void StartJobActivity_NullParentSpanId_SetsDefaultParentId()
     {
         var traceId = Guid.NewGuid();

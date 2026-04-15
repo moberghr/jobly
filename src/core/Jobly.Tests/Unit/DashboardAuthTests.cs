@@ -38,7 +38,7 @@ public class DashboardAuthTests
         return (app, app.GetTestClient());
     }
 
-    [Fact]
+    [TimedFact]
     public async Task NoAuth_ApiReturnsOk()
     {
         var (app, client) = await CreateApp();
@@ -54,7 +54,7 @@ public class DashboardAuthTests
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task BuiltInLogin_ApiReturns401WithoutCookie()
     {
         var (app, client) = await CreateApp(o => o.UseBuiltInLogin<TestCredentialValidator>());
@@ -70,7 +70,7 @@ public class DashboardAuthTests
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task BuiltInLogin_ValidCredentials_Returns200AndSetsCookie()
     {
         var (app, client) = await CreateApp(o => o.UseBuiltInLogin<TestCredentialValidator>());
@@ -93,7 +93,7 @@ public class DashboardAuthTests
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task BuiltInLogin_InvalidCredentials_Returns401()
     {
         var (app, client) = await CreateApp(o => o.UseBuiltInLogin<TestCredentialValidator>());
@@ -114,7 +114,7 @@ public class DashboardAuthTests
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task BuiltInLogin_WithCookie_ApiReturnsOk()
     {
         var (app, client) = await CreateApp(o => o.UseBuiltInLogin<TestCredentialValidator>());
@@ -143,7 +143,7 @@ public class DashboardAuthTests
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CustomAuthFilter_Unauthorized_Returns401ForApi()
     {
         var (app, client) = await CreateApp(o => o.Authorization = new DenyAllFilter());
@@ -159,7 +159,7 @@ public class DashboardAuthTests
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CustomAuthFilter_WithRedirectUrl_RedirectsForSpa()
     {
         var (app, client) = await CreateApp(o =>

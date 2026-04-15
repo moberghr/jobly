@@ -18,7 +18,7 @@ public abstract class RecurringJobLogCascadeTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task WhenJobIsDeleted_RecurringJobLog_JobIdSetToNull()
     {
         // Arrange: create a recurring job, a job, and a log linking them
@@ -61,7 +61,7 @@ public abstract class RecurringJobLogCascadeTestsBase : IAsyncLifetime
         log.JobId.ShouldBeNull("JobId should be set to null by cascade");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task WhenJobExists_RecurringJobLog_JobIdIsSet()
     {
         // Arrange

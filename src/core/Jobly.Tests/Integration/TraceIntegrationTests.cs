@@ -15,7 +15,7 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenSpawnChildJobRequest_WhenProcessed_ThenChildInheritsParentTraceId()
     {
         var publisher = Server.CreatePublisher();
@@ -37,7 +37,7 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
         child.CurrentState.ShouldBe(State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenSpawnGrandchildJobRequest_WhenProcessed_ThenThreeLevelChainSharesTraceId()
     {
         var publisher = Server.CreatePublisher();
@@ -68,7 +68,7 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
         leaf.CurrentState.ShouldBe(State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenMultiHandlerMessage_WhenRouted_ThenAllHandlerJobsShareSameTraceId()
     {
         var publisher = Server.CreatePublisher();
@@ -90,7 +90,7 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
         handlerJobs.ShouldAllBe(j => j.TraceId == message.TraceId);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenTwoSeparateJobs_WhenPublished_ThenEachHasDifferentTraceId()
     {
         var publisher = Server.CreatePublisher();

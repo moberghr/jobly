@@ -26,7 +26,7 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
         return new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_WithJobParameters_SetsAllFields()
     {
         // Arrange
@@ -66,7 +66,7 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
         job.ScheduleTime.ShouldBeGreaterThan(DateTime.UtcNow.AddHours(1));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Schedule_WithQueue_SetsScheduleTimeAndQueue()
     {
         // Arrange
@@ -86,7 +86,7 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
         job.ScheduleTime.ShouldBeGreaterThan(DateTime.UtcNow.AddHours(1));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Schedule_WithParent_SetsScheduleTimeAndParent()
     {
         // Arrange
@@ -119,7 +119,7 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Awaiting);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Schedule_WithParentAndQueue_SetsAllFields()
     {
         // Arrange

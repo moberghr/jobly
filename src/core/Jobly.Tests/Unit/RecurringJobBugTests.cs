@@ -23,7 +23,7 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task AddOrUpdateRecurringJob_DoesNotCreateJob()
     {
         var ctx = _fixture.CreateContext();
@@ -40,7 +40,7 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
         recurring.NextExecution.ShouldNotBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_CreatesJobWithScheduleTimeNow()
     {
         // Arrange: register a recurring job with NextExecution in the past (so scheduler triggers)
@@ -70,7 +70,7 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
         updatedRecurring.NextExecution.Value.ShouldBeGreaterThan(DateTime.UtcNow, "NextExecution should be in the future");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_SetsScheduleTimeToNow()
     {
         // Arrange: create a job with a future schedule time that has failed

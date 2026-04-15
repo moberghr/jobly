@@ -10,7 +10,7 @@ public class SqlServerRowLockInterceptorTests
 {
     private readonly SqlServerRowLockInterceptor _interceptor = new();
 
-    [Fact]
+    [TimedFact]
     public void ManipulateCommand_WithDefaultTableName_AddsReadPastHint()
     {
         var command = CreateCommand($"""
@@ -25,7 +25,7 @@ public class SqlServerRowLockInterceptorTests
         command.CommandText.ShouldContain("FROM [Job] AS [j] WITH (ROWLOCK, UPDLOCK, READPAST)");
     }
 
-    [Fact]
+    [TimedFact]
     public void ManipulateCommand_WithSchemaQualifiedTableName_AddsReadPastHint()
     {
         var command = CreateCommand($"""
@@ -40,7 +40,7 @@ public class SqlServerRowLockInterceptorTests
         command.CommandText.ShouldContain("FROM [jobly].[Job] AS [j] WITH (ROWLOCK, UPDLOCK, READPAST)");
     }
 
-    [Fact]
+    [TimedFact]
     public void ManipulateCommand_WithWaitTag_AddsUpdLockWithoutReadPast()
     {
         var command = CreateCommand($"""
@@ -56,7 +56,7 @@ public class SqlServerRowLockInterceptorTests
         command.CommandText.ShouldNotContain("READPAST");
     }
 
-    [Fact]
+    [TimedFact]
     public void ManipulateCommand_WithCounterTag_AddsReadPastHint()
     {
         var command = CreateCommand($"""

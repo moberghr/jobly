@@ -46,7 +46,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
     }
 
     // --- Publisher.Enqueue ---
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_WithActiveActivity_CapturesParentSpanId()
     {
         // Arrange
@@ -71,7 +71,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
         job.ParentSpanId.ShouldBe(activity.SpanId.ToHexString());
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_WithoutActivity_ParentSpanIdIsNull()
     {
         // Arrange
@@ -103,7 +103,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
     }
 
     // --- Publisher.Publish (Message) ---
-    [Fact]
+    [TimedFact]
     public async Task Publish_WithActiveActivity_CapturesParentSpanId()
     {
         // Arrange
@@ -129,7 +129,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
     }
 
     // --- BatchPublisher ---
-    [Fact]
+    [TimedFact]
     public async Task StartBatch_WithActiveActivity_CapturesParentSpanIdOnBatchAndChildren()
     {
         // Arrange
@@ -169,7 +169,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
     }
 
     // --- MessageRoutingTask propagation ---
-    [Fact]
+    [TimedFact]
     public async Task MessageRouting_PropagatesParentSpanIdToChildJobs()
     {
         // Arrange
@@ -211,7 +211,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task MessageRouting_MessageWithNullParentSpanId_ChildJobsHaveNullParentSpanId()
     {
         // Arrange
@@ -253,7 +253,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
     }
 
     // --- Publisher inside handler (JobExecutionContext active) ---
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_InsideHandlerWithActivity_CapturesHandlerSpanId()
     {
         // Arrange — simulate handler execution context with an active Activity

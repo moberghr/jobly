@@ -31,7 +31,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         };
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJoblyStatus_CountsMessagesByState()
     {
         // Arrange
@@ -63,7 +63,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         status.MessagesFailed.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJoblyStatus_CountsBatchesByState()
     {
         // Arrange
@@ -99,7 +99,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         status.Batches.ShouldBe(4); // excludes deleted
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJoblyStatus_CountsJobStates()
     {
         // Arrange
@@ -129,7 +129,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         status.Deleted.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJoblyStatus_ExcludesNonJobKindFromJobCounts()
     {
         // Arrange — only insert Message + Batch kinds, no Job kind
@@ -154,7 +154,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         status.Failed.ShouldBe(0);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJoblyStatus_CombinesStatisticAndCounterValues()
     {
         // Arrange

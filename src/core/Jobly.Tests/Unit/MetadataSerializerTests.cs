@@ -5,7 +5,7 @@ namespace Jobly.Tests.Unit;
 
 public class MetadataSerializerTests
 {
-    [Theory]
+    [TimedTheory]
     [InlineData("""{"Name":"Alice"}""", "Name", "Alice")]
     [InlineData("""{"Key":""}""", "Key", "")]
     [InlineData("""{"Key":"hello world"}""", "Key", "hello world")]
@@ -17,7 +17,7 @@ public class MetadataSerializerTests
         dict[key].ShouldBe(expected);
     }
 
-    [Theory]
+    [TimedTheory]
     [InlineData("""{"Count":0}""", "Count", 0L)]
     [InlineData("""{"Count":42}""", "Count", 42L)]
     [InlineData("""{"Count":-1}""", "Count", -1L)]
@@ -30,7 +30,7 @@ public class MetadataSerializerTests
         dict[key].ShouldBe(expected);
     }
 
-    [Theory]
+    [TimedTheory]
     [InlineData("""{"Value":3.14}""", "Value", 3.14)]
     [InlineData("""{"Value":0.5}""", "Value", 0.5)]
     public void Deserialize_FloatValues_ReturnsDouble(string json, string key, double expected)
@@ -41,7 +41,7 @@ public class MetadataSerializerTests
         dict[key].ShouldBe(expected);
     }
 
-    [Theory]
+    [TimedTheory]
     [InlineData("""{"Active":true}""", "Active", true)]
     [InlineData("""{"Active":false}""", "Active", false)]
     public void Deserialize_BooleanValues_ReturnsBool(string json, string key, bool expected)
@@ -52,7 +52,7 @@ public class MetadataSerializerTests
         dict[key].ShouldBe(expected);
     }
 
-    [Fact]
+    [TimedFact]
     public void Deserialize_NullValue_ReturnsNull()
     {
         var dict = MetadataSerializer.Deserialize("""{"Key":null}""");
@@ -61,7 +61,7 @@ public class MetadataSerializerTests
         dict["Key"].ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public void Deserialize_IntArray_ReturnsList()
     {
         var dict = MetadataSerializer.Deserialize("""{"Delays":[15,60,300]}""");
@@ -73,7 +73,7 @@ public class MetadataSerializerTests
         list[2].ShouldBe(300L);
     }
 
-    [Fact]
+    [TimedFact]
     public void Deserialize_StringArray_ReturnsList()
     {
         var dict = MetadataSerializer.Deserialize("""{"Tags":["a","b","c"]}""");
@@ -85,7 +85,7 @@ public class MetadataSerializerTests
         list[2].ShouldBe("c");
     }
 
-    [Fact]
+    [TimedFact]
     public void Deserialize_EmptyArray_ReturnsList()
     {
         var dict = MetadataSerializer.Deserialize("""{"Items":[]}""");
@@ -94,7 +94,7 @@ public class MetadataSerializerTests
         list.Count.ShouldBe(0);
     }
 
-    [Fact]
+    [TimedFact]
     public void Deserialize_MixedArray_ReturnsList()
     {
         var dict = MetadataSerializer.Deserialize("""{"Mixed":[1,"two",true]}""");
@@ -106,7 +106,7 @@ public class MetadataSerializerTests
         list[2].ShouldBe(true);
     }
 
-    [Fact]
+    [TimedFact]
     public void Deserialize_NestedObject_ReturnsDictionary()
     {
         var dict = MetadataSerializer.Deserialize("""{"Outer":{"Inner":"value","Count":5}}""");
@@ -116,7 +116,7 @@ public class MetadataSerializerTests
         nested["Count"].ShouldBe(5L);
     }
 
-    [Fact]
+    [TimedFact]
     public void Deserialize_MultipleKeys_AllConvertedCorrectly()
     {
         var dict = MetadataSerializer.Deserialize("""{"Name":"John","Age":30,"Active":true,"Score":9.5}""");
@@ -127,7 +127,7 @@ public class MetadataSerializerTests
         dict["Score"].ShouldBe(9.5);
     }
 
-    [Fact]
+    [TimedFact]
     public void Deserialize_NullJson_ReturnsEmptyDictionary()
     {
         var dict = MetadataSerializer.Deserialize(null);
@@ -136,7 +136,7 @@ public class MetadataSerializerTests
         dict.ShouldBeEmpty();
     }
 
-    [Fact]
+    [TimedFact]
     public void Deserialize_EmptyString_ReturnsEmptyDictionary()
     {
         var dict = MetadataSerializer.Deserialize("");
@@ -145,7 +145,7 @@ public class MetadataSerializerTests
         dict.ShouldBeEmpty();
     }
 
-    [Fact]
+    [TimedFact]
     public void Deserialize_EmptyObject_ReturnsEmptyDictionary()
     {
         var dict = MetadataSerializer.Deserialize("{}");
@@ -154,7 +154,7 @@ public class MetadataSerializerTests
         dict.ShouldBeEmpty();
     }
 
-    [Fact]
+    [TimedFact]
     public void Serialize_DictionaryWithNativeTypes_ProducesCorrectJson()
     {
         var dict = new Dictionary<string, object>
@@ -172,19 +172,19 @@ public class MetadataSerializerTests
         json.ShouldContain("\"Active\":true");
     }
 
-    [Fact]
+    [TimedFact]
     public void Serialize_EmptyDictionary_ReturnsNull()
     {
         MetadataSerializer.Serialize(new Dictionary<string, object>()).ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public void Serialize_NullDictionary_ReturnsNull()
     {
         MetadataSerializer.Serialize(null).ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public void RoundTrip_NativeTypes_PreservedAfterSerializeDeserialize()
     {
         var original = new Dictionary<string, object>
@@ -204,7 +204,7 @@ public class MetadataSerializerTests
         restored["Score"].ShouldBe(9.5);
     }
 
-    [Fact]
+    [TimedFact]
     public void RoundTrip_ArrayValues_PreservedAfterSerializeDeserialize()
     {
         var original = new Dictionary<string, object>
@@ -222,7 +222,7 @@ public class MetadataSerializerTests
         list[2].ShouldBe(300L);
     }
 
-    [Fact]
+    [TimedFact]
     public void Deserialize_DeeplyNested_AllLevelsConverted()
     {
         var json = """{"L1":{"L2":{"L3":"deep","Num":99}}}""";
@@ -234,7 +234,7 @@ public class MetadataSerializerTests
         l2["Num"].ShouldBe(99L);
     }
 
-    [Fact]
+    [TimedFact]
     public void Deserialize_ArrayOfObjects_ReturnsListOfDictionaries()
     {
         var json = """{"Items":[{"Name":"A"},{"Name":"B"}]}""";
