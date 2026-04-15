@@ -68,6 +68,22 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
             var nextExecution = CronExpression.Parse(recurringJob.Cron!)
                 .GetNextOccurrence(DateTime.SpecifyKind(now, DateTimeKind.Utc));
 
+            if (recurringJob.DisabledAt != null)
+            {
+                context.Set<RecurringJobLog>().Add(new RecurringJobLog
+                {
+                    RecurringJobId = recurringJob.Id,
+                    Skipped = true,
+                    CreatedAt = now,
+                });
+
+                recurringJob.LastExecution = recurringJob.NextExecution;
+                recurringJob.NextExecution = nextExecution;
+                count++;
+
+                continue;
+            }
+
             var newJob = JobHelper.CreateJob(
                 message: recurringJob.Message!,
                 type: recurringJob.Type!,

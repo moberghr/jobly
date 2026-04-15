@@ -81,6 +81,8 @@ export const getRecurringJobJobs = (id: number, page = 0, pageSize = 20) =>
   api.get<PagedList<RecurringJobHistoryModel>>(`/recurring/${id}/jobs`, { params: { page, pageSize } }).then(r => r.data);
 
 export const triggerRecurringJob = (id: number) => api.post(`/recurring/${id}/trigger`);
+export const enableRecurringJob = (id: number) => api.post(`/recurring/${id}/enable`);
+export const disableRecurringJob = (id: number) => api.post(`/recurring/${id}/disable`);
 export const deleteRecurringJob = (id: number) => api.delete(`/recurring/${id}`);
 
 // Bulk actions

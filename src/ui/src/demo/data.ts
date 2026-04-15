@@ -446,26 +446,31 @@ export const recurringJobs: RecurringJobModel[] = [
     id: 1, name: 'Daily Report', cron: '0 8 * * *',
     type: 'Acme.Reports.GenerateReportRequest',
     nextExecution: future(3600), lastExecution: ago(82800), createdAt: ago(86400 * 30),
+    disabledAt: null,
   },
   {
     id: 2, name: 'Inventory Sync', cron: '*/15 * * * *',
     type: 'Acme.Inventory.SyncInventoryRequest',
     nextExecution: future(600), lastExecution: ago(300), createdAt: ago(86400 * 60),
+    disabledAt: null,
   },
   {
     id: 3, name: 'Email Digest', cron: '0 18 * * 1-5',
     type: 'Acme.Notifications.SendEmailRequest',
     nextExecution: future(86400), lastExecution: ago(86400), createdAt: ago(86400 * 90),
+    disabledAt: ago(3600),
   },
   {
     id: 4, name: 'Tax Calculation', cron: '0 0 1 * *',
     type: 'Acme.Billing.CalculateTaxRequest',
     nextExecution: future(86400 * 15), lastExecution: ago(86400 * 15), createdAt: ago(86400 * 180),
+    disabledAt: null,
   },
   {
     id: 5, name: 'Order Cleanup', cron: '0 3 * * *',
     type: 'Acme.Orders.ProcessOrderRequest',
     nextExecution: future(28800), lastExecution: ago(57600), createdAt: ago(86400 * 7),
+    disabledAt: null,
   },
 ];
 
@@ -486,6 +491,7 @@ export function getRecurringHistory(id: number): RecurringJobHistoryModel[] {
     jobExists: i < 12,
     type: rj?.type ?? null,
     currentState: i < 12 ? (i === 3 ? State.Failed : State.Completed) : null,
+    skipped: i >= 12 && i < 14,
   }));
 }
 

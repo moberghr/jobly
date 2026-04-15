@@ -43,6 +43,16 @@ export default function RecurringDetailPage() {
   if (error) return <ErrorState message={error} />;
   if (!detail) return <LoadingState />;
 
+  const handleToggleEnabled = async () => {
+    if (detail.disabledAt) {
+      await api.enableRecurringJob(detail.id);
+    } else {
+      await api.disableRecurringJob(detail.id);
+    }
+    const updated = await api.getRecurringJobById(detail.id);
+    setDetail(updated);
+  };
+
   const handleTrigger = async () => {
     await api.triggerRecurringJob(detail.id);
     const updated = await api.getRecurringJobById(detail.id);
@@ -61,7 +71,17 @@ export default function RecurringDetailPage() {
       <div className="flex items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">{detail.name}</h1>
         <span className="font-mono text-sm bg-muted px-2 py-1 rounded">{detail.cron}</span>
+        {detail.disabledAt ? (
+          <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+            Disabled <RelativeTime date={detail.disabledAt} />
+          </span>
+        ) : (
+          <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">Enabled</span>
+        )}
         <div className="flex-1" />
+        <Button variant="outline" size="sm" onClick={handleToggleEnabled}>
+          {detail.disabledAt ? 'Enable' : 'Disable'}
+        </Button>
         <Button variant="outline" size="sm" onClick={handleTrigger}>Trigger</Button>
         <Button variant="destructive" size="sm" onClick={handleDelete}>Delete</Button>
       </div>
@@ -129,7 +149,9 @@ export default function RecurringDetailPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            {entry.jobExists && entry.currentState != null ? (
+                            {entry.skipped ? (
+                              <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">Skipped</span>
+                            ) : entry.jobExists && entry.currentState != null ? (
                               <StateBadge state={entry.currentState} />
                             ) : (
                               <span className="text-xs text-muted-foreground">Cleaned up</span>

@@ -17,6 +17,10 @@ public interface IRecurringJobService
     Task TriggerRecurringJob(int id);
 
     Task DeleteRecurringJob(int id);
+
+    Task EnableRecurringJob(int id);
+
+    Task DisableRecurringJob(int id);
 }
 
 public class RecurringJobService<TContext> : IRecurringJobService
@@ -44,6 +48,7 @@ public class RecurringJobService<TContext> : IRecurringJobService
                 NextExecution = x.NextExecution,
                 LastExecution = x.LastExecution,
                 CreatedAt = x.CreatedAt,
+                DisabledAt = x.DisabledAt,
             })
             .ToPagedListAsync(request);
     }
@@ -63,6 +68,7 @@ public class RecurringJobService<TContext> : IRecurringJobService
                 LastExecution = x.LastExecution,
                 CreatedAt = x.CreatedAt,
                 UpdatedAt = x.UpdatedAt,
+                DisabledAt = x.DisabledAt,
             })
             .FirstOrDefaultAsync();
     }
@@ -79,6 +85,7 @@ public class RecurringJobService<TContext> : IRecurringJobService
                 JobExists = l.Job != null,
                 Type = l.Job != null ? l.Job.Type : null,
                 CurrentState = l.Job != null ? l.Job.CurrentState : null,
+                Skipped = l.Skipped,
             })
             .ToPagedListAsync(request);
     }
@@ -122,6 +129,20 @@ public class RecurringJobService<TContext> : IRecurringJobService
     {
         var recurringJob = await _context.Set<RecurringJob>().FindAsync(id) ?? throw new ArgumentException("Recurring job not found.", nameof(id));
         _context.Set<RecurringJob>().Remove(recurringJob);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task EnableRecurringJob(int id)
+    {
+        var recurringJob = await _context.Set<RecurringJob>().FindAsync(id) ?? throw new ArgumentException("Recurring job not found.", nameof(id));
+        recurringJob.DisabledAt = null;
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task DisableRecurringJob(int id)
+    {
+        var recurringJob = await _context.Set<RecurringJob>().FindAsync(id) ?? throw new ArgumentException("Recurring job not found.", nameof(id));
+        recurringJob.DisabledAt = _timeProvider.GetUtcNow().UtcDateTime;
         await _context.SaveChangesAsync();
     }
 }
