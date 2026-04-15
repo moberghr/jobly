@@ -1,0 +1,29 @@
+{
+  "change_manifest": [
+    "src/core/Jobly.Core/Handlers/JobFailureOutcome.cs",
+    "src/core/Jobly.Core/Handlers/IJobContext.cs",
+    "src/core/Jobly.Core/Publisher.cs",
+    "src/core/Jobly.Worker/Retry/RetryOptions.cs",
+    "src/core/Jobly.Worker/Retry/RetryPublishBehavior.cs",
+    "src/core/Jobly.Worker/Retry/RetryPipelineBehavior.cs",
+    "src/core/Jobly.Worker/Retry/RetryServiceConfiguration.cs",
+    "src/core/Jobly.Worker/JoblyWorkerService.cs",
+    "src/core/Jobly.Worker/JoblyDispatcherWorker.cs",
+    "src/core/Jobly.Tests/Unit/RetryTests.cs",
+    "src/core/Jobly.Tests/Integration/RetryIntegrationTests.cs",
+    "src/core/Jobly.Tests/Integration/JoblyTestServer.cs"
+  ],
+  "public_contracts": [
+    "IJobContext.RetriedTimes",
+    "IJobContext.FailureOutcome",
+    "JobFailureOutcome",
+    "RetryOptions",
+    "AddJoblyRetry()"
+  ],
+  "security_impact": [],
+  "out_of_scope": [
+    "Random jitter",
+    "UI changes",
+    "Removing MaxRetries column"
+  ]
+}

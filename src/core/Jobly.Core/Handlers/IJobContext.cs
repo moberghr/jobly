@@ -5,6 +5,8 @@ public interface IJobContext : IJobMetadata
     Guid JobId { get; }
 
     Guid TraceId { get; }
+
+    JobFailureOutcome? FailureOutcome { get; set; }
 }
 
 public class JobContext : IJobContext
@@ -13,5 +15,7 @@ public class JobContext : IJobContext
 
     public Guid TraceId { get; set; }
 
-    public IReadOnlyDictionary<string, string> Metadata { get; set; } = new Dictionary<string, string>();
+    public JobFailureOutcome? FailureOutcome { get; set; }
+
+    public Dictionary<string, string> Metadata { get; set; } = [];
 }

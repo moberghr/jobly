@@ -314,6 +314,11 @@ public class Publisher<TContext> : IPublisher
             {
                 foreach (var kvp in inherited)
                 {
+                    if (kvp.Key.StartsWith('$'))
+                    {
+                        continue;
+                    }
+
                     metadata[kvp.Key] = kvp.Value;
                 }
             }

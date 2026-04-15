@@ -9,8 +9,6 @@ public class PublishContext<T> : IJobMetadata
     public required T Job { get; init; }
 
     public Dictionary<string, string> Metadata { get; init; } = [];
-
-    IReadOnlyDictionary<string, string> IJobMetadata.Metadata => Metadata;
 }
 
 [SuppressMessage("Naming", "CA1716:Identifiers should not match keywords", Justification = "Public API")]

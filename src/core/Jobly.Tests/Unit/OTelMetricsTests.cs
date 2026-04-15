@@ -9,8 +9,10 @@ using Jobly.Core.Logging;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
+using Jobly.Worker.Retry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -64,6 +66,12 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
         services.AddSingleton(barrier ?? new BarrierSignal());
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddJoblyRetry(o =>
+        {
+            o.MaxRetries = 3;
+            o.Delays = [];
+        });
 
         var workerConfig = new OptionsWrapper<JoblyWorkerConfiguration>(new JoblyWorkerConfiguration
         {
@@ -218,6 +226,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = queue,
+            Metadata = JsonSerializer.Serialize(new Dictionary<string, string> { ["$maxRetries"] = "0" }),
         });
         await ctx.SaveChangesAsync();
 
