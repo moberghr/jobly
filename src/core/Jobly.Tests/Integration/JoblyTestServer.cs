@@ -6,7 +6,7 @@ using Jobly.Core.Handlers;
 using Jobly.Core.Services;
 using Jobly.Tests.Fixtures;
 using Jobly.Worker;
-using Jobly.Worker.Retry;
+using Jobly.Core.Retry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

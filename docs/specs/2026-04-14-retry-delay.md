@@ -12,7 +12,7 @@
 
 **Retry as pipeline module:** `AddJoblyRetry()` registers `RetryPipelineBehavior` (catches failures, reads typed metadata, sets `FailureOutcome`) and `RetryPublishBehavior` (injects retry config at publish time). Jobly Core has zero retry knowledge.
 
-**Typed metadata:** `IJobMetadata` marker interface + source generator produces `Dictionary<string, object>` subclasses with typed property accessors. `IJobContext<T>` provides typed access via open generic DI. `MetadataSerializer` uses a custom `JsonConverter` for native types.
+**Typed metadata:** `IJobMetadata` marker interface + source generator produces `Dictionary<string, object>` subclasses with typed property accessors. `IJobContext.GetMetadata<T>()` provides typed access. `MetadataSerializer` uses a custom `JsonConverter` for native types.
 
 **Worker scope isolation:** Worker and handler use separate DI scopes. Handler's DbContext changes are committed on success (outbox), discarded on failure.
 
@@ -22,7 +22,7 @@
 Publish: RetryPublishBehavior → metadata["MaxRetries"] = 3
 
 Execute: workerScope creates handlerScope
-  → RetryPipelineBehavior wraps handler (IJobContext<IRetryMetadata>)
+  → RetryPipelineBehavior wraps handler (IJobContext.GetMetadata<IRetryMetadata>())
     → Handler runs
     ← Handler throws
   ← RetryPipelineBehavior: meta.RetriedTimes++, sets FailureOutcome
@@ -45,11 +45,12 @@ public partial interface IOrderMetadata : IJobMetadata
 }
 
 // Handler with typed access
-public class MyHandler(IJobContext<IOrderMetadata> ctx) : IJobHandler<MyJob>
+public class MyHandler(IJobContext ctx) : IJobHandler<MyJob>
 {
     public Task HandleAsync(MyJob msg, CancellationToken ct)
     {
-        ctx.Metadata.CustomerName = "John";  // typed, writes to dict
+        var meta = ctx.GetMetadata<IOrderMetadata>();
+        meta.CustomerName = "John";  // typed, writes to dict
     }
 }
 ```

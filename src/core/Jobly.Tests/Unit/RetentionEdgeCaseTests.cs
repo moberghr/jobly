@@ -8,7 +8,7 @@ using Jobly.Core.Services;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
-using Jobly.Worker.Retry;
+using Jobly.Core.Retry;
 using Jobly.Worker.Services;
 using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;

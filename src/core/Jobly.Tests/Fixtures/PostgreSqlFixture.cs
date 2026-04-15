@@ -20,9 +20,9 @@ public class PostgreSqlFixture : IAsyncLifetime, IDatabaseFixture
 
     public JoblyTestServer? TestServer => null;
 
-    public PostgresRowLockInterceptor Interceptor { get; } = new();
+    internal PostgresRowLockInterceptor Interceptor { get; } = new();
 
-    public SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();
+    internal SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();
 
     public async ValueTask InitializeAsync()
     {

@@ -3,7 +3,7 @@ using Jobly.Core.Data.Entities;
 
 namespace Jobly.Core.Logging;
 
-public class JobLogCollector
+internal class JobLogCollector
 {
     public Guid JobId { get; set; }
 
@@ -38,7 +38,7 @@ public class JobLogCollector
     }
 }
 
-public static class JobLogContext
+internal static class JobLogContext
 {
     private static readonly AsyncLocal<JobLogCollector?> _current = new();
 

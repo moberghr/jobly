@@ -18,9 +18,9 @@ public class SqlServerFixture : IAsyncLifetime, IDatabaseFixture
 
     public JoblyTestServer? TestServer => null;
 
-    public SqlServerRowLockInterceptor Interceptor { get; } = new();
+    internal SqlServerRowLockInterceptor Interceptor { get; } = new();
 
-    public SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();
+    internal SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();
 
     public async ValueTask InitializeAsync()
     {

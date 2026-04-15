@@ -357,15 +357,20 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         var messageType = Type.GetType(job.Type!) ?? throw new JoblyException($"Unknown type {job.Type}");
         var payload = JsonSerializer.Deserialize(job.Message!, messageType) ?? throw new JoblyException($"Unable to deserialize message {job.Message} to type {job.Type}");
 
+        var jobContext = provider.GetRequiredService<JobContext>();
+
         if (job.HandlerType != null)
         {
             var handlerType = Type.GetType(job.HandlerType) ?? throw new JoblyException($"Unknown handler type {job.HandlerType}");
+            jobContext.HandlerType = handlerType;
             await JobDispatcher.ExecuteHandler(payload, messageType, handlerType, provider, cancellationToken);
+
             return;
         }
 
         var jobHandlerType = JobDispatcher.DiscoverJobHandler(messageType, provider) ?? throw new JoblyException($"No handler registered for {messageType.Name}");
         job.HandlerType = jobHandlerType.AssemblyQualifiedName;
+        jobContext.HandlerType = jobHandlerType;
         await JobDispatcher.ExecuteJobHandler(payload, messageType, jobHandlerType, provider, cancellationToken);
     }
 

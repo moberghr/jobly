@@ -79,7 +79,7 @@ public class BatchPublisher<TContext> : IBatchPublisher
         var metadata = await RunPublishPipeline(batchJobMessages[0], adHocMetadata);
         var serializedMetadata = metadata.Count > 0 ? JsonSerializer.Serialize(metadata) : null;
 
-        var batchChildJobs = batchJobMessages.ConvertAll(x => JobHelper.CreateJob(x, 0, null, null, _joblyConfiguration.DefaultQueue, batchJob.Id, batchJobsState, now, metadata: serializedMetadata));
+        var batchChildJobs = batchJobMessages.ConvertAll(x => JobHelper.CreateJob(x, null, _joblyConfiguration.DefaultQueue, batchJob.Id, batchJobsState, now, metadata: serializedMetadata));
 
         // Propagate trace: execution context > parent's trace > self
         var executionContext = JobExecutionContext.Current;

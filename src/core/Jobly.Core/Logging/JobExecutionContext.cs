@@ -1,6 +1,6 @@
 namespace Jobly.Core.Logging;
 
-public class JobExecutionInfo
+internal class JobExecutionInfo
 {
     public Guid JobId { get; set; }
 
@@ -9,7 +9,7 @@ public class JobExecutionInfo
     public string? MetadataJson { get; set; }
 }
 
-public static class JobExecutionContext
+internal static class JobExecutionContext
 {
     private static readonly AsyncLocal<JobExecutionInfo?> _current = new();
 

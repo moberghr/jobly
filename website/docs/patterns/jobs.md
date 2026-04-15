@@ -37,9 +37,44 @@ await publisher.Schedule(new GenerateReport { ReportId = 1 }, DateTime.UtcNow.Ad
 
 ## Retries
 
+Declare retry policy on the handler:
+
 ```csharp
-await publisher.Enqueue(new GenerateReport { ReportId = 1 }, maxRetries: 3);
+[Retry(3)]
+public class GenerateReportHandler : IJobHandler<GenerateReport>
+{
+    // ...
+}
 ```
+
+Or on the job class:
+
+```csharp
+[Retry(3, Delays = [15, 60, 300])]
+public class GenerateReport : IJob
+{
+    public int ReportId { get; set; }
+}
+```
+
+Override per-enqueue via metadata:
+
+```csharp
+await publisher.Enqueue(new GenerateReport { ReportId = 1 },
+    new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 5));
+```
+
+Configure global defaults:
+
+```csharp
+services.AddJoblyRetry(o =>
+{
+    o.MaxRetries = 3;
+    o.Delays = [15, 60, 300]; // seconds
+});
+```
+
+Priority: per-enqueue metadata > handler attribute > job attribute > global `RetryOptions`.
 
 Failed jobs are retried automatically. Crash requeues (server died mid-execution) do **not** count against the retry limit.
 

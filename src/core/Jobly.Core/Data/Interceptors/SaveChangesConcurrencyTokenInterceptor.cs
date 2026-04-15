@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Jobly.Core.Interceptors;
 
-public class SaveChangesConcurrencyTokenInterceptor : SaveChangesInterceptor
+internal class SaveChangesConcurrencyTokenInterceptor : SaveChangesInterceptor
 {
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData,

@@ -1,8 +1,7 @@
 using Jobly.Core.Handlers;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace Jobly.Worker.Retry;
+namespace Jobly.Core.Retry;
 
 public static class RetryServiceConfiguration
 {
@@ -17,7 +16,6 @@ public static class RetryServiceConfiguration
             services.AddOptions<RetryOptions>();
         }
 
-        services.TryAddScoped(typeof(IJobContext<>), typeof(JobContext<>));
         services.AddTransient(typeof(IPublishPipelineBehavior<>), typeof(RetryPublishBehavior<>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(RetryPipelineBehavior<,>));
 

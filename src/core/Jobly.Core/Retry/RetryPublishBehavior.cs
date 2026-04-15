@@ -1,7 +1,7 @@
 using Jobly.Core.Handlers;
 using Microsoft.Extensions.Options;
 
-namespace Jobly.Worker.Retry;
+namespace Jobly.Core.Retry;
 
 public class RetryPublishBehavior<T> : IPublishPipelineBehavior<T>
 {
@@ -14,14 +14,13 @@ public class RetryPublishBehavior<T> : IPublishPipelineBehavior<T>
 
     public Task PublishAsync(PublishContext<T> context, PublishDelegate next, CancellationToken ct)
     {
-        if (!context.Metadata.ContainsKey("MaxRetries"))
-        {
-            context.Metadata["MaxRetries"] = _options.Value.MaxRetries;
-        }
+        var meta = context.GetMetadata<IRetryMetadata>();
 
-        if (_options.Value.Delays.Length > 0 && !context.Metadata.ContainsKey("RetryDelays"))
+        meta.MaxRetries ??= _options.Value.MaxRetries;
+
+        if (_options.Value.Delays.Length > 0 && meta.RetryDelays == null)
         {
-            context.Metadata["RetryDelays"] = _options.Value.Delays;
+            meta.RetryDelays = _options.Value.Delays;
         }
 
         return next();

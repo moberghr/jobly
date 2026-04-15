@@ -3,6 +3,7 @@ using Jobly.Core.Handlers;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Helper;
+using Jobly.Core.Retry;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Microsoft.EntityFrameworkCore;
@@ -37,7 +38,7 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
     public async Task GivenFailingJobWithThreeRetries_WhenProcessed_ThenRetriesThreeTimesThenFails()
     {
         var publisher = Server.CreatePublisher();
-        var jobId = await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 3);
+        var jobId = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 3));
         await publisher.SaveChangesAsync();
 
         await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(30));
@@ -46,7 +47,6 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
 
         var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId);
         job.CurrentState.ShouldBe(State.Failed);
-        job.MaxRetries.ShouldBe(3);
         GetRetriedTimes(job).ShouldBe(3);
 
         // Should have 1 initial attempt + 3 retries = 4 "Processing" log entries
@@ -71,7 +71,6 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters
         {
-            MaxRetries = 0,
             Metadata = new Dictionary<string, object> { ["MaxRetries"] = 0 },
         });
         await publisher.SaveChangesAsync();
@@ -82,7 +81,6 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
 
         var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId);
         job.CurrentState.ShouldBe(State.Failed);
-        job.MaxRetries.ShouldBe(0);
         GetRetriedTimes(job).ShouldBe(0);
 
         // Should have exactly 1 "Processing" log entry (the single attempt)
@@ -107,9 +105,8 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters
         {
-            MaxRetries = 1,
             Metadata = new Dictionary<string, object> { ["MaxRetries"] = 1 },
-        });
+        }.Configure<IRetryMetadata>(m => m.MaxRetries = 1));
         await publisher.SaveChangesAsync();
 
         await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(30));

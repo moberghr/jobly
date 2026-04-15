@@ -1,6 +1,6 @@
 using Jobly.Core.Handlers;
 
-namespace Jobly.Worker.Retry;
+namespace Jobly.Core.Retry;
 
 public partial interface IRetryMetadata : IJobMetadata
 {

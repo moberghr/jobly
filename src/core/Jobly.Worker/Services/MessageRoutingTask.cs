@@ -101,9 +101,7 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
                 var job = JobHelper.CreateJob(
                     message: message.Message!,
                     type: message.Type!,
-                    retries: 0,
                     scheduleTime: null,
-                    maxRetries: 0,
                     queue: message.Queue,
                     parentId: message.Id,
                     state: State.Enqueued,

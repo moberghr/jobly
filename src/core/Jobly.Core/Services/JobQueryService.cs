@@ -202,8 +202,6 @@ public class JobQueryService<TContext> : IJobQueryService
                 Message = x.Message,
                 HandlerType = x.HandlerType,
                 ScheduleTime = x.ScheduleTime == DateTime.MinValue ? null : x.ScheduleTime,
-                RetriedTimes = x.RetriedTimes,
-                MaxRetries = x.MaxRetries,
                 ConcurrencyKey = x.ConcurrencyKey,
                 ContinuationOptions = x.ContinuationOptions,
                 Queue = x.Queue,

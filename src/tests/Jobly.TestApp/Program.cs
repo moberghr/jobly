@@ -4,6 +4,7 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
+using Jobly.Core.Retry;
 using Jobly.Test.Shared;
 using Jobly.UI;
 using Jobly.UI.UIMiddleware;
@@ -28,9 +29,9 @@ builder.Services.AddCors(options =>
         policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 
+builder.Services.AddJoblyRetry(o => o.MaxRetries = 3);
 builder.Services.AddJoblyWorker<TestContext>(options =>
 {
-    options.RetryCount = 3;
     options.WorkerCount = 10;
     options.ServerName = "jobly-demo-server";
     options.DefaultQueue = "default";
@@ -105,7 +106,7 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     // === Failing jobs with retries (shows retry lifecycle) ===
     for (var i = 0; i < 10; i++)
     {
-        await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 3, queue: queues[random.Next(queues.Length)]);
+        await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters { Queue = queues[random.Next(queues.Length)] }.Configure<IRetryMetadata>(m => m.MaxRetries = 3));
     }
 
     // === Continuations (parent → child chains) ===
@@ -231,7 +232,7 @@ app.MapPost("/seed-flow", async (IPublisher publisher, IBatchPublisher batchPubl
     var simpleJobId = await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 });
 
     // 2. Simple failing job (shows retries + failed state)
-    var failingJobId = await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 2);
+    var failingJobId = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 2));
 
     // 3. Job → 3 continuation jobs (fan-out, creates trace via handler spawning)
     var fanOutId = await publisher.Enqueue(new RegisterRequest { Email = "flow-parent@test.com" });
@@ -308,7 +309,7 @@ app.MapPost("/seed/simple-job", async (IPublisher publisher) =>
 
 app.MapPost("/seed/failing-job", async (IPublisher publisher) =>
 {
-    var id = await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 2);
+    var id = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 2));
     await publisher.SaveChangesAsync();
     return Results.Ok(new { detail = $"/jobly/detail/{id}" });
 });

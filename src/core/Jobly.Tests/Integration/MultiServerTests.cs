@@ -2,6 +2,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Helper;
+using Jobly.Core.Retry;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker.Services;
@@ -288,7 +289,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         // 5. Failing jobs with retries (3, maxRetries=2)
         for (var i = 0; i < 3; i++)
         {
-            await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 2);
+            await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 2));
         }
 
         // 6. Batch of 10 → continuation of 3
