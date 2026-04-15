@@ -91,7 +91,7 @@ const config: Config = {
           items: [
             { label: 'Getting Started', to: '/docs/getting-started' },
             { label: 'Patterns', to: '/docs/patterns' },
-            { label: 'Dashboard', to: '/docs/dashboard/overview' },
+            { label: 'UI', to: '/docs/ui/overview' },
             { label: 'Releases', to: '/docs/releases' },
           ],
         },
