@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);SA1600;SA1601;SA1402;SA1649;SA1502;SA1503;SA1515;SA1516;CA1001;CA1822;CA1859;S1135;S1481;S3459;MA0004;MA0006;MA0038;MA0040;MA0042;MA0048;MA0051;IDE0011</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../core/Jobly.Core/Jobly.Core.csproj" />
+    <ProjectReference Include="../../core/Jobly.Worker/Jobly.Worker.csproj" />
+    <ProjectReference Include="../../tests/Jobly.Test.Shared/Jobly.Test.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.14.*" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.*" />
+    <PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
+  </ItemGroup>
+
+</Project>
