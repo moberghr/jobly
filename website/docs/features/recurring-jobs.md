@@ -17,6 +17,10 @@ await recurringPublisher.AddOrUpdateRecurringJob(
 
 `AddOrUpdateRecurringJob` only registers (or updates) the definition — it does **not** create a job. The `RecurringJobSchedulerTask` background task creates jobs when the cron time arrives.
 
+:::info Saves immediately
+`AddOrUpdateRecurringJob` acquires a distributed lock on the job name and calls `SaveChanges` internally. You do **not** need to call `SaveChanges` after this method. The lock prevents race conditions when multiple app instances register the same recurring job concurrently.
+:::
+
 ## How It Works
 
 1. **Registration**: `AddOrUpdateRecurringJob` stores the cron expression, message payload, and type. Sets `NextExecution` to the next cron occurrence.

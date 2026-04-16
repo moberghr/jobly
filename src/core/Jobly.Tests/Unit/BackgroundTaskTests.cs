@@ -235,6 +235,61 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         var server = await readCtx.Set<Server>().FirstOrDefaultAsync(s => s.Id == serverId);
         server.ShouldBeNull();
     }
+
+    [TimedFact]
+    public async Task AggregateCounters_NoCounters_ReturnsZero()
+    {
+        // Arrange — empty counters table
+        var aggCtx = _fixture.CreateContext();
+
+        // Act
+        var count = await CounterAggregatorTask<TestContext>.AggregateCounters(aggCtx);
+
+        // Assert
+        count.ShouldBe(0);
+    }
+
+    [TimedFact]
+    public async Task AggregateCounters_ExistingStat_IncrementsValue()
+    {
+        // Arrange — pre-existing stat + new counter for the same key
+        var ctx = _fixture.CreateContext();
+        ctx.Set<Statistic>().Add(new Statistic { Key = "stats:completed", Value = 100 });
+        ctx.Set<Counter>().Add(new Counter { Key = "stats:completed", Value = 5 });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var aggCtx = _fixture.CreateContext();
+        await CounterAggregatorTask<TestContext>.AggregateCounters(aggCtx);
+
+        // Assert — should increment existing stat, not create a new one
+        var readCtx = _fixture.CreateContext();
+        var stat = await readCtx.Set<Statistic>().FindAsync("stats:completed");
+        stat.ShouldNotBeNull();
+        stat.Value.ShouldBe(105);
+
+        var statCount = await readCtx.Set<Statistic>().CountAsync(x => x.Key == "stats:completed");
+        statCount.ShouldBe(1);
+    }
+
+    [TimedFact]
+    public async Task AggregateCounters_NewKey_CreatesStatistic()
+    {
+        // Arrange — counter for a key that has no existing stat
+        var ctx = _fixture.CreateContext();
+        ctx.Set<Counter>().Add(new Counter { Key = "stats:new-key", Value = 3 });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var aggCtx = _fixture.CreateContext();
+        await CounterAggregatorTask<TestContext>.AggregateCounters(aggCtx);
+
+        // Assert — should create new stat with correct value
+        var readCtx = _fixture.CreateContext();
+        var stat = await readCtx.Set<Statistic>().FindAsync("stats:new-key");
+        stat.ShouldNotBeNull();
+        stat.Value.ShouldBe(3);
+    }
 }
 
 [Collection<PostgreSqlCollection>]

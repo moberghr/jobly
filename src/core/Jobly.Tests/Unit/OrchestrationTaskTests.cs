@@ -1,3 +1,4 @@
+using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Tests.Fixtures;
@@ -395,6 +396,237 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
         var continuation = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == continuationId);
         continuation.ShouldNotBeNull();
         continuation.CurrentState.ShouldBe(State.Awaiting);
+    }
+
+    [TimedFact]
+    public async Task RunOrchestration_BatchFinalized_ReturnsTrue()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var batchId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = batchId,
+            Kind = JobKind.Batch,
+            CurrentState = State.Awaiting,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            JobCount = 1,
+        });
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = Guid.NewGuid(),
+            Kind = JobKind.Job,
+            CurrentState = State.Completed,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            ParentJobId = batchId,
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var orchCtx = _fixture.CreateContext();
+        var workDone = await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+
+        // Assert
+        workDone.ShouldBeTrue();
+    }
+
+    [TimedFact]
+    public async Task RunOrchestration_DeletedParent_FailsAwaitingChildren()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var parentId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = parentId,
+            Kind = JobKind.Batch,
+            CurrentState = State.Deleted,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = childId,
+            Kind = JobKind.Job,
+            CurrentState = State.Awaiting,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            ParentJobId = parentId,
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var orchCtx = _fixture.CreateContext();
+        var workDone = await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+
+        // Assert
+        workDone.ShouldBeTrue();
+        var readCtx = _fixture.CreateContext();
+        var child = await readCtx.Set<Job>().FindAsync(childId);
+        child.ShouldNotBeNull();
+        child.CurrentState.ShouldBe(State.Failed);
+        child.ExpireAt.ShouldNotBeNull();
+
+        var log = await readCtx.Set<JobLog>().FirstOrDefaultAsync(x => x.JobId == childId);
+        log.ShouldNotBeNull();
+        log.EventType.ShouldBe("Failed");
+    }
+
+    [TimedFact]
+    public async Task RunOrchestration_DeletedParent_FailsAwaitingBatchAndGrandchildren()
+    {
+        // Arrange: deleted parent -> awaiting batch child -> awaiting grandchildren
+        var ctx = _fixture.CreateContext();
+        var parentId = Guid.NewGuid();
+        var batchChildId = Guid.NewGuid();
+        var grandchildId = Guid.NewGuid();
+
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = parentId,
+            Kind = JobKind.Batch,
+            CurrentState = State.Deleted,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = batchChildId,
+            Kind = JobKind.Batch,
+            CurrentState = State.Awaiting,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            ParentJobId = parentId,
+        });
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = grandchildId,
+            Kind = JobKind.Job,
+            CurrentState = State.Awaiting,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            ParentJobId = batchChildId,
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var orchCtx = _fixture.CreateContext();
+        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var batchChild = await readCtx.Set<Job>().FindAsync(batchChildId);
+        batchChild.ShouldNotBeNull();
+        batchChild.CurrentState.ShouldBe(State.Failed);
+
+        var grandchild = await readCtx.Set<Job>().FindAsync(grandchildId);
+        grandchild.ShouldNotBeNull();
+        grandchild.CurrentState.ShouldBe(State.Failed);
+    }
+
+    [TimedFact]
+    public async Task RunOrchestration_FailedParentOnAnyFinished_ActivatesContinuation()
+    {
+        // Arrange: failed batch parent (OnAnyFinishedState) -> awaiting continuation
+        var ctx = _fixture.CreateContext();
+        var parentBatchId = Guid.NewGuid();
+        var continuationId = Guid.NewGuid();
+
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = parentBatchId,
+            Kind = JobKind.Batch,
+            CurrentState = State.Awaiting,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            JobCount = 1,
+            ContinuationOptions = ContinuationOptions.OnAnyFinishedState,
+        });
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = Guid.NewGuid(),
+            Kind = JobKind.Job,
+            CurrentState = State.Failed,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            ParentJobId = parentBatchId,
+        });
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = continuationId,
+            Kind = JobKind.Job,
+            CurrentState = State.Awaiting,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            ParentJobId = parentBatchId,
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act — finalize parent (Failed but OnAnyFinished → Completed), then activate continuation
+        var orchCtx1 = _fixture.CreateContext();
+        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx1, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        var orchCtx2 = _fixture.CreateContext();
+        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx2, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var continuation = await readCtx.Set<Job>().FindAsync(continuationId);
+        continuation.ShouldNotBeNull();
+        continuation.CurrentState.ShouldBe(State.Enqueued);
+    }
+
+    [TimedFact]
+    public async Task RunOrchestration_NoDeletedParent_AwaitingChildStaysAwaiting()
+    {
+        // Arrange: non-deleted parent -> awaiting child should not be failed
+        var ctx = _fixture.CreateContext();
+        var parentId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = parentId,
+            Kind = JobKind.Batch,
+            CurrentState = State.Processing,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+        });
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = childId,
+            Kind = JobKind.Job,
+            CurrentState = State.Awaiting,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            ParentJobId = parentId,
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var orchCtx = _fixture.CreateContext();
+        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var child = await readCtx.Set<Job>().FindAsync(childId);
+        child.ShouldNotBeNull();
+        child.CurrentState.ShouldBe(State.Awaiting);
     }
 
     [TimedFact]

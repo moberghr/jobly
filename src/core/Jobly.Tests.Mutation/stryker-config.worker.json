@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-net/master/src/Stryker.Core/Stryker.Core/stryker-config.schema.json",
+  "stryker-config": {
+    "project": "Jobly.Worker.csproj",
+    "solution": "stryker.slnx",
+    "test-projects": ["./Jobly.Tests.Mutation.csproj"],
+    "target-framework": "net10.0",
+    "mutation-level": "Standard",
+    "thresholds": {
+      "high": 70,
+      "low": 60,
+      "break": 50
+    },
+    "reporters": ["html", "progress", "cleartext"],
+    "test-runner": "mtp",
+    "concurrency": 4,
+    "mutate": [
+      "!**/Configuration.cs",
+      "!**/ServiceConfiguration.cs"
+    ]
+  }
+}

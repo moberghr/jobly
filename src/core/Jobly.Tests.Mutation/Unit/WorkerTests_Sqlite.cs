@@ -1,0 +1,13 @@
+using Jobly.Tests.Mutation.Fixtures;
+using Jobly.Tests.Unit;
+
+namespace Jobly.Tests.Mutation.Unit;
+
+[Collection<SqliteCollection>]
+public class WorkerTests_Sqlite : WorkerTestsBase
+{
+    public WorkerTests_Sqlite(SqliteFixture fixture)
+        : base(fixture)
+    {
+    }
+}

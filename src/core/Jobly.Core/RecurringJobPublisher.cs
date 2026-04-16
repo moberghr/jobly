@@ -9,6 +9,11 @@ namespace Jobly.Core;
 
 public interface IRecurringJobPublisher
 {
+    /// <summary>
+    /// Registers or updates a recurring job definition. Does not create job instances — that is
+    /// handled by <c>RecurringJobSchedulerTask</c>. Acquires a distributed lock on the job name
+    /// and saves changes immediately (callers should NOT call SaveChanges after this method).
+    /// </summary>
     Task AddOrUpdateRecurringJob<T>(T message, string name, string cron)
         where T : class, IJob;
 }
@@ -21,13 +26,17 @@ file static class RecurringJobPublisherConstants
 public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
     where TContext : DbContext
 {
+    private static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(15);
+
     private readonly TContext _context;
     private readonly TimeProvider _timeProvider;
+    private readonly IJoblyLockProvider _lockProvider;
 
-    public RecurringJobPublisher(TContext context, TimeProvider timeProvider)
+    public RecurringJobPublisher(TContext context, TimeProvider timeProvider, IJoblyLockProvider lockProvider)
     {
         _context = context;
         _timeProvider = timeProvider;
+        _lockProvider = lockProvider;
     }
 
     public async Task AddOrUpdateRecurringJob<T>(T message, string name, string cron)
@@ -35,42 +44,48 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
     {
         ValidateCronExpression(cron);
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
-
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-        var nextExecution = CronExpression.Parse(cron).GetNextOccurrence(now);
-        var jobMessage = JsonSerializer.Serialize(message);
-        var jobType = message.GetType().AssemblyQualifiedName!;
-
-        var recurringJob = await _context.Set<RecurringJob>()
-            .Where(x => x.Name == name)
-            .FirstOrDefaultAsync();
-
-        if (recurringJob != null)
+        var handle = await _lockProvider.TryAcquireAsync($"jobly:recurring:{name}", LockTimeout, CancellationToken.None);
+        if (handle == null)
         {
-            recurringJob.Cron = cron;
-            recurringJob.Message = jobMessage;
-            recurringJob.Type = jobType;
-            recurringJob.UpdatedAt = now;
-            recurringJob.NextExecution = nextExecution;
+            throw new TimeoutException($"Could not acquire lock for recurring job '{name}' within {LockTimeout.TotalSeconds}s.");
         }
-        else
+
+        await using (handle)
         {
-            recurringJob = new RecurringJob
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            var nextExecution = CronExpression.Parse(cron).GetNextOccurrence(now);
+            var jobMessage = JsonSerializer.Serialize(message);
+            var jobType = message.GetType().AssemblyQualifiedName!;
+
+            var recurringJob = await _context.Set<RecurringJob>()
+                .Where(x => x.Name == name)
+                .FirstOrDefaultAsync();
+
+            if (recurringJob != null)
             {
-                Name = name,
-                Message = jobMessage,
-                Type = jobType,
-                Cron = cron,
-                CreatedAt = now,
-                NextExecution = nextExecution,
-            };
+                recurringJob.Cron = cron;
+                recurringJob.Message = jobMessage;
+                recurringJob.Type = jobType;
+                recurringJob.UpdatedAt = now;
+                recurringJob.NextExecution = nextExecution;
+            }
+            else
+            {
+                recurringJob = new RecurringJob
+                {
+                    Name = name,
+                    Message = jobMessage,
+                    Type = jobType,
+                    Cron = cron,
+                    CreatedAt = now,
+                    NextExecution = nextExecution,
+                };
 
-            await _context.Set<RecurringJob>().AddAsync(recurringJob);
+                await _context.Set<RecurringJob>().AddAsync(recurringJob);
+            }
+
+            await _context.SaveChangesAsync();
         }
-
-        await _context.SaveChangesAsync();
-        await transaction.CommitAsync();
     }
 
     private static void ValidateCronExpression(string cronExpression)
