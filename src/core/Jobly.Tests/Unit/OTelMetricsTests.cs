@@ -98,8 +98,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
             groupConfig,
-            TimeProvider.System,
-            new FakeLockProvider());
+            TimeProvider.System);
     }
 
     private static bool HasTag(ReadOnlySpan<KeyValuePair<string, object?>> tags, string key, string value)

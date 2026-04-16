@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using Medallion.Threading;
+using Jobly.Core;
 
 namespace Jobly.Tests.Fixtures;
 
@@ -7,55 +7,39 @@ namespace Jobly.Tests.Fixtures;
 /// In-memory lock provider that actually tracks held locks.
 /// TryAcquire returns null if the lock is already held (real mutex behavior).
 /// </summary>
-internal class FakeLockProvider : IDistributedLockProvider
+internal class FakeLockProvider : IJoblyLockProvider
 {
     private readonly ConcurrentDictionary<string, bool> _heldLocks = new();
 
-    public IDistributedLock CreateLock(string name) => new FakeLock(name, _heldLocks);
-}
-
-internal class FakeLock(string name, ConcurrentDictionary<string, bool> heldLocks) : IDistributedLock
-{
-    public string Name => name;
-
-    public IDistributedSynchronizationHandle Acquire(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
-        => TryAcquire(timeout ?? TimeSpan.Zero, cancellationToken) ?? throw new InvalidOperationException("Lock not acquired");
-
-    public IDistributedSynchronizationHandle? TryAcquire(TimeSpan timeout = default, CancellationToken cancellationToken = default)
+    public Task<IAsyncDisposable?> TryAcquireAsync(string name, TimeSpan timeout, CancellationToken ct)
     {
-        if (heldLocks.TryAdd(name, true))
+        if (_heldLocks.TryAdd(name, true))
         {
-            return new FakeHandle(name, heldLocks);
+            IAsyncDisposable handle = new FakeHandle(name, _heldLocks);
+
+            return Task.FromResult<IAsyncDisposable?>(handle);
         }
 
-        return null;
+        return Task.FromResult<IAsyncDisposable?>(null);
     }
 
-    public ValueTask<IDistributedSynchronizationHandle> AcquireAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Pre-hold a lock (simulating another worker holding it).
+    /// Returns a disposable handle to release the lock.
+    /// </summary>
+    public IAsyncDisposable HoldLock(string name)
     {
-        var handle = heldLocks.TryAdd(name, true)
-            ? new FakeHandle(name, heldLocks)
-            : throw new InvalidOperationException("Lock not acquired");
+        if (!_heldLocks.TryAdd(name, true))
+        {
+            throw new InvalidOperationException($"Lock '{name}' is already held");
+        }
 
-        return new ValueTask<IDistributedSynchronizationHandle>(handle);
-    }
-
-    public ValueTask<IDistributedSynchronizationHandle?> TryAcquireAsync(TimeSpan timeout = default, CancellationToken cancellationToken = default)
-    {
-        IDistributedSynchronizationHandle? handle = heldLocks.TryAdd(name, true)
-            ? new FakeHandle(name, heldLocks)
-            : null;
-
-        return new ValueTask<IDistributedSynchronizationHandle?>(handle);
+        return new FakeHandle(name, _heldLocks);
     }
 }
 
-internal class FakeHandle(string name, ConcurrentDictionary<string, bool> heldLocks) : IDistributedSynchronizationHandle
+internal class FakeHandle(string name, ConcurrentDictionary<string, bool> heldLocks) : IAsyncDisposable
 {
-    public CancellationToken HandleLostToken => CancellationToken.None;
-
-    public void Dispose() => heldLocks.TryRemove(name, out _);
-
     public ValueTask DisposeAsync()
     {
         heldLocks.TryRemove(name, out _);

@@ -1,9 +1,9 @@
 using Cronos;
+using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Helper;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -23,7 +23,7 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
         IServiceScopeFactory scopeFactory,
         ILogger<RecurringJobSchedulerTask<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
-        IDistributedLockProvider lockProvider,
+        IJoblyLockProvider lockProvider,
         TimeProvider timeProvider)
         : base(scopeFactory, logger, configuration, timeProvider, "jobly:recurring-scheduler", lockProvider)
     {

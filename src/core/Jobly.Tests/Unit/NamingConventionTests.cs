@@ -70,7 +70,6 @@ public class NamingConventionTests
         jobEntity.FindProperty(nameof(Job.ScheduleTime))!.GetColumnName().ShouldBe("schedule_time");
         jobEntity.FindProperty(nameof(Job.ParentJobId))!.GetColumnName().ShouldBe("parent_job_id");
         jobEntity.FindProperty(nameof(Job.HandlerType))!.GetColumnName().ShouldBe("handler_type");
-        jobEntity.FindProperty(nameof(Job.ConcurrencyKey))!.GetColumnName().ShouldBe("concurrency_key");
         jobEntity.FindProperty(nameof(Job.CancellationMode))!.GetColumnName().ShouldBe("cancellation_mode");
     }
 

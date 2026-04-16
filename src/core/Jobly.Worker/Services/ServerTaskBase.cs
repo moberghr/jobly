@@ -1,6 +1,6 @@
 using System.Diagnostics;
+using Jobly.Core;
 using Jobly.Core.Data.Entities;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -19,7 +19,8 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger _logger;
     private readonly JoblyWorkerConfiguration _configuration;
-    private readonly IDistributedLock? _distributedLock;
+    private readonly IJoblyLockProvider? _lockProvider;
+    private readonly string? _lockName;
     private readonly TimeProvider _timeProvider;
     private readonly SemaphoreSlim _signal = new(0);
     private int? _serverTaskId;
@@ -30,15 +31,14 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
         IOptions<JoblyWorkerConfiguration> configuration,
         TimeProvider timeProvider,
         string? lockName = null,
-        IDistributedLockProvider? lockProvider = null)
+        IJoblyLockProvider? lockProvider = null)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _configuration = configuration.Value;
         _timeProvider = timeProvider;
-        _distributedLock = lockName != null && lockProvider != null
-            ? lockProvider.CreateLock(lockName)
-            : null;
+        _lockProvider = lockName != null ? lockProvider : null;
+        _lockName = lockName;
     }
 
     protected abstract string TaskName { get; }
@@ -85,9 +85,9 @@ public abstract class ServerTaskBase<TContext> : BackgroundService
             var didWork = false;
             try
             {
-                if (_distributedLock != null)
+                if (_lockProvider != null && _lockName != null)
                 {
-                    await using var handle = await _distributedLock.TryAcquireAsync(timeout: TimeSpan.Zero, stoppingToken);
+                    await using var handle = await _lockProvider.TryAcquireAsync(_lockName, TimeSpan.Zero, stoppingToken);
                     if (handle == null)
                     {
                         await UpdateServerTask("Skipped", "Lock held by another server", sw.Elapsed.TotalMilliseconds);

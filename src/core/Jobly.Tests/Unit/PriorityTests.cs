@@ -7,7 +7,6 @@ using Jobly.Core.Handlers;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -86,8 +85,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
             groupConfig,
-            TimeProvider.System,
-            new FakeLockProvider());
+            TimeProvider.System);
     }
 
     [TimedFact]

@@ -147,11 +147,18 @@ If the job is processing, this sets `CancellationMode = Graceful` instead of imm
 
 ## Mutex
 
-Only one job per mutex key can be processing at a time:
+Only one job per mutex key can be processing at a time. Requires `AddJoblyMutex()`:
 
 ```csharp
 await publisher.Enqueue(new ProcessPayment { CustomerId = 123 },
-    new JobParameters { Mutex = "payment:123" });
+    new JobParameters().WithMutex("payment:123"));
+```
+
+Or use the `[Mutex]` attribute on the job class for static keys:
+
+```csharp
+[Mutex("payment-processing")]
+public class ProcessPayment : IJob { ... }
 ```
 
 See [Mutex](/docs/features/mutex) for details.

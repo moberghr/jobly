@@ -1,5 +1,5 @@
+using Jobly.Core;
 using Jobly.Core.Data.Entities;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -14,7 +14,7 @@ public class CounterAggregatorTask<TContext> : ServerTaskBase<TContext>
         IServiceScopeFactory scopeFactory,
         ILogger<CounterAggregatorTask<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
-        IDistributedLockProvider lockProvider,
+        IJoblyLockProvider lockProvider,
         TimeProvider timeProvider)
         : base(scopeFactory, logger, configuration, timeProvider, "jobly:counter-aggregation", lockProvider)
     {

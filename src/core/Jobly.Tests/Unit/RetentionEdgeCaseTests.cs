@@ -10,7 +10,6 @@ using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
 using Jobly.Core.Retry;
 using Jobly.Worker.Services;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -95,8 +94,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
             groupConfig,
-            TimeProvider.System,
-            new FakeLockProvider());
+            TimeProvider.System);
     }
 
     [TimedFact]
