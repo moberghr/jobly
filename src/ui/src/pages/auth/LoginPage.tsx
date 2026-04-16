@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useTheme } from '@/hooks/useTheme';
+import { Moon, Sun } from 'lucide-react';
 import api from '@/api/client';
 
 export default function LoginPage({ onLogin }: { onLogin: () => void }) {
+  const { theme, toggle } = useTheme();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
@@ -29,7 +32,10 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="min-h-screen bg-background flex items-center justify-center relative">
+      <button onClick={toggle} className="absolute top-4 right-4 p-2 rounded-md hover:bg-accent text-muted-foreground">
+        {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      </button>
       <Card className="w-[360px]">
         <CardHeader>
           <CardTitle>Jobly Dashboard</CardTitle>

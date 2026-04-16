@@ -8,6 +8,8 @@ using Jobly.Core.Mutex;
 using Jobly.Core.Retry;
 using Jobly.Test.Shared;
 using Jobly.UI;
+using Jobly.UI.Extensions;
+using Jobly.UI.Extensions.Retry;
 using Jobly.UI.UIMiddleware;
 using Jobly.Worker;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +34,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddJoblyRetry(o => o.MaxRetries = 3);
 builder.Services.AddJoblyMutex();
+builder.Services.AddSingleton<IJoblyUIExtension, RetryUIExtension>();
 builder.Services.AddJoblyWorker<TestContext>(options =>
 {
     options.WorkerCount = 10;

@@ -10,6 +10,7 @@
 
 	<ItemGroup>
 		<EmbeddedResource Include="dist/**/*" />
+		<EmbeddedResource Include="Extensions/Retry/dist/**/*" />
 	</ItemGroup>
 
 	<!-- Rebuild React UI before embedding -->
