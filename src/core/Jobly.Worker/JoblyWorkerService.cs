@@ -8,7 +8,6 @@ using Jobly.Core.Handlers;
 using Jobly.Core.Interceptors;
 using Jobly.Core.Logging;
 using Jobly.Worker.Services;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -30,9 +29,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     private readonly JoblyWorkerConfiguration _configuration;
     private readonly WorkerGroupConfiguration _groupConfiguration;
     private readonly TimeProvider _timeProvider;
-    private readonly IDistributedLockProvider _lockProvider;
 
-    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration, TimeProvider timeProvider, IDistributedLockProvider lockProvider)
+    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration, TimeProvider timeProvider)
     {
         _workerId = workerId;
         _serviceScopeFactory = serviceScopeFactory;
@@ -40,7 +38,6 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         _configuration = configuration.Value;
         _groupConfiguration = groupConfiguration;
         _timeProvider = timeProvider;
-        _lockProvider = lockProvider;
     }
 
     public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
@@ -94,43 +91,6 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         PerfTrace.Mark(PerfTrace.CommitTransaction1);
         await transaction.CommitAsync(cancellationToken);
 
-        IAsyncDisposable? mutexHandleToRelease = null;
-
-        // Mutex check: use distributed lock to ensure only one job per ConcurrencyKey is Processing.
-        // Acquired AFTER commit so the Processing state is visible to other workers.
-        if (job.ConcurrencyKey != null)
-        {
-            var mutexLock = _lockProvider.CreateLock($"jobly:mutex:{job.ConcurrencyKey}");
-            var mutexHandle = await mutexLock.TryAcquireAsync(timeout: TimeSpan.Zero, cancellationToken);
-
-            if (mutexHandle == null)
-            {
-                // Another worker holds this mutex — cancel this job
-                await using var cancelTx = await workerContext.Database.BeginTransactionAsync(cancellationToken);
-                job.CurrentState = State.Deleted;
-                job.ExpireAt = now.Add(_configuration.JobExpirationTimeout);
-                job.CurrentWorkerId = null;
-                job.LastKeepAlive = null;
-                workerContext.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
-                workerContext.Set<JobLog>().Add(new JobLog
-                {
-                    JobId = job.Id,
-                    EventType = "Deleted",
-                    Timestamp = now,
-                    Level = "Information",
-                    Message = $"Cancelled — mutex '{job.ConcurrencyKey}' held by another job",
-                    WorkerId = _workerId,
-                });
-                await workerContext.SaveChangesAsync(cancellationToken);
-                await cancelTx.CommitAsync(cancellationToken);
-                return true;
-            }
-
-            // Lock acquired — will be held until handler completes (released in finally below)
-            // Store handle to release after execution
-            mutexHandleToRelease = mutexHandle;
-        }
-
         var logCollector = new JobLogCollector { JobId = job.Id, TimeProvider = _timeProvider, WorkerId = _workerId };
         using var jobCts = new CancellationTokenSource();
         var monitorTask = RunJobMonitor(job.Id, logCollector, jobCts, cancellationToken);
@@ -181,20 +141,35 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             var handlerContext = handlerScope.ServiceProvider.GetRequiredService<TContext>();
             await handlerContext.SaveChangesAsync(default);
 
-            // Read metadata from handler scope before disposing
+            // Read metadata and outcome from handler scope before disposing
             job.Metadata = JsonSerializer.Serialize(jobContext.Metadata);
+            var successOutcome = jobContext.Outcome;
             handlerScope.Dispose();
             handlerScope = null;
 
             var durationMs = handlerStopwatch.Elapsed.TotalMilliseconds;
-            activity.SetTag("jobly.job.status", "succeeded");
-            activity.SetTag("jobly.job.duration_ms", durationMs);
-            activity.AddEvent(new ActivityEvent("jobly.job.completed", tags: new ActivityTagsCollection
+
+            if (successOutcome != null)
             {
-                { "duration_ms", durationMs },
-            }));
-            JoblyTelemetry.JobDuration.Record(durationMs, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", "succeeded"));
-            JoblyTelemetry.JobsCompleted.Add(1, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", "succeeded"));
+                // Pipeline behavior short-circuited (e.g. mutex held)
+                var outcomeStatus = successOutcome.State.ToString().ToLowerInvariant();
+                activity.SetTag("jobly.job.status", outcomeStatus);
+                activity.SetTag("jobly.job.duration_ms", durationMs);
+                activity.AddEvent(new ActivityEvent($"jobly.job.{outcomeStatus}"));
+                JoblyTelemetry.JobDuration.Record(durationMs, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", outcomeStatus));
+                JoblyTelemetry.JobsCompleted.Add(1, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", outcomeStatus));
+            }
+            else
+            {
+                activity.SetTag("jobly.job.status", "succeeded");
+                activity.SetTag("jobly.job.duration_ms", durationMs);
+                activity.AddEvent(new ActivityEvent("jobly.job.completed", tags: new ActivityTagsCollection
+                {
+                    { "duration_ms", durationMs },
+                }));
+                JoblyTelemetry.JobDuration.Record(durationMs, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", "succeeded"));
+                JoblyTelemetry.JobsCompleted.Add(1, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", "succeeded"));
+            }
 
             JobLogContext.Current = null;
             JobExecutionContext.Current = null;
@@ -207,8 +182,26 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
             PerfTrace.Mark(PerfTrace.BeginTransaction2);
             await using var endTransaction = await workerContext.Database.BeginTransactionAsync(default);
-            job.CurrentState = State.Completed;
-            FinalizeJobState(workerContext, job, null, handlerStopwatch.Elapsed.TotalMilliseconds);
+
+            if (successOutcome != null)
+            {
+                job.CurrentState = successOutcome.State;
+                if (successOutcome.ClearHandlerType)
+                {
+                    job.HandlerType = null;
+                }
+
+                if (successOutcome.ScheduleTime != null)
+                {
+                    job.ScheduleTime = successOutcome.ScheduleTime.Value;
+                }
+            }
+            else
+            {
+                job.CurrentState = State.Completed;
+            }
+
+            FinalizeJobState(workerContext, job, null, handlerStopwatch.Elapsed.TotalMilliseconds, successOutcome);
             if (_configuration.EnableHandlerLogging)
             {
                 await SaveJobLogs(workerContext, logCollector);
@@ -266,8 +259,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             handlerStopwatch?.Stop();
             var errorDurationMs = handlerStopwatch?.Elapsed.TotalMilliseconds;
 
-            // Read pipeline failure outcome from handler scope before disposing
-            var outcome = jobContext?.FailureOutcome;
+            // Read pipeline outcome from handler scope before disposing
+            var outcome = jobContext?.Outcome;
             if (outcome != null)
             {
                 job.CurrentState = outcome.State;
@@ -318,7 +311,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await monitorTask;
 
             await using var endTransaction = await workerContext.Database.BeginTransactionAsync(default);
-            FinalizeJobState(workerContext, job, e, errorDurationMs);
+            FinalizeJobState(workerContext, job, e, errorDurationMs, outcome);
             if (_configuration.EnableHandlerLogging)
             {
                 await SaveJobLogs(workerContext, logCollector);
@@ -335,11 +328,6 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             activity.Dispose();
             JobLogContext.Current = null;
             JobExecutionContext.Current = null;
-
-            if (mutexHandleToRelease != null)
-            {
-                await mutexHandleToRelease.DisposeAsync();
-            }
         }
 
         // Signal orchestrator — this job may have a parent that needs finalization,
@@ -459,7 +447,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     /// Finalizes job state: clears worker fields, adds counters and log entry.
     /// State must be set on the job before calling this method.
     /// </summary>
-    private void FinalizeJobState(TContext context, Job job, Exception? error, double? durationMs)
+    private void FinalizeJobState(TContext context, Job job, Exception? error, double? durationMs, JobOutcome? outcome = null)
     {
         var state = job.CurrentState;
         job.CancellationMode = CancellationMode.None;
@@ -477,8 +465,14 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         {
             AddCounters(context, "stats:failed", $"stats:failed:{hourSuffix}");
         }
+        else if (state == State.Deleted)
+        {
+            job.ExpireAt = now.Add(_configuration.JobExpirationTimeout);
+            AddCounters(context, "stats:deleted", $"stats:deleted:{hourSuffix}");
+        }
 
-        var logMessage = error != null ? error.Message : $"Job {job.Id} completed";
+        var logMessage = outcome?.LogMessage
+            ?? (error != null ? error.Message : $"Job {job.Id} completed");
         var logException = error?.ToString();
 
         var eventType = state switch
@@ -486,6 +480,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             State.Completed => "Completed",
             State.Failed => "Failed",
             State.Enqueued => "Requeued",
+            State.Deleted => "Deleted",
             _ => state.ToString(),
         };
 

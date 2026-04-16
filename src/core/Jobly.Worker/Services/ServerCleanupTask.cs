@@ -1,6 +1,6 @@
+using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Interceptors;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -15,7 +15,7 @@ public class ServerCleanupTask<TContext> : ServerTaskBase<TContext>
         IServiceScopeFactory scopeFactory,
         ILogger<ServerCleanupTask<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
-        IDistributedLockProvider lockProvider,
+        IJoblyLockProvider lockProvider,
         TimeProvider timeProvider)
         : base(scopeFactory, logger, configuration, timeProvider, "jobly:server-cleanup", lockProvider)
     {

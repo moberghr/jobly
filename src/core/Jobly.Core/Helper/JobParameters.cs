@@ -17,8 +17,6 @@ public class JobParameters
 
     public State? State { get; set; }
 
-    public string? Mutex { get; set; }
-
     public Dictionary<string, object>? Metadata { get; set; }
 
     public JobParameters Configure<T>(Action<T> configure)

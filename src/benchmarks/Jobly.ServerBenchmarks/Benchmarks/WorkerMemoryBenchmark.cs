@@ -8,7 +8,6 @@ using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.ServerBenchmarks.Infrastructure;
 using Jobly.Worker;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -43,8 +42,7 @@ public class WorkerMemoryBenchmark
             services.GetRequiredService<ILogger<JoblyWorkerService<TestContext>>>(),
             services.GetRequiredService<IOptions<JoblyWorkerConfiguration>>(),
             new WorkerGroupConfiguration { Queues = ["default"], WorkerCount = 1 },
-            services.GetRequiredService<TimeProvider>(),
-            services.GetRequiredService<IDistributedLockProvider>());
+            services.GetRequiredService<TimeProvider>());
 
         // Register a server + worker in the DB (required for job processing)
         await using var scope = services.CreateAsyncScope();

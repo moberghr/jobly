@@ -148,7 +148,7 @@ public class Publisher<TContext> : IPublisher
 
     public async Task<Guid> Enqueue<T>(T job, JobParameters jobParameters)
         where T : class, IJob
-        => await CreateJob(job, jobParameters.ScheduleTime, jobParameters.Queue, jobParameters.ParentId, jobParameters.Mutex, jobParameters.Metadata);
+        => await CreateJob(job, jobParameters.ScheduleTime, jobParameters.Queue, jobParameters.ParentId, jobParameters.Metadata);
 
     public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime)
         where T : class, IJob
@@ -171,7 +171,6 @@ public class Publisher<TContext> : IPublisher
         DateTime? scheduleTime,
         string? queue,
         Guid? parentId,
-        string? mutex = null,
         Dictionary<string, object>? adHocMetadata = null)
         where T : class, IJob
     {
@@ -186,7 +185,6 @@ public class Publisher<TContext> : IPublisher
             parentId,
             null,
             now,
-            concurrencyKey: mutex,
             metadata: SerializeMetadata(publishCtx.Metadata));
 
         // Automatic trace propagation: execution context > parent's trace > self

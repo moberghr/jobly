@@ -2,6 +2,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Helper;
+using Jobly.Core.Mutex;
 using Jobly.Core.Retry;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
@@ -228,7 +229,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
     {
         // Enqueue a slow job that holds the mutex — published via Server1
         var publisher1 = Server1.CreatePublisher();
-        var job1Id = await publisher1.Enqueue(new CancellableRequest(), new JobParameters { Mutex = "multi-server-mutex" });
+        var job1Id = await publisher1.Enqueue(new CancellableRequest(), new JobParameters().WithMutex("multi-server-mutex"));
         await publisher1.SaveChangesAsync();
 
         // Wait for it to start processing
@@ -236,7 +237,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
 
         // Enqueue a second job with the same mutex — published via Server2
         var publisher2 = Server2.CreatePublisher();
-        var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters { Mutex = "multi-server-mutex" });
+        var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("multi-server-mutex"));
         await publisher2.SaveChangesAsync();
 
         // Job2 should be deleted due to mutex (regardless of which server picks it up)

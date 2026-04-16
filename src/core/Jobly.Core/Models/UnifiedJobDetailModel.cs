@@ -27,8 +27,6 @@ public class UnifiedJobDetailModel
 
     public DateTime? ScheduleTime { get; set; }
 
-    public string? ConcurrencyKey { get; set; }
-
     // Batch-specific
     public int TotalJobs { get; set; }
 

@@ -8,7 +8,7 @@ public interface IJobContext
 
     Type? HandlerType { get; }
 
-    JobFailureOutcome? FailureOutcome { get; set; }
+    JobOutcome? Outcome { get; set; }
 
     Dictionary<string, object> Metadata { get; }
 
@@ -24,7 +24,7 @@ public class JobContext : IJobContext
 
     public Type? HandlerType { get; set; }
 
-    public JobFailureOutcome? FailureOutcome { get; set; }
+    public JobOutcome? Outcome { get; set; }
 
     public Dictionary<string, object> Metadata { get; set; } = [];
 

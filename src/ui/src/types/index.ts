@@ -110,7 +110,6 @@ export interface UnifiedJobDetailModel {
   scheduleTime: string | null;
   retriedTimes: number;
   maxRetries: number;
-  concurrencyKey: string | null;
   totalJobs: number;
   completedJobs: number;
   failedJobs: number;

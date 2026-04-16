@@ -116,6 +116,8 @@ public static class ServiceConfiguration
             return new SqlDistributedSynchronizationProvider(connectionString);
         });
 
+        services.AddSingleton<IJoblyLockProvider, JoblyLockProvider>();
+
         services.AddHostedService<JoblyWorkerSetup<TContext>>();
         services.AddHostedService<HeartbeatTask<TContext>>();
         services.AddHostedService<CounterAggregatorTask<TContext>>();

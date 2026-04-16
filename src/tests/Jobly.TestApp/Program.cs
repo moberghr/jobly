@@ -4,6 +4,7 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
+using Jobly.Core.Mutex;
 using Jobly.Core.Retry;
 using Jobly.Test.Shared;
 using Jobly.UI;
@@ -30,6 +31,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddJoblyRetry(o => o.MaxRetries = 3);
+builder.Services.AddJoblyMutex();
 builder.Services.AddJoblyWorker<TestContext>(options =>
 {
     options.WorkerCount = 10;
@@ -156,12 +158,12 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     // Uses a-critical queue so these are picked up before the 300+ other jobs
     await publisher.Enqueue(
         new SlowRequest(),
-        new JobParameters { Queue = "a-critical", Mutex = "payment:customer-42" });
+        new JobParameters { Queue = "a-critical", }.WithMutex("payment:customer-42"));
     for (var i = 0; i < 4; i++)
     {
         await publisher.Enqueue(
             new SendEmailRequest { EmailLogId = 1 },
-            new JobParameters { Queue = "a-critical", Mutex = "payment:customer-42" });
+            new JobParameters { Queue = "a-critical", }.WithMutex("payment:customer-42"));
     }
 
     // === Multiple continuation fan-out (parent → 3 continuations) ===
@@ -265,10 +267,10 @@ app.MapPost("/seed-flow", async (IPublisher publisher, IBatchPublisher batchPubl
     // 9. Mutex jobs (same key — first holds mutex, rest cancelled)
     var mutexId1 = await publisher.Enqueue(
         new SlowRequest(),
-        new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
+        new JobParameters { Queue = "a-critical", }.WithMutex("test-mutex"));
     var mutexId2 = await publisher.Enqueue(
         new SendEmailRequest { EmailLogId = 1 },
-        new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
+        new JobParameters { Queue = "a-critical", }.WithMutex("test-mutex"));
 
     await publisher.SaveChangesAsync();
 
@@ -374,8 +376,8 @@ app.MapPost("/seed/light-flow", async (IPublisher publisher, TestContext context
 
 app.MapPost("/seed/mutex", async (IPublisher publisher) =>
 {
-    var id1 = await publisher.Enqueue(new SlowRequest(), new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
-    var id2 = await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
+    var id1 = await publisher.Enqueue(new SlowRequest(), new JobParameters { Queue = "a-critical", }.WithMutex("test-mutex"));
+    var id2 = await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, new JobParameters { Queue = "a-critical", }.WithMutex("test-mutex"));
     await publisher.SaveChangesAsync();
     return Results.Ok(new { holder = $"/jobly/detail/{id1}", cancelled = $"/jobly/detail/{id2}" });
 });

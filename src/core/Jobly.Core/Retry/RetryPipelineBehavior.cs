@@ -49,7 +49,7 @@ public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
 
                 meta.RetriedTimes = retriedTimes + 1;
 
-                _jobContext.FailureOutcome = new JobFailureOutcome
+                _jobContext.Outcome = new JobOutcome
                 {
                     State = State.Enqueued,
                     ScheduleTime = scheduleTime,
