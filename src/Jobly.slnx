@@ -6,6 +6,7 @@
   </Configurations>
   <Folder Name="/Benchmarks/">
     <Project Path="benchmarks/Jobly.Benchmarks/Jobly.Benchmarks.csproj" />
+    <Project Path="benchmarks/Jobly.ServerBenchmarks/Jobly.ServerBenchmarks.csproj" />
   </Folder>
   <Folder Name="/core/">
     <Project Path="core/Jobly.SourceGenerator/Jobly.SourceGenerator.csproj" />
