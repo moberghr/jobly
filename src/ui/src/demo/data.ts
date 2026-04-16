@@ -684,7 +684,8 @@ export const jobDetailFailed: UnifiedJobDetailModel = {
   spawnedByJob: null,
   continuations: [],
   spawnedJobs: [],
-  metadata: { correlationId: 'order-1042', source: 'OrderService' },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  metadata: { correlationId: 'order-1042', source: 'OrderService', MaxRetries: 3, RetriedTimes: 3, RetryDelays: [15, 60, 300] } as any,
   logs: [
     makeLog('log-f1', 'Created', 300, null, null),
     makeLog('log-f2', 'Processing', 299, null, null, null, 'Information', IDS.worker1),

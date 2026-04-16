@@ -1,5 +1,6 @@
 import api from './client';
 import type { DashboardStatistics, JobModel, JobGroupModel, JobGroupDetailModel, RecurringJobModel, RecurringJobDetailModel, RecurringJobHistoryModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint, TypeCountModel, WorkerDetailModel, WorkerJobLogModel, TraceJobModel, UnifiedJobDetailModel } from '@/types';
+import type { ExtensionManifest } from '@/extensions/types';
 
 // Dashboard
 export const getStatus = () => api.get<DashboardStatistics>('/status').then(r => r.data);
@@ -130,3 +131,7 @@ export const resumeWorkerGroup = (groupId: string) => api.post(`/groups/${groupI
 
 export const getStatsHistory = (hours = 24) =>
   api.get<StatsHistoryPoint[]>('/stats/history', { params: { hours } }).then(r => r.data);
+
+// Extensions
+export const getExtensions = () =>
+  api.get<ExtensionManifest[]>('/extensions').then(r => r.data);
