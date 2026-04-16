@@ -54,6 +54,16 @@ services.AddJoblyRetry(options =>
 
 Per-job override via `[Retry]` attribute on handler or job class, or per-enqueue via metadata. See [Jobs](/docs/patterns/jobs#retries).
 
+## Mutex Configuration
+
+Enable mutex (concurrency control) with `AddJoblyMutex()`:
+
+```csharp
+services.AddJoblyMutex();
+```
+
+No options — just register and use `.WithMutex("key")` or `[Mutex("key")]` at publish time. See [Mutex](/docs/features/mutex) for details.
+
 ## Worker Configuration (`JoblyWorkerConfiguration`)
 
 Extends `JoblyConfiguration`. Used by the worker side (`AddJoblyWorker<TContext>`):

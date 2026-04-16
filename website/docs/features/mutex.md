@@ -6,29 +6,62 @@ sidebar_position: 4
 
 Mutexes prevent duplicate processing — only one job per key can be processing at a time. If a worker picks up a job whose mutex is already held, the job is cancelled.
 
+## Setup
+
+Mutex is an opt-in addon. Register it alongside `AddJoblyWorker`:
+
+```csharp
+builder.Services.AddJoblyWorker<AppDbContext>();
+builder.Services.AddJoblyMutex();
+```
+
 ## Usage
+
+Set the mutex key at publish time using the `.WithMutex()` extension:
 
 ```csharp
 await publisher.Enqueue(
     new ProcessPayment { CustomerId = 123 },
-    new JobParameters { Mutex = "payment:123" });
+    new JobParameters().WithMutex("payment:123"));
+```
+
+Or use the `[Mutex]` attribute for a static key on the job class:
+
+```csharp
+[Mutex("payment-processing")]
+public class ProcessPayment : IJob
+{
+    public int CustomerId { get; set; }
+}
+
+// Enqueue normally — key comes from the attribute
+await publisher.Enqueue(new ProcessPayment { CustomerId = 123 });
+```
+
+You can also set the key via typed metadata:
+
+```csharp
+await publisher.Enqueue(new ProcessPayment { CustomerId = 123 },
+    new JobParameters().Configure<IMutexMetadata>(m => m.ConcurrencyKey = "payment:123"));
 ```
 
 ## How It Works
 
+Mutex is implemented as a `MutexPipelineBehavior` — a pipeline behavior that wraps handler execution:
+
 1. **Enqueue** always succeeds — the mutex is not checked at publish time.
 2. **Worker picks up** the job and marks it as `Processing`.
-3. **Mutex check**: Before executing the handler, the worker queries if another job with the same `ConcurrencyKey` is already `Processing`.
-4. **If held**: The job is set to `Deleted` with a log entry "Cancelled — mutex 'payment:123' held by another job". The worker moves on to the next job.
-5. **If free**: The job executes normally.
+3. **Pipeline runs**: `MutexPipelineBehavior` attempts to acquire a distributed lock keyed by `jobly:mutex:{key}`.
+4. **If held**: The behavior sets `IJobContext.Outcome` to `Deleted` and returns without calling the handler. The worker finalizes the job as Deleted with a log entry "Cancelled — mutex 'payment:123' held by another job".
+5. **If free**: The lock is acquired, the handler executes, and the lock is released when the handler completes (or fails).
 
 ## Race Condition Safety
 
-The mutex check happens inside the same transaction that marks the job as `Processing`. If two workers fetch two jobs with the same mutex simultaneously, the first to commit wins — the second sees the first as Processing and cancels itself.
+The distributed lock (via `IJoblyLockProvider`) ensures mutual exclusion across all workers and servers. If two workers fetch two jobs with the same mutex key simultaneously, the first to acquire the lock wins — the second sees the lock as held and cancels.
 
 ## Zero Overhead for Regular Jobs
 
-Jobs without a mutex (`ConcurrencyKey = null`) skip the check entirely. No extra DB query, no performance impact.
+Jobs without a mutex key skip the lock check entirely. The behavior reads the metadata, finds no key, and calls the next behavior immediately.
 
 ## Use Cases
 
@@ -38,10 +71,4 @@ Jobs without a mutex (`ConcurrencyKey = null`) skip the check entirely. No extra
 
 ## Dashboard
 
-Jobs cancelled by mutex appear as `Deleted` with a log entry explaining which mutex key was held. The job detail page shows the mutex key in the Details card.
-
-## Future: Semaphores & Rate Limiting
-
-The `ConcurrencyKey` field is designed for extension. The same column will support:
-- **Semaphores**: Max N concurrent jobs per key (not just 1)
-- **Rate limiting**: Max N executions per time window per key
+Jobs cancelled by mutex appear as `Deleted` with a log entry explaining which mutex key was held. The mutex key is visible in the job's metadata section on the detail page.
