@@ -118,7 +118,7 @@ await foreach (var user in mediator.CreateStream(new GetUsers { Role = "Admin" }
 ### Job Entity
 
 Single table with `Kind` enum. Key fields:
-- **Shared**: Id, Kind, Type, Message (payload), CreateTime, CurrentState, Queue, ExpireAt, ParentJobId, TraceId, SpawnedByJobId, CancellationMode, ConcurrencyKey
+- **Shared**: Id, Kind, Type, Message (payload), CreateTime, CurrentState, Queue, ExpireAt, ParentJobId, TraceId, SpawnedByJobId, CancellationMode
 - **Job-specific**: ScheduleTime, HandlerType, CurrentWorkerId, LastKeepAlive
 - **Batch-specific**: ContinuationOptions (generalized to all kinds — controls child activation on parent failure)
 - **JobLog** — Unified audit trail. EventType: Created, Processing, Completed, Failed, Requeued, Deleted, Cancelled, CancellationRequested, Log (ILogger output). Includes optional `WorkerId` (set by worker-produced entries, null for command/orchestration entries).
@@ -130,10 +130,9 @@ Workers are **pure executors** — they only fetch and execute `Kind=Job` jobs. 
 ```
 Worker (pure executor):
   1. Fetch Job (Kind=Job, Enqueued, ScheduleTime < now)
-  2. Mutex check (if ConcurrencyKey set, cancel if another job with same key is Processing)
-  3. Execute handler
-  4. Update state, counters, logs
-  5. Signal orchestrator
+  2. Execute handler (pipeline behaviors run first — mutex, retry, etc.)
+  3. Update state, counters, logs
+  4. Signal orchestrator
 
 MessageRoutingTask (polls every 1s):
   - Routes Kind=Message jobs → discovers handlers, creates N child jobs
@@ -154,7 +153,7 @@ Uses `CancellationMode` enum (`None=0, Graceful=1`) instead of immediate state c
 
 ### Mutex (Concurrency Control)
 
-`ConcurrencyKey` on Job — only one job per key can be Processing at a time. Set at publish time via `JobParameters.Mutex`. Worker checks after marking job Processing — if another job with same key is already Processing, cancels this one with "mutex held" log. Zero overhead for jobs without a key. Same column designed for future semaphore/rate-limiting extension.
+Opt-in addon via `services.AddJoblyMutex()`. Only one job per concurrency key can be Processing at a time. Set at publish time via `.WithMutex("key")` extension or `[Mutex("key")]` attribute on the job class. Implemented as `MutexPipelineBehavior` — acquires a distributed lock before the handler runs, short-circuits to Deleted via `IJobContext.Outcome` if the lock is held. Lock released after handler completes. Zero overhead for jobs without a key. Concurrency key stored in job metadata (not a dedicated column).
 
 ### Recurring Jobs
 
@@ -328,7 +327,9 @@ public class MyIntegrationTests_SqlServer : MyIntegrationTestsBase
 - Wraps the existing `DbContextOptions<TContext>` service descriptor to add row-lock interceptors
 - Replaces `IModelCustomizer` with `JoblyModelCustomizer` to auto-apply entity configurations
 - Registers `TimeProvider.System` via `TryAddSingleton` (overridable for testing)
+- Registers `IJoblyLockProvider` (wraps `IDistributedLockProvider` — Medallion.Threading is internal)
 - Users just register their DbContext normally — no manual configuration needed
+- Opt-in addons: `AddJoblyRetry()` for retry behavior, `AddJoblyMutex()` for mutex/concurrency control
 
 ### Worker Groups
 
@@ -449,6 +450,6 @@ var activeJobs = await _context.Set<Job>()
 - **§8.3** `ContinuationOptions` is generalized to all job kinds — any job with children can control child activation on failure.
 - **§8.4** `RequeueJob` resets `ScheduleTime` to now. Requeued jobs always execute immediately.
 - **§8.5** Cancellation uses `CancellationMode` enum, not immediate state change. Worker monitors and cancels handler token.
-- **§8.6** `ConcurrencyKey` for mutex. Worker checks after marking Processing — if held, cancels with "mutex held" log.
+- **§8.6** Mutex is an opt-in addon (`AddJoblyMutex()`). `MutexPipelineBehavior` uses distributed lock via `IJoblyLockProvider`. Set key via `.WithMutex("key")` or `[Mutex("key")]` attribute. Concurrency key stored in metadata.
 - **§8.7** `RecurringJobSchedulerTask` creates jobs, `AddOrUpdateRecurringJob` only registers/updates definitions.
 - **§8.8** Source generator (`Jobly.SourceGenerator`) for zero-allocation mediator and worker dispatch.
