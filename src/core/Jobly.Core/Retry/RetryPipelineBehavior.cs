@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace Jobly.Core.Retry;
 
 public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IRequest<TResponse>
+    where TRequest : IRequest<TResponse>, IJob
 {
     private static readonly ConcurrentDictionary<Type, RetryAttribute?> AttributeCache = new();
 
@@ -28,7 +28,7 @@ public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
         {
             return await next(request, cancellationToken);
         }
-        catch (Exception) when (request is IJob)
+        catch (Exception)
         {
             var meta = _jobContext.GetMetadata<IRetryMetadata>();
             var attr = GetRetryAttribute();

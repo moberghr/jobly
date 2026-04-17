@@ -20,5 +20,11 @@ public class TestContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.AddOutboxStateEntity(_schema);
+
+        // Tests use the CircuitBreaker addon, which contributes its own entity via
+        // JoblyConfiguration.EntityConfigurators when AddJoblyCircuitBreaker is called.
+        // TestContext is constructed directly by fixtures without going through DI,
+        // so we must explicitly include the addon entity here.
+        ServiceConfiguration.AddCircuitBreakerStateEntity(modelBuilder, _schema);
     }
 }
