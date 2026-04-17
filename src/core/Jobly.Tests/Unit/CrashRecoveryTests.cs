@@ -319,10 +319,15 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
     [TimedFact]
     public async Task CleanUpServers_HeartbeatAtExactTimeout_NotCleaned()
     {
-        // Arrange — server with heartbeat exactly at timeout boundary should NOT be cleaned
+        // Arrange — server with heartbeat exactly at timeout boundary should NOT be cleaned.
+        // Round `now` to microsecond precision so LastHeartbeatTime survives PostgreSQL round-trip
+        // (timestamp has 6-digit precision; raw .NET ticks have 7 digits). Without this, the saved
+        // value would be truncated and `now - savedHeartbeat` would exceed timeout by sub-microsecond
+        // ticks, falsely tripping the `>` boundary check.
         var ctx = _fixture.CreateContext();
         var timeout = TimeSpan.FromMinutes(5);
-        var now = DateTime.UtcNow.AddMinutes(10);
+        var rawNow = DateTime.UtcNow.AddMinutes(10);
+        var now = new DateTime(rawNow.Ticks - (rawNow.Ticks % 10), DateTimeKind.Utc);
 
         var serverId = Guid.NewGuid();
         ctx.Set<Server>().Add(new Server
