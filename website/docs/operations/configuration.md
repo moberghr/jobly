@@ -73,7 +73,9 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 {
     // Worker
     options.WorkerCount = 10;
-    options.PollingInterval = TimeSpan.FromSeconds(1);
+    options.PollingInterval = TimeSpan.FromSeconds(1);    // floor
+    options.MaxPollingInterval = TimeSpan.FromSeconds(30); // ceiling for exponential backoff
+    options.PollingIntervalFactor = 2.0;                   // multiplier on each empty poll (1.0 disables backoff)
     options.Queues = ["a-critical", "b-default", "c-low"];
 
     // Dispatcher mode (batch-fetch instead of per-worker polling)
@@ -114,8 +116,20 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `WorkerCount` | `int` | `min(CPU * 5, 20)` | Number of concurrent worker threads |
-| `PollingInterval` | `TimeSpan` | `1 second` | Delay between polls when no jobs are available |
+| `PollingInterval` | `TimeSpan` | `1 second` | Delay between polls when no jobs are available. Also serves as the floor for exponential backoff. |
+| `MaxPollingInterval` | `TimeSpan` | `30 seconds` | Upper bound on the polling delay during idle periods. The delay grows from `PollingInterval` by `PollingIntervalFactor` on each empty poll, clamped to this value, and resets instantly when a job is processed. |
+| `PollingIntervalFactor` | `double` | `2.0` | Multiplier applied to the current polling delay on each consecutive empty poll. Set to `1.0` (or lower) to disable exponential backoff — the delay stays at `PollingInterval`. |
 | `Queues` | `string[]` | `["default"]` | Queues this worker subscribes to. Processed in alphabetical order |
+
+### Exponential Polling Backoff
+
+On idle queues, the poll delay grows geometrically from `PollingInterval` (floor) toward `MaxPollingInterval` (ceiling) by `PollingIntervalFactor` on each consecutive empty poll. The delay resets to the floor instantly when any job is processed, so latency remains bounded by `PollingInterval` under load.
+
+With defaults (`1s` → `30s`, factor `2.0`), an idle worker backs off through `1s → 2s → 4s → 8s → 16s → 30s` before capping at 30s. A burst of work resets it back to 1s immediately.
+
+To disable backoff entirely, set `PollingIntervalFactor = 1.0`. The delay then stays at `PollingInterval` on every poll.
+
+Paused workers/groups always poll at the floor (no backoff while paused).
 
 ### Handler Logging
 
@@ -157,6 +171,8 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
         group.WorkerCount = 2;
         group.Queues = ["reports", "default"];
         group.PollingInterval = TimeSpan.FromSeconds(5);
+        group.MaxPollingInterval = TimeSpan.FromSeconds(60);
+        group.PollingIntervalFactor = 2.0;
     });
 });
 ```
@@ -167,7 +183,9 @@ This creates 7 workers total: 5 polling `critical` every 100ms, and 2 polling `r
 |--------|------|---------|-------------|
 | `WorkerCount` | `int` | `min(CPU * 5, 20)` | Number of workers in this group |
 | `Queues` | `string[]` | `["default"]` | Queues this group subscribes to |
-| `PollingInterval` | `TimeSpan` | `1 second` | Delay between polls for this group |
+| `PollingInterval` | `TimeSpan` | `1 second` | Delay between polls for this group. Also the floor for exponential backoff. |
+| `MaxPollingInterval` | `TimeSpan` | `30 seconds` | Upper bound on the polling delay during idle periods for this group |
+| `PollingIntervalFactor` | `double` | `2.0` | Multiplier on each consecutive empty poll for this group. Set to `1.0` to disable backoff. |
 
 ### Server Identity
 

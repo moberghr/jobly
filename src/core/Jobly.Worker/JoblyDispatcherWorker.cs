@@ -48,6 +48,8 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Channel-based pull: blocks on ReadAllAsync until the dispatcher produces a job.
+        // No idle polling loop here — polling backoff lives in JoblyDispatcher.ExecuteAsync.
         await foreach (var job in _jobReader.ReadAllAsync(stoppingToken))
         {
             try
