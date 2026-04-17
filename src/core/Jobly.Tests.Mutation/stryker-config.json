@@ -11,7 +11,7 @@
       "low": 70,
       "break": 60
     },
-    "reporters": ["html", "progress", "cleartext"],
+    "reporters": ["html", "progress", "cleartext", "json"],
     "test-runner": "mtp",
     "concurrency": 4,
     "mutate": [
