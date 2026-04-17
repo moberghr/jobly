@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Jobly.Core.Handlers;
 
-internal static class MetadataSerializer
+public static class MetadataSerializer
 {
     private static readonly JsonSerializerOptions Options = new()
     {
