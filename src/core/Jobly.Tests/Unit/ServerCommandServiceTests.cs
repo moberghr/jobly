@@ -16,7 +16,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task PauseServer_SetsPausedAt()
     {
         // Arrange
@@ -41,7 +41,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
         server.PausedAt.ShouldNotBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ResumeServer_ClearsPausedAt()
     {
         // Arrange
@@ -67,7 +67,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
         server.PausedAt.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task PauseServer_ReturnsFalseForNonexistent()
     {
         var svc = new ServerCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -75,7 +75,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
         result.ShouldBeFalse();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task PauseWorkerGroup_SetsPausedAt()
     {
         // Arrange
@@ -108,7 +108,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
         group.PausedAt.ShouldNotBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ResumeWorkerGroup_ClearsPausedAt()
     {
         // Arrange
@@ -142,7 +142,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
         group.PausedAt.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task PauseWorkerGroup_ReturnsFalseForNonexistent()
     {
         var svc = new ServerCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -150,7 +150,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
         result.ShouldBeFalse();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ResumeServer_ReturnsFalseForNonexistent()
     {
         var svc = new ServerCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -158,7 +158,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
         result.ShouldBeFalse();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ResumeWorkerGroup_ReturnsFalseForNonexistent()
     {
         var svc = new ServerCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -166,7 +166,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
         result.ShouldBeFalse();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task PauseServer_AlreadyPaused_UpdatesTimestamp()
     {
         // Arrange

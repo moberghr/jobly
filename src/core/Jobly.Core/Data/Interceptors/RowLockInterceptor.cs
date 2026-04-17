@@ -4,14 +4,14 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Jobly.Core.Interceptors;
 
-public static class InterceptorConstants
+internal static class InterceptorConstants
 {
     public static readonly string RowLockTableJob = "LOCK ROW TABLE JOB";
     public static readonly string RowLockTableJobWait = "LOCK ROW TABLE JOB WAIT";
     public static readonly string RowLockTableCounter = "LOCK ROW TABLE COUNTER";
 }
 
-public class PostgresRowLockInterceptor : DbCommandInterceptor
+internal class PostgresRowLockInterceptor : DbCommandInterceptor
 {
     public override InterceptionResult<DbDataReader> ReaderExecuting(
         DbCommand command,
@@ -56,7 +56,7 @@ public class PostgresRowLockInterceptor : DbCommandInterceptor
     }
 }
 
-public partial class SqlServerRowLockInterceptor : DbCommandInterceptor
+internal partial class SqlServerRowLockInterceptor : DbCommandInterceptor
 {
     // Matches the first FROM [table] AS [alias] or FROM [schema].[table] AS [alias] pattern
     [GeneratedRegex(@"(?<from>FROM\s+(?:\[\w+\]\.)*\[\w+\]\s+AS\s+\[\w+\])", RegexOptions.NonBacktracking | RegexOptions.ExplicitCapture)]

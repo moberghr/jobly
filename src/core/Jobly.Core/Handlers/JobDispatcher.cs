@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Jobly.Core.Handlers;
 
-public static class JobDispatcher
+internal static class JobDispatcher
 {
     private static readonly ConcurrentDictionary<Type, Type> _handlerInterfaceCache = new();
     private static readonly ConcurrentDictionary<(Type HandlerType, Type MessageType), MethodInfo> _handleMethodCache = new();

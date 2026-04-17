@@ -22,12 +22,12 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task AddOrUpdateRecurringJob_CreatesRecurringJobInDb()
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System, new FakeLockProvider());
 
         // Act
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "test-recurring", "* * * * *");
@@ -43,13 +43,13 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         recurringJob.Queue.ShouldBe("default");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetRecurringJobs_ReturnsPaginated()
     {
         // Arrange
         for (var i = 0; i < 3; i++)
         {
-            var publisher = new RecurringJobPublisher<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+            var publisher = new RecurringJobPublisher<TestContext>(_fixture.CreateContext(), TimeProvider.System, new FakeLockProvider());
             await publisher.AddOrUpdateRecurringJob(new UnitRequest(), $"recurring-{i}", "* * * * *");
         }
 
@@ -61,12 +61,12 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         result.TotalCount.ShouldBe(3);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetRecurringJobById_ReturnsDetail()
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System, new FakeLockProvider());
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "detail-test", "*/5 * * * *");
 
         var readCtx = _fixture.CreateContext();
@@ -82,12 +82,12 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         detail.Cron.ShouldBe("*/5 * * * *");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteRecurringJob_RemovesFromDb()
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System, new FakeLockProvider());
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "to-delete", "* * * * *");
 
         var readCtx = _fixture.CreateContext();
@@ -110,12 +110,12 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         deleted.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task TriggerRecurringJob_CreatesJob()
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System, new FakeLockProvider());
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "trigger-test", "* * * * *");
 
         var readCtx = _fixture.CreateContext();
@@ -137,12 +137,12 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         jobCountAfter.ShouldBe(jobCountBefore + 1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DisableRecurringJob_SetsDisabledAt()
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System, new FakeLockProvider());
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "disable-test", "* * * * *");
 
         var readCtx = _fixture.CreateContext();
@@ -158,7 +158,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         updated.DisabledAt.ShouldNotBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task EnableRecurringJob_ClearsDisabledAt()
     {
         // Arrange
@@ -188,7 +188,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         updated.DisabledAt.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetRecurringJobs_ReturnsDisabledAt()
     {
         // Arrange
@@ -216,7 +216,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         item.DisabledAt.Value.ShouldBe(disabledTime, TimeSpan.FromSeconds(1));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetRecurringJobById_ReturnsDisabledAt()
     {
         // Arrange
@@ -247,7 +247,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         detail.DisabledAt.Value.ShouldBe(disabledTime, TimeSpan.FromSeconds(1));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetRecurringJobHistory_ReturnsSkippedFlag()
     {
         // Arrange
@@ -282,7 +282,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         entry.JobId.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RecurringJobScheduler_CreatesJobWhenDue()
     {
         // Arrange — create a recurring job with NextExecution in the past

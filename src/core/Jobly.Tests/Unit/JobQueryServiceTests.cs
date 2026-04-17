@@ -19,7 +19,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task GetJobsList_ReturnsJobsByState()
     {
         // Arrange
@@ -60,7 +60,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         result.TotalCount.ShouldBe(3);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetScheduledJobs_ReturnsFutureScheduledOnly()
     {
         // Arrange
@@ -98,7 +98,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         result.TotalCount.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAwaitingJobs_ReturnsOnlyAwaiting()
     {
         // Arrange
@@ -131,7 +131,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         result.TotalCount.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetSiblingJobs_ReturnsOtherChildrenOfSameParent()
     {
         // Arrange
@@ -183,7 +183,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         result.TotalCount.ShouldBe(2);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetChildJobs_ReturnsDirectChildren()
     {
         // Arrange
@@ -223,7 +223,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
         result.TotalCount.ShouldBe(2);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetTraceJobs_ReturnsJobsWithSameTraceId()
     {
         // Arrange

@@ -18,7 +18,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueStaleJobs_MultipleStaleJobs_AllRequeued()
     {
         // Arrange — insert 5 stale Processing jobs
@@ -56,7 +56,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueStaleJobs_NonProcessingJobs_NotAffected()
     {
         // Arrange — insert jobs in Completed, Failed, and Enqueued states with old keepalive
@@ -113,7 +113,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         (await readCtx.Set<Job>().FirstAsync(j => j.Id == enqueuedId)).CurrentState.ShouldBe(State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueStaleJobs_StaleJob_RetriedTimesNotIncremented()
     {
         // Arrange
@@ -144,7 +144,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         job.RetriedTimes.ShouldBe(2); // Unchanged
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueStaleJobs_ConcurrentCalls_OnlyOnceRequeued()
     {
         // Arrange
@@ -179,7 +179,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         logs.Count.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CleanUpServers_DeadServerWithProcessingJob_JobStateUnchanged()
     {
         // Arrange
@@ -226,7 +226,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Processing); // Unchanged — StaleJobRecovery handles this
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CleanUpServers_CombinedRecovery_JobsRequeuedAndServerCleaned()
     {
         // Arrange
@@ -280,6 +280,75 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         var servers = await readCtx.Set<Server>().CountAsync();
         servers.ShouldBe(0);
     }
+
+    [TimedFact]
+    public async Task RequeueStaleJobs_KeepAliveAtExactCutoff_NotRequeued()
+    {
+        // Arrange — job with LastKeepAlive exactly at cutoff should NOT be requeued (strict < comparison)
+        var ctx = _fixture.CreateContext();
+        var timeout = TimeSpan.FromMinutes(5);
+        var now = DateTime.UtcNow.AddMinutes(10);
+        var exactCutoff = now - timeout;
+
+        var jobId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Processing,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            LastKeepAlive = exactCutoff,
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var tp = new FakeTimeProvider(now);
+        var count = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(
+            _fixture.CreateContext(), tp, timeout);
+
+        // Assert — should NOT be requeued (at boundary, not past it)
+        count.ShouldBe(0);
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        job.ShouldNotBeNull();
+        job.CurrentState.ShouldBe(State.Processing);
+    }
+
+    [TimedFact]
+    public async Task CleanUpServers_HeartbeatAtExactTimeout_NotCleaned()
+    {
+        // Arrange — server with heartbeat exactly at timeout boundary should NOT be cleaned
+        var ctx = _fixture.CreateContext();
+        var timeout = TimeSpan.FromMinutes(5);
+        var now = DateTime.UtcNow.AddMinutes(10);
+
+        var serverId = Guid.NewGuid();
+        ctx.Set<Server>().Add(new Server
+        {
+            Id = serverId,
+            StartedTime = now.AddHours(-1),
+            LastHeartbeatTime = now - timeout,
+            ServiceCount = 1,
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var tp = new FakeTimeProvider(now);
+        await ServerCleanupTask<TestContext>.CleanUpServers(
+            _fixture.CreateContext(), tp, timeout);
+
+        // Assert — server should still exist
+        var readCtx = _fixture.CreateContext();
+        var server = await readCtx.Set<Server>().FindAsync(serverId);
+        server.ShouldNotBeNull();
+    }
+}
+
+file class FakeTimeProvider(DateTime utcNow) : TimeProvider
+{
+    public override DateTimeOffset GetUtcNow() => new(utcNow, TimeSpan.Zero);
 }
 
 [Collection<PostgreSqlCollection>]

@@ -9,7 +9,6 @@ using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
 using Jobly.Worker.Services;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -87,11 +86,10 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
             groupConfig,
-            TimeProvider.System,
-            new FakeLockProvider());
+            TimeProvider.System);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_CompletedJob_IncrementsHourlySucceededStat()
     {
         // Arrange
@@ -126,7 +124,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         stat.Value.ShouldBeGreaterThanOrEqualTo(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_FailedJob_IncrementsHourlyFailedStat()
     {
         // Arrange
@@ -161,7 +159,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         stat.Value.ShouldBeGreaterThanOrEqualTo(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_MultipleJobs_HourlyStatsAccumulate()
     {
         // Arrange — create 3 jobs
@@ -201,7 +199,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         stat.Value.ShouldBe(3);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJoblyStatus_IncludesHistoricalTotals()
     {
         // Arrange — insert stats

@@ -66,7 +66,7 @@ public static class ServiceConfiguration
         services.AddScoped<IMediator>(x => new Mediator(x));
 
         services.AddScoped<IRecurringJobPublisher>(x =>
-            new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
+            new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IJoblyLockProvider>()));
         services.AddScoped<IJobQueryService>(x => new JobQueryService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
         services.AddScoped<IJobCommandService>(x => new JobCommandService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IOptions<JoblyConfiguration>>()));
         services.AddScoped<IJobGroupQueryService>(x => new JobGroupQueryService<TContext>(x.GetRequiredService<TContext>()));
@@ -81,7 +81,6 @@ public static class ServiceConfiguration
 
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
-        services.AddScoped(typeof(IJobContext<>), typeof(JobContext<>));
 
         return services;
     }
@@ -199,8 +198,6 @@ public static class ServiceConfiguration
         job.HasIndex(p => p.TraceId);
 
         job.Property(p => p.CancellationMode);
-        job.Property(p => p.ConcurrencyKey);
-        job.HasIndex(p => p.ConcurrencyKey);
 
         job.Property(p => p.Metadata);
 

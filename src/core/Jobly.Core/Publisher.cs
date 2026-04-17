@@ -28,22 +28,10 @@ public interface IPublisher
     Task<Guid> Enqueue<T>(T job, string? queue)
         where T : class, IJob;
 
-    Task<Guid> Enqueue<T>(T job, int maxRetries)
-        where T : class, IJob;
-
-    Task<Guid> Enqueue<T>(T job, int maxRetries, string? queue)
-        where T : class, IJob;
-
     Task<Guid> Enqueue<T>(T job, Guid parentJobId)
         where T : class, IJob;
 
     Task<Guid> Enqueue<T>(T job, Guid parentJobId, string? queue)
-        where T : class, IJob;
-
-    Task<Guid> Enqueue<T>(T job, int maxRetries, Guid parentJobId)
-        where T : class, IJob;
-
-    Task<Guid> Enqueue<T>(T job, int maxRetries, Guid parentJobId, string? queue)
         where T : class, IJob;
 
     Task<Guid> Enqueue<T>(T job, JobParameters jobParameters)
@@ -55,22 +43,10 @@ public interface IPublisher
     Task<Guid> Schedule<T>(T job, DateTime scheduleTime, string? queue)
         where T : class, IJob;
 
-    Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries)
-        where T : class, IJob;
-
-    Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, string? queue)
-        where T : class, IJob;
-
     Task<Guid> Schedule<T>(T job, DateTime scheduleTime, Guid parentJobId)
         where T : class, IJob;
 
     Task<Guid> Schedule<T>(T job, DateTime scheduleTime, Guid parentJobId, string? queue)
-        where T : class, IJob;
-
-    Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, Guid parentJobId)
-        where T : class, IJob;
-
-    Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, Guid parentJobId, string? queue)
         where T : class, IJob;
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
@@ -156,79 +132,45 @@ public class Publisher<TContext> : IPublisher
     // --- IJob: create Job rows directly ---
     public async Task<Guid> Enqueue<T>(T job)
         where T : class, IJob
-        => await CreateJob(job, null, null, null, null);
+        => await CreateJob(job, null, null, null);
 
     public async Task<Guid> Enqueue<T>(T job, string? queue)
         where T : class, IJob
-        => await CreateJob(job, null, null, queue, null);
-
-    public async Task<Guid> Enqueue<T>(T job, int maxRetries)
-        where T : class, IJob
-        => await CreateJob(job, null, maxRetries, null, null);
-
-    public async Task<Guid> Enqueue<T>(T job, int maxRetries, string? queue)
-        where T : class, IJob
-        => await CreateJob(job, null, maxRetries, queue, null);
+        => await CreateJob(job, null, queue, null);
 
     public async Task<Guid> Enqueue<T>(T job, Guid parentJobId)
         where T : class, IJob
-        => await CreateJob(job, null, null, null, parentJobId);
+        => await CreateJob(job, null, null, parentJobId);
 
     public async Task<Guid> Enqueue<T>(T job, Guid parentJobId, string? queue)
         where T : class, IJob
-        => await CreateJob(job, null, null, queue, parentJobId);
-
-    public async Task<Guid> Enqueue<T>(T job, int maxRetries, Guid parentJobId)
-        where T : class, IJob
-        => await CreateJob(job, null, maxRetries, null, parentJobId);
-
-    public async Task<Guid> Enqueue<T>(T job, int maxRetries, Guid parentJobId, string? queue)
-        where T : class, IJob
-        => await CreateJob(job, null, maxRetries, queue, parentJobId);
+        => await CreateJob(job, null, queue, parentJobId);
 
     public async Task<Guid> Enqueue<T>(T job, JobParameters jobParameters)
         where T : class, IJob
-        => await CreateJob(job, jobParameters.ScheduleTime, jobParameters.MaxRetries, jobParameters.Queue, jobParameters.ParentId, jobParameters.Mutex, jobParameters.Metadata);
+        => await CreateJob(job, jobParameters.ScheduleTime, jobParameters.Queue, jobParameters.ParentId, jobParameters.Metadata);
 
     public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime)
         where T : class, IJob
-        => await CreateJob(job, scheduleTime, null, null, null);
+        => await CreateJob(job, scheduleTime, null, null);
 
     public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, string? queue)
         where T : class, IJob
-        => await CreateJob(job, scheduleTime, null, queue, null);
-
-    public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries)
-        where T : class, IJob
-        => await CreateJob(job, scheduleTime, maxRetries, null, null);
-
-    public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, string? queue)
-        where T : class, IJob
-        => await CreateJob(job, scheduleTime, maxRetries, queue, null);
+        => await CreateJob(job, scheduleTime, queue, null);
 
     public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, Guid parentJobId)
         where T : class, IJob
-        => await CreateJob(job, scheduleTime, null, null, parentJobId);
+        => await CreateJob(job, scheduleTime, null, parentJobId);
 
     public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, Guid parentJobId, string? queue)
         where T : class, IJob
-        => await CreateJob(job, scheduleTime, null, queue, parentJobId);
-
-    public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, Guid parentJobId)
-        where T : class, IJob
-        => await CreateJob(job, scheduleTime, maxRetries, null, parentJobId);
-
-    public async Task<Guid> Schedule<T>(T job, DateTime scheduleTime, int maxRetries, Guid parentJobId, string? queue)
-        where T : class, IJob
-        => await CreateJob(job, scheduleTime, maxRetries, queue, parentJobId);
+        => await CreateJob(job, scheduleTime, queue, parentJobId);
 
     private async Task<Guid> CreateJob<T>(
         T job,
         DateTime? scheduleTime,
-        int? maxRetries,
         string? queue,
         Guid? parentId,
-        string? mutex = null,
         Dictionary<string, object>? adHocMetadata = null)
         where T : class, IJob
     {
@@ -238,14 +180,11 @@ public class Publisher<TContext> : IPublisher
 
         var newJob = JobHelper.CreateJob(
             job,
-            _configuration.RetryCount,
             scheduleTime,
-            maxRetries,
             queue,
             parentId,
             null,
             now,
-            concurrencyKey: mutex,
             metadata: SerializeMetadata(publishCtx.Metadata));
 
         // Automatic trace propagation: execution context > parent's trace > self

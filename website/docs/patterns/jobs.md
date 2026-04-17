@@ -37,23 +37,46 @@ await publisher.Schedule(new GenerateReport { ReportId = 1 }, DateTime.UtcNow.Ad
 
 ## Retries
 
-Retry is an opt-in pipeline module. Register it to enable automatic retries with exponential backoff:
+Declare retry policy on the handler:
 
 ```csharp
-services.AddJoblyRetry(options =>
+[Retry(3)]
+public class GenerateReportHandler : IJobHandler<GenerateReport>
 {
-    options.MaxRetries = 3;
-    options.Delays = [15, 60, 300]; // seconds between retries
+    // ...
+}
+```
+
+Or on the job class:
+
+```csharp
+[Retry(3, Delays = [15, 60, 300])]
+public class GenerateReport : IJob
+{
+    public int ReportId { get; set; }
+}
+```
+
+Override per-enqueue via metadata:
+
+```csharp
+await publisher.Enqueue(new GenerateReport { ReportId = 1 },
+    new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 5));
+```
+
+Configure global defaults:
+
+```csharp
+services.AddJoblyRetry(o =>
+{
+    o.MaxRetries = 3;
+    o.Delays = [15, 60, 300]; // seconds
 });
 ```
 
-You can also set max retries per job at publish time:
+Priority: per-enqueue metadata > handler attribute > job attribute > global `RetryOptions`.
 
-```csharp
-await publisher.Enqueue(new GenerateReport { ReportId = 1 }, maxRetries: 5);
-```
-
-Failed jobs are re-enqueued with a future `ScheduleTime` based on the delay array. Crash requeues (server died mid-execution) do **not** count against the retry limit. Without `AddJoblyRetry()`, failed jobs go directly to `Failed` state.
+Failed jobs are retried automatically. Crash requeues (server died mid-execution) do **not** count against the retry limit.
 
 ## Named Queues
 
@@ -124,11 +147,18 @@ If the job is processing, this sets `CancellationMode = Graceful` instead of imm
 
 ## Mutex
 
-Only one job per mutex key can be processing at a time:
+Only one job per mutex key can be processing at a time. Requires `AddJoblyMutex()`:
 
 ```csharp
 await publisher.Enqueue(new ProcessPayment { CustomerId = 123 },
-    new JobParameters { Mutex = "payment:123" });
+    new JobParameters().WithMutex("payment:123"));
+```
+
+Or use the `[Mutex]` attribute on the job class for static keys:
+
+```csharp
+[Mutex("payment-processing")]
+public class ProcessPayment : IJob { ... }
 ```
 
 See [Mutex](/docs/features/mutex) for details.

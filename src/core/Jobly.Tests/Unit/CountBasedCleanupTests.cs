@@ -18,7 +18,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task RunCountBasedCleanup_WhenOverThreshold_DeletesOldestByExpireAt()
     {
         // Arrange
@@ -51,7 +51,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         remaining.ShouldBe(20);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCountBasedCleanup_WhenUnderThreshold_DeletesNothing()
     {
         // Arrange
@@ -84,7 +84,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         remaining.ShouldBe(15);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCountBasedCleanup_BatchesCorrectly()
     {
         // Arrange
@@ -122,7 +122,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         earliestRemaining.Value.ShouldBeGreaterThanOrEqualTo(DateTime.UtcNow.AddHours(9));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCountBasedCleanup_ExcludesJobsWithNullExpireAt()
     {
         // Arrange
@@ -183,7 +183,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         totalRemaining.ShouldBe(30);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCountBasedCleanup_DeletesAssociatedJobLogs()
     {
         // Arrange — insert 25 jobs (5 over threshold of 20), with logs on the 5 oldest
@@ -250,6 +250,39 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         // Log for surviving job should remain
         var survivorLogs = await readCtx.Set<JobLog>().Where(l => l.JobId == jobIds[20]).CountAsync();
         survivorLogs.ShouldBe(1);
+    }
+
+    [TimedFact]
+    public async Task RunCountBasedCleanup_AtExactlyMaxCount_DeletesNothing()
+    {
+        // Arrange — exactly at threshold should NOT trigger cleanup
+        var ctx = _fixture.CreateContext();
+        for (var i = 0; i < 10; i++)
+        {
+            ctx.Set<Job>().Add(new Job
+            {
+                Id = Guid.NewGuid(),
+                Kind = JobKind.Job,
+                CurrentState = State.Completed,
+                CreateTime = DateTime.UtcNow,
+                ScheduleTime = DateTime.UtcNow,
+                Queue = "default",
+                ExpireAt = DateTime.UtcNow.AddHours(i),
+            });
+        }
+
+        await ctx.SaveChangesAsync();
+
+        // Act — maxCount == actual count
+        var cleanCtx = _fixture.CreateContext();
+        var deleted = await ExpirationCleanupTask<TestContext>.RunCountBasedCleanup(cleanCtx, maxCount: 10, batchSize: 1000);
+
+        // Assert
+        deleted.ShouldBe(0);
+
+        var readCtx = _fixture.CreateContext();
+        var remaining = await readCtx.Set<Job>().CountAsync();
+        remaining.ShouldBe(10);
     }
 }
 

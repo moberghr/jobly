@@ -20,7 +20,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_AlreadyEnqueued_NoOpReturnsEarly()
     {
         // Arrange
@@ -51,7 +51,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
         logs.ShouldNotContain(l => l.EventType == "Requeued");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_DeletedJob_RequeuesSuccessfully()
     {
         // Arrange
@@ -81,7 +81,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
         job.ExpireAt.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_ParentNotFound_StillRequeues()
     {
         // Arrange — child job with ParentJobId pointing to non-existent parent
@@ -123,7 +123,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_NonExistentJob_Throws()
     {
         // Act & Assert
@@ -134,7 +134,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
         ex.Message.ShouldContain("Job not found");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task DeleteJob_NonExistentJob_Throws()
     {
         // Act & Assert

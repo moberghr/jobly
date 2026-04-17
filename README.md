@@ -165,7 +165,6 @@ public class GenerateReportHandler : IJobHandler<GenerateReport>
 ```csharp
 await publisher.Enqueue(new GenerateReport { Month = 3 });
 await publisher.Schedule(new GenerateReport { Month = 3 }, tomorrow);
-await publisher.Enqueue(new GenerateReport { Month = 3 }, maxRetries: 3);
 await publisher.Enqueue(new GenerateReport { Month = 3 }, queue: "reports");
 await publisher.Enqueue(new FollowUp(), parentJobId: prepareId); // continuation
 ```
@@ -421,9 +420,9 @@ src/
 ## Development
 
 ```bash
-dotnet build Jobly.sln
-dotnet test Jobly.sln --filter "Category!=SqlServer"  # PostgreSQL only (~45s)
-dotnet test Jobly.sln                                   # Both databases (~80s)
+dotnet build Jobly.slnx
+dotnet test Jobly.slnx --filter "Category!=SqlServer"  # PostgreSQL only (~45s)
+dotnet test Jobly.slnx                                   # Both databases (~80s)
 cd src/ui && npm run dev                                # Dashboard on :5173
 ```
 

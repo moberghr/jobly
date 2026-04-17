@@ -4,8 +4,12 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
+using Jobly.Core.Mutex;
+using Jobly.Core.Retry;
 using Jobly.Test.Shared;
 using Jobly.UI;
+using Jobly.UI.Extensions;
+using Jobly.UI.Extensions.Retry;
 using Jobly.UI.UIMiddleware;
 using Jobly.Worker;
 using Microsoft.EntityFrameworkCore;
@@ -28,9 +32,11 @@ builder.Services.AddCors(options =>
         policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 
+builder.Services.AddJoblyRetry(o => o.MaxRetries = 3);
+builder.Services.AddJoblyMutex();
+builder.Services.AddSingleton<IJoblyUIExtension, RetryUIExtension>();
 builder.Services.AddJoblyWorker<TestContext>(options =>
 {
-    options.RetryCount = 3;
     options.WorkerCount = 10;
     options.ServerName = "jobly-demo-server";
     options.DefaultQueue = "default";
@@ -105,7 +111,7 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     // === Failing jobs with retries (shows retry lifecycle) ===
     for (var i = 0; i < 10; i++)
     {
-        await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 3, queue: queues[random.Next(queues.Length)]);
+        await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters { Queue = queues[random.Next(queues.Length)] }.Configure<IRetryMetadata>(m => m.MaxRetries = 3));
     }
 
     // === Continuations (parent → child chains) ===
@@ -155,12 +161,12 @@ app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher
     // Uses a-critical queue so these are picked up before the 300+ other jobs
     await publisher.Enqueue(
         new SlowRequest(),
-        new JobParameters { Queue = "a-critical", Mutex = "payment:customer-42" });
+        new JobParameters { Queue = "a-critical", }.WithMutex("payment:customer-42"));
     for (var i = 0; i < 4; i++)
     {
         await publisher.Enqueue(
             new SendEmailRequest { EmailLogId = 1 },
-            new JobParameters { Queue = "a-critical", Mutex = "payment:customer-42" });
+            new JobParameters { Queue = "a-critical", }.WithMutex("payment:customer-42"));
     }
 
     // === Multiple continuation fan-out (parent → 3 continuations) ===
@@ -231,7 +237,7 @@ app.MapPost("/seed-flow", async (IPublisher publisher, IBatchPublisher batchPubl
     var simpleJobId = await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 });
 
     // 2. Simple failing job (shows retries + failed state)
-    var failingJobId = await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 2);
+    var failingJobId = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 2));
 
     // 3. Job → 3 continuation jobs (fan-out, creates trace via handler spawning)
     var fanOutId = await publisher.Enqueue(new RegisterRequest { Email = "flow-parent@test.com" });
@@ -264,10 +270,10 @@ app.MapPost("/seed-flow", async (IPublisher publisher, IBatchPublisher batchPubl
     // 9. Mutex jobs (same key — first holds mutex, rest cancelled)
     var mutexId1 = await publisher.Enqueue(
         new SlowRequest(),
-        new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
+        new JobParameters { Queue = "a-critical", }.WithMutex("test-mutex"));
     var mutexId2 = await publisher.Enqueue(
         new SendEmailRequest { EmailLogId = 1 },
-        new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
+        new JobParameters { Queue = "a-critical", }.WithMutex("test-mutex"));
 
     await publisher.SaveChangesAsync();
 
@@ -308,7 +314,7 @@ app.MapPost("/seed/simple-job", async (IPublisher publisher) =>
 
 app.MapPost("/seed/failing-job", async (IPublisher publisher) =>
 {
-    var id = await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 2);
+    var id = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 2));
     await publisher.SaveChangesAsync();
     return Results.Ok(new { detail = $"/jobly/detail/{id}" });
 });
@@ -373,8 +379,8 @@ app.MapPost("/seed/light-flow", async (IPublisher publisher, TestContext context
 
 app.MapPost("/seed/mutex", async (IPublisher publisher) =>
 {
-    var id1 = await publisher.Enqueue(new SlowRequest(), new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
-    var id2 = await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, new JobParameters { Queue = "a-critical", Mutex = "test-mutex" });
+    var id1 = await publisher.Enqueue(new SlowRequest(), new JobParameters { Queue = "a-critical", }.WithMutex("test-mutex"));
+    var id2 = await publisher.Enqueue(new SendEmailRequest { EmailLogId = 1 }, new JobParameters { Queue = "a-critical", }.WithMutex("test-mutex"));
     await publisher.SaveChangesAsync();
     return Results.Ok(new { holder = $"/jobly/detail/{id1}", cancelled = $"/jobly/detail/{id2}" });
 });

@@ -18,7 +18,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task GetJobGroups_Message_ReturnsMessageKindJobs()
     {
         // Arrange
@@ -55,7 +55,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
         result.TotalCount.ShouldBe(2);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJobGroups_Batch_ReturnsBatchKindJobs()
     {
         // Arrange
@@ -93,7 +93,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
         result.TotalCount.ShouldBe(2);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJobGroups_WithStateFilter_FiltersCorrectly()
     {
         // Arrange
@@ -126,7 +126,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
         result.TotalCount.ShouldBe(1);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJobGroupById_ReturnsDetailWithSpawnedJobsCount()
     {
         // Arrange
@@ -167,7 +167,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
         result.SpawnedJobsCount.ShouldBe(3);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJobGroupById_NonExistent_ReturnsNull()
     {
         // Act
@@ -178,7 +178,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
         result.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJobGroupJobs_ReturnsChildJobs()
     {
         // Arrange
@@ -218,7 +218,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
         result.TotalCount.ShouldBe(3);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetJobGroupJobCounts_ReturnsStateBreakdown()
     {
         // Arrange

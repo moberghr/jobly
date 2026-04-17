@@ -20,7 +20,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_JobStillPending_SkipsScheduling()
     {
         // Arrange — recurring job with NextJobId pointing to an Enqueued (pending) job
@@ -72,7 +72,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         jobCountAfter.ShouldBe(jobCountBefore);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_MultipleDueJobs_SchedulesAll()
     {
         // Arrange — insert 3 recurring jobs with past NextExecution, each with a completed next job
@@ -123,7 +123,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         count.ShouldBe(3);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_UpdatesNextExecution()
     {
         // Arrange
@@ -173,7 +173,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         rj.NextExecution.Value.ShouldBeGreaterThan(DateTime.UtcNow);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_UpdatesLastExecution()
     {
         // Arrange
@@ -223,7 +223,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         rj.LastExecution.Value.ShouldBe(pastTime, TimeSpan.FromSeconds(1));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_DisabledJob_CreatesSkippedLogEntry()
     {
         // Arrange
@@ -258,7 +258,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         log.JobId.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_DisabledJob_DoesNotCreateJob()
     {
         // Arrange
@@ -287,7 +287,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         jobCountAfter.ShouldBe(jobCountBefore);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_DisabledJob_AdvancesNextExecution()
     {
         // Arrange
@@ -316,7 +316,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         rj.NextExecution.Value.ShouldBeGreaterThan(DateTime.UtcNow);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_DisabledJob_AdvancesLastExecution()
     {
         // Arrange
@@ -345,7 +345,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         rj.LastExecution.Value.ShouldBe(pastTime, TimeSpan.FromSeconds(1));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task ScheduleRecurringJobs_EnabledJob_CreatesJobNormally()
     {
         // Arrange — enabled recurring job (DisabledAt = null) with completed previous job
@@ -404,6 +404,135 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         log.Skipped.ShouldBeFalse();
         log.JobId.ShouldNotBeNull();
     }
+
+    [TimedFact]
+    public async Task ScheduleRecurringJobs_NextExecutionExactlyNow_Schedules()
+    {
+        // Arrange — NextExecution == now should be scheduled (<= comparison)
+        var ctx = _fixture.CreateContext();
+        var now = DateTime.UtcNow.AddMinutes(10);
+
+        var recurringJob = new RecurringJob
+        {
+            Name = "boundary-test",
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new UnitRequest()),
+            Cron = "* * * * *",
+            CreatedAt = now.AddMinutes(-10),
+            NextExecution = now,
+        };
+        ctx.Set<RecurringJob>().Add(recurringJob);
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var tp = new FakeTimeProvider(now);
+        var schedCtx = _fixture.CreateContext();
+        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, tp);
+
+        // Assert — should schedule (NextExecution <= now)
+        count.ShouldBe(1);
+    }
+
+    [TimedFact]
+    public async Task ScheduleRecurringJobs_NextExecutionInFuture_DoesNotSchedule()
+    {
+        // Arrange — NextExecution in the future should NOT be scheduled
+        var ctx = _fixture.CreateContext();
+        var now = DateTime.UtcNow;
+
+        var recurringJob = new RecurringJob
+        {
+            Name = "future-test",
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new UnitRequest()),
+            Cron = "* * * * *",
+            CreatedAt = now.AddMinutes(-10),
+            NextExecution = now.AddMinutes(5),
+        };
+        ctx.Set<RecurringJob>().Add(recurringJob);
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var schedCtx = _fixture.CreateContext();
+        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+
+        // Assert
+        count.ShouldBe(0);
+    }
+
+    [TimedFact]
+    public async Task ScheduleRecurringJobs_DedupChecksLatestLog_NotOldest()
+    {
+        // Arrange — oldest log has completed job, latest log has enqueued job → should skip
+        var ctx = _fixture.CreateContext();
+        var now = DateTime.UtcNow;
+
+        var oldJobId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = oldJobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Completed,
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new UnitRequest()),
+            CreateTime = now.AddMinutes(-10),
+            ScheduleTime = now.AddMinutes(-10),
+            Queue = "default",
+        });
+
+        var newJobId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = newJobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new UnitRequest()),
+            CreateTime = now.AddMinutes(-1),
+            ScheduleTime = now.AddMinutes(-1),
+            Queue = "default",
+        });
+
+        var recurringJob = new RecurringJob
+        {
+            Name = "dedup-order-test",
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new UnitRequest()),
+            Cron = "* * * * *",
+            CreatedAt = now.AddMinutes(-20),
+            NextExecution = now.AddMinutes(-1),
+        };
+        ctx.Set<RecurringJob>().Add(recurringJob);
+        await ctx.SaveChangesAsync();
+
+        // Old log (completed job) — should NOT be the one checked
+        ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
+        {
+            RecurringJobId = recurringJob.Id,
+            JobId = oldJobId,
+            CreatedAt = now.AddMinutes(-10),
+        });
+        // Latest log (enqueued job) — should BE the one checked
+        ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
+        {
+            RecurringJobId = recurringJob.Id,
+            JobId = newJobId,
+            CreatedAt = now.AddMinutes(-1),
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var schedCtx = _fixture.CreateContext();
+        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+
+        // Assert — should skip because latest log's job is Enqueued
+        count.ShouldBe(0);
+    }
+}
+
+file class FakeTimeProvider(DateTime utcNow) : TimeProvider
+{
+    public override DateTimeOffset GetUtcNow() => new(utcNow, TimeSpan.Zero);
 }
 
 [Collection<PostgreSqlCollection>]

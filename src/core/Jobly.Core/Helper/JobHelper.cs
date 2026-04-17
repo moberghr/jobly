@@ -5,9 +5,9 @@ using Jobly.Core.Handlers;
 
 namespace Jobly.Core.Helper;
 
-public static class JobHelper
+internal static class JobHelper
 {
-    private static Job CreateJobInternal(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, State? state, DateTime now, string? concurrencyKey = null, string? metadata = null)
+    private static Job CreateJobInternal(string message, string type, DateTime? scheduleTime, string? queue, Guid? parentId, State? state, DateTime now, string? metadata = null)
     {
         var job = new Job
         {
@@ -16,10 +16,8 @@ public static class JobHelper
             Type = type,
             ScheduleTime = scheduleTime ?? now,
             CurrentState = state ?? (parentId == null ? State.Enqueued : State.Awaiting),
-            MaxRetries = maxRetries ?? retries,
             Queue = queue ?? "default",
             ParentJobId = parentId,
-            ConcurrencyKey = concurrencyKey,
             Metadata = metadata,
         };
 
@@ -28,24 +26,22 @@ public static class JobHelper
 
     public static Job CreateJob<T>(
         T message,
-        int retries,
         DateTime? scheduleTime,
-        int? maxRetries,
         string? queue,
         Guid? parentId,
         State? state,
         DateTime now,
-        string? concurrencyKey = null,
         string? metadata = null)
         where T : class, IJob
     {
         var serializedMessage = JsonSerializer.Serialize(message);
         var type = message!.GetType().AssemblyQualifiedName!;
-        return CreateJobInternal(serializedMessage, type, retries, scheduleTime, maxRetries, queue, parentId, state, now, concurrencyKey, metadata);
+
+        return CreateJobInternal(serializedMessage, type, scheduleTime, queue, parentId, state, now, metadata);
     }
 
-    public static Job CreateJob(string message, string type, int retries, DateTime? scheduleTime, int? maxRetries, string? queue, Guid? parentId, State? state, DateTime now, string? concurrencyKey = null, string? metadata = null)
+    public static Job CreateJob(string message, string type, DateTime? scheduleTime, string? queue, Guid? parentId, State? state, DateTime now, string? metadata = null)
     {
-        return CreateJobInternal(message, type, retries, scheduleTime, maxRetries, queue, parentId, state, now, concurrencyKey, metadata);
+        return CreateJobInternal(message, type, scheduleTime, queue, parentId, state, now, metadata);
     }
 }

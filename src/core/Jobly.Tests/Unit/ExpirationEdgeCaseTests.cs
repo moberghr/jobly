@@ -51,7 +51,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCleanup_OldHourlyStats_Deleted()
     {
         // Arrange — use stats:failed: prefix because the cleanup uses a lexicographic comparison
@@ -73,7 +73,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         stat.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCleanup_RecentHourlyStats_Kept()
     {
         // Arrange
@@ -95,7 +95,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         stat.Value.ShouldBe(7);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCleanup_OldServerLogs_DeletedBasedOnTaskInterval()
     {
         // Arrange — insert a ServerTask with 60s interval, retention = 60 * 300 = 18000 seconds
@@ -134,7 +134,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         log.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunCleanup_RecentServerLogs_Kept()
     {
         // Arrange
@@ -173,7 +173,171 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         log.ShouldNotBeNull();
     }
 
-    [Fact]
+    [TimedFact]
+    public async Task RunCleanup_JobExpiringExactlyNow_NotDeleted()
+    {
+        // Arrange — job with ExpireAt == now should NOT be deleted (strict < comparison)
+        var fixedTime = DateTime.UtcNow.AddMinutes(10);
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Completed,
+            CreateTime = fixedTime,
+            ScheduleTime = fixedTime,
+            Queue = "default",
+            ExpireAt = fixedTime,
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act — use a FakeTimeProvider that returns the same fixedTime
+        var tp = new FakeTimeProvider(fixedTime);
+        var cleanCtx = _fixture.CreateContext();
+        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, tp);
+
+        // Assert — job should still exist (ExpireAt is NOT < now, it's equal)
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        job.ShouldNotBeNull();
+    }
+
+    [TimedFact]
+    public async Task RunCleanup_ParentWithUnexpiredChild_NotDeleted()
+    {
+        // Arrange — parent has expired, but child hasn't yet → parent must be kept (FK safety)
+        var ctx = _fixture.CreateContext();
+        var parentId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = parentId,
+            Kind = JobKind.Batch,
+            CurrentState = State.Completed,
+            CreateTime = DateTime.UtcNow.AddDays(-2),
+            ScheduleTime = DateTime.UtcNow.AddDays(-2),
+            Queue = "default",
+            ExpireAt = DateTime.UtcNow.AddHours(-1),
+        });
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = childId,
+            Kind = JobKind.Job,
+            CurrentState = State.Completed,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            ParentJobId = parentId,
+            ExpireAt = DateTime.UtcNow.AddHours(1),
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var cleanCtx = _fixture.CreateContext();
+        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+
+        // Assert — parent should still exist
+        var readCtx = _fixture.CreateContext();
+        var parent = await readCtx.Set<Job>().FindAsync(parentId);
+        parent.ShouldNotBeNull();
+    }
+
+    [TimedFact]
+    public async Task RunCleanup_NoExpiredJobs_ReturnsZero()
+    {
+        // Arrange — no expired jobs
+        var ctx = _fixture.CreateContext();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = Guid.NewGuid(),
+            Kind = JobKind.Job,
+            CurrentState = State.Completed,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            ExpireAt = DateTime.UtcNow.AddHours(1),
+        });
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var cleanCtx = _fixture.CreateContext();
+        var deleted = await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+
+        // Assert
+        deleted.ShouldBe(0);
+    }
+
+    [TimedFact]
+    public async Task RunCleanup_RecentOrphanedServerLogs_Kept()
+    {
+        // Arrange — orphaned log (no TaskId) less than 1 day old should be kept
+        var ctx = _fixture.CreateContext();
+        await InsertExpiredJob(ctx);
+
+        var recentOrphanedLog = new ServerLog
+        {
+            ServerId = ServerId,
+            ServerTaskId = null,
+            Status = "Info",
+            Message = "Recent orphaned log",
+            Timestamp = DateTime.UtcNow.AddHours(-1),
+        };
+        ctx.Set<ServerLog>().Add(recentOrphanedLog);
+        await ctx.SaveChangesAsync();
+        var logId = recentOrphanedLog.Id;
+
+        // Act
+        var cleanCtx = _fixture.CreateContext();
+        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var log = await readCtx.Set<ServerLog>().FirstOrDefaultAsync(x => x.Id == logId);
+        log.ShouldNotBeNull();
+    }
+
+    [TimedFact]
+    public async Task RunCleanup_ServerTaskWithNullInterval_UsesDefaultRetention()
+    {
+        // Arrange — task with null IntervalSeconds should use default (60s * 300 = 18000s)
+        var ctx = _fixture.CreateContext();
+        await InsertExpiredJob(ctx);
+
+        var serverTask = new ServerTask
+        {
+            ServerId = ServerId,
+            TaskName = "NullIntervalTask",
+            IntervalSeconds = null,
+        };
+        ctx.Set<ServerTask>().Add(serverTask);
+        await ctx.SaveChangesAsync();
+
+        // Insert a log older than default retention (18000s ≈ 5 hours)
+        var oldLog = new ServerLog
+        {
+            ServerId = ServerId,
+            ServerTaskId = serverTask.Id,
+            Status = "Success",
+            Message = "Old log",
+            Timestamp = DateTime.UtcNow.AddHours(-6),
+        };
+        ctx.Set<ServerLog>().Add(oldLog);
+        await ctx.SaveChangesAsync();
+        var logId = oldLog.Id;
+
+        // Act
+        var cleanCtx = _fixture.CreateContext();
+        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var log = await readCtx.Set<ServerLog>().FirstOrDefaultAsync(x => x.Id == logId);
+        log.ShouldBeNull();
+    }
+
+    [TimedFact]
     public async Task RunCleanup_OrphanedServerLogs_DeletedAfterOneDay()
     {
         // Arrange
@@ -202,6 +366,11 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         var log = await readCtx.Set<ServerLog>().FirstOrDefaultAsync(l => l.Id == logId);
         log.ShouldBeNull();
     }
+}
+
+file class FakeTimeProvider(DateTime utcNow) : TimeProvider
+{
+    public override DateTimeOffset GetUtcNow() => new(utcNow, TimeSpan.Zero);
 }
 
 [Collection<PostgreSqlCollection>]

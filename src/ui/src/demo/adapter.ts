@@ -60,6 +60,11 @@ function routeGet(url: string, params: Record<string, unknown>): unknown {
   const pageSize = Number(params.pageSize ?? 20);
   const state = params.state as string | undefined;
 
+  // Extensions
+  if (url === '/extensions') {
+    return [{ name: 'retry', scriptUrl: '/_ext/retry/index.js', pages: [] }];
+  }
+
   // Dashboard
   if (url === '/status') {
     return data.getDashboardStats();

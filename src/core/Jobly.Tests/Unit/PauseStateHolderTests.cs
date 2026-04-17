@@ -5,7 +5,7 @@ namespace Jobly.Tests.Unit;
 
 public class PauseStateHolderTests
 {
-    [Fact]
+    [TimedFact]
     public void IsPaused_ReturnsFalse_WhenNothingPaused()
     {
         var holder = new PauseStateHolder();
@@ -15,7 +15,7 @@ public class PauseStateHolderTests
         holder.IsPaused(null).ShouldBeFalse();
     }
 
-    [Fact]
+    [TimedFact]
     public void IsPaused_ReturnsTrue_WhenServerPaused()
     {
         var holder = new PauseStateHolder();
@@ -27,7 +27,7 @@ public class PauseStateHolderTests
         holder.IsPaused(null).ShouldBeTrue();
     }
 
-    [Fact]
+    [TimedFact]
     public void IsPaused_ReturnsTrue_WhenGroupPaused()
     {
         var holder = new PauseStateHolder();
@@ -45,7 +45,7 @@ public class PauseStateHolderTests
         holder.IsPaused(null).ShouldBeFalse();
     }
 
-    [Fact]
+    [TimedFact]
     public void IsPaused_ReturnsTrue_WhenBothPaused()
     {
         var holder = new PauseStateHolder();
@@ -56,7 +56,7 @@ public class PauseStateHolderTests
         holder.IsPaused(groupId).ShouldBeTrue();
     }
 
-    [Fact]
+    [TimedFact]
     public void Update_ReplacesState()
     {
         var holder = new PauseStateHolder();
@@ -69,7 +69,7 @@ public class PauseStateHolderTests
         holder.IsPaused(groupId).ShouldBeFalse();
     }
 
-    [Fact]
+    [TimedFact]
     public void IsPaused_ReturnsFalse_OnFreshInstance()
     {
         // A fresh PauseStateHolder should default to "not paused".
@@ -90,7 +90,7 @@ public class PauseStateHolderTests
     /// State B: server=false, group=true  → IsPaused=true  (group is paused)
     /// Torn:    server=false, group=false → IsPaused=FALSE (bug!)
     /// </summary>
-    [Fact]
+    [TimedFact]
     public async Task Update_IsAtomic_NeverExposesTornState()
     {
         var holder = new PauseStateHolder();

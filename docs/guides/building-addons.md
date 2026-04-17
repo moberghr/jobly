@@ -8,7 +8,7 @@ Jobly provides three extension points for addons:
 
 1. **`IPublishPipelineBehavior<T>`** — runs at publish time, can modify job metadata
 2. **`IPipelineBehavior<TRequest, TResponse>`** — wraps handler execution, can catch exceptions and influence failure handling
-3. **`IJobContext` / `IJobContext<T>`** — mutable metadata dictionary available during handler execution, with optional typed views via source-generated interfaces
+3. **`IJobContext`** — mutable metadata dictionary available during handler execution, with typed views via `GetMetadata<T>()` and source-generated interfaces
 
 The worker is a generic state machine. On handler failure, it reads `IJobContext.FailureOutcome` and applies whatever state the pipeline decided. If no pipeline set an outcome, the job is marked as `Failed`.
 
@@ -56,12 +56,13 @@ public partial interface IOrderMetadata : IJobMetadata
     int Priority { get; set; }
 }
 
-// Handler injects typed context
-public class ProcessOrderHandler(IJobContext<IOrderMetadata> ctx) : IJobHandler<ProcessOrder>
+// Handler gets typed metadata via GetMetadata<T>()
+public class ProcessOrderHandler(IJobContext ctx) : IJobHandler<ProcessOrder>
 {
     public Task HandleAsync(ProcessOrder msg, CancellationToken ct)
     {
-        ctx.Metadata.CustomerName = "John";   // typed property → writes to dict
+        var meta = ctx.GetMetadata<IOrderMetadata>();
+        meta.CustomerName = "John";            // typed property → writes to dict
         ctx.Metadata["Priority"];              // raw dict access → same value
     }
 }
@@ -69,7 +70,7 @@ public class ProcessOrderHandler(IJobContext<IOrderMetadata> ctx) : IJobHandler<
 
 The typed view IS the dictionary — property writes go directly to the underlying `Dictionary<string, object>`. No sync, no flush, no copy.
 
-**Registration:** `IJobContext<T>` is registered as an open generic in `AddJobly()`. No per-type registration needed. Just inject `IJobContext<IYourMetadata>` and it works.
+**Registration:** `IJobContext` is registered in `AddJobly()`. Call `GetMetadata<T>()` to get a typed view. The typed impl replaces the underlying dictionary, so writes flow through directly.
 
 **Nullable properties:** Use `int?` for properties where "not set" must be distinguishable from `0`:
 
@@ -104,18 +105,19 @@ public class RetryPublishBehavior<T> : IPublishPipelineBehavior<T>
 {
     public Task PublishAsync(PublishContext<T> context, PublishDelegate next, CancellationToken ct)
     {
-        if (!context.Metadata.ContainsKey("MaxRetries"))
-            context.Metadata["MaxRetries"] = _options.Value.MaxRetries;
+        var meta = context.GetMetadata<IRetryMetadata>();
 
-        if (_options.Value.Delays.Length > 0 && !context.Metadata.ContainsKey("RetryDelays"))
-            context.Metadata["RetryDelays"] = _options.Value.Delays;
+        meta.MaxRetries ??= _options.Value.MaxRetries;
+
+        if (_options.Value.Delays.Length > 0 && meta.RetryDelays == null)
+            meta.RetryDelays = _options.Value.Delays;
 
         return next();
     }
 }
 ```
 
-Uses `ContainsKey` so user-registered `IPublishPipelineBehavior<T>` can override per job type.
+Uses null-coalescing so per-enqueue metadata set via `Configure<IRetryMetadata>()` takes precedence.
 
 ### Handler Pipeline: RetryPipelineBehavior
 
@@ -123,7 +125,7 @@ Wraps handler execution. On failure, reads retry config from typed metadata and 
 
 ```csharp
 public class RetryPipelineBehavior<TRequest, TResponse>(
-    IJobContext<IRetryMetadata> jobContext,
+    IJobContext jobContext,
     IOptions<RetryOptions> options,
     TimeProvider timeProvider) : IPipelineBehavior<TRequest, TResponse>
 {
@@ -133,8 +135,9 @@ public class RetryPipelineBehavior<TRequest, TResponse>(
         try { return await next(request, ct); }
         catch (Exception) when (request is IJob)
         {
-            var meta = jobContext.Metadata;
-            var maxRetries = meta.MaxRetries ?? options.Value.MaxRetries;
+            var meta = jobContext.GetMetadata<IRetryMetadata>();
+            var attr = GetRetryAttribute(); // checks [Retry] on handler, then job class
+            var maxRetries = meta.MaxRetries ?? attr?.MaxRetries ?? options.Value.MaxRetries;
 
             if (meta.RetriedTimes < maxRetries)
             {
@@ -201,7 +204,7 @@ public partial interface IDeadLetterMetadata : IJobMetadata
 
 // 2. Handler behavior — on permanent failure, re-enqueue to dead letter queue
 public class DeadLetterBehavior<TRequest, TResponse>(
-    IJobContext<IDeadLetterMetadata> ctx,
+    IJobContext ctx,
     TimeProvider timeProvider) : IPipelineBehavior<TRequest, TResponse>
 {
     public async Task<TResponse> HandleAsync(TRequest request,
@@ -210,10 +213,11 @@ public class DeadLetterBehavior<TRequest, TResponse>(
         try { return await next(request, ct); }
         catch (Exception) when (request is IJob && ctx.FailureOutcome == null)
         {
-            var dlq = ctx.Metadata.DeadLetterQueue;
+            var meta = ctx.GetMetadata<IDeadLetterMetadata>();
+            var dlq = meta.DeadLetterQueue;
             if (dlq != null)
             {
-                ctx.Metadata.OriginalQueue = "default";
+                meta.OriginalQueue = "default";
                 ctx.FailureOutcome = new JobFailureOutcome
                 {
                     State = State.Enqueued,
@@ -229,7 +233,6 @@ public class DeadLetterBehavior<TRequest, TResponse>(
 // 3. Registration
 public static IServiceCollection AddDeadLetterQueue(this IServiceCollection services)
 {
-    services.TryAddScoped(typeof(IJobContext<>), typeof(JobContext<>));
     services.AddTransient(typeof(IPipelineBehavior<,>), typeof(DeadLetterBehavior<,>));
     return services;
 }

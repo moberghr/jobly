@@ -1,6 +1,8 @@
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
+using Jobly.Core.Helper;
+using Jobly.Core.Retry;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker.Services;
@@ -16,7 +18,7 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenComplexWorkload_WhenProcessedByRealWorkers_ThenAllJobsReachTerminalState()
     {
         var publisher = Server.CreatePublisher();
@@ -61,7 +63,7 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
         // 7. Failing jobs with retries (5, maxRetries=2)
         for (var i = 0; i < 5; i++)
         {
-            await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 2);
+            await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 2));
         }
 
         // 8. Batch of 10 → continuation of 3

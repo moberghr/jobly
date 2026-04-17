@@ -103,7 +103,6 @@ public class RecurringJobService<TContext> : IRecurringJobService
             CreateTime = now,
             ScheduleTime = now,
             CurrentState = State.Enqueued,
-            MaxRetries = 0,
             Queue = recurringJob.Queue,
         };
 

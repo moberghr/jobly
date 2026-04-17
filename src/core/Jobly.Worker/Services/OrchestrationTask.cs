@@ -1,7 +1,7 @@
+using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -18,7 +18,7 @@ public class OrchestrationTask<TContext> : ServerTaskBase<TContext>
         IServiceScopeFactory scopeFactory,
         ILogger<OrchestrationTask<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
-        IDistributedLockProvider lockProvider,
+        IJoblyLockProvider lockProvider,
         TimeProvider timeProvider)
         : base(scopeFactory, logger, configuration, timeProvider, "jobly:orchestration", lockProvider)
     {

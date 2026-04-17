@@ -2,6 +2,7 @@ using Jobly.Core;
 using Jobly.Core.Enums;
 using Jobly.Core.Models;
 using Jobly.Core.Services;
+using Jobly.UI.Extensions;
 using Jobly.UI.UIMiddleware;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -11,7 +12,7 @@ namespace Jobly.UI.Endpoints;
 
 public static class JoblyEndpoints
 {
-    public static void MapJoblyApiEndpoints(this WebApplication app, JoblyUIOptions options)
+    public static void MapJoblyApiEndpoints(this WebApplication app, JoblyUIOptions options, List<IJoblyUIExtension> extensions)
     {
         var apiGroup = app.MapGroup($"{options.RoutePrefix}/api");
 
@@ -172,5 +173,16 @@ public static class JoblyEndpoints
         apiGroup.MapGet("processing", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetJobStatesInProcess(request));
 
         apiGroup.MapGet("scheduled", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetScheduledJobs(request));
+
+        // Extension manifests
+        var manifests = extensions.ConvertAll(x => x.GetManifest());
+        apiGroup.MapGet("extensions", () => manifests);
+
+        // Extension API endpoints (each under /ext/{name}/, auth-protected)
+        foreach (var ext in extensions)
+        {
+            var extGroup = apiGroup.MapGroup($"ext/{ext.Name}");
+            ext.MapEndpoints(extGroup);
+        }
     }
 }

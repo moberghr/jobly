@@ -26,7 +26,7 @@ public abstract class BugFixTestsBase : IAsyncLifetime
     /// BUG: Expiration cleanup fails with FK violation when parent job has ExpireAt
     /// but child jobs still reference it via ParentJobId.
     /// </summary>
-    [Fact]
+    [TimedFact]
     public async Task ExpirationCleanup_ParentWithChildren_DoesNotThrowFkViolation()
     {
         // Arrange: parent with ExpireAt in the past, child referencing it
@@ -74,7 +74,7 @@ public abstract class BugFixTestsBase : IAsyncLifetime
     /// BUG: Expiration cleanup fails when parent is expired but child is not yet expired.
     /// Parent can't be deleted because child still references it.
     /// </summary>
-    [Fact]
+    [TimedFact]
     public async Task ExpirationCleanup_ParentExpiredChildNot_DoesNotThrowFkViolation()
     {
         // Arrange: parent expired, child NOT expired (still has future ExpireAt)
@@ -125,7 +125,7 @@ public abstract class BugFixTestsBase : IAsyncLifetime
     /// <summary>
     /// BUG: JobModel doesn't include HandlerType. Job lists should show handler info.
     /// </summary>
-    [Fact]
+    [TimedFact]
     public async Task GetJobsList_IncludesHandlerType()
     {
         // Arrange: create a job with a handler type

@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="../Jobly.Core/Jobly.Core.csproj" />
+  <Project Path="../Jobly.Worker/Jobly.Worker.csproj" />
+  <Project Path="../Jobly.SourceGenerator/Jobly.SourceGenerator.csproj" />
+  <Project Path="Jobly.Tests.Mutation.csproj" />
+</Solution>

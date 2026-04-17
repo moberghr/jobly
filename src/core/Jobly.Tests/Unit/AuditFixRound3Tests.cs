@@ -24,7 +24,7 @@ public abstract class AuditFixRound3TestsBase : IAsyncLifetime
     /// <summary>
     /// Count-based cleanup must not delete parents whose children haven't expired.
     /// </summary>
-    [Fact]
+    [TimedFact]
     public async Task CountBasedCleanup_SkipsParentsWithNonExpiredChildren()
     {
         // Arrange: 5 standalone expired jobs + 1 parent with non-expired child
@@ -87,7 +87,7 @@ public abstract class AuditFixRound3TestsBase : IAsyncLifetime
     /// RequeueJob on a child should lock the parent row to prevent concurrent OrchestrationTask race.
     /// Verify that parent state is correctly set after requeue.
     /// </summary>
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_LocksParentRow_ParentStateCorrect()
     {
         // Arrange: batch with 2 failed children, parent finalized as Failed

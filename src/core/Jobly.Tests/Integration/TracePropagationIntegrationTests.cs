@@ -14,7 +14,7 @@ public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenJobThatSpawnsChild_ThenChildHasSpawnedByJobId()
     {
         // Arrange
@@ -36,7 +36,7 @@ public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
         child.CurrentState.ShouldBe(State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenJobThatSpawnsBatch_ThenBatchJobsHaveTraceId()
     {
         // Arrange
@@ -66,7 +66,7 @@ public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
         batchChildren.ShouldAllBe(j => j.TraceId == traceId);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenJobThatSpawnsBatch_ThenBatchJobsHaveSpawnedByJobId()
     {
         // Arrange

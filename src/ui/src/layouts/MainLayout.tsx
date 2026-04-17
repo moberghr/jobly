@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useDashboardStore } from '@/stores/dashboard';
 import { usePolling } from '@/hooks/usePolling';
+import * as LucideIcons from 'lucide-react';
 import {
   LayoutDashboard,
   Briefcase,
@@ -11,12 +12,14 @@ import {
   Moon,
   Sun,
   LogOut,
+  Puzzle,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { config } from '@/config';
 import type { DashboardStatistics } from '@/types';
+import type { ExtensionManifest } from '@/extensions/types';
 
-const navItems = [
+const builtInNavItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/jobs/enqueued', label: 'Jobs', icon: Briefcase },
   { to: '/messages/enqueued', label: 'Messages', icon: Mail },
@@ -25,7 +28,22 @@ const navItems = [
   { to: '/servers', label: 'Servers', icon: Server },
 ];
 
-export default function MainLayout() {
+function resolveIcon(name?: string): React.ComponentType<{ className?: string }> {
+  if (!name) {
+    return Puzzle;
+  }
+
+  // Convert kebab-case to PascalCase (e.g., "refresh-cw" → "RefreshCw")
+  const pascalCase = name
+    .split('-')
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .join('');
+  const icons = LucideIcons as Record<string, unknown>;
+
+  return (icons[pascalCase] as React.ComponentType<{ className?: string }>) ?? Puzzle;
+}
+
+export default function MainLayout({ extensions = [] }: { extensions?: ExtensionManifest[] }) {
   const { stats, error, fetchStats } = useDashboardStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -44,7 +62,16 @@ export default function MainLayout() {
         <div className="flex h-14 items-center px-6">
           <Link to="/" className="text-lg font-bold mr-8">Jobly</Link>
           <nav className="flex gap-1">
-            {navItems.map((item) => {
+            {[
+              ...builtInNavItems,
+              ...extensions.flatMap((ext) =>
+                ext.pages.map((page) => ({
+                  to: page.path,
+                  label: page.label,
+                  icon: resolveIcon(page.icon),
+                }))
+              ),
+            ].map((item) => {
               const Icon = item.icon;
               const matchPath = item.to.includes('/') && item.to !== '/'
                 ? '/' + item.to.split('/')[1]

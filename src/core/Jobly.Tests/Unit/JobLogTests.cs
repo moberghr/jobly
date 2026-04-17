@@ -9,7 +9,6 @@ using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
 using Jobly.Worker.Services;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -87,11 +86,10 @@ public abstract class JobLogTestsBase : IAsyncLifetime
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
             groupConfig,
-            TimeProvider.System,
-            new FakeLockProvider());
+            TimeProvider.System);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_CreatedJob_HasCreatedLog()
     {
         // Arrange
@@ -114,7 +112,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
         logs.ShouldContain(l => l.EventType == "Created");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_CompletedJob_HasFullLifecycleLogs()
     {
         // Arrange
@@ -146,7 +144,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
         completed.Timestamp.ShouldBeGreaterThanOrEqualTo(processing.Timestamp);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_FailedJob_HasFailedLogWithErrorLevel()
     {
         // Arrange
@@ -181,7 +179,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
         logs.ShouldNotContain(l => l.EventType == "Completed");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RequeueJob_CreatesRequeuedLog()
     {
         // Arrange

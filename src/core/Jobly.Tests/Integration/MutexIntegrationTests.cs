@@ -1,6 +1,7 @@
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Helper;
+using Jobly.Core.Mutex;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Microsoft.EntityFrameworkCore;
@@ -15,13 +16,13 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenTwoJobsWithSameMutex_WhenProcessed_ThenSecondIsCancelled()
     {
         var publisher = Server.CreatePublisher();
 
         // Enqueue a slow job that holds the mutex
-        var job1Id = await publisher.Enqueue(new CancellableRequest(), new JobParameters { Mutex = "test-mutex" });
+        var job1Id = await publisher.Enqueue(new CancellableRequest(), new JobParameters().WithMutex("test-mutex"));
         await publisher.SaveChangesAsync();
 
         // Wait for it to start processing
@@ -29,7 +30,7 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
 
         // Enqueue a second job with the same mutex
         var publisher2 = Server.CreatePublisher();
-        var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters { Mutex = "test-mutex" });
+        var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("test-mutex"));
         await publisher2.SaveChangesAsync();
 
         // Wait for job2 to be picked up and cancelled

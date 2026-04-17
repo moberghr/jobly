@@ -7,7 +7,6 @@ using Jobly.Core.Handlers;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -86,11 +85,10 @@ public abstract class PriorityTestsBase : IAsyncLifetime
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
             groupConfig,
-            TimeProvider.System,
-            new FakeLockProvider());
+            TimeProvider.System);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_MultipleQueues_ProcessesAlphabeticalFirst()
     {
         // Arrange — insert jobs in "b-default" and "a-critical"
@@ -139,7 +137,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
         defaultJob.CurrentState.ShouldBe(State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_SameQueue_ProcessesEarlierScheduledFirst()
     {
         // Arrange — insert 2 jobs same queue, different ScheduleTime
@@ -186,7 +184,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
         laterJob.CurrentState.ShouldBe(State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_DefaultQueue_Processed()
     {
         // Arrange
@@ -217,7 +215,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_PastScheduledJob_Processed()
     {
         // Arrange

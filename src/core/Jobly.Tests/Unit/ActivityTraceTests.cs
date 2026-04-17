@@ -9,7 +9,6 @@ using Jobly.Core.Logging;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -91,13 +90,12 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
             groupConfig,
-            TimeProvider.System,
-            new FakeLockProvider());
+            TimeProvider.System);
 
         return (worker, capture);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_JobWithTraceId_ActivityHasMatchingTraceId()
     {
         // Arrange
@@ -127,7 +125,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
         capture.TraceId.ShouldBe(traceId.ToString("N"));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_JobWithTraceId_ActivityHasNonEmptySpanId()
     {
         // Arrange
@@ -157,7 +155,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
         capture.SpanId.ShouldNotBe("0000000000000000");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_JobWithoutTraceId_ActivityUsesJobIdAsTraceId()
     {
         // Arrange
@@ -186,7 +184,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
         capture.TraceId.ShouldBe(jobId.ToString("N"));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_JobWithParentSpanId_ActivityHasMatchingParentId()
     {
         // Arrange
@@ -217,7 +215,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
         capture.ParentSpanId.ShouldBe(parentSpanId);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_JobWithoutParentSpanId_ActivityHasEmptyParentId()
     {
         // Arrange
@@ -247,7 +245,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
         capture.ParentSpanId.ShouldBe("0000000000000000");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_AfterExecution_ActivityIsCleared()
     {
         // Arrange
@@ -276,7 +274,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
         Activity.Current.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_HandlerThrows_ActivityIsCleared()
     {
         // Arrange
@@ -305,7 +303,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
         Activity.Current.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_TwoJobs_EachGetsUniqueSpanId()
     {
         // Arrange
@@ -355,7 +353,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
         firstSpanId.ShouldNotBe(secondSpanId);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetAndProcessJob_Completed_ActivityHasMessagingAttributes()
     {
         // Arrange

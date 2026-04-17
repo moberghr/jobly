@@ -12,7 +12,6 @@ Used by the publisher side (`AddJobly<TContext>`):
 builder.Services.AddJobly<AppDbContext>(options =>
 {
     options.Schema = "jobly";      // Database schema for all Jobly tables (default: "jobly", null for default schema)
-    options.RetryCount = 3;        // Default max retries for new jobs (default: 0)
     options.DefaultQueue = "default"; // Queue name when none specified (default: "default")
     options.JobExpirationTimeout = TimeSpan.FromDays(1); // How long completed/deleted jobs kept (default: 1 day)
 });
@@ -21,7 +20,6 @@ builder.Services.AddJobly<AppDbContext>(options =>
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `Schema` | `string?` | `"jobly"` | Database schema for all Jobly tables. Set to `null` for the database's default schema. |
-| `RetryCount` | `int` | `0` | Default max retries for jobs that don't specify their own |
 | `DefaultQueue` | `string` | `"default"` | Queue used when no queue is specified at publish time |
 | `JobExpirationTimeout` | `TimeSpan` | `1 day` | How long completed/deleted jobs are kept before cleanup. Failed jobs never expire. |
 
@@ -36,6 +34,35 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 ```
 
 This produces tables like `jobly.job`, `jobly.job_log`, `jobly.server`, etc.
+
+## Retry Configuration
+
+Configure retry behavior with `AddJoblyRetry()`:
+
+```csharp
+services.AddJoblyRetry(options =>
+{
+    options.MaxRetries = 3;               // Default max retries (default: 0)
+    options.Delays = [15, 60, 300];       // Retry delays in seconds (default: [15, 60, 300])
+});
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `MaxRetries` | `int` | `0` | Default max retries when no `[Retry]` attribute is present |
+| `Delays` | `int[]` | `[15, 60, 300]` | Delay in seconds between retries. Last value is reused if fewer delays than retries |
+
+Per-job override via `[Retry]` attribute on handler or job class, or per-enqueue via metadata. See [Jobs](/docs/patterns/jobs#retries).
+
+## Mutex Configuration
+
+Enable mutex (concurrency control) with `AddJoblyMutex()`:
+
+```csharp
+services.AddJoblyMutex();
+```
+
+No options — just register and use `.WithMutex("key")` or `[Mutex("key")]` at publish time. See [Mutex](/docs/features/mutex) for details.
 
 ## Worker Configuration (`JoblyWorkerConfiguration`)
 
@@ -78,7 +105,6 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     options.ExpirationCleanupInterval = TimeSpan.FromSeconds(60);
 
     // Inherited from JoblyConfiguration
-    options.RetryCount = 3;
     options.DefaultQueue = "default";
 });
 ```

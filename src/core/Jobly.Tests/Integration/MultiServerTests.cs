@@ -2,6 +2,8 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Helper;
+using Jobly.Core.Mutex;
+using Jobly.Core.Retry;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker.Services;
@@ -17,7 +19,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenManyJobs_WithTwoServers_ThenEachJobProcessedExactlyOnce()
     {
         var publisher = Server1.CreatePublisher();
@@ -66,7 +68,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenMessages_WithTwoServers_ThenEachRoutedExactlyOnce()
     {
         var publisher = Server1.CreatePublisher();
@@ -101,7 +103,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenMultiHandlerMessage_WithTwoServers_ThenCorrectChildCount()
     {
         var publisher = Server1.CreatePublisher();
@@ -134,7 +136,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenBatch_WithTwoServers_ThenBatchCompletesCorrectly()
     {
         var batchPublisher = Server1.CreateBatchPublisher();
@@ -185,7 +187,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         continuationChildren.ShouldAllBe(x => x.CurrentState == State.Completed);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenContinuations_WithTwoServers_ThenContinuationsActivateAndExecute()
     {
         var publisher = Server1.CreatePublisher();
@@ -222,12 +224,12 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         }
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenMutexJobs_WithTwoServers_ThenMutexEnforcedAcrossServers()
     {
         // Enqueue a slow job that holds the mutex — published via Server1
         var publisher1 = Server1.CreatePublisher();
-        var job1Id = await publisher1.Enqueue(new CancellableRequest(), new JobParameters { Mutex = "multi-server-mutex" });
+        var job1Id = await publisher1.Enqueue(new CancellableRequest(), new JobParameters().WithMutex("multi-server-mutex"));
         await publisher1.SaveChangesAsync();
 
         // Wait for it to start processing
@@ -235,7 +237,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
 
         // Enqueue a second job with the same mutex — published via Server2
         var publisher2 = Server2.CreatePublisher();
-        var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters { Mutex = "multi-server-mutex" });
+        var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("multi-server-mutex"));
         await publisher2.SaveChangesAsync();
 
         // Job2 should be deleted due to mutex (regardless of which server picks it up)
@@ -255,7 +257,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         await Server1.WaitForJobState(job1Id, State.Deleted, timeout: TimeSpan.FromSeconds(15));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenComplexWorkload_WithTwoServers_ThenAllReachTerminalState()
     {
         var publisher = Server1.CreatePublisher();
@@ -288,7 +290,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         // 5. Failing jobs with retries (3, maxRetries=2)
         for (var i = 0; i < 3; i++)
         {
-            await publisher.Enqueue(new ThrowExceptionRequest(), maxRetries: 2);
+            await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 2));
         }
 
         // 6. Batch of 10 → continuation of 3
@@ -376,7 +378,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         statsFailed.ShouldBe(failedJobs, "stats:failed should match failed job count");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenPausedServer_WithTwoServers_ThenOtherServerProcessesJobs()
     {
         // Get Server1's worker group and pause it

@@ -8,7 +8,7 @@ namespace Jobly.Tests.Unit;
 
 public class NamingConventionTests
 {
-    [Fact]
+    [TimedFact]
     public void JoblyEntities_UsePascalCaseTableNames_WhenNoConventionApplied()
     {
         var options = new DbContextOptionsBuilder<TestContext>()
@@ -30,7 +30,7 @@ public class NamingConventionTests
         model.FindEntityType(typeof(ServerLog))!.GetTableName().ShouldBe("ServerLog");
     }
 
-    [Fact]
+    [TimedFact]
     public void JoblyEntities_UseSnakeCaseTableNames_WhenSnakeCaseConventionApplied()
     {
         var options = new DbContextOptionsBuilder<TestContext>()
@@ -54,7 +54,7 @@ public class NamingConventionTests
         model.FindEntityType(typeof(ServerLog))!.GetTableName().ShouldBe("server_log");
     }
 
-    [Fact]
+    [TimedFact]
     public void JoblyEntities_UseSnakeCaseColumnNames_WhenSnakeCaseConventionApplied()
     {
         var options = new DbContextOptionsBuilder<TestContext>()
@@ -70,11 +70,10 @@ public class NamingConventionTests
         jobEntity.FindProperty(nameof(Job.ScheduleTime))!.GetColumnName().ShouldBe("schedule_time");
         jobEntity.FindProperty(nameof(Job.ParentJobId))!.GetColumnName().ShouldBe("parent_job_id");
         jobEntity.FindProperty(nameof(Job.HandlerType))!.GetColumnName().ShouldBe("handler_type");
-        jobEntity.FindProperty(nameof(Job.ConcurrencyKey))!.GetColumnName().ShouldBe("concurrency_key");
         jobEntity.FindProperty(nameof(Job.CancellationMode))!.GetColumnName().ShouldBe("cancellation_mode");
     }
 
-    [Fact]
+    [TimedFact]
     public void JoblyEntities_UseDefaultJoblySchema()
     {
         var options = new DbContextOptionsBuilder<TestContext>()
@@ -92,7 +91,7 @@ public class NamingConventionTests
         model.FindEntityType(typeof(Counter))!.GetSchema().ShouldBe("jobly");
     }
 
-    [Fact]
+    [TimedFact]
     public void JoblyEntities_UseCustomSchema_WhenOverridden()
     {
         var options = new DbContextOptionsBuilder<SchemaTestContext>()
@@ -105,7 +104,7 @@ public class NamingConventionTests
         model.FindEntityType(typeof(Job))!.GetSchema().ShouldBe("custom");
     }
 
-    [Fact]
+    [TimedFact]
     public void JoblyEntities_UseNullSchema_WhenSetToNull()
     {
         var options = new DbContextOptionsBuilder<NullSchemaTestContext>()

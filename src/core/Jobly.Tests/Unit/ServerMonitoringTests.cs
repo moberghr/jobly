@@ -15,7 +15,7 @@ public abstract class ServerMonitoringTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task GetServers_ReturnsServerWithWorkers()
     {
         // Arrange
@@ -55,7 +55,7 @@ public abstract class ServerMonitoringTestsBase : IAsyncLifetime
         servers[0].Workers.Count.ShouldBe(2);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetServerById_ReturnsServerDetail()
     {
         // Arrange
@@ -91,7 +91,7 @@ public abstract class ServerMonitoringTestsBase : IAsyncLifetime
         server.Workers[0].WorkerId.ShouldBe(workerId);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GetServerById_NonExistent_ReturnsNull()
     {
         // Act

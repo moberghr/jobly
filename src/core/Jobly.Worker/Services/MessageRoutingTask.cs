@@ -1,10 +1,10 @@
+using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
 using Jobly.Core.Interceptors;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -21,7 +21,7 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
         IServiceScopeFactory scopeFactory,
         ILogger<MessageRoutingTask<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
-        IDistributedLockProvider lockProvider,
+        IJoblyLockProvider lockProvider,
         TimeProvider timeProvider)
         : base(scopeFactory, logger, configuration, timeProvider, "jobly:message-routing", lockProvider)
     {
@@ -101,9 +101,7 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
                 var job = JobHelper.CreateJob(
                     message: message.Message!,
                     type: message.Type!,
-                    retries: 0,
                     scheduleTime: null,
-                    maxRetries: 0,
                     queue: message.Queue,
                     parentId: message.Id,
                     state: State.Enqueued,

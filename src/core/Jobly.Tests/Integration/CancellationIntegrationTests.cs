@@ -14,7 +14,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenProcessingJob_WhenDeleted_ThenHandlerIsCancelledAndLoggedAsCancelled()
     {
         var publisher = Server.CreatePublisher();
@@ -36,7 +36,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
         job.CurrentState.ShouldBe(State.Deleted);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenProcessingJob_WhenDeleted_ThenCancellationModeIsSetToGraceful()
     {
         var publisher = Server.CreatePublisher();
@@ -60,7 +60,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
         cancellationLog.WorkerId.ShouldBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenProcessingJob_WhenDeleted_ThenWorkerLogsHaveWorkerId()
     {
         var publisher = Server.CreatePublisher();
@@ -85,7 +85,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
         cancelledLog.WorkerId.ShouldNotBeNull();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenProcessingJob_WhenDeleted_ThenCompletesQuicklyNotAfterFullDuration()
     {
         var publisher = Server.CreatePublisher();

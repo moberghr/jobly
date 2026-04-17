@@ -3,6 +3,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Logging;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +28,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         return new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Publish_CreatesMessageKindJobWithEnqueuedState()
     {
         // Arrange
@@ -46,7 +47,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Publish_WithQueue_SetsQueueOnJob()
     {
         // Arrange
@@ -64,7 +65,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.Queue.ShouldBe("critical");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Publish_SetsTraceIdToJobId()
     {
         // Arrange
@@ -82,7 +83,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.TraceId.ShouldBe(job.Id);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_CreatesJobKindJobWithEnqueuedState()
     {
         // Arrange
@@ -101,7 +102,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Enqueued);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_WithParentId_SetsParentAndAwaitingState()
     {
         // Arrange
@@ -133,7 +134,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Awaiting);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_CreatesJobLog()
     {
         // Arrange
@@ -151,7 +152,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         logs[0].EventType.ShouldBe("Created");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Schedule_SetsScheduleTime()
     {
         // Arrange
@@ -170,7 +171,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         job.ScheduleTime.ShouldBeGreaterThan(DateTime.UtcNow.AddHours(1));
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_WithParent_InheritsParentTrace_SameContext()
     {
         // Arrange: parent and child created in same context before SaveChanges
@@ -191,7 +192,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         child.TraceId.ShouldBe(parent.TraceId);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_WithParent_InheritsParentTrace_SeparateContext()
     {
         // Arrange: parent already committed to DB
@@ -215,7 +216,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         child.TraceId.ShouldBe(parent.TraceId);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task Enqueue_WithoutParent_GetsOwnTrace()
     {
         // Arrange
@@ -231,6 +232,58 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         var job = await readCtx.Set<Job>().FindAsync(jobId);
         job.ShouldNotBeNull();
         job.TraceId.ShouldBe(jobId);
+    }
+
+    [TimedFact]
+    public async Task Publish_InsideExecutionContext_InheritsTraceAndSpawnedBy()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var publisher = CreatePublisher(ctx);
+        var parentJobId = Guid.NewGuid();
+        var parentTraceId = Guid.NewGuid();
+
+        JobExecutionContext.Current = new JobExecutionInfo
+        {
+            JobId = parentJobId,
+            TraceId = parentTraceId,
+        };
+
+        try
+        {
+            // Act
+            var id = await publisher.Publish(new SingleHandlerMessage());
+            await ctx.SaveChangesAsync();
+
+            // Assert
+            var readCtx = _fixture.CreateContext();
+            var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id);
+            job.ShouldNotBeNull();
+            job.TraceId.ShouldBe(parentTraceId);
+            job.SpawnedByJobId.ShouldBe(parentJobId);
+        }
+        finally
+        {
+            JobExecutionContext.Current = null;
+        }
+    }
+
+    [TimedFact]
+    public async Task SaveChangesAsync_PersistsEnqueuedJob()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var publisher = CreatePublisher(ctx);
+        var id = await publisher.Enqueue(new UnitRequest());
+
+        // Act
+        await publisher.SaveChangesAsync();
+
+        // Assert
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FindAsync(id);
+        job.ShouldNotBeNull();
+        job.CurrentState.ShouldBe(State.Enqueued);
     }
 }
 

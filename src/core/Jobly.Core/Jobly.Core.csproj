@@ -13,9 +13,18 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<InternalsVisibleTo Include="Jobly.Worker" />
+		<InternalsVisibleTo Include="Jobly.Tests" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="Cronos" Version="0.11.1" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.5" />
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Jobly.SourceGenerator\Jobly.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 	</ItemGroup>
 
 </Project>

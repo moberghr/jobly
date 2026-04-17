@@ -1,5 +1,4 @@
 using Jobly.Core.Data.Entities;
-using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -151,8 +150,7 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                         _serviceProvider.GetRequiredService<ILogger<JoblyWorkerService<TContext>>>(),
                         _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>(),
                         group,
-                        _timeProvider,
-                        _serviceProvider.GetRequiredService<IDistributedLockProvider>());
+                        _timeProvider);
 
                     var worker = new JoblyWorker<TContext>(
                         workerService,

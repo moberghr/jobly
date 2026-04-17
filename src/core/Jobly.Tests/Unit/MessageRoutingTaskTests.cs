@@ -29,7 +29,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
         return provider.GetRequiredService<IServiceScopeFactory>();
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunMessageRouting_WithEnqueuedMessage_CreatesChildJobs()
     {
         // Arrange
@@ -63,7 +63,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
         children.Count.ShouldBeGreaterThan(0);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunMessageRouting_SetsMessageToProcessing()
     {
         // Arrange
@@ -95,7 +95,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
         message.CurrentState.ShouldBe(State.Processing);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunMessageRouting_ChildJobsInheritQueue()
     {
         // Arrange
@@ -128,7 +128,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
         children.ShouldAllBe(c => c.Queue == "critical");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunMessageRouting_NoMessages_ReturnsZero()
     {
         // Arrange — empty DB
@@ -142,7 +142,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
         routed.ShouldBe(0);
     }
 
-    [Fact]
+    [TimedFact]
     public async Task RunMessageRouting_MultipleMessages_RoutesAll()
     {
         // Arrange

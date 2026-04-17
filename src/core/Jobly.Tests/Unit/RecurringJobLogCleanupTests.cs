@@ -16,7 +16,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task CleanupRecurringJobLogs_KeepsLast100PerRecurringJob()
     {
         // Arrange: 150 logs for recurring job 1, 50 for recurring job 2
@@ -60,7 +60,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
         rj2Count.ShouldBe(50, "Should keep all 50 for rj2 (under limit)");
     }
 
-    [Fact]
+    [TimedFact]
     public async Task CleanupRecurringJobLogs_DeletesOldestEntries()
     {
         // Arrange: 110 logs, verify the 10 oldest are deleted
@@ -103,7 +103,37 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
         oldest.ShouldBeGreaterThan(newestBefore.AddMinutes(-100), "Oldest surviving entry should be within the last 100");
     }
 
-    [Fact]
+    [TimedFact]
+    public async Task CleanupRecurringJobLogs_ExactlyAtLimit_DoesNotDelete()
+    {
+        // Arrange: exactly 100 logs — should NOT trigger cleanup (> 100, not >= 100)
+        var ctx = _fixture.CreateContext();
+        var rj = new RecurringJob { Name = "exact-100", Cron = "* * * * *", CreatedAt = DateTime.UtcNow };
+        ctx.Set<RecurringJob>().Add(rj);
+        await ctx.SaveChangesAsync();
+
+        for (var i = 0; i < 100; i++)
+        {
+            ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
+            {
+                RecurringJobId = rj.Id,
+                CreatedAt = DateTime.UtcNow.AddMinutes(-100 + i),
+            });
+        }
+
+        await ctx.SaveChangesAsync();
+
+        // Act
+        var cleanCtx = _fixture.CreateContext();
+        await ExpirationCleanupTask<TestContext>.CleanupRecurringJobLogs(cleanCtx);
+
+        // Assert — all 100 should remain
+        var readCtx = _fixture.CreateContext();
+        var count = await readCtx.Set<RecurringJobLog>().CountAsync(x => x.RecurringJobId == rj.Id);
+        count.ShouldBe(100);
+    }
+
+    [TimedFact]
     public async Task CleanupRecurringJobLogs_NoLogsDoesNothing()
     {
         var cleanCtx = _fixture.CreateContext();
