@@ -18,6 +18,7 @@
   </Folder>
   <Project Path="core/Jobly.Core/Jobly.Core.csproj" />
   <Project Path="core/Jobly.Tests/Jobly.Tests.csproj" />
+  <Project Path="core/Jobly.Tests.Mutation/Jobly.Tests.Mutation.csproj" />
   <Project Path="core/Jobly.UI/Jobly.UI.csproj" />
   <Project Path="core/Jobly.Worker/Jobly.Worker.csproj" />
 </Solution>

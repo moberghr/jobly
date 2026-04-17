@@ -5,9 +5,12 @@ namespace Jobly.Tests;
 
 public class TestContext : DbContext
 {
-    public TestContext(DbContextOptions<TestContext> options)
+    private readonly string? _schema;
+
+    public TestContext(DbContextOptions<TestContext> options, string? schema = "jobly")
         : base(options)
     {
+        _schema = schema;
     }
 
     public DbSet<TestLog> TestLogs => Set<TestLog>();
@@ -16,6 +19,6 @@ public class TestContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.AddOutboxStateEntity();
+        modelBuilder.AddOutboxStateEntity(_schema);
     }
 }

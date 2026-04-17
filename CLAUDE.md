@@ -157,7 +157,7 @@ Opt-in addon via `services.AddJoblyMutex()`. Only one job per concurrency key ca
 
 ### Recurring Jobs
 
-- `AddOrUpdateRecurringJob` only registers/updates the definition (cron, message, type). **Does not create jobs.**
+- `AddOrUpdateRecurringJob` only registers/updates the definition (cron, message, type). **Does not create jobs.** Acquires a distributed lock on the recurring job name, saves immediately (exception to §5.7 — lock must be held during save to prevent race conditions).
 - `RecurringJobSchedulerTask` creates jobs with `ScheduleTime = now` (ready for immediate execution) and sets `NextExecution` to the next cron occurrence.
 - **RecurringJobLog** — Immutable audit trail linking recurring jobs to their created jobs. Fields: `Id, RecurringJobId, JobId (nullable), CreatedAt`. `JobId` has FK with `SET NULL` cascade — when the job is cleaned up, `JobId` becomes null but the log entry survives. Navigation property `Job` for clean LINQ queries.
 - Scheduler uses RecurringJobLog for dedup: checks if the most recent log entry's job is still Enqueued/Processing via nav property.

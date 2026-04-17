@@ -366,3 +366,6 @@ FodyWeavers.xsd
 # Playwright MCP snapshots
 .playwright-mcp/
 tasks/todo.md
+
+# Stryker.NET mutation testing output
+**/StrykerOutput/

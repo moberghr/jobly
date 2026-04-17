@@ -27,7 +27,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System, new FakeLockProvider());
 
         // Act
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "test-recurring", "* * * * *");
@@ -49,7 +49,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         // Arrange
         for (var i = 0; i < 3; i++)
         {
-            var publisher = new RecurringJobPublisher<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+            var publisher = new RecurringJobPublisher<TestContext>(_fixture.CreateContext(), TimeProvider.System, new FakeLockProvider());
             await publisher.AddOrUpdateRecurringJob(new UnitRequest(), $"recurring-{i}", "* * * * *");
         }
 
@@ -66,7 +66,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System, new FakeLockProvider());
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "detail-test", "*/5 * * * *");
 
         var readCtx = _fixture.CreateContext();
@@ -87,7 +87,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System, new FakeLockProvider());
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "to-delete", "* * * * *");
 
         var readCtx = _fixture.CreateContext();
@@ -115,7 +115,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System, new FakeLockProvider());
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "trigger-test", "* * * * *");
 
         var readCtx = _fixture.CreateContext();
@@ -142,7 +142,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System, new FakeLockProvider());
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "disable-test", "* * * * *");
 
         var readCtx = _fixture.CreateContext();

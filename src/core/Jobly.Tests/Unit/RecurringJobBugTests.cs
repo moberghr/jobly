@@ -27,7 +27,7 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
     public async Task AddOrUpdateRecurringJob_DoesNotCreateJob()
     {
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System, new FakeLockProvider());
 
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "no-job-test", "* * * * *");
 
@@ -45,7 +45,7 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
     {
         // Arrange: register a recurring job with NextExecution in the past (so scheduler triggers)
         var ctx = _fixture.CreateContext();
-        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System);
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System, new FakeLockProvider());
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "schedule-now-test", "* * * * *");
 
         // Set NextExecution to the past so the scheduler picks it up
