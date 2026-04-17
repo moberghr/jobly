@@ -7,6 +7,7 @@ using Jobly.Core.Services;
 using Jobly.Tests.Fixtures;
 using Jobly.Worker;
 using Jobly.Core.Mutex;
+using Jobly.Core.NoRestart;
 using Jobly.Core.Retry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -140,6 +141,7 @@ public class JoblyTestServer : IAsyncDisposable
                     o.Delays = [1];
                 });
                 services.AddJoblyMutex();
+                services.AddJoblyNoRestart();
             })
             .Build();
 

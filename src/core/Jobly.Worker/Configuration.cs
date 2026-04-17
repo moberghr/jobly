@@ -92,6 +92,13 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     public TimeSpan InvisibilityTimeout { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
+    /// When a job's worker dies and the job is recovered, by default it is requeued (true).
+    /// Set to false to fail stale jobs by default. Can be overridden per-job with
+    /// [NoRestart]/[Restart] attributes or .WithRestart(bool).
+    /// </summary>
+    public bool RestartStaleJobsByDefault { get; set; } = true;
+
+    /// <summary>
     /// Worker Id should be unique for each worker. If you need to control the worker id, you can set it here.
     /// </summary>
     public Guid ServerId { get; set; } = Guid.NewGuid();
