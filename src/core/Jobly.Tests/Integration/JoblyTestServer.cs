@@ -237,6 +237,31 @@ public class JoblyTestServer : IAsyncDisposable
         throw new TimeoutException($"Job {jobId} did not get log event '{eventType}' within {timeout ?? TimeSpan.FromSeconds(10)}. Events: {eventTypes}");
     }
 
+    /// <summary>
+    /// Polls until every job on <paramref name="queue"/> has left the <see cref="State.Enqueued"/>
+    /// state (i.e. a worker has picked it up), without waiting for terminal completion.
+    /// Use this when the test wants to observe in-flight / buffered state before shutdown.
+    /// </summary>
+    public async Task WaitForJobsToLeaveEnqueued(string queue, int expectedCount, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(15));
+        while (DateTime.UtcNow < deadline)
+        {
+            var ctx = CreateContext();
+            var totalSeen = await ctx.Set<Job>().CountAsync(j => j.Queue == queue);
+            var stillEnqueued = await ctx.Set<Job>()
+                .CountAsync(j => j.Queue == queue && j.CurrentState == State.Enqueued);
+            if (totalSeen >= expectedCount && stillEnqueued == 0)
+            {
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException($"Jobs on queue {queue} did not leave Enqueued within {timeout ?? TimeSpan.FromSeconds(15)}");
+    }
+
     public async Task WaitForCompletion(TimeSpan? timeout = null)
     {
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));

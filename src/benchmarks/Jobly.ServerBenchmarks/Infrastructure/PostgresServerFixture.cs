@@ -32,7 +32,7 @@ public class PostgresServerFixture : IAsyncDisposable
     /// <summary>
     /// Boots the full server: container, schema, host with workers + background tasks.
     /// </summary>
-    public async Task InitializeAsync(int workerCount = 5)
+    public async Task InitializeAsync(int workerCount = 5, bool useDispatcher = false, int completionBatchSize = 50, TimeSpan? completionFlushInterval = null)
     {
         await _container.StartAsync();
         _connectionString = _container.GetConnectionString();
@@ -58,7 +58,9 @@ public class PostgresServerFixture : IAsyncDisposable
                     config.OrchestrationInterval = TimeSpan.FromMilliseconds(100);
                     config.MessageRoutingInterval = TimeSpan.FromMilliseconds(500);
                     config.HealthCheckInterval = TimeSpan.FromMilliseconds(200);
-                    config.UseDispatcher = false;
+                    config.UseDispatcher = useDispatcher;
+                    config.CompletionBatchSize = completionBatchSize;
+                    config.CompletionFlushInterval = completionFlushInterval ?? TimeSpan.FromMilliseconds(100);
                 });
             })
             .Build();

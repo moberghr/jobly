@@ -15,6 +15,10 @@
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.5" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="Jobly.Tests" />
+	</ItemGroup>
+
 	<ItemGroup Condition="'$(Configuration)'!='Debug'">
 		<PackageReference Include="Moberg.Jobly.Core" Version="$(PackageVersion)" />
 	</ItemGroup>
