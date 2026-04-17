@@ -228,10 +228,12 @@ public class GenerateReportHandler : IJobHandler<GenerateReport> { ... }
 Or configure global defaults:
 
 ```csharp
-services.AddJoblyRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; });
+services.AddJoblyRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; o.JitterFactor = 0.2; });
 ```
 
 Priority: per-enqueue metadata > handler attribute > job attribute > global RetryOptions. Failed jobs are retried automatically. Crash requeues do NOT count against the retry limit.
+
+`JitterFactor` (global only, default `0.0`, clamped to `[0, 1]`) applies multiplicative random jitter to each computed delay: `delay * (1 + JitterFactor * rand(-1, 1))`. Spreads retries to avoid thundering herds when many jobs fail at the same time.
 
 ### Named queues
 
