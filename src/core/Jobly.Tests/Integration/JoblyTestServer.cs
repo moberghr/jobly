@@ -1,13 +1,15 @@
 using Jobly.Core;
+using Jobly.Core.CircuitBreaker;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Mutex;
+using Jobly.Core.NoRestart;
+using Jobly.Core.Retry;
 using Jobly.Core.Services;
 using Jobly.Tests.Fixtures;
 using Jobly.Worker;
-using Jobly.Core.Mutex;
-using Jobly.Core.Retry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -140,6 +142,13 @@ public class JoblyTestServer : IAsyncDisposable
                     o.Delays = [1];
                 });
                 services.AddJoblyMutex();
+                services.AddJoblyNoRestart();
+                services.AddJoblyCircuitBreaker<TestContext>(o =>
+                {
+                    o.Threshold = 1000;
+                    o.Duration = TimeSpan.FromHours(1);
+                    o.ResetJitter = TimeSpan.FromSeconds(1);
+                });
             })
             .Build();
 

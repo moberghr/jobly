@@ -55,21 +55,31 @@ public class JoblyDispatcher<TContext> : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var floor = _groupConfiguration.PollingInterval;
+        var max = _groupConfiguration.MaxPollingInterval;
+        var factor = _groupConfiguration.PollingIntervalFactor;
+        var currentDelay = floor;
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 if (_pauseStateHolder.IsPaused(_workerGroupId))
                 {
-                    await Task.Delay(_groupConfiguration.PollingInterval, stoppingToken);
+                    currentDelay = floor;
+                    await Task.Delay(floor, stoppingToken);
                     continue;
                 }
 
-                var fetched = await FetchAndDistribute(stoppingToken);
-                if (!fetched)
+                var result = await FetchAndDistribute(stoppingToken);
+                if (result == FetchResult.Empty)
                 {
-                    await Task.Delay(_groupConfiguration.PollingInterval, stoppingToken);
+                    currentDelay = PollingBackoff.Next(currentDelay, floor, max, factor);
+                    await Task.Delay(currentDelay, stoppingToken);
+                    continue;
                 }
+
+                currentDelay = floor;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -78,20 +88,21 @@ public class JoblyDispatcher<TContext> : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Dispatcher fetch failed");
-                await Task.Delay(_groupConfiguration.PollingInterval, stoppingToken);
+                currentDelay = PollingBackoff.Next(currentDelay, floor, max, factor);
+                await Task.Delay(currentDelay, stoppingToken);
             }
         }
 
         _jobChannel.Writer.Complete();
     }
 
-    private async Task<bool> FetchAndDistribute(CancellationToken ct)
+    private async Task<FetchResult> FetchAndDistribute(CancellationToken ct)
     {
         var available = _workerCount - _jobChannel.Reader.Count;
         if (available <= 0)
         {
             await Task.Delay(TimeSpan.FromMilliseconds(10), ct);
-            return true;
+            return FetchResult.ChannelFull;
         }
 
         using var scope = _scopeFactory.CreateScope();
@@ -114,7 +125,7 @@ public class JoblyDispatcher<TContext> : BackgroundService
         if (jobs.Count == 0)
         {
             await transaction.CommitAsync(ct);
-            return false;
+            return FetchResult.Empty;
         }
 
         // Batch mark all fetched jobs as Processing
@@ -143,6 +154,13 @@ public class JoblyDispatcher<TContext> : BackgroundService
             await _jobChannel.Writer.WriteAsync(job, ct);
         }
 
-        return true;
+        return FetchResult.Fetched;
+    }
+
+    private enum FetchResult
+    {
+        Empty,
+        Fetched,
+        ChannelFull,
     }
 }

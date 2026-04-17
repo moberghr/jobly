@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace Jobly.Core.Retry;
 
 public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IRequest<TResponse>
+    where TRequest : IRequest<TResponse>, IJob
 {
     private static readonly ConcurrentDictionary<Type, RetryAttribute?> AttributeCache = new();
 
@@ -28,7 +28,7 @@ public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
         {
             return await next(request, cancellationToken);
         }
-        catch (Exception) when (request is IJob)
+        catch (Exception)
         {
             var meta = _jobContext.GetMetadata<IRetryMetadata>();
             var attr = GetRetryAttribute();
@@ -44,7 +44,18 @@ public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
                 if (delays.Length > 0)
                 {
                     var idx = Math.Min(retriedTimes, delays.Length - 1);
-                    scheduleTime = now + TimeSpan.FromSeconds(delays[idx]);
+                    var baseDelaySeconds = (double)delays[idx];
+                    var jitterFactor = Math.Clamp(_options.Value.JitterFactor, 0.0, 1.0);
+
+                    if (jitterFactor > 0)
+                    {
+                        var r = (Random.Shared.NextDouble() * 2.0) - 1.0;
+                        baseDelaySeconds *= 1.0 + (jitterFactor * r);
+                    }
+
+                    // Defensive: guards against a future clamp loosening producing a negative delay.
+                    baseDelaySeconds = Math.Max(0.0, baseDelaySeconds);
+                    scheduleTime = now + TimeSpan.FromSeconds(baseDelaySeconds);
                 }
 
                 meta.RetriedTimes = retriedTimes + 1;

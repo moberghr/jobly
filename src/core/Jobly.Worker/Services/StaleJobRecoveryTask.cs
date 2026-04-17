@@ -2,7 +2,9 @@ using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
+using Jobly.Core.Handlers;
 using Jobly.Core.Interceptors;
+using Jobly.Core.NoRestart;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -31,15 +33,25 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
-        var count = await RequeueStaleJobs(context, TimeProvider, Configuration.InvisibilityTimeout);
-        return count > 0 ? $"Requeued {count} stale jobs" : null;
+        var result = await RecoverStaleJobs(context, TimeProvider, Configuration.InvisibilityTimeout, Configuration.RestartStaleJobsByDefault);
+        if (result.Total == 0)
+        {
+            return null;
+        }
+
+        return $"Recovered {result.Total} stale jobs ({result.Requeued} requeued, {result.Failed} failed, {result.Deleted} deleted)";
     }
 
     /// <summary>
-    /// Finds jobs stuck in Processing with stale LastKeepAlive and requeues them.
-    /// Public static so tests can call it directly.
+    /// Finds jobs stuck in Processing with stale LastKeepAlive and recovers them —
+    /// requeueing, failing (per <see cref="ICanBeRestartedMetadata.CanBeRestarted"/>),
+    /// or deleting (when cancellation was pending). Public static so tests can call it directly.
     /// </summary>
-    public static async Task<int> RequeueStaleJobs<TCtx>(TCtx context, TimeProvider timeProvider, TimeSpan invisibilityTimeout)
+    public static async Task<StaleJobRecoveryResult> RecoverStaleJobs<TCtx>(
+        TCtx context,
+        TimeProvider timeProvider,
+        TimeSpan invisibilityTimeout,
+        bool restartByDefault = true)
         where TCtx : DbContext
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -51,6 +63,10 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
             .Where(x => x.LastKeepAlive != null && x.LastKeepAlive < cutoff)
             .TagWith(InterceptorConstants.RowLockTableJob)
             .ToListAsync();
+
+        var requeued = 0;
+        var failed = 0;
+        var deleted = 0;
 
         foreach (var job in staleJobs)
         {
@@ -72,8 +88,14 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
                     Level = "Warning",
                     Message = "Cancelled by crash recovery — cancellation was pending when worker stopped",
                 });
+                deleted++;
+
+                continue;
             }
-            else
+
+            var canRestart = ReadCanBeRestarted(job.Metadata) ?? restartByDefault;
+
+            if (canRestart)
             {
                 job.CurrentState = State.Enqueued;
                 context.Set<JobLog>().Add(new JobLog
@@ -84,12 +106,41 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
                     Level = "Warning",
                     Message = "Requeued by crash recovery — worker stopped responding",
                 });
+                requeued++;
+            }
+            else
+            {
+                job.CurrentState = State.Failed;
+                job.ExpireAt = null;
+                context.Set<Counter>().Add(new Counter { Key = "stats:failed", Value = 1 });
+                context.Set<JobLog>().Add(new JobLog
+                {
+                    JobId = job.Id,
+                    EventType = "Failed",
+                    Timestamp = now,
+                    Level = "Error",
+                    Message = "Failed by crash recovery — job opted out of restart",
+                });
+                failed++;
             }
         }
 
         await context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        return staleJobs.Count;
+        return new StaleJobRecoveryResult(requeued, failed, deleted);
+    }
+
+    private static bool? ReadCanBeRestarted(string? metadataJson)
+    {
+        if (string.IsNullOrEmpty(metadataJson))
+        {
+            return null;
+        }
+
+        var dict = MetadataSerializer.Deserialize(metadataJson);
+        var meta = MetadataFactory.Create<ICanBeRestartedMetadata>(dict);
+
+        return meta.CanBeRestarted;
     }
 }

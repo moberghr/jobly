@@ -19,5 +19,13 @@ internal sealed class JoblyModelCustomizer : RelationalModelCustomizer
         var config = context.GetService<IOptions<JoblyConfiguration>>()?.Value;
         var schema = config != null ? config.Schema : "jobly";
         modelBuilder.AddOutboxStateEntity(schema);
+
+        if (config != null)
+        {
+            foreach (var configurator in config.EntityConfigurators)
+            {
+                configurator(modelBuilder, schema);
+            }
+        }
     }
 }

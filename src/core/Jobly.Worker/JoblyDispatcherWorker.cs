@@ -58,6 +58,12 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Channel-based pull: WaitToReadAsync blocks until the dispatcher produces a job.
+        // No idle polling loop here — polling backoff lives in JoblyDispatcher.ExecuteAsync.
+        // The hand-rolled WaitToRead/TryRead loop (vs await foreach ReadAllAsync) exists so we
+        // can flush any buffered completions BEFORE suspending on the next WaitToReadAsync —
+        // otherwise a small batch (below CompletionBatchSize) would wait for the time trigger
+        // or forever if no more jobs arrive.
         try
         {
             while (await _jobReader.WaitToReadAsync(stoppingToken).ConfigureAwait(false))

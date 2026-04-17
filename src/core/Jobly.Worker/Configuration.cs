@@ -8,7 +8,26 @@ public class WorkerGroupConfiguration
 
     public string[] Queues { get; set; } = ["default"];
 
+    /// <summary>
+    /// Each time the worker polls for a job, it will wait for this interval before polling again.
+    /// Also serves as the floor for exponential backoff when consecutive polls return no work.
+    /// </summary>
     public TimeSpan PollingInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Upper bound on the polling delay when consecutive polls return no work.
+    /// The delay grows from <see cref="PollingInterval"/> by <see cref="PollingIntervalFactor"/>
+    /// on each empty poll, clamped to this value. Resets to <see cref="PollingInterval"/>
+    /// instantly when a job is processed.
+    /// </summary>
+    public TimeSpan MaxPollingInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Multiplier applied to the current polling delay on each consecutive empty poll.
+    /// Set to 1.0 (or lower) to disable exponential backoff — the delay stays at
+    /// <see cref="PollingInterval"/>.
+    /// </summary>
+    public double PollingIntervalFactor { get; set; } = 2.0;
 }
 
 public class JoblyWorkerConfiguration : JoblyConfiguration
@@ -22,9 +41,22 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
 
     /// <summary>
     /// Each time the worker polls for a job, it will wait for this interval before polling again.
-    /// Applies to the implicit default worker group.
+    /// Applies to the implicit default worker group. Also serves as the floor for exponential
+    /// backoff when consecutive polls return no work.
     /// </summary>
     public TimeSpan PollingInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Upper bound on the polling delay when consecutive polls return no work.
+    /// Applies to the implicit default worker group.
+    /// </summary>
+    public TimeSpan MaxPollingInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Multiplier applied to the current polling delay on each consecutive empty poll.
+    /// Set to 1.0 (or lower) to disable exponential backoff. Applies to the implicit default worker group.
+    /// </summary>
+    public double PollingIntervalFactor { get; set; } = 2.0;
 
     /// <summary>
     /// Queues this worker subscribes to. Applies to the implicit default worker group.
@@ -58,6 +90,13 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     /// Workers refresh keep-alive every InvisibilityTimeout / 5 during execution.
     /// </summary>
     public TimeSpan InvisibilityTimeout { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// When a job's worker dies and the job is recovered, by default it is requeued (true).
+    /// Set to false to fail stale jobs by default. Can be overridden per-job with
+    /// [NoRestart]/[Restart] attributes or .WithRestart(bool).
+    /// </summary>
+    public bool RestartStaleJobsByDefault { get; set; } = true;
 
     /// <summary>
     /// Worker Id should be unique for each worker. If you need to control the worker id, you can set it here.
@@ -142,6 +181,8 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
                 WorkerCount = WorkerCount,
                 Queues = Queues,
                 PollingInterval = PollingInterval,
+                MaxPollingInterval = MaxPollingInterval,
+                PollingIntervalFactor = PollingIntervalFactor,
             },
         };
 
