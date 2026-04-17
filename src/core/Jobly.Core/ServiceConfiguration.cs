@@ -403,4 +403,20 @@ public static class ServiceConfiguration
 
         serverLog.Metadata.SetSchema(schema);
     }
+
+    public static void AddCircuitBreakerStateEntity(ModelBuilder modelBuilder, string? schema)
+    {
+        var state = modelBuilder.Entity<CircuitBreakerState>();
+
+        state.Property(p => p.GroupKey).HasMaxLength(200).IsRequired();
+        state.HasKey(p => p.GroupKey);
+
+        state.Property(p => p.FailureCount);
+        state.Property(p => p.OpenUntil);
+        state.Property(p => p.LastFailureAt);
+
+        state.HasIndex(p => p.OpenUntil);
+
+        state.Metadata.SetSchema(schema);
+    }
 }
