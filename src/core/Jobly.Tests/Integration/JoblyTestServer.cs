@@ -5,6 +5,7 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Mutex;
+using Jobly.Core.NoRestart;
 using Jobly.Core.Retry;
 using Jobly.Core.Services;
 using Jobly.Tests.Fixtures;
@@ -141,6 +142,7 @@ public class JoblyTestServer : IAsyncDisposable
                     o.Delays = [1];
                 });
                 services.AddJoblyMutex();
+                services.AddJoblyNoRestart();
                 services.AddJoblyCircuitBreaker<TestContext>(o =>
                 {
                     o.Threshold = 1000;

@@ -56,7 +56,7 @@ public abstract class AuditFixTestsBase : IAsyncLifetime
 
         // Act: run stale recovery
         var recoveryCtx = _fixture.CreateContext();
-        await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5));
+        await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert: job should be Deleted (not Enqueued) because user intended to cancel it
         var readCtx = _fixture.CreateContext();

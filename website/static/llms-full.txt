@@ -228,10 +228,12 @@ public class GenerateReportHandler : IJobHandler<GenerateReport> { ... }
 Or configure global defaults:
 
 ```csharp
-services.AddJoblyRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; });
+services.AddJoblyRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; o.JitterFactor = 0.2; });
 ```
 
 Priority: per-enqueue metadata > handler attribute > job attribute > global RetryOptions. Failed jobs are retried automatically. Crash requeues do NOT count against the retry limit.
+
+`JitterFactor` (global only, default `0.0`, clamped to `[0, 1]`) applies multiplicative random jitter to each computed delay: `delay * (1 + JitterFactor * rand(-1, 1))`. Spreads retries to avoid thundering herds when many jobs fail at the same time.
 
 ### Named queues
 
@@ -709,7 +711,9 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 {
     // Worker
     options.WorkerCount = 10;                                  // Concurrent workers (default: min(CPU*5, 20))
-    options.PollingInterval = TimeSpan.FromSeconds(1);         // Poll delay when idle (default: 1s)
+    options.PollingInterval = TimeSpan.FromSeconds(1);         // Poll delay when idle; also floor for backoff (default: 1s)
+    options.MaxPollingInterval = TimeSpan.FromSeconds(30);     // Ceiling for exponential backoff (default: 30s)
+    options.PollingIntervalFactor = 2.0;                       // Multiplier per empty poll; 1.0 disables backoff (default: 2.0)
     options.Queues = ["a-critical", "b-default", "c-low"];     // Subscribed queues (default: ["default"])
 
     // Handler logging
@@ -766,9 +770,13 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
         group.WorkerCount = 2;
         group.Queues = ["reports", "default"];
         group.PollingInterval = TimeSpan.FromSeconds(5);
+        group.MaxPollingInterval = TimeSpan.FromSeconds(60);   // per-group ceiling
+        group.PollingIntervalFactor = 2.0;                      // per-group multiplier
     });
 });
 // Creates 7 workers total: 5 on "critical" @ 100ms, 2 on "reports"/"default" @ 5s
+// On idle queues, each group backs off geometrically: floor → floor*factor → … → MaxPollingInterval.
+// Any processed job resets the delay to the floor instantly.
 ```
 
 ### Dashboard Configuration

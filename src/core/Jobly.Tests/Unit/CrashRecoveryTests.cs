@@ -43,11 +43,11 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var count = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(
+        var result = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
             _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
-        count.ShouldBe(5);
+        result.Requeued.ShouldBe(5);
         var readCtx = _fixture.CreateContext();
         foreach (var id in jobIds)
         {
@@ -101,11 +101,11 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        var count = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(
+        var result = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
             _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
-        count.ShouldBe(0);
+        result.Total.ShouldBe(0);
 
         var readCtx = _fixture.CreateContext();
         (await readCtx.Set<Job>().FirstAsync(j => j.Id == completedId)).CurrentState.ShouldBe(State.Completed);
@@ -134,7 +134,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act
-        await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(
+        await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
             _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
@@ -164,14 +164,14 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Act — run 5 concurrent requeue attempts
         var tasks = Enumerable.Range(0, 5)
-            .Select(_ => StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(
+            .Select(_ => StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
                 _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5)))
             .ToList();
 
         var results = await Task.WhenAll(tasks);
 
         // Assert — exactly 1 should have requeued the job
-        results.Sum().ShouldBe(1);
+        results.Sum(x => x.Requeued).ShouldBe(1);
 
         var logs = await _fixture.CreateContext().Set<JobLog>()
             .Where(x => x.JobId == jobId && x.EventType == "Requeued")
@@ -264,13 +264,13 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act — run both cleanup + recovery (as health manager would)
-        var requeued = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(
+        var recovery = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
             _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
         var removed = await ServerCleanupTask<TestContext>.CleanUpServers(
             _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
-        requeued.ShouldBe(1);
+        recovery.Requeued.ShouldBe(1);
         removed.ShouldBe(1);
 
         var readCtx = _fixture.CreateContext();
@@ -305,11 +305,11 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Act
         var tp = new FakeTimeProvider(now);
-        var count = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(
+        var result = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
             _fixture.CreateContext(), tp, timeout);
 
         // Assert — should NOT be requeued (at boundary, not past it)
-        count.ShouldBe(0);
+        result.Total.ShouldBe(0);
         var readCtx = _fixture.CreateContext();
         var job = await readCtx.Set<Job>().FindAsync(jobId);
         job.ShouldNotBeNull();

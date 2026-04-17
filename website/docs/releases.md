@@ -4,6 +4,16 @@ sidebar_position: 6
 
 # Releases
 
+## 0.8.0
+
+*Unreleased*
+
+### New Features
+
+- **Exponential Polling Backoff** — Workers and the batch-fetch dispatcher now back off geometrically when queues are idle, reducing database load during quiet periods. Configure via `MaxPollingInterval` (default `30s`, ceiling) and `PollingIntervalFactor` (default `2.0`, multiplier). `PollingInterval` becomes the floor. On any processed job, the delay resets to the floor instantly, so throughput under load is unchanged. Paused workers stay at the floor (no compounding while paused). Available on both top-level `JoblyWorkerConfiguration` and per-group `WorkerGroupConfiguration`. Set `PollingIntervalFactor = 1.0` to disable backoff. See [Operations → Configuration → Exponential Polling Backoff](/docs/operations/configuration#exponential-polling-backoff).
+
+---
+
 ## 0.7.0
 
 *2026-04-17*

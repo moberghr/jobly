@@ -169,10 +169,10 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var recoveryCtx = _fixture.CreateContext();
-        var count = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5));
+        var result = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
-        count.ShouldBe(1);
+        result.Requeued.ShouldBe(1);
         var readCtx = _fixture.CreateContext();
         var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
         job.ShouldNotBeNull();
@@ -199,10 +199,10 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var recoveryCtx = _fixture.CreateContext();
-        var count = await StaleJobRecoveryTask<TestContext>.RequeueStaleJobs(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5));
+        var result = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5));
 
         // Assert
-        count.ShouldBe(0);
+        result.Total.ShouldBe(0);
         var readCtx = _fixture.CreateContext();
         var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
         job.ShouldNotBeNull();

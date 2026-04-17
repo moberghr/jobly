@@ -24,19 +24,29 @@ public class JoblyWorker<TContext> : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var floor = _groupConfiguration.PollingInterval;
+        var max = _groupConfiguration.MaxPollingInterval;
+        var factor = _groupConfiguration.PollingIntervalFactor;
+        var currentDelay = floor;
+
         while (!stoppingToken.IsCancellationRequested)
         {
             if (_pauseStateHolder.IsPaused(_workerGroupId))
             {
-                await Task.Delay(_groupConfiguration.PollingInterval, stoppingToken);
+                currentDelay = floor;
+                await Task.Delay(floor, stoppingToken);
                 continue;
             }
 
             var didProcessJob = await _joblyWorkerService.GetAndProcessJob(stoppingToken);
-            if (!didProcessJob)
+            if (didProcessJob)
             {
-                await Task.Delay(_groupConfiguration.PollingInterval, stoppingToken);
+                currentDelay = floor;
+                continue;
             }
+
+            currentDelay = PollingBackoff.Next(currentDelay, floor, max, factor);
+            await Task.Delay(currentDelay, stoppingToken);
         }
 
         _logger.LogInformation("Jobly worker is stopping.");
