@@ -67,7 +67,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         return 0;
     }
 
-    private JoblyWorkerService<TestContext> CreateWorker(int maxRetries = 3, int[]? delays = null)
+    private JoblyWorkerService<TestContext> CreateWorker(int maxRetries = 3, int[]? delays = null, double jitterFactor = 0)
     {
         var services = new ServiceCollection();
         services.AddHandlers(typeof(RetryTestsBase).Assembly);
@@ -82,6 +82,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         {
             o.MaxRetries = maxRetries;
             o.Delays = delays ?? [];
+            o.JitterFactor = jitterFactor;
         });
 
         var workerConfig = new OptionsWrapper<JoblyWorkerConfiguration>(new JoblyWorkerConfiguration
@@ -655,6 +656,220 @@ public abstract class RetryTestsBase : IAsyncLifetime
         var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
         job.CurrentState.ShouldBe(State.Enqueued);
         job.ScheduleTime.ShouldBeGreaterThan(now.AddSeconds(90));
+    }
+
+    [TimedFact]
+    public async Task GetAndProcessJob_WithJitterFactorZero_ScheduleTimeIsExactDelay()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new ThrowExceptionRequest()),
+            CreateTime = now,
+            ScheduleTime = now,
+            Queue = "default",
+        });
+        await ctx.SaveChangesAsync();
+
+        var worker = CreateWorker(maxRetries: 1, delays: [100], jitterFactor: 0);
+
+        // Act
+        var before = DateTime.UtcNow;
+        await worker.GetAndProcessJob(CancellationToken.None);
+        var after = DateTime.UtcNow;
+
+        // Assert — ScheduleTime ≈ now + 100s (no jitter)
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(100).AddSeconds(-1));
+        job.ScheduleTime.ShouldBeLessThanOrEqualTo(after.AddSeconds(100).AddSeconds(1));
+    }
+
+    [TimedFact]
+    public async Task GetAndProcessJob_WithJitterFactor_ScheduleTimeWithinJitteredWindowAndVaries()
+    {
+        // Arrange — run N iterations to verify both the [50s, 150s] window AND that jitter actually varies
+        var worker = CreateWorker(maxRetries: 1, delays: [100], jitterFactor: 0.5);
+        var scheduleTimes = new List<DateTime>();
+
+        for (var i = 0; i < 10; i++)
+        {
+            var ctx = _fixture.CreateContext();
+            var jobId = Guid.NewGuid();
+            var now = DateTime.UtcNow;
+            ctx.Set<Job>().Add(new Job
+            {
+                Id = jobId,
+                Kind = JobKind.Job,
+                CurrentState = State.Enqueued,
+                Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
+                Message = JsonSerializer.Serialize(new ThrowExceptionRequest()),
+                CreateTime = now,
+                ScheduleTime = now,
+                Queue = "default",
+            });
+            await ctx.SaveChangesAsync();
+
+            var before = DateTime.UtcNow;
+
+            // Act
+            await worker.GetAndProcessJob(CancellationToken.None);
+
+            var after = DateTime.UtcNow;
+
+            // Assert — each ScheduleTime ∈ [now + 50s, now + 150s]
+            var readCtx = _fixture.CreateContext();
+            var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+            job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(50).AddSeconds(-1));
+            job.ScheduleTime.ShouldBeLessThanOrEqualTo(after.AddSeconds(150).AddSeconds(1));
+            scheduleTimes.Add(job.ScheduleTime);
+        }
+
+        // Assert — jitter actually produces variation across iterations (≥2 distinct values)
+        scheduleTimes.Distinct().Count().ShouldBeGreaterThanOrEqualTo(2);
+    }
+
+    [TimedFact]
+    public async Task GetAndProcessJob_WithJitterFactorAboveOne_ClampedToOne()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new ThrowExceptionRequest()),
+            CreateTime = now,
+            ScheduleTime = now,
+            Queue = "default",
+        });
+        await ctx.SaveChangesAsync();
+
+        var worker = CreateWorker(maxRetries: 1, delays: [100], jitterFactor: 5.0);
+
+        // Act
+        var before = DateTime.UtcNow;
+        await worker.GetAndProcessJob(CancellationToken.None);
+        var after = DateTime.UtcNow;
+
+        // Assert — clamped to 1.0, so ScheduleTime ∈ [now, now + 200s]
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(-1));
+        job.ScheduleTime.ShouldBeLessThanOrEqualTo(after.AddSeconds(200).AddSeconds(1));
+    }
+
+    [TimedFact]
+    public async Task GetAndProcessJob_WithJitterFactorBelowZero_ClampedToZero()
+    {
+        // Arrange
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new ThrowExceptionRequest()),
+            CreateTime = now,
+            ScheduleTime = now,
+            Queue = "default",
+        });
+        await ctx.SaveChangesAsync();
+
+        var worker = CreateWorker(maxRetries: 1, delays: [100], jitterFactor: -1.0);
+
+        // Act
+        var before = DateTime.UtcNow;
+        await worker.GetAndProcessJob(CancellationToken.None);
+        var after = DateTime.UtcNow;
+
+        // Assert — clamped to 0, so ScheduleTime ≈ now + 100s (no jitter)
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(100).AddSeconds(-1));
+        job.ScheduleTime.ShouldBeLessThanOrEqualTo(after.AddSeconds(100).AddSeconds(1));
+    }
+
+    [TimedFact]
+    public async Task GetAndProcessJob_WithJitterFactor_DoesNotProduceNegativeDelay()
+    {
+        // Arrange — factor 1.0 can produce r = -1, multiply by 0; run many iterations
+        var worker = CreateWorker(maxRetries: 1, delays: [100], jitterFactor: 1.0);
+
+        for (var i = 0; i < 50; i++)
+        {
+            var ctx = _fixture.CreateContext();
+            var jobId = Guid.NewGuid();
+            var now = DateTime.UtcNow;
+            ctx.Set<Job>().Add(new Job
+            {
+                Id = jobId,
+                Kind = JobKind.Job,
+                CurrentState = State.Enqueued,
+                Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
+                Message = JsonSerializer.Serialize(new ThrowExceptionRequest()),
+                CreateTime = now,
+                ScheduleTime = now,
+                Queue = "default",
+            });
+            await ctx.SaveChangesAsync();
+
+            var before = DateTime.UtcNow;
+
+            // Act
+            await worker.GetAndProcessJob(CancellationToken.None);
+
+            // Assert — ScheduleTime must never be before 'before' (no negative delay)
+            var readCtx = _fixture.CreateContext();
+            var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+            job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(-1));
+        }
+    }
+
+    [TimedFact]
+    public async Task GetAndProcessJob_WithEmptyDelaysAndJitter_StillHasNoDelay()
+    {
+        // Arrange — empty delays with jitter factor should short-circuit (no scheduleTime)
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        var originalScheduleTime = DateTime.UtcNow;
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new ThrowExceptionRequest()),
+            CreateTime = originalScheduleTime,
+            ScheduleTime = originalScheduleTime,
+            Queue = "default",
+        });
+        await ctx.SaveChangesAsync();
+
+        var worker = CreateWorker(maxRetries: 1, delays: [], jitterFactor: 0.5);
+
+        // Act
+        await worker.GetAndProcessJob(CancellationToken.None);
+
+        // Assert — ScheduleTime should remain in the past (empty-delays short-circuit preserved)
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        job.CurrentState.ShouldBe(State.Enqueued);
+        job.ScheduleTime.ShouldBeLessThanOrEqualTo(TimeProvider.System.GetUtcNow().UtcDateTime);
     }
 }
 

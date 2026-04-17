@@ -71,12 +71,15 @@ services.AddJoblyRetry(o =>
 {
     o.MaxRetries = 3;
     o.Delays = [15, 60, 300]; // seconds
+    o.JitterFactor = 0.2;     // ±20% random jitter on each delay (default: 0, no jitter)
 });
 ```
 
 Priority: per-enqueue metadata > handler attribute > job attribute > global `RetryOptions`.
 
 Failed jobs are retried automatically. Crash requeues (server died mid-execution) do **not** count against the retry limit.
+
+`JitterFactor` is a multiplicative, global-only jitter applied to each computed delay: `delay * (1 + JitterFactor * rand(-1, 1))`. Clamped to `[0, 1]`. Useful when many jobs fail at the same time (e.g. downstream outage) to spread their retry attempts and avoid a thundering herd.
 
 ## Named Queues
 

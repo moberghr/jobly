@@ -44,6 +44,7 @@ services.AddJoblyRetry(options =>
 {
     options.MaxRetries = 3;               // Default max retries (default: 0)
     options.Delays = [15, 60, 300];       // Retry delays in seconds (default: [15, 60, 300])
+    options.JitterFactor = 0.2;           // Random ±20% jitter on each delay (default: 0, no jitter)
 });
 ```
 
@@ -51,6 +52,7 @@ services.AddJoblyRetry(options =>
 |--------|------|---------|-------------|
 | `MaxRetries` | `int` | `0` | Default max retries when no `[Retry]` attribute is present |
 | `Delays` | `int[]` | `[15, 60, 300]` | Delay in seconds between retries. Last value is reused if fewer delays than retries |
+| `JitterFactor` | `double` | `0.0` | Multiplicative jitter applied to each delay: `delay * (1 + JitterFactor * rand(-1, 1))`. Clamped to `[0, 1]`. Global only — no per-job override. Helps avoid retry thundering herds |
 
 Per-job override via `[Retry]` attribute on handler or job class, or per-enqueue via metadata. See [Jobs](/docs/patterns/jobs#retries).
 
