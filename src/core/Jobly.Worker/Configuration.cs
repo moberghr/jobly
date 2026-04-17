@@ -131,6 +131,30 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     /// </summary>
     public bool UseDispatcher { get; set; }
 
+    /// <summary>
+    /// Dispatcher-mode only. Maximum number of job completions each worker buffers in memory
+    /// before flushing them to the database in a single transaction. Defaults to 50.
+    /// Set to 1 to disable batching (every completion commits in its own transaction).
+    /// <para>
+    /// Trade-off: batching widens the at-least-once duplicate-execution window. If a worker
+    /// crashes with buffered completions that have not yet been flushed, those jobs stay in
+    /// <c>Processing</c> and <c>StaleJobRecoveryTask</c> will requeue them per the
+    /// <c>[NoRestart]</c> setting. Handlers with side effects should be idempotent or marked
+    /// <c>[NoRestart]</c>.
+    /// </para>
+    /// </summary>
+    public int CompletionBatchSize { get; set; } = 50;
+
+    /// <summary>
+    /// Dispatcher-mode only. Maximum time a buffered completion may wait before being flushed.
+    /// The timer starts when the first entry is added to an empty buffer. Defaults to 100ms.
+    /// <para>
+    /// A longer interval batches more completions (lower DB overhead) but widens the duplicate-execution
+    /// window on worker crash. See <see cref="CompletionBatchSize"/> for the crash-safety trade-off.
+    /// </para>
+    /// </summary>
+    public TimeSpan CompletionFlushInterval { get; set; } = TimeSpan.FromMilliseconds(100);
+
     internal List<WorkerGroupConfiguration> ExplicitWorkerGroups { get; } = [];
 
     /// <summary>

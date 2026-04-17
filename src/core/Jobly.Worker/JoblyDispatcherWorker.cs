@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 using System.Threading.Channels;
 using Jobly.Core;
@@ -19,6 +20,8 @@ namespace Jobly.Worker;
 /// <summary>
 /// Worker that receives pre-fetched jobs from a dispatcher channel.
 /// Pure executor — handles execution and completion only. Orchestration handled by OrchestrationTask.
+/// Completions are buffered in a per-worker <see cref="CompletionBatch{TContext}"/> and flushed
+/// as a single multi-row transaction when any of: size threshold, time threshold, idle, or shutdown fires.
 /// </summary>
 public class JoblyDispatcherWorker<TContext> : BackgroundService
     where TContext : DbContext
@@ -29,6 +32,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
     private readonly ILogger<JoblyDispatcherWorker<TContext>> _logger;
     private readonly JoblyWorkerConfiguration _configuration;
     private readonly TimeProvider _timeProvider;
+    private readonly CompletionBatch<TContext> _batch;
 
     public JoblyDispatcherWorker(
         Guid workerId,
@@ -44,26 +48,91 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         _logger = logger;
         _configuration = configuration.Value;
         _timeProvider = timeProvider;
+        _batch = new CompletionBatch<TContext>(
+            scopeFactory,
+            timeProvider,
+            logger,
+            _configuration.CompletionBatchSize,
+            _configuration.CompletionFlushInterval);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Channel-based pull: blocks on ReadAllAsync until the dispatcher produces a job.
+        // Channel-based pull: WaitToReadAsync blocks until the dispatcher produces a job.
         // No idle polling loop here — polling backoff lives in JoblyDispatcher.ExecuteAsync.
-        await foreach (var job in _jobReader.ReadAllAsync(stoppingToken))
+        // The hand-rolled WaitToRead/TryRead loop (vs await foreach ReadAllAsync) exists so we
+        // can flush any buffered completions BEFORE suspending on the next WaitToReadAsync —
+        // otherwise a small batch (below CompletionBatchSize) would wait for the time trigger
+        // or forever if no more jobs arrive.
+        try
         {
-            try
+            while (await _jobReader.WaitToReadAsync(stoppingToken).ConfigureAwait(false))
             {
-                await ProcessJob(job, stoppingToken);
+                while (_jobReader.TryRead(out var job))
+                {
+                    try
+                    {
+                        await ProcessJob(job, stoppingToken);
+                    }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Dispatcher worker failed on job {id}", job.Id);
+                    }
+
+                    if (_batch.IsFull || _batch.IsTimeElapsed)
+                    {
+                        await FlushBatchSafely(stoppingToken);
+                    }
+                }
+
+                // Idle — drain any buffered completions before suspending on WaitToReadAsync
+                await FlushBatchSafely(stoppingToken);
             }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Dispatcher worker failed on job {id}", job.Id);
-            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Graceful stop — StopAsync handles the final flush
+        }
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await base.StopAsync(cancellationToken);
+
+        try
+        {
+            await _batch.FlushAsync(CancellationToken.None);
+            OrchestrationTask<TContext>.SignalOrchestrator();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Final batch flush on shutdown failed");
+        }
+    }
+
+    private async Task FlushBatchSafely(CancellationToken cancellationToken)
+    {
+        if (_batch.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await _batch.FlushAsync(cancellationToken);
+            OrchestrationTask<TContext>.SignalOrchestrator();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to flush completion batch");
         }
     }
 
@@ -71,16 +140,10 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
     {
         PerfTrace.Begin();
 
-        // Worker scope — owns Jobly state (Job, JobLog, Counter). Isolated from handler's DbContext.
-        using var workerScope = _scopeFactory.CreateScope();
-        var workerContext = workerScope.ServiceProvider.GetRequiredService<TContext>();
-
-        var trackedJob = await workerContext.Set<Job>().FindAsync([job.Id], cancellationToken)
-            ?? throw new InvalidOperationException($"Job {job.Id} not found");
-        trackedJob.CurrentWorkerId = _workerId;
-        trackedJob.HandlerType = job.HandlerType;
-        await workerContext.SaveChangesAsync(cancellationToken);
-        job = trackedJob;
+        // Operational observability — Dashboard/incident response needs to see "worker X holds job Y"
+        // while it runs. Single UPDATE (no SELECT, no change tracker). Scope disposes when the helper returns.
+        await MarkWorkerOwnership(job, cancellationToken);
+        job.CurrentWorkerId = _workerId;
 
         var logCollector = new JobLogCollector { JobId = job.Id, TimeProvider = _timeProvider, WorkerId = _workerId };
 
@@ -170,9 +233,6 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             await jobCts.CancelAsync();
             await monitorTask;
 
-            PerfTrace.Mark(PerfTrace.BeginTransaction2);
-            await using var endTransaction = await workerContext.Database.BeginTransactionAsync(default);
-
             if (successOutcome != null)
             {
                 job.CurrentState = successOutcome.State;
@@ -191,17 +251,9 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
                 job.CurrentState = State.Completed;
             }
 
-            FinalizeJobState(workerContext, job, null, handlerStopwatch.Elapsed.TotalMilliseconds, successOutcome);
-            if (_configuration.EnableHandlerLogging)
-            {
-                await SaveJobLogs(workerContext, logCollector);
-            }
-
-            PerfTrace.Mark(PerfTrace.SaveCompleted);
-            await workerContext.SaveChangesAsync(default);
-
-            PerfTrace.Mark(PerfTrace.CommitTransaction2);
-            await endTransaction.CommitAsync(default);
+            var (counters, finalLog) = BuildFinalization(job, null, durationMs, successOutcome);
+            var logs = CollectLogs(finalLog, logCollector).ToArray();
+            _batch.Add(new PendingCompletion(job, counters, logs));
         }
         catch (OperationCanceledException) when (jobCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
@@ -219,14 +271,21 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             await monitorTask;
 
             var cancelNow = _timeProvider.GetUtcNow().UtcDateTime;
-            await using var endTransaction = await workerContext.Database.BeginTransactionAsync(default);
             job.CurrentState = State.Deleted;
             job.ExpireAt = cancelNow.Add(_configuration.JobExpirationTimeout);
             job.CancellationMode = CancellationMode.None;
             job.CurrentWorkerId = null;
             job.LastKeepAlive = null;
-            workerContext.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
-            workerContext.Set<JobLog>().Add(new JobLog
+
+            // Match BuildFinalization: emit both the aggregate and per-hour counters so cancellations
+            // show up in the dashboard's hourly graph alongside other terminal states.
+            var hourSuffix = cancelNow.ToString("yyyy-MM-dd-HH", CultureInfo.InvariantCulture);
+            IReadOnlyList<Counter> cancelCounters =
+            [
+                new() { Key = "stats:deleted", Value = 1 },
+                new() { Key = $"stats:deleted:{hourSuffix}", Value = 1 },
+            ];
+            var cancelLog = new JobLog
             {
                 JobId = job.Id,
                 EventType = "Cancelled",
@@ -235,14 +294,9 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
                 Message = "Job was cancelled by user",
                 DurationMs = handlerStopwatch?.Elapsed.TotalMilliseconds,
                 WorkerId = _workerId,
-            });
-            if (_configuration.EnableHandlerLogging)
-            {
-                await SaveJobLogs(workerContext, logCollector);
-            }
-
-            await workerContext.SaveChangesAsync(default);
-            await endTransaction.CommitAsync(default);
+            };
+            var logs = CollectLogs(cancelLog, logCollector).ToArray();
+            _batch.Add(new PendingCompletion(job, cancelCounters, logs));
         }
         catch (Exception e)
         {
@@ -300,15 +354,9 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             await jobCts.CancelAsync();
             await monitorTask;
 
-            await using var endTransaction = await workerContext.Database.BeginTransactionAsync(default);
-            FinalizeJobState(workerContext, job, e, errorDurationMs, outcome);
-            if (_configuration.EnableHandlerLogging)
-            {
-                await SaveJobLogs(workerContext, logCollector);
-            }
-
-            await workerContext.SaveChangesAsync(default);
-            await endTransaction.CommitAsync(default);
+            var (counters, finalLog) = BuildFinalization(job, e, errorDurationMs, outcome);
+            var logs = CollectLogs(finalLog, logCollector).ToArray();
+            _batch.Add(new PendingCompletion(job, counters, logs));
         }
         finally
         {
@@ -320,10 +368,22 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             JobExecutionContext.Current = null;
         }
 
-        OrchestrationTask<TContext>.SignalOrchestrator();
-
         PerfTrace.Mark(PerfTrace.Done);
         PerfTrace.End();
+    }
+
+    private async Task MarkWorkerOwnership(Job job, CancellationToken cancellationToken)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<TContext>();
+        var handlerTypeToSet = job.HandlerType;
+        await context.Set<Job>()
+            .Where(x => x.Id == job.Id)
+            .ExecuteUpdateAsync(
+                x => x
+                    .SetProperty(p => p.CurrentWorkerId, _workerId)
+                    .SetProperty(p => p.HandlerType, handlerTypeToSet),
+                cancellationToken);
     }
 
     private static async Task ExecuteJob(Job job, IServiceProvider provider, CancellationToken cancellationToken)
@@ -430,10 +490,10 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
     }
 
     /// <summary>
-    /// Finalizes job state: clears worker fields, adds counters and log entry.
+    /// Clears worker-owned fields on the job and produces the completion counters + final state log.
     /// State must be set on the job before calling this method.
     /// </summary>
-    private void FinalizeJobState(TContext context, Job job, Exception? error, double? durationMs, JobOutcome? outcome = null)
+    private (List<Counter> Counters, JobLog FinalLog) BuildFinalization(Job job, Exception? error, double? durationMs, JobOutcome? outcome)
     {
         var state = job.CurrentState;
         job.CancellationMode = CancellationMode.None;
@@ -442,19 +502,23 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var hourSuffix = now.ToString("yyyy-MM-dd-HH");
+        var counters = new List<Counter>();
         if (state == State.Completed)
         {
             job.ExpireAt = now.Add(_configuration.JobExpirationTimeout);
-            AddCounters(context, "stats:succeeded", $"stats:succeeded:{hourSuffix}");
+            counters.Add(new Counter { Key = "stats:succeeded", Value = 1 });
+            counters.Add(new Counter { Key = $"stats:succeeded:{hourSuffix}", Value = 1 });
         }
         else if (state == State.Failed)
         {
-            AddCounters(context, "stats:failed", $"stats:failed:{hourSuffix}");
+            counters.Add(new Counter { Key = "stats:failed", Value = 1 });
+            counters.Add(new Counter { Key = $"stats:failed:{hourSuffix}", Value = 1 });
         }
         else if (state == State.Deleted)
         {
             job.ExpireAt = now.Add(_configuration.JobExpirationTimeout);
-            AddCounters(context, "stats:deleted", $"stats:deleted:{hourSuffix}");
+            counters.Add(new Counter { Key = "stats:deleted", Value = 1 });
+            counters.Add(new Counter { Key = $"stats:deleted:{hourSuffix}", Value = 1 });
         }
 
         var logMessage = outcome?.LogMessage
@@ -470,7 +534,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             _ => state.ToString(),
         };
 
-        context.Set<JobLog>().Add(new JobLog
+        var finalLog = new JobLog
         {
             JobId = job.Id,
             EventType = eventType,
@@ -480,24 +544,24 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             Exception = logException,
             DurationMs = durationMs,
             WorkerId = _workerId,
-        });
+        };
+
+        return (counters, finalLog);
     }
 
-    private static async Task SaveJobLogs(TContext context, JobLogCollector collector)
+    private IEnumerable<JobLog> CollectLogs(JobLog finalLog, JobLogCollector collector)
     {
-        var entries = collector.Drain();
-        if (entries.Count == 0)
+        yield return finalLog;
+
+        if (!_configuration.EnableHandlerLogging)
         {
-            return;
+            yield break;
         }
 
-        await context.Set<JobLog>().AddRangeAsync(entries);
-    }
-
-    private static void AddCounters(TContext context, string totalKey, string hourlyKey)
-    {
-        context.Set<Counter>().Add(new Counter { Key = totalKey, Value = 1 });
-        context.Set<Counter>().Add(new Counter { Key = hourlyKey, Value = 1 });
+        foreach (var drained in collector.Drain())
+        {
+            yield return drained;
+        }
     }
 
     private static string Truncate(string value, int maxLength)
