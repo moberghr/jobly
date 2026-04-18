@@ -1,5 +1,5 @@
 using Jobly.Tests.Fixtures;
-using Jobly.Tests.Integration;
+using Jobly.Tests.Fixtures;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 

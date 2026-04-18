@@ -1,6 +1,6 @@
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Interceptors;
-using Jobly.Tests.Integration;
+using Jobly.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Respawn;
