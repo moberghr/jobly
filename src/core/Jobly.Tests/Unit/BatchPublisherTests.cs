@@ -231,6 +231,7 @@ public abstract class BatchPublisherUnitTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class BatchPublisherUnitTests_PostgreSql : BatchPublisherUnitTestsBase
 {
     public BatchPublisherUnitTests_PostgreSql(PostgreSqlFixture fixture)

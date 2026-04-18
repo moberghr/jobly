@@ -696,6 +696,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class CircuitBreakerTests_PostgreSql : CircuitBreakerTestsBase
 {
     public CircuitBreakerTests_PostgreSql(PostgreSqlFixture fixture)

@@ -374,6 +374,7 @@ file class FakeTimeProvider(DateTime utcNow) : TimeProvider
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class ExpirationEdgeCaseTests_PostgreSql : ExpirationEdgeCaseTestsBase
 {
     public ExpirationEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture)

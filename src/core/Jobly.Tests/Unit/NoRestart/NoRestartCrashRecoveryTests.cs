@@ -207,6 +207,7 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class NoRestartCrashRecoveryTests_PostgreSql : NoRestartCrashRecoveryTestsBase
 {
     public NoRestartCrashRecoveryTests_PostgreSql(PostgreSqlFixture fixture)

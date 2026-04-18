@@ -5,6 +5,7 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit.NoRestart;
 
+[Trait("Category", "NoDb")]
 public class NoRestartPublishBehaviorTests
 {
     private static async Task<ICanBeRestartedMetadata> RunBehavior<T>(T job, Dictionary<string, object>? startingMetadata = null)

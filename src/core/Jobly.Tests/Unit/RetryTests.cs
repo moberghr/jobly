@@ -922,6 +922,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class RetryTests_PostgreSql : RetryTestsBase
 {
     public RetryTests_PostgreSql(PostgreSqlFixture fixture)

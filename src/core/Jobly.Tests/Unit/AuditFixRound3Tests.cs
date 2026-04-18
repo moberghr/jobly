@@ -149,6 +149,7 @@ public abstract class AuditFixRound3TestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class AuditFixRound3Tests_PostgreSql : AuditFixRound3TestsBase
 {
     public AuditFixRound3Tests_PostgreSql(PostgreSqlFixture fixture)

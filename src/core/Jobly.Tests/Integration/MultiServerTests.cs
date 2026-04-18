@@ -439,6 +439,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
 }
 
 [Collection<PostgreSqlMultiServerCollection>]
+[Trait("Category", "PostgreSql")]
 public class MultiServerTests_PostgreSql : MultiServerTestsBase
 {
     public MultiServerTests_PostgreSql(PostgreSqlMultiServerFixture fixture)

@@ -508,6 +508,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class OTelMetricsTests_PostgreSql : OTelMetricsTestsBase
 {
     public OTelMetricsTests_PostgreSql(PostgreSqlFixture fixture)

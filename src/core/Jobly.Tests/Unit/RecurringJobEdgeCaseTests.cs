@@ -536,6 +536,7 @@ file class FakeTimeProvider(DateTime utcNow) : TimeProvider
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class RecurringJobEdgeCaseTests_PostgreSql : RecurringJobEdgeCaseTestsBase
 {
     public RecurringJobEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture)

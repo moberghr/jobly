@@ -293,6 +293,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class BackgroundTaskTests_PostgreSql : BackgroundTaskTestsBase
 {
     public BackgroundTaskTests_PostgreSql(PostgreSqlFixture fixture)

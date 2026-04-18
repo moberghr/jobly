@@ -268,6 +268,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class JobQueryServiceTests_PostgreSql : JobQueryServiceTestsBase
 {
     public JobQueryServiceTests_PostgreSql(PostgreSqlFixture fixture)

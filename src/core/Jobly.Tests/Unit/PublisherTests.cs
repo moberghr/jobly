@@ -288,6 +288,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class PublisherTests_PostgreSql : PublisherTestsBase
 {
     public PublisherTests_PostgreSql(PostgreSqlFixture fixture)

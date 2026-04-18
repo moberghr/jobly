@@ -98,6 +98,7 @@ public abstract class RecurringJobLogCascadeTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class RecurringJobLogCascadeTests_PostgreSql : RecurringJobLogCascadeTestsBase
 {
     public RecurringJobLogCascadeTests_PostgreSql(PostgreSqlFixture fixture)

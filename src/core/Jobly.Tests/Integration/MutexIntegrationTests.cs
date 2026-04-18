@@ -50,6 +50,7 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class MutexIntegrationTests_PostgreSql : MutexIntegrationTestsBase
 {
     public MutexIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

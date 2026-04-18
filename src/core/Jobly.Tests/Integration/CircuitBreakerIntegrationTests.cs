@@ -109,6 +109,7 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class CircuitBreakerIntegrationTests_PostgreSql : CircuitBreakerIntegrationTestsBase
 {
     public CircuitBreakerIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

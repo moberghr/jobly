@@ -5,6 +5,7 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit.NoRestart;
 
+[Trait("Category", "NoDb")]
 public class NoRestartExtensionTests
 {
     [TimedFact]

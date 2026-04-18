@@ -673,6 +673,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class OrchestrationTaskTests_PostgreSql : OrchestrationTaskTestsBase
 {
     public OrchestrationTaskTests_PostgreSql(PostgreSqlFixture fixture)

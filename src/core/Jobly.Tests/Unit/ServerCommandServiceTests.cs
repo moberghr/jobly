@@ -196,6 +196,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class ServerCommandServiceTests_PostgreSql : ServerCommandServiceTestsBase
 {
     public ServerCommandServiceTests_PostgreSql(PostgreSqlFixture fixture)

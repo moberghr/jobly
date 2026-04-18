@@ -14,6 +14,7 @@ namespace Jobly.Tests.Unit;
 /// Tests for dashboard authorization middleware. Uses a minimal app with no Jobly services —
 /// only tests the auth layer (login, logout, cookie, filter, redirect).
 /// </summary>
+[Trait("Category", "NoDb")]
 public class DashboardAuthTests
 {
     private static async Task<(WebApplication App, HttpClient Client)> CreateApp(Action<JoblyUIOptions>? configure = null)

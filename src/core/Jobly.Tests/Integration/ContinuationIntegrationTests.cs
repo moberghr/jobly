@@ -119,6 +119,7 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class ContinuationIntegrationTests_PostgreSql : ContinuationIntegrationTestsBase
 {
     public ContinuationIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

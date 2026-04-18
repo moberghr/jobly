@@ -155,6 +155,7 @@ public abstract class BugFixTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class BugFixTests_PostgreSql : BugFixTestsBase
 {
     public BugFixTests_PostgreSql(PostgreSqlFixture fixture)

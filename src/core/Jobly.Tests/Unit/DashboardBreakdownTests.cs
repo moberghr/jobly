@@ -179,6 +179,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class DashboardBreakdownTests_PostgreSql : DashboardBreakdownTestsBase
 {
     public DashboardBreakdownTests_PostgreSql(PostgreSqlFixture fixture)

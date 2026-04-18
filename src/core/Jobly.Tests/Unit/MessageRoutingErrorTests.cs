@@ -174,6 +174,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class MessageRoutingErrorTests_PostgreSql : MessageRoutingErrorTestsBase
 {
     public MessageRoutingErrorTests_PostgreSql(PostgreSqlFixture fixture)

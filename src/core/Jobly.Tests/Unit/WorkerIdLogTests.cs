@@ -78,6 +78,7 @@ public abstract class WorkerIdLogTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class WorkerIdLogTests_PostgreSql : WorkerIdLogTestsBase
 {
     public WorkerIdLogTests_PostgreSql(PostgreSqlFixture fixture)

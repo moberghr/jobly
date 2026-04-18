@@ -389,6 +389,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class ActivityTraceTests_PostgreSql : ActivityTraceTestsBase
 {
     public ActivityTraceTests_PostgreSql(PostgreSqlFixture fixture)

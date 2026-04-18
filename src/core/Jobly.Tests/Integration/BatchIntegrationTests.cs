@@ -212,6 +212,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class BatchIntegrationTests_PostgreSql : BatchIntegrationTestsBase
 {
     public BatchIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

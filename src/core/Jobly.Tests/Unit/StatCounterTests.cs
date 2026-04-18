@@ -222,6 +222,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class StatCounterTests_PostgreSql : StatCounterTestsBase
 {
     public StatCounterTests_PostgreSql(PostgreSqlFixture fixture)

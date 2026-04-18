@@ -331,6 +331,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class RetentionTests_PostgreSql : RetentionTestsBase
 {
     public RetentionTests_PostgreSql(PostgreSqlFixture fixture)

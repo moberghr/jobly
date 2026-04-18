@@ -104,6 +104,7 @@ public abstract class ServerMonitoringTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class ServerMonitoringTests_PostgreSql : ServerMonitoringTestsBase
 {
     public ServerMonitoringTests_PostgreSql(PostgreSqlFixture fixture)

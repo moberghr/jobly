@@ -88,6 +88,7 @@ public abstract class JobExpirationTimeoutTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class JobExpirationTimeoutTests_PostgreSql : JobExpirationTimeoutTestsBase
 {
     public JobExpirationTimeoutTests_PostgreSql(PostgreSqlFixture fixture)

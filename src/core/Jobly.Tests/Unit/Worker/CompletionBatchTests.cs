@@ -343,6 +343,7 @@ internal sealed class BatchTestTimeProvider(DateTime start) : TimeProvider
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class CompletionBatchTests_PostgreSql : CompletionBatchTestsBase
 {
     public CompletionBatchTests_PostgreSql(PostgreSqlFixture fixture)

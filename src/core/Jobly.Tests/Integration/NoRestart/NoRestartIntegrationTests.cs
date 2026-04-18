@@ -93,6 +93,7 @@ public abstract class NoRestartIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class NoRestartIntegrationTests_PostgreSql : NoRestartIntegrationTestsBase
 {
     public NoRestartIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

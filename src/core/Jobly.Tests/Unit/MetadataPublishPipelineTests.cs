@@ -444,6 +444,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class MetadataPublishPipelineTests_PostgreSql : MetadataPublishPipelineTestsBase
 {
     public MetadataPublishPipelineTests_PostgreSql(PostgreSqlFixture fixture)

@@ -258,6 +258,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class RetentionEdgeCaseTests_PostgreSql : RetentionEdgeCaseTestsBase
 {
     public RetentionEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture)

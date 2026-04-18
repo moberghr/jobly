@@ -357,6 +357,7 @@ file class FakeTimeProvider(DateTime utcNow) : TimeProvider
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class CrashRecoveryTests_PostgreSql : CrashRecoveryTestsBase
 {
     public CrashRecoveryTests_PostgreSql(PostgreSqlFixture fixture)

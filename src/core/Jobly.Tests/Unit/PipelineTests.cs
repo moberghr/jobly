@@ -131,6 +131,7 @@ public abstract class PipelineTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class PipelineTests_PostgreSql : PipelineTestsBase
 {
     public PipelineTests_PostgreSql(PostgreSqlFixture fixture)

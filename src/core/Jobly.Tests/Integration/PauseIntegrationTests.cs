@@ -141,6 +141,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class PauseIntegrationTests_PostgreSql : PauseIntegrationTestsBase
 {
     public PauseIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

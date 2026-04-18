@@ -297,6 +297,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class SpanPropagationTests_PostgreSql : SpanPropagationTestsBase
 {
     public SpanPropagationTests_PostgreSql(PostgreSqlFixture fixture)

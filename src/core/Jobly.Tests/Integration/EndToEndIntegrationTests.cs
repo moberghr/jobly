@@ -141,6 +141,7 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class EndToEndIntegrationTests_PostgreSql : EndToEndIntegrationTestsBase
 {
     public EndToEndIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

@@ -146,6 +146,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class RecurringJobLogCleanupTests_PostgreSql : RecurringJobLogCleanupTestsBase
 {
     public RecurringJobLogCleanupTests_PostgreSql(PostgreSqlFixture fixture)

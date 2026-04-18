@@ -101,6 +101,7 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class RecurringJobBugTests_PostgreSql : RecurringJobBugTestsBase
 {
     public RecurringJobBugTests_PostgreSql(PostgreSqlFixture fixture)

@@ -157,6 +157,7 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class MessageIntegrationTests_PostgreSql : MessageIntegrationTestsBase
 {
     public MessageIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

@@ -5,6 +5,7 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit.Worker;
 
+[Trait("Category", "NoDb")]
 public class JoblyWorkerResilienceTests
 {
     [TimedFact(timeout: 5_000)]

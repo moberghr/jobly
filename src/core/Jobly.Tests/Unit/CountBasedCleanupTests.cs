@@ -287,6 +287,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class CountBasedCleanupTests_PostgreSql : CountBasedCleanupTestsBase
 {
     public CountBasedCleanupTests_PostgreSql(PostgreSqlFixture fixture)

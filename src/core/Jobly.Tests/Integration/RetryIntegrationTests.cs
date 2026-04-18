@@ -124,6 +124,7 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class RetryIntegrationTests_PostgreSql : RetryIntegrationTestsBase
 {
     public RetryIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

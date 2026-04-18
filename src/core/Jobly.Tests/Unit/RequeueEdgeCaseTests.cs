@@ -147,6 +147,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class RequeueEdgeCaseTests_PostgreSql : RequeueEdgeCaseTestsBase
 {
     public RequeueEdgeCaseTests_PostgreSql(PostgreSqlFixture fixture)

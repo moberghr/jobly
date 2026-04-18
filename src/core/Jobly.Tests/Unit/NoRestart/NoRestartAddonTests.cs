@@ -114,6 +114,7 @@ public abstract class NoRestartAddonTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class NoRestartAddonTests_PostgreSql : NoRestartAddonTestsBase
 {
     public NoRestartAddonTests_PostgreSql(PostgreSqlFixture fixture)

@@ -19,9 +19,11 @@ jobs:
       matrix:
         include:
           - database: PostgreSQL
-            filter: --filter-not-trait "Category=SqlServer"
+            filter: --filter-trait "Category=PostgreSql"
           - database: SQL Server
             filter: --filter-trait "Category=SqlServer"
+          - database: NoDb
+            filter: --filter-trait "Category=NoDb"
 
     steps:
       - uses: actions/checkout@v4

@@ -7,6 +7,7 @@ using Shouldly;
 
 namespace Jobly.Tests.Unit;
 
+[Trait("Category", "NoDb")]
 public class TypedMetadataTests
 {
     [TimedFact]

@@ -7,6 +7,7 @@ namespace Jobly.Tests.Unit;
 /// <summary>
 /// Pure unit tests for JoblyTelemetry — no database, no collection fixture.
 /// </summary>
+[Trait("Category", "NoDb")]
 public class JoblyTelemetryTests
 {
     [TimedFact]

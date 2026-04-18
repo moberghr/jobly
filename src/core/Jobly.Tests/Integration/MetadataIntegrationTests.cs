@@ -89,6 +89,7 @@ public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class MetadataIntegrationTests_PostgreSql : MetadataIntegrationTestsBase
 {
     public MetadataIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

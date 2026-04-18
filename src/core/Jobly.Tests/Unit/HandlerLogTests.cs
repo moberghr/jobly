@@ -328,6 +328,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class HandlerLogTests_PostgreSql : HandlerLogTestsBase
 {
     public HandlerLogTests_PostgreSql(PostgreSqlFixture fixture)

@@ -190,6 +190,7 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class ServerQueryTests_PostgreSql : ServerQueryTestsBase
 {
     public ServerQueryTests_PostgreSql(PostgreSqlFixture fixture)

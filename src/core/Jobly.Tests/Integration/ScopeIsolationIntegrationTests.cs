@@ -124,6 +124,7 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class ScopeIsolationIntegrationTests_PostgreSql : ScopeIsolationIntegrationTestsBase
 {
     public ScopeIsolationIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

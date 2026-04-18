@@ -109,6 +109,7 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class ConcurrencyEdgeCaseTests_PostgreSql : ConcurrencyEdgeCaseTestsBase
 {
     public ConcurrencyEdgeCaseTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

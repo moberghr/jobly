@@ -11,6 +11,7 @@ namespace Jobly.Tests.Unit;
 // only runs if the when-clause accepts the generated SqlException. A synthetic SqlException
 // unit test is impractical because the type's constructors are internal; end-to-end coverage
 // on both providers is sufficient.
+[Trait("Category", "NoDb")]
 public class CircuitBreakerExceptionsTests
 {
     [Fact]

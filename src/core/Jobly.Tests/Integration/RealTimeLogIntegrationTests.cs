@@ -105,6 +105,7 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class RealTimeLogIntegrationTests_PostgreSql : RealTimeLogIntegrationTestsBase
 {
     public RealTimeLogIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

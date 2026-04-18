@@ -115,6 +115,7 @@ public abstract class CancellationModeTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class CancellationModeTests_PostgreSql : CancellationModeTestsBase
 {
     public CancellationModeTests_PostgreSql(PostgreSqlFixture fixture)

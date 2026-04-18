@@ -112,6 +112,7 @@ public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class ConcurrencyIntegrationTests_PostgreSql : ConcurrencyIntegrationTestsBase
 {
     public ConcurrencyIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

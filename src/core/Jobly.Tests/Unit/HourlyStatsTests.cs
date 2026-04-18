@@ -221,6 +221,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class HourlyStatsTests_PostgreSql : HourlyStatsTestsBase
 {
     public HourlyStatsTests_PostgreSql(PostgreSqlFixture fixture)

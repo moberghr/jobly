@@ -371,6 +371,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class MutexTests_PostgreSql : MutexTestsBase
 {
     public MutexTests_PostgreSql(PostgreSqlFixture fixture)

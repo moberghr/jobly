@@ -108,6 +108,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class CancellationIntegrationTests_PostgreSql : CancellationIntegrationTestsBase
 {
     public CancellationIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

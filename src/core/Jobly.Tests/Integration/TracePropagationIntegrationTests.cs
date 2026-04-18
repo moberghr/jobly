@@ -88,6 +88,7 @@ public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
 }
 
 [Collection<PostgreSqlIntegrationCollection>]
+[Trait("Category", "PostgreSql")]
 public class TracePropagationIntegrationTests_PostgreSql : TracePropagationIntegrationTestsBase
 {
     public TracePropagationIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture)

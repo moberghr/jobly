@@ -255,6 +255,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlBatchedCompletionCollection>]
+[Trait("Category", "PostgreSql")]
 public class BatchedCompletionIntegrationTests_PostgreSql : BatchedCompletionIntegrationTestsBase
 {
     public BatchedCompletionIntegrationTests_PostgreSql(PostgreSqlBatchedCompletionFixture fixture)

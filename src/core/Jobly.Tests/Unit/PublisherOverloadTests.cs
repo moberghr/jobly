@@ -154,6 +154,7 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class PublisherOverloadTests_PostgreSql : PublisherOverloadTestsBase
 {
     public PublisherOverloadTests_PostgreSql(PostgreSqlFixture fixture)

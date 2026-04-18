@@ -275,6 +275,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
 }
 
 [Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
 public class WorkerTests_PostgreSql : WorkerTestsBase
 {
     public WorkerTests_PostgreSql(PostgreSqlFixture fixture)
