@@ -431,6 +431,197 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         state.OpenUntil.ShouldBeNull();
     }
 
+    [TimedFact]
+    public async Task ExpiredOpenCircuit_WhenProbeSucceeds_ThenCircuitClosesAndResets()
+    {
+        // End-to-end coverage for the probe-success path. Pre-fix to PR #126 review F2,
+        // this path went through the behavior with no probe gate (thundering herd); the
+        // introduced CAS must also integrate with the existing success-reset logic so the
+        // winning probe worker actually transitions the state row from HalfOpen → Closed
+        // and zeroes the counter. Snapshot-vs-DB skew is tolerated: the pipeline's local
+        // `state` snapshot was Open before probe, so the success-reset heuristic fires.
+        var now = DateTime.UtcNow;
+        var ctx = _fixture.CreateContext();
+        ctx.Set<CircuitBreakerState>().Add(new CircuitBreakerState
+        {
+            GroupKey = nameof(UnitRequest),
+            FailureCount = 3,
+            LastFailureAt = now.AddMinutes(-5),
+            OpenUntil = now.AddSeconds(-1),
+            State = CircuitState.Open,
+        });
+        var jobId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            CreateTime = now,
+            ScheduleTime = now.AddMinutes(-1),
+            Queue = "default",
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = "{}",
+        });
+        await ctx.SaveChangesAsync();
+
+        var worker = CreateWorker();
+        await worker.GetAndProcessJob(CancellationToken.None);
+
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        job.ShouldNotBeNull();
+        job.CurrentState.ShouldBe(State.Completed);
+
+        var state = await readCtx.Set<CircuitBreakerState>()
+            .Where(x => x.GroupKey == nameof(UnitRequest))
+            .FirstAsync(CancellationToken.None);
+        state.State.ShouldBe(CircuitState.Closed);
+        state.FailureCount.ShouldBe(0);
+        state.OpenUntil.ShouldBeNull();
+    }
+
+    [TimedFact]
+    public async Task ExpiredOpenCircuit_WhenProbeFails_ThenCircuitReopensWithFreshOpenUntil()
+    {
+        // End-to-end coverage for the probe-failure path: a failing probe must transition
+        // HalfOpen → Open with a fresh OpenUntil; otherwise a flaky downstream would
+        // continuously be probed with no cooldown. RecordFailureAsync's HalfOpen branch
+        // must trip regardless of FailureCount vs threshold.
+        var now = DateTime.UtcNow;
+        var duration = TimeSpan.FromMinutes(1);
+        var ctx = _fixture.CreateContext();
+        ctx.Set<CircuitBreakerState>().Add(new CircuitBreakerState
+        {
+            GroupKey = nameof(ThrowExceptionRequest),
+            FailureCount = 3,
+            LastFailureAt = now.AddMinutes(-5),
+            OpenUntil = now.AddSeconds(-1),
+            State = CircuitState.Open,
+        });
+        var jobId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            CreateTime = now,
+            ScheduleTime = now.AddMinutes(-1),
+            Queue = "default",
+            Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
+            Message = "{}",
+        });
+        await ctx.SaveChangesAsync();
+
+        var before = DateTime.UtcNow;
+        var worker = CreateWorker(duration: duration);
+        await worker.GetAndProcessJob(CancellationToken.None);
+        var after = DateTime.UtcNow;
+
+        var readCtx = _fixture.CreateContext();
+        var state = await readCtx.Set<CircuitBreakerState>()
+            .Where(x => x.GroupKey == nameof(ThrowExceptionRequest))
+            .FirstAsync(CancellationToken.None);
+        state.State.ShouldBe(CircuitState.Open);
+        state.FailureCount.ShouldBe(4);
+        state.OpenUntil.ShouldNotBeNull();
+        state.OpenUntil!.Value.ShouldBeGreaterThanOrEqualTo(before + duration - TimeSpan.FromSeconds(5));
+        state.OpenUntil.Value.ShouldBeLessThanOrEqualTo(after + duration + TimeSpan.FromSeconds(5));
+    }
+
+    [TimedFact]
+    public async Task TryBeginProbeAsync_ConcurrentCallsAfterExpiry_OnlyOneWins()
+    {
+        // Regression for PR #126 review F2: when OpenUntil lapses, all workers polling
+        // simultaneously observe an expired circuit and all execute the handler concurrently —
+        // the exact thundering herd a circuit breaker is meant to prevent. The fix is a
+        // half-open probe gate: exactly one worker atomically transitions Open → HalfOpen and
+        // probes the downstream; the others observe HalfOpen and reschedule.
+        var key = "probe-race-" + Guid.NewGuid().ToString("N");
+        var now = DateTime.UtcNow;
+        var ctx = _fixture.CreateContext();
+        ctx.Set<CircuitBreakerState>().Add(new CircuitBreakerState
+        {
+            GroupKey = key,
+            FailureCount = 3,
+            LastFailureAt = now.AddSeconds(-120),
+            OpenUntil = now.AddSeconds(-1),
+            State = CircuitState.Open,
+        });
+        await ctx.SaveChangesAsync();
+
+        var scopeFactory = CreateStoreScopeFactory();
+        var tasks = Enumerable.Range(0, 10).Select(_ =>
+        {
+            var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory);
+
+            return store.TryBeginProbeAsync(key, now, CancellationToken.None);
+        }).ToArray();
+
+        var results = await Task.WhenAll(tasks);
+
+        results.Count(x => x).ShouldBe(1);
+
+        var readCtx = _fixture.CreateContext();
+        var state = await readCtx.Set<CircuitBreakerState>()
+            .Where(x => x.GroupKey == key)
+            .FirstAsync(CancellationToken.None);
+        state.State.ShouldBe(CircuitState.HalfOpen);
+    }
+
+    [TimedFact]
+    public async Task TryBeginProbeAsync_WhenOpenUntilNotElapsed_ReturnsFalse()
+    {
+        var key = "probe-early-" + Guid.NewGuid().ToString("N");
+        var now = DateTime.UtcNow;
+        var ctx = _fixture.CreateContext();
+        ctx.Set<CircuitBreakerState>().Add(new CircuitBreakerState
+        {
+            GroupKey = key,
+            FailureCount = 3,
+            LastFailureAt = now,
+            OpenUntil = now.AddMinutes(1),
+            State = CircuitState.Open,
+        });
+        await ctx.SaveChangesAsync();
+
+        var scopeFactory = CreateStoreScopeFactory();
+        var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory);
+
+        var won = await store.TryBeginProbeAsync(key, now, CancellationToken.None);
+
+        won.ShouldBeFalse();
+
+        var readCtx = _fixture.CreateContext();
+        var state = await readCtx.Set<CircuitBreakerState>()
+            .Where(x => x.GroupKey == key)
+            .FirstAsync(CancellationToken.None);
+        state.State.ShouldBe(CircuitState.Open);
+    }
+
+    [TimedFact]
+    public async Task TryBeginProbeAsync_WhenAlreadyHalfOpen_ReturnsFalse()
+    {
+        var key = "probe-duplicate-" + Guid.NewGuid().ToString("N");
+        var now = DateTime.UtcNow;
+        var ctx = _fixture.CreateContext();
+        ctx.Set<CircuitBreakerState>().Add(new CircuitBreakerState
+        {
+            GroupKey = key,
+            FailureCount = 3,
+            LastFailureAt = now.AddSeconds(-120),
+            OpenUntil = now.AddSeconds(-1),
+            State = CircuitState.HalfOpen,
+        });
+        await ctx.SaveChangesAsync();
+
+        var scopeFactory = CreateStoreScopeFactory();
+        var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory);
+
+        var won = await store.TryBeginProbeAsync(key, now, CancellationToken.None);
+
+        won.ShouldBeFalse();
+    }
+
     private IServiceScopeFactory CreateStoreScopeFactory()
     {
         var services = new ServiceCollection();

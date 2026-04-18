@@ -86,6 +86,13 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     public TimeSpan CancellationCheckInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
+    /// How often the job monitor drains buffered handler logs into the JobLog table.
+    /// Lower values surface dashboard logs faster at the cost of more DB writes; tests
+    /// may tune this down to avoid multi-second sleeps.
+    /// </summary>
+    public TimeSpan LogFlushInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
     /// How long a job can go without a keep-alive refresh before being considered stale and requeued.
     /// Workers refresh keep-alive every InvisibilityTimeout / 5 during execution.
     /// </summary>

@@ -79,7 +79,13 @@ public class JoblyDispatcher<TContext> : BackgroundService
                     continue;
                 }
 
-                currentDelay = floor;
+                if (result == FetchResult.Fetched)
+                {
+                    // Real work happened — reset the idle backoff. ChannelFull is not evidence
+                    // of work done (workers are saturated), so leave currentDelay alone; the
+                    // 10ms wait inside FetchAndDistribute is the channel-full throttle.
+                    currentDelay = floor;
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -87,9 +93,11 @@ public class JoblyDispatcher<TContext> : BackgroundService
             }
             catch (Exception ex)
             {
+                // Exception is a transient signal, not an idle-queue signal — do not compound
+                // the polling backoff. A single floor delay keeps the dispatcher responsive
+                // after recovery instead of sitting at MaxPollingInterval for 30s.
                 _logger.LogError(ex, "Dispatcher fetch failed");
-                currentDelay = PollingBackoff.Next(currentDelay, floor, max, factor);
-                await Task.Delay(currentDelay, stoppingToken);
+                await Task.Delay(floor, stoppingToken);
             }
         }
 
@@ -144,8 +152,9 @@ public class JoblyDispatcher<TContext> : BackgroundService
             });
         }
 
-        // Note: mutex check for dispatcher mode happens in JoblyDispatcherWorker.ProcessJob
-        // via distributed lock, not here in the batch fetch.
+        // Mutex enforcement is not done here. MutexPipelineBehavior (registered via
+        // AddJoblyMutex) runs inside the handler pipeline in JoblyDispatcherWorker.ExecuteJob
+        // and short-circuits to Deleted via IJobContext.Outcome if the concurrency key is held.
         await context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 

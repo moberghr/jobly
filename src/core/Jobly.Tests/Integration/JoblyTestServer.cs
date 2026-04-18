@@ -131,6 +131,17 @@ public class JoblyTestServer : IAsyncDisposable
                     config.MessageRoutingInterval = TimeSpan.FromMilliseconds(500);
                     config.InvisibilityTimeout = TimeSpan.FromMinutes(1);
                     config.HealthCheckInterval = TimeSpan.FromMilliseconds(200);
+                    config.LogFlushInterval = TimeSpan.FromMilliseconds(100);
+                    // Disable idle-polling backoff in tests: workers must pick up a new job
+                    // within PollingInterval, not up to MaxPollingInterval (30s default).
+                    // Without this, the first job enqueued after an idle period waits for
+                    // the exponentially-grown sleep to expire.
+                    config.MaxPollingInterval = TimeSpan.FromMilliseconds(100);
+                    config.PollingIntervalFactor = 1.0;
+                    // Run stale-recovery fast so crash-recovery tests don't need multi-second
+                    // waits. Production default is 30s; that's fine for real servers but forces
+                    // tests to either wait or reach deep into StaleJobRecoveryTask internals.
+                    config.StaleJobRecoveryInterval = TimeSpan.FromMilliseconds(200);
                     config.UseDispatcher = false;
 
                     configure?.Invoke(config);
@@ -201,7 +212,12 @@ public class JoblyTestServer : IAsyncDisposable
 
     public async Task WaitForJobState(Guid jobId, State state, TimeSpan? timeout = null)
     {
-        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));
+        // Default 5s — with idle backoff disabled (see JoblyTestServer.StartAsync), worker
+        // pickup is bounded by PollingInterval (100ms). Any wait beyond 5s indicates a real
+        // bug, not "needs more time". Tests that exercise slower pipelines (retries with
+        // configured delays, stale recovery) pass an explicit larger timeout.
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(5);
+        var deadline = DateTime.UtcNow + effectiveTimeout;
         while (DateTime.UtcNow < deadline)
         {
             var currentState = await CreateContext().Set<Job>()
@@ -222,12 +238,12 @@ public class JoblyTestServer : IAsyncDisposable
             .Select(x => x.CurrentState)
             .FirstOrDefaultAsync();
 
-        throw new TimeoutException($"Job {jobId} did not reach state {state} within {timeout ?? TimeSpan.FromSeconds(10)}. Current state: {finalState}");
+        throw new TimeoutException($"Job {jobId} did not reach state {state} within {effectiveTimeout}. Current state: {finalState}");
     }
 
     public async Task WaitForJobLog(Guid jobId, string eventType, TimeSpan? timeout = null)
     {
-        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
         while (DateTime.UtcNow < deadline)
         {
             var hasLog = await CreateContext().Set<JobLog>()

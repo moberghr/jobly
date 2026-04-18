@@ -50,12 +50,23 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
         // Act
         await Server.WaitForCompletion(TimeSpan.FromSeconds(45));
 
-        // Assert — all jobs reach Completed, and one Completed JobLog exists per job
+        // Assert — all jobs reach Completed, and one Completed JobLog exists per job.
+        // Per-row terminal-state fields must also match non-dispatcher mode: no worker
+        // ownership left, no keep-alive, no lingering cancellation flag, ExpireAt set.
         var ctx = Server.CreateContext();
         var completedCount = await ctx.Set<Job>()
             .Where(j => j.Kind == JobKind.Job && j.CurrentState == State.Completed)
             .CountAsync();
         completedCount.ShouldBe(jobCount);
+
+        var jobs = await ctx.Set<Job>()
+            .Where(j => j.Kind == JobKind.Job)
+            .AsNoTracking()
+            .ToListAsync();
+        jobs.ShouldAllBe(j => j.CurrentWorkerId == null);
+        jobs.ShouldAllBe(j => j.LastKeepAlive == null);
+        jobs.ShouldAllBe(j => j.CancellationMode == CancellationMode.None);
+        jobs.ShouldAllBe(j => j.ExpireAt != null);
 
         var completedLogs = await ctx.Set<JobLog>()
             .Where(l => l.EventType == "Completed")

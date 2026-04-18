@@ -6,6 +6,7 @@ if (args.Length > 0 && string.Equals(args[0], "stress", StringComparison.Ordinal
     var workers = 10;
     var jobsPerRound = 10_000;
     var rounds = 10;
+    var useDispatcher = false;
 
     for (var i = 1; i < args.Length; i++)
     {
@@ -21,9 +22,13 @@ if (args.Length > 0 && string.Equals(args[0], "stress", StringComparison.Ordinal
         {
             rounds = int.Parse(args[i]["--rounds=".Length..]);
         }
+        else if (string.Equals(args[i], "--dispatcher", StringComparison.OrdinalIgnoreCase))
+        {
+            useDispatcher = true;
+        }
     }
 
-    await MemoryStressTest.RunAsync(workers, jobsPerRound, rounds);
+    await MemoryStressTest.RunAsync(workers, jobsPerRound, rounds, useDispatcher);
 }
 else
 {

@@ -46,8 +46,9 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
         // Wait for parent to fail
         await Server.WaitForJobState(parentId, State.Failed, timeout: TimeSpan.FromSeconds(15));
 
-        // Give orchestration time to run, then verify child stays Awaiting
-        await Task.Delay(2000);
+        // Give orchestration a few ticks (100ms interval in the test server) to confirm the
+        // child is not activated. 500ms covers ~5 passes without stalling the test for 2s.
+        await Task.Delay(500);
 
         var ctx = Server.CreateContext();
 

@@ -36,19 +36,39 @@ public class CircuitBreakerPipelineBehavior<TRequest, TResponse> : IPipelineBeha
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var state = await _store.GetAsync(groupKey, cancellationToken);
-        if (state?.OpenUntil is { } openUntil && openUntil > now)
+
+        // HalfOpen: another worker is already probing. Reschedule; do not run the handler.
+        if (state?.State == CircuitState.HalfOpen)
         {
-            var jitter = attr?.GetResetJitter(options) ?? options.ResetJitter;
-            var jitterMs = (int)jitter.TotalMilliseconds;
-            var delayMs = jitterMs > 0 ? Random.Shared.Next(0, jitterMs + 1) : 0;
-            _jobContext.Outcome = new JobOutcome
-            {
-                State = State.Enqueued,
-                ScheduleTime = openUntil.AddMilliseconds(delayMs),
-                LogMessage = $"Rescheduled due to open circuit breaker '{groupKey}'",
-            };
+            _jobContext.Outcome = BuildReschedule(now, attr, options, groupKey, "probe-in-progress");
 
             return default!;
+        }
+
+        // Open, not expired: reschedule until OpenUntil. Gate on OpenUntil rather than
+        // State so that rows written before the State column was introduced still behave
+        // correctly (State defaults to Closed for those rows).
+        if (state?.OpenUntil is { } openUntil && openUntil > now)
+        {
+            _jobContext.Outcome = BuildReschedule(openUntil, attr, options, groupKey, "open");
+
+            return default!;
+        }
+
+        // Open but expired: race for the HalfOpen probe slot. Only State == Open rows
+        // participate — pre-column rows that happen to have OpenUntil in the past are
+        // treated as closed (the implicit healing window has passed).
+        if (state?.State == CircuitState.Open && state.OpenUntil is { } expired && expired <= now)
+        {
+            var probeWon = await _store.TryBeginProbeAsync(groupKey, now, cancellationToken);
+            if (!probeWon)
+            {
+                _jobContext.Outcome = BuildReschedule(now, attr, options, groupKey, "probe-lost");
+
+                return default!;
+            }
+
+            // We won — fall through and execute the handler as the recovery probe.
         }
 
         try
@@ -57,8 +77,15 @@ public class CircuitBreakerPipelineBehavior<TRequest, TResponse> : IPipelineBeha
 
             // Only reset on a real handler success. If another behavior (e.g. Mutex) set an Outcome,
             // the handler didn't actually complete — treat as a non-event for the circuit counter.
-            // state is a pre-execution snapshot: if a concurrent worker incremented FailureCount during
-            // next(), our snapshot may show 0 and we skip the reset. The next clean success corrects it.
+            // state is a pre-execution snapshot. Two acknowledged skews:
+            //   1. Concurrent failure during handler execution: if another worker incremented
+            //      FailureCount while next() was running, our snapshot may still read 0 → skip
+            //      reset. The next clean success corrects it.
+            //   2. Probe-winner reset after a concurrent failure: snapshot shows Open with
+            //      FailureCount > 0, handler succeeds, ResetAsync fires. A concurrent failure
+            //      recorded during the probe's handler is WIPED by that reset. Tolerated: the
+            //      probe succeeded, so treating the circuit as healthy is acceptable; a fresh
+            //      failure on the next request will re-open the circuit.
             if (_jobContext.Outcome is null && state?.FailureCount > 0)
             {
                 await _store.ResetAsync(groupKey, cancellationToken);
@@ -79,6 +106,20 @@ public class CircuitBreakerPipelineBehavior<TRequest, TResponse> : IPipelineBeha
 
             throw;
         }
+    }
+
+    private static JobOutcome BuildReschedule(DateTime baseTime, CircuitBreakerAttribute? attr, CircuitBreakerOptions options, string groupKey, string reason)
+    {
+        var jitter = attr?.GetResetJitter(options) ?? options.ResetJitter;
+        var jitterMs = (int)jitter.TotalMilliseconds;
+        var delayMs = jitterMs > 0 ? Random.Shared.Next(0, jitterMs + 1) : 0;
+
+        return new JobOutcome
+        {
+            State = State.Enqueued,
+            ScheduleTime = baseTime.AddMilliseconds(delayMs),
+            LogMessage = $"Rescheduled due to circuit breaker '{groupKey}' ({reason})",
+        };
     }
 
     private CircuitBreakerAttribute? GetCircuitBreakerAttribute()

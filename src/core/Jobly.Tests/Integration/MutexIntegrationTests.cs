@@ -33,8 +33,7 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
         var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("test-mutex"));
         await publisher2.SaveChangesAsync();
 
-        // Wait for job2 to be picked up and cancelled
-        await Server.WaitForJobState(job2Id, State.Deleted, timeout: TimeSpan.FromSeconds(10));
+        await Server.WaitForJobState(job2Id, State.Deleted);
 
         // Verify job2 was cancelled due to mutex
         var logs = await Server.GetJobLogs(job2Id);

@@ -24,7 +24,8 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
         await Server.WaitForJobState(jobId, State.Processing);
 
         // Wait for monitor to flush logs (ticks every 1s)
-        await Task.Delay(2000);
+        // JoblyTestServer uses LogFlushInterval = 100ms, so 300ms is enough to see >= 2 flushes.
+        await Task.Delay(300);
 
         // Verify logs are in DB while job is still processing
         var ctx = Server.CreateContext();
@@ -56,7 +57,8 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
 
         await Server.WaitForJobState(jobId, State.Processing);
 
-        await Task.Delay(2000);
+        // JoblyTestServer uses LogFlushInterval = 100ms, so 300ms is enough to see >= 2 flushes.
+        await Task.Delay(300);
 
         var ctx = Server.CreateContext();
         var handlerLogs = await ctx.Set<JobLog>()

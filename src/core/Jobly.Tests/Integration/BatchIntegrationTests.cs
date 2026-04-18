@@ -165,8 +165,10 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         // Wait for batch to fail
         await Server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(15));
 
-        // Give orchestration time to run, then verify continuation stays Awaiting
-        await Task.Delay(2000);
+        // Give orchestration a few ticks (100ms interval in the test server) to confirm the
+        // continuation is not activated. 500ms covers ~5 passes — more than enough to catch
+        // an erroneous activation without adding 2s to the test.
+        await Task.Delay(500);
 
         var ctx = Server.CreateContext();
 

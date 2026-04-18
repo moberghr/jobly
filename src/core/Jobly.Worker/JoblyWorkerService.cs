@@ -364,7 +364,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
     private async Task RunJobMonitor(Guid jobId, JobLogCollector logCollector, CancellationTokenSource jobCts, CancellationToken stoppingToken)
     {
-        var logFlushInterval = TimeSpan.FromSeconds(1);
+        var logFlushInterval = _configuration.LogFlushInterval;
         var cancellationCheckInterval = _configuration.CancellationCheckInterval;
         var tickInterval = logFlushInterval < cancellationCheckInterval ? logFlushInterval : cancellationCheckInterval;
         var timeSinceLastCheck = TimeSpan.Zero;
@@ -483,6 +483,14 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             State.Deleted => "Deleted",
             _ => state.ToString(),
         };
+
+        // Retries apply jitter to ScheduleTime; recording it here so operators debugging a
+        // retry storm can see the actual delay applied (otherwise the factor is invisible).
+        if (state == State.Enqueued)
+        {
+            var scheduledAt = job.ScheduleTime.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
+            logMessage = $"{logMessage} (next attempt scheduled: {scheduledAt})";
+        }
 
         context.Set<JobLog>().Add(new JobLog
         {

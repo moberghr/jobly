@@ -737,6 +737,52 @@ public abstract class RetryTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
+    public async Task GetAndProcessJob_RetryRequeued_JobLogRecordsScheduledTime()
+    {
+        // Regression for PR #124 review F4: jitter may randomize the retry delay by ±100%
+        // of the configured value, but the "Requeued" JobLog entry did not include the
+        // resulting ScheduleTime. An operator reading the dashboard after a retry storm
+        // cannot confirm how jitter actually affected the rescheduling without this data.
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
+            Message = JsonSerializer.Serialize(new ThrowExceptionRequest()),
+            CreateTime = now,
+            ScheduleTime = now,
+            Queue = "default",
+        });
+        await ctx.SaveChangesAsync();
+
+        var worker = CreateWorker(maxRetries: 3, delays: [30]);
+
+        await worker.GetAndProcessJob(CancellationToken.None);
+
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var log = await readCtx.Set<JobLog>()
+            .Where(x => x.JobId == jobId)
+            .Where(x => x.EventType == "Requeued")
+            .FirstOrDefaultAsync();
+
+        log.ShouldNotBeNull();
+        // Assert the log contains the scheduled-at marker and a parseable timestamp close to
+        // the persisted ScheduleTime. Exact string equality is brittle across DB backends
+        // (Postgres truncates to microseconds while .NET DateTime has 100-ns precision).
+        log.Message.ShouldContain("next attempt scheduled:");
+        var marker = "next attempt scheduled: ";
+        var startIndex = log.Message.IndexOf(marker, StringComparison.Ordinal) + marker.Length;
+        var endIndex = log.Message.IndexOf(')', startIndex);
+        var logged = DateTime.Parse(log.Message[startIndex..endIndex], System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind);
+        (logged - job.ScheduleTime).Duration().ShouldBeLessThan(TimeSpan.FromSeconds(1));
+    }
+
+    [TimedFact]
     public async Task GetAndProcessJob_WithJitterFactorAboveOne_ClampedToOne()
     {
         // Arrange
@@ -763,10 +809,12 @@ public abstract class RetryTestsBase : IAsyncLifetime
         await worker.GetAndProcessJob(CancellationToken.None);
         var after = DateTime.UtcNow;
 
-        // Assert — clamped to 1.0, so ScheduleTime ∈ [now, now + 200s]
+        // Assert — clamped to 1.0, so ScheduleTime ∈ [now, now + 200s]. Lower bound is
+        // `before` (not `before.AddSeconds(-1)`): jitter must never produce a delay so
+        // negative that the schedule lands in the past, otherwise the job runs immediately.
         var readCtx = _fixture.CreateContext();
         var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
-        job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(-1));
+        job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(before);
         job.ScheduleTime.ShouldBeLessThanOrEqualTo(after.AddSeconds(200).AddSeconds(1));
     }
 

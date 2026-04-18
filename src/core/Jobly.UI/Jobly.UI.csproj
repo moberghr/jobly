@@ -22,11 +22,7 @@
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(Configuration)'!='Debug'">
-		<PackageReference Include="Moberg.Jobly.Core" Version="$(PackageVersion)" />
-	</ItemGroup>
-
-	<ItemGroup Condition="'$(Configuration)'=='Debug'">
+	<ItemGroup>
 		<ProjectReference Include="..\Jobly.Core\Jobly.Core.csproj" />
 	</ItemGroup>
 

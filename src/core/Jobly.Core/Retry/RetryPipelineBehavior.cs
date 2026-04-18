@@ -49,11 +49,16 @@ public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
 
                     if (jitterFactor > 0)
                     {
+                        // Random.Shared.NextDouble() returns [0.0, 1.0) so r ∈ [-1.0, +1.0).
+                        // With jitterFactor ∈ [0, 1] (clamped above) and non-negative
+                        // baseDelaySeconds, the result stays in [0, 2 * baseDelaySeconds).
                         var r = (Random.Shared.NextDouble() * 2.0) - 1.0;
                         baseDelaySeconds *= 1.0 + (jitterFactor * r);
                     }
 
-                    // Defensive: guards against a future clamp loosening producing a negative delay.
+                    // Defensive floor: a user-supplied negative delay (or a pathological
+                    // RetryOptions constructed directly, bypassing Math.Clamp) would put
+                    // ScheduleTime in the past and run the retry immediately.
                     baseDelaySeconds = Math.Max(0.0, baseDelaySeconds);
                     scheduleTime = now + TimeSpan.FromSeconds(baseDelaySeconds);
                 }

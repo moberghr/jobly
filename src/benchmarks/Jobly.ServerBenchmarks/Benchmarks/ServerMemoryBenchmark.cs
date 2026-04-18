@@ -22,11 +22,14 @@ public class ServerMemoryBenchmark
     [Params(10_000)]
     public int JobCount { get; set; }
 
+    [Params(false, true)]
+    public bool UseDispatcher { get; set; }
+
     [GlobalSetup]
     public async Task Setup()
     {
         _fixture = new PostgresServerFixture();
-        await _fixture.InitializeAsync(workerCount: 10);
+        await _fixture.InitializeAsync(workerCount: 10, useDispatcher: UseDispatcher);
 
         // Warmup: process some jobs to prime JIT, type caches, connection pool
         var publisher = _fixture.CreatePublisher();

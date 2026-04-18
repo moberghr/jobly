@@ -240,8 +240,8 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("multi-server-mutex"));
         await publisher2.SaveChangesAsync();
 
-        // Job2 should be deleted due to mutex (regardless of which server picks it up)
-        await Server1.WaitForJobState(job2Id, State.Deleted, timeout: TimeSpan.FromSeconds(10));
+        // Job2 should be deleted due to mutex (regardless of which server picks it up).
+        await Server1.WaitForJobState(job2Id, State.Deleted);
 
         // Verify the mutex violation was logged
         var logs = await Server1.GetJobLogs(job2Id);
