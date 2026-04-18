@@ -1,0 +1,29 @@
+<Project>
+
+  <!-- Library-only settings that don't need to land during props phase.
+       (GenerateDocumentationFile + symbols + PublishRepositoryUrl live in props because
+       the Sdk props phase reads GenerateDocumentationFile to auto-derive DocumentationFile.)
+       - AssemblyVersion pinned to major.0.0.0 for binding stability across patch bumps
+       - TreatWarningsAsErrors so regressions are caught at build time -->
+  <PropertyGroup Condition="'$(PackageId)' != ''">
+    <AssemblyVersion Condition="'$(Version)' != ''">$([System.Version]::Parse('$(Version.Split(`-`)[0])').Major).0.0.0</AssemblyVersion>
+    <FileVersion Condition="'$(Version)' != ''">$([System.Version]::Parse('$(Version.Split(`-`)[0])').Major).$([System.Version]::Parse('$(Version.Split(`-`)[0])').Minor).$([System.Version]::Parse('$(Version.Split(`-`)[0])').Build).0</FileVersion>
+    <InformationalVersion Condition="'$(Version)' != ''">$(Version)</InformationalVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Warnings currently emitted by source-generator output and a handful of in-tree spots.
+         Track these in follow-up issues; keeping them suppressed here avoids bundling
+         unrelated cleanup with the best-practices scope.
+         CS1591: missing XML doc comment for publicly visible type or member.
+         CS8767/CS8601/CS8603: nullability mismatches in source-generated proxy types.
+         S2743/S4487: in-tree stylistic warnings pre-dating this setup.
+         IDE0028/IDE0052: style rules that need more invasive refactoring to silence.
+         MA0008: StructLayoutAttribute hint on a small internal-ish record struct. -->
+    <NoWarn>$(NoWarn);CS1591;CS8767;CS8601;CS8603;S2743;S4487;IDE0028;IDE0052;MA0008</NoWarn>
+  </PropertyGroup>
+
+  <!-- Source Link for library packages so consumers can step into Jobly source while debugging. -->
+  <ItemGroup Condition="'$(PackageId)' != ''">
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

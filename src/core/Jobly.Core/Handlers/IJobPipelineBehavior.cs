@@ -8,7 +8,7 @@ public delegate Task<TResponse> RequestHandlerDelegate<TRequest, TResponse>(TReq
 
 /// <summary>
 /// Pipeline behavior that wraps handler execution for all request types (IJob, IMessage, IRequest).
-/// Call <paramref name="next"/> to continue the pipeline.
+/// Call the <c>next</c> delegate to continue the pipeline.
 /// </summary>
 public interface IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>

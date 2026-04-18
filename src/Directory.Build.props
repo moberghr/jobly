@@ -4,6 +4,13 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
+  <!-- NuGet audit + deterministic build flags (applied everywhere) -->
+  <PropertyGroup>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+  </PropertyGroup>
+
   <!-- Shared NuGet package metadata -->
   <PropertyGroup>
     <Authors>Moberg</Authors>
@@ -14,6 +21,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>jobs;background;queue;mediator;scheduling;dotnet</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>See https://moberghr.github.io/jobly/docs/releases for full release notes.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,4 +35,16 @@
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
+
+  <!-- Library-only settings. Gated on MSBuildProjectName rather than PackageId because the
+       Sdk props phase auto-derives DocumentationFile from GenerateDocumentationFile during
+       props evaluation — PackageId isn't set yet at that point, but MSBuildProjectName is.
+       Settings that don't need to land during props phase (TreatWarningsAsErrors, Source Link
+       package reference, assembly-version strategy) live in Directory.Build.targets. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Jobly.Core' Or '$(MSBuildProjectName)' == 'Jobly.Worker' Or '$(MSBuildProjectName)' == 'Jobly.UI'">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+  </PropertyGroup>
 </Project>

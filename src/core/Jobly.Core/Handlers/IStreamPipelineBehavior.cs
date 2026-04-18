@@ -8,7 +8,7 @@ public delegate IAsyncEnumerable<TResponse> StreamHandlerDelegate<in TRequest, o
 
 /// <summary>
 /// Pipeline behavior that wraps handler execution for stream request types.
-/// Call <paramref name="next"/> to continue the pipeline.
+/// Call the <c>next</c> delegate to continue the pipeline.
 /// </summary>
 public interface IStreamPipelineBehavior<TRequest, TResponse>
     where TRequest : IStreamRequest<TResponse>

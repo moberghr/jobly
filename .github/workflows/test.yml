@@ -1,0 +1,55 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '10.0'
+
+jobs:
+  test:
+    name: ${{ matrix.database }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - database: PostgreSQL
+            filter: --filter-not-trait "Category=SqlServer"
+          - database: SQL Server
+            filter: --filter-trait "Category=SqlServer"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Node.js (for Jobly.UI npm build)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/ui/package-lock.json
+
+      - name: Install UI dependencies
+        working-directory: src/ui
+        run: npm ci
+
+      - name: Restore
+        working-directory: src
+        run: dotnet restore Jobly.slnx
+
+      - name: Build
+        working-directory: src
+        run: dotnet build Jobly.slnx --no-restore --configuration Debug
+
+      - name: Test (${{ matrix.database }})
+        working-directory: src
+        run: dotnet test core/Jobly.Tests/Jobly.Tests.csproj --no-build --configuration Debug -- ${{ matrix.filter }}
