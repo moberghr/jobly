@@ -1,5 +1,4 @@
 using Jobly.Core;
-using Jobly.Core.Handlers;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;

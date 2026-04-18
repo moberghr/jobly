@@ -9,6 +9,9 @@ on:
 
 env:
   DOTNET_VERSION: '10.0'
+  # Opt into Node.js 24 for JS-based actions (setup-dotnet, setup-node, checkout).
+  # Node 20 is deprecated on GitHub Actions runners from 2026-06-02.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   test:
@@ -36,7 +39,7 @@ jobs:
       - name: Setup Node.js (for Jobly.UI npm build)
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: src/ui/package-lock.json
 

@@ -4,11 +4,25 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
-  <!-- NuGet audit + deterministic build flags (applied everywhere) -->
+  <!-- Build hygiene: NuGet audit, deterministic CI builds, warnings-as-errors everywhere
+       (tests and benchmarks included). Current emission set is NoWarn-ed below so only
+       NEW warning categories fail the build — existing ones can be cleaned up gradually. -->
   <PropertyGroup>
     <NuGetAuditMode>all</NuGetAuditMode>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Compiler warnings currently emitted: -->
+    <!--   CS0105 duplicate using, CS1591 missing XML doc (libraries), -->
+    <!--   CS8601/CS8603/CS8767 nullability mismatches in generated code -->
+    <!-- StyleCop: SA1107 SA1122 SA1210 SA1508 SA1515 SA1516 — layout rules not strictly enforced -->
+    <!-- Roslynator: RCS1118 mark-as-const -->
+    <!-- Sonar: S1215 (GC.Collect, intentional in benchmarks), S1481 unused local, S2743 static on generic, S3993 attribute design, S4487 unread field -->
+    <!-- Meziantou: MA0006 string.Equals, MA0008 StructLayout, MA0042 blocking in async -->
+    <!-- FxCop: CA1036 operator overloads, CA1725 param name match, CA1861 constant arrays -->
+    <!-- IDE: IDE0028 collection init, IDE0052 unread field -->
+    <!-- xUnit: xUnit3003 FactAttribute ctor source info -->
+    <NoWarn>$(NoWarn);CS0105;CS1591;CS8601;CS8603;CS8767;SA1107;SA1122;SA1210;SA1508;SA1515;SA1516;RCS1118;S1215;S1481;S2743;S3993;S4487;MA0006;MA0008;MA0042;CA1036;CA1725;CA1861;IDE0028;IDE0052;xUnit3003</NoWarn>
   </PropertyGroup>
 
   <!-- Shared NuGet package metadata -->

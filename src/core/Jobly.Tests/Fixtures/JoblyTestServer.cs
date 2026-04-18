@@ -13,6 +13,7 @@ using Jobly.Worker;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Jobly.Tests.Fixtures;
 
@@ -101,6 +102,13 @@ public class JoblyTestServer : IAsyncDisposable
         await tempCtx.DisposeAsync();
 
         var host = Host.CreateDefaultBuilder()
+            .ConfigureLogging(logging =>
+            {
+                // EF Core logs every command at Information level — fine in an app, but
+                // catastrophic in CI where every test run dumps thousands of SQL lines.
+                // Filter just the DB layer to Warning; Jobly's own logs stay at default.
+                logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+            })
             .ConfigureServices(services =>
             {
                 services.AddDbContext<TestContext>(options =>
