@@ -139,9 +139,9 @@ public class JoblyTestServer : IAsyncDisposable
                     config.MaxPollingInterval = TimeSpan.FromMilliseconds(100);
                     config.PollingIntervalFactor = 1.0;
                     // Run stale-recovery fast so crash-recovery tests don't need multi-second
-                    // waits. Production default is 30s; that's fine for real servers but forces
-                    // tests to either wait or reach deep into StaleJobRecoveryTask internals.
-                    config.StaleJobRecoveryInterval = TimeSpan.FromMilliseconds(200);
+                    // waits. Production default is 30s; 1s is 30x faster without being so
+                    // aggressive that it races worker keep-alive refreshes under two-server load.
+                    config.StaleJobRecoveryInterval = TimeSpan.FromSeconds(1);
                     config.UseDispatcher = false;
 
                     configure?.Invoke(config);

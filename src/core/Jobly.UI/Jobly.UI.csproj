@@ -13,7 +13,12 @@
 		<EmbeddedResource Include="Extensions/Retry/dist/**/*" />
 	</ItemGroup>
 
-	<!-- Rebuild React UI before embedding -->
+	<!-- Rebuild React UI before embedding. Auto-bootstraps node_modules on first build
+	     so checking out the repo + building doesn't require a separate npm install step. -->
+	<Target Name="InstallUI" BeforeTargets="BuildUI" Condition="'$(BuildingInsideVisualStudio)' != 'true' And !Exists('$(ProjectDir)..\..\ui\node_modules')">
+		<Exec Command="npm install" WorkingDirectory="$(ProjectDir)..\..\ui" />
+	</Target>
+
 	<Target Name="BuildUI" BeforeTargets="BeforeBuild" Condition="'$(BuildingInsideVisualStudio)' != 'true'">
 		<Exec Command="npm run build" WorkingDirectory="$(ProjectDir)..\..\ui" />
 	</Target>
