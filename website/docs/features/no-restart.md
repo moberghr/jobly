@@ -47,6 +47,8 @@ public class RegenerateThumbnail : IJob { /* idempotent */ }
 
 Applying both `[NoRestart]` and `[Restart]` to the same class throws `InvalidOperationException` at publish time.
 
+**Inheritance**: both attributes inherit by default (`Inherited = true`). A base class decorated with `[NoRestart]` applies to every derived concrete job, so you can declare one policy on `PaymentJobBase` and have all payment jobs opt out without repeating the attribute. A derived class with its own `[NoRestart]` or `[Restart]` overrides any attribute on the base — the closest direct declaration wins.
+
 ### `.WithRestart(bool)` fluent extension
 
 Per-publish override — wins over attributes and over the global default:

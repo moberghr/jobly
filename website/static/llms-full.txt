@@ -297,6 +297,41 @@ await publisher.Enqueue(
 
 If a worker picks up a job whose mutex is already held by another processing job, the new job is cancelled automatically. Jobs without a mutex skip the check entirely (zero overhead).
 
+### NoRestart (stale-recovery opt-out)
+
+Opt-in addon: `services.AddJoblyNoRestart()`. Lets specific job types stay `Failed` on worker crash instead of being auto-requeued by `StaleJobRecoveryTask`.
+
+```csharp
+[NoRestart]
+public class ChargeCard : IJob { }
+```
+
+Override chain (first non-null wins): per-publish `.WithRestart(bool)` > `[NoRestart]`/`[Restart]` attribute (inherits through base classes, with direct-declaration precedence) > global `RestartStaleJobsByDefault` (default `true`). Use for non-idempotent work: payments, webhooks, outbound notifications.
+
+### Circuit Breaker
+
+Opt-in addon: `services.AddJoblyCircuitBreaker<TContext>()`. Adds a `CircuitBreakerState` entity (migration required). Opens after `Threshold` consecutive failures, stays open for `Duration`, then transitions to **HalfOpen** where an atomic CAS guarantees exactly one worker probes while others reschedule.
+
+```csharp
+services.AddJoblyCircuitBreaker<AppDbContext>(o =>
+{
+    o.Threshold = 5;
+    o.Duration = TimeSpan.FromMinutes(1);
+    o.ResetJitter = TimeSpan.FromSeconds(10);
+});
+
+[CircuitBreaker(Group = "payments-gateway")]
+public class ChargeCard : IJob { }
+```
+
+Jobs rescheduled by an open circuit do NOT increment Retry's `RetriedTimes` — the retry budget is preserved for when the circuit closes.
+
+### Batched Completions (Dispatcher Mode)
+
+When `UseDispatcher = true`, each worker buffers job completions and commits them as a single multi-row transaction. Tune via `CompletionBatchSize` (default `50`) and `CompletionFlushInterval` (default `100ms`). Set `CompletionBatchSize = 1` to opt out.
+
+Poison-entry isolation: a single bad row in a batch of 50 is dropped via recursive split, the other 49 still commit. SIGTERM mid-flush is safe — `FlushAsync()` commits to completion using `CancellationToken.None` internally. Trade-off: at-least-once semantics. Pair with `[NoRestart]` for non-idempotent handlers.
+
 ### JobParameters
 
 For full control, pass a `JobParameters` object:
@@ -718,9 +753,14 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 
     // Handler logging
     options.EnableHandlerLogging = true;                       // false to suppress ILogger capture (default: true)
+    options.LogFlushInterval = TimeSpan.FromSeconds(1);        // How often handler logs drain to DB (default: 1s)
 
     // Dispatcher mode (batch-fetch instead of per-worker polling)
     options.UseDispatcher = false;                             // default: false
+    options.CompletionBatchSize = 50;                          // Dispatcher only. Max completions per flush (default: 50)
+    options.CompletionFlushInterval = TimeSpan.FromMilliseconds(100); // Dispatcher only (default: 100ms)
+    // Stale recovery opt-out default — with NoRestart addon and [NoRestart]/[Restart] attributes, flip per-type
+    options.RestartStaleJobsByDefault = true;                  // false makes stale jobs Failed by default (default: true)
 
     // Cancellation
     options.CancellationCheckInterval = TimeSpan.FromSeconds(5); // default: 5s
