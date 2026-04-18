@@ -414,6 +414,7 @@ public static class ServiceConfiguration
         state.Property(p => p.FailureCount);
         state.Property(p => p.OpenUntil);
         state.Property(p => p.LastFailureAt);
+        state.Property(p => p.State).HasConversion<int>();
 
         state.HasIndex(p => p.OpenUntil);
 

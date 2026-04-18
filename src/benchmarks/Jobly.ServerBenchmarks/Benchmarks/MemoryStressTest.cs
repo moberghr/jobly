@@ -13,16 +13,16 @@ namespace Jobly.ServerBenchmarks.Benchmarks;
 /// </summary>
 public static class MemoryStressTest
 {
-    public static async Task RunAsync(int workerCount = 10, int jobsPerRound = 10_000, int rounds = 10)
+    public static async Task RunAsync(int workerCount = 10, int jobsPerRound = 10_000, int rounds = 10, bool useDispatcher = false)
     {
         var totalJobs = jobsPerRound * rounds;
         Console.WriteLine($"=== Jobly Memory Stress Test ===");
-        Console.WriteLine($"Workers: {workerCount}, Jobs per round: {jobsPerRound:N0}, Rounds: {rounds}, Total: {totalJobs:N0}");
+        Console.WriteLine($"Workers: {workerCount}, Jobs per round: {jobsPerRound:N0}, Rounds: {rounds}, Total: {totalJobs:N0}, Dispatcher: {useDispatcher}");
         Console.WriteLine();
 
         var fixture = new PostgresServerFixture();
         Console.Write("Starting PostgreSQL container... ");
-        await fixture.InitializeAsync(workerCount);
+        await fixture.InitializeAsync(workerCount, useDispatcher);
         Console.WriteLine("ready.");
 
         // Warmup

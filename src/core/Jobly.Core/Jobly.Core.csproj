@@ -15,6 +15,9 @@
 	<ItemGroup>
 		<InternalsVisibleTo Include="Jobly.Worker" />
 		<InternalsVisibleTo Include="Jobly.Tests" />
+		<!-- Benchmarks need access to JobDispatcher to measure the reflection path against
+		     the source-generated one. No production consumer has this grant. -->
+		<InternalsVisibleTo Include="Jobly.Benchmarks" />
 	</ItemGroup>
 
 	<ItemGroup>

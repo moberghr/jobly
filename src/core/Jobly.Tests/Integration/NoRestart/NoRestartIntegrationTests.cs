@@ -1,4 +1,3 @@
-using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
@@ -17,11 +16,23 @@ public abstract class NoRestartIntegrationTestsBase : IntegrationTestBase
     {
     }
 
+    private static string SerializeCanBeRestarted(bool value)
+    {
+        var dict = new Dictionary<string, object>();
+        var meta = MetadataFactory.Create<ICanBeRestartedMetadata>(dict);
+        meta.CanBeRestarted = value;
+
+        return MetadataSerializer.Serialize((Dictionary<string, object>)(object)meta)!;
+    }
+
     [TimedFact(60_000)]
     public async Task GivenStaleNoRestartJob_WhenRecovered_ThenMarkedFailed()
     {
-        var metadata = MetadataSerializer.Serialize(
-            new Dictionary<string, object> { [nameof(ICanBeRestartedMetadata.CanBeRestarted)] = false })!;
+        // Build metadata through the generated proxy so the serialized key matches what
+        // the stale-recovery reader expects. Bypassing MetadataFactory couples the test to
+        // whatever string the generator happens to produce today — a rename would silently
+        // pass here while production breaks.
+        var metadata = SerializeCanBeRestarted(false);
         var staleKeepAlive = DateTime.UtcNow.AddMinutes(-10);
 
         var ctx = Server.CreateContext();
@@ -39,7 +50,7 @@ public abstract class NoRestartIntegrationTestsBase : IntegrationTestBase
         });
         await ctx.SaveChangesAsync();
 
-        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(45));
+        await Server.WaitForJobState(jobId, State.Failed);
 
         var job = await Server.GetJob(jobId);
         job.CurrentState.ShouldBe(State.Failed);
@@ -73,7 +84,7 @@ public abstract class NoRestartIntegrationTestsBase : IntegrationTestBase
                 .SetProperty(p => p.CurrentState, State.Processing)
                 .SetProperty(p => p.LastKeepAlive, DateTime.UtcNow.AddMinutes(-10)));
 
-        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(45));
+        await Server.WaitForJobState(jobId, State.Failed);
 
         var job = await Server.GetJob(jobId);
         job.CurrentState.ShouldBe(State.Failed);

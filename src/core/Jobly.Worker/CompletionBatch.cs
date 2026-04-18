@@ -75,8 +75,14 @@ internal sealed class CompletionBatch<TContext>
     /// the buffer is cleared. On transient failure (non-<see cref="DbUpdateException"/>) the buffer
     /// is already drained — the exception propagates and the orphaned <c>Processing</c> rows are
     /// recovered by <c>StaleJobRecoveryTask</c>.
+    /// <para>
+    /// No cancellation parameter on purpose: once the buffer is drained, cancelling an in-flight
+    /// flush would orphan the drained entries (the split-on-failure recursion makes re-queuing
+    /// them unsound). DB operations run under <see cref="CancellationToken.None"/> so graceful
+    /// shutdown still commits any in-flight batch.
+    /// </para>
     /// </summary>
-    public async Task FlushAsync(CancellationToken cancellationToken)
+    public async Task FlushAsync()
     {
         if (_buffer.Count == 0)
         {
@@ -87,7 +93,7 @@ internal sealed class CompletionBatch<TContext>
         _buffer.Clear();
         _firstEntryTimestamp = null;
 
-        await FlushRangeAsync(pending, 0, pending.Length, cancellationToken);
+        await FlushRangeAsync(pending, 0, pending.Length, CancellationToken.None);
     }
 
     private async Task FlushRangeAsync(PendingCompletion[] entries, int start, int count, CancellationToken cancellationToken)

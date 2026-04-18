@@ -31,22 +31,37 @@ public class JoblyWorker<TContext> : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            if (_pauseStateHolder.IsPaused(_workerGroupId))
+            try
             {
-                currentDelay = floor;
+                if (_pauseStateHolder.IsPaused(_workerGroupId))
+                {
+                    currentDelay = floor;
+                    await Task.Delay(floor, stoppingToken);
+                    continue;
+                }
+
+                var didProcessJob = await _joblyWorkerService.GetAndProcessJob(stoppingToken);
+                if (didProcessJob)
+                {
+                    currentDelay = floor;
+                    continue;
+                }
+
+                currentDelay = PollingBackoff.Next(currentDelay, floor, max, factor);
+                await Task.Delay(currentDelay, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                // Exception is a transient signal, not an idle-queue signal — do not compound
+                // the polling backoff. Sleep a short fixed interval and retry, keeping the
+                // service alive across DB hiccups or handler pipeline faults.
+                _logger.LogError(ex, "Worker fetch failed");
                 await Task.Delay(floor, stoppingToken);
-                continue;
             }
-
-            var didProcessJob = await _joblyWorkerService.GetAndProcessJob(stoppingToken);
-            if (didProcessJob)
-            {
-                currentDelay = floor;
-                continue;
-            }
-
-            currentDelay = PollingBackoff.Next(currentDelay, floor, max, factor);
-            await Task.Delay(currentDelay, stoppingToken);
         }
 
         _logger.LogInformation("Jobly worker is stopping.");

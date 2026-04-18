@@ -85,12 +85,12 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
 
                     if (_batch.IsFull || _batch.IsTimeElapsed)
                     {
-                        await FlushBatchSafely(stoppingToken);
+                        await FlushBatchSafely();
                     }
                 }
 
                 // Idle — drain any buffered completions before suspending on WaitToReadAsync
-                await FlushBatchSafely(stoppingToken);
+                await FlushBatchSafely();
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -105,7 +105,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
 
         try
         {
-            await _batch.FlushAsync(CancellationToken.None);
+            await _batch.FlushAsync();
             OrchestrationTask<TContext>.SignalOrchestrator();
         }
         catch (Exception ex)
@@ -114,7 +114,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         }
     }
 
-    private async Task FlushBatchSafely(CancellationToken cancellationToken)
+    private async Task FlushBatchSafely()
     {
         if (_batch.Count == 0)
         {
@@ -123,7 +123,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
 
         try
         {
-            await _batch.FlushAsync(cancellationToken);
+            await _batch.FlushAsync();
             OrchestrationTask<TContext>.SignalOrchestrator();
         }
         catch (OperationCanceledException)
@@ -410,7 +410,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
 
     private async Task RunJobMonitor(Guid jobId, JobLogCollector logCollector, CancellationTokenSource jobCts, CancellationToken stoppingToken)
     {
-        var logFlushInterval = TimeSpan.FromSeconds(1);
+        var logFlushInterval = _configuration.LogFlushInterval;
         var cancellationCheckInterval = _configuration.CancellationCheckInterval;
         var tickInterval = logFlushInterval < cancellationCheckInterval ? logFlushInterval : cancellationCheckInterval;
         var timeSinceLastCheck = TimeSpan.Zero;
@@ -501,7 +501,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         job.LastKeepAlive = null;
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
-        var hourSuffix = now.ToString("yyyy-MM-dd-HH");
+        var hourSuffix = now.ToString("yyyy-MM-dd-HH", CultureInfo.InvariantCulture);
         var counters = new List<Counter>();
         if (state == State.Completed)
         {
@@ -533,6 +533,14 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             State.Deleted => "Deleted",
             _ => state.ToString(),
         };
+
+        // Retries apply jitter to ScheduleTime; recording it here so operators debugging a
+        // retry storm can see the actual delay applied (otherwise the factor is invisible).
+        if (state == State.Enqueued)
+        {
+            var scheduledAt = job.ScheduleTime.ToString("o", CultureInfo.InvariantCulture);
+            logMessage = $"{logMessage} (next attempt scheduled: {scheduledAt})";
+        }
 
         var finalLog = new JobLog
         {

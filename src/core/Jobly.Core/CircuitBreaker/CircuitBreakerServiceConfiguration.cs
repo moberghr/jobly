@@ -11,13 +11,10 @@ public static class CircuitBreakerServiceConfiguration
         Action<CircuitBreakerOptions>? configure = null)
         where TContext : DbContext
     {
+        services.AddOptions<CircuitBreakerOptions>();
         if (configure != null)
         {
             services.Configure(configure);
-        }
-        else
-        {
-            services.AddOptions<CircuitBreakerOptions>();
         }
 
         // Contribute the CircuitBreakerState entity only when the addon is opted in.

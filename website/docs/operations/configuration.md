@@ -66,6 +66,39 @@ services.AddJoblyMutex();
 
 No options — just register and use `.WithMutex("key")` or `[Mutex("key")]` at publish time. See [Mutex](/docs/features/mutex) for details.
 
+## Circuit Breaker Configuration
+
+Enable the circuit breaker with `AddJoblyCircuitBreaker<TContext>()`:
+
+```csharp
+services.AddJoblyCircuitBreaker<AppDbContext>(options =>
+{
+    options.Threshold = 5;                         // default: 3
+    options.Duration = TimeSpan.FromMinutes(1);    // default: 1 minute
+    options.ResetJitter = TimeSpan.FromSeconds(10); // default: 10s
+});
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `Threshold` | `int` | `3` | Consecutive failures before the circuit opens |
+| `Duration` | `TimeSpan` | `1 minute` | How long the circuit stays open before the half-open probe window |
+| `ResetJitter` | `TimeSpan` | `10 seconds` | Jitter added to each rescheduled `ScheduleTime` so rescheduled jobs don't all hit the downstream at the exact moment the circuit expires |
+
+Per-handler overrides on `[CircuitBreaker]` use `Group`, `Threshold`, `DurationSeconds`, and `ResetJitterSeconds`. The addon adds a `CircuitBreakerState` entity to your DbContext — an EF Core migration is required after enabling it. See [Circuit Breaker](/docs/features/circuit-breaker) for details.
+
+## NoRestart Configuration
+
+Enable the stale-recovery opt-out with `AddJoblyNoRestart()`:
+
+```csharp
+services.AddJoblyNoRestart();
+```
+
+No options. Register it to make `[NoRestart]` / `[Restart]` attributes take effect at publish time. `.WithRestart(bool)` works without the addon. See [NoRestart](/docs/features/no-restart) for details.
+
+The fleet-wide default is controlled by `JoblyWorkerConfiguration.RestartStaleJobsByDefault` (default `true`). Flip to `false` to fail stale jobs on crash unless they explicitly opt in.
+
 ## Worker Configuration (`JoblyWorkerConfiguration`)
 
 Extends `JoblyConfiguration`. Used by the worker side (`AddJoblyWorker<TContext>`):
@@ -150,10 +183,20 @@ Paused workers/groups always poll at the floor (no backoff while paused).
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `UseDispatcher` | `bool` | `false` | When true, uses a batch-fetch dispatcher instead of per-worker polling |
+| `CompletionBatchSize` | `int` | `50` | Dispatcher mode only. Max job completions buffered per worker before an automatic flush |
+| `CompletionFlushInterval` | `TimeSpan` | `100ms` | Dispatcher mode only. Max age of the oldest buffered completion before flush |
 
 By default, each worker polls the database independently for the next job. With `UseDispatcher = true`, a single dispatcher thread batch-fetches jobs and distributes them to workers via an in-memory channel. This reduces database load when running many workers, at the cost of slightly higher latency for the first job in a batch.
 
+In dispatcher mode, each worker also buffers job completions and commits them as a single multi-row transaction — tune `CompletionBatchSize` / `CompletionFlushInterval` or set `CompletionBatchSize = 1` to opt out. See [Batched Completions](/docs/features/batched-completions) for trade-offs.
+
 Use dispatcher mode when you have many workers (20+) and want to reduce database polling pressure. For most setups, the default per-worker polling is simpler and works well.
+
+### Log Flushing
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `LogFlushInterval` | `TimeSpan` | `1 second` | How often the job monitor drains buffered handler `ILogger` output into the JobLog table. Lower values surface dashboard logs faster at the cost of more DB writes. |
 
 ### Worker Groups
 

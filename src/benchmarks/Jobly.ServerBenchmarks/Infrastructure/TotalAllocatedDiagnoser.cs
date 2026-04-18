@@ -80,15 +80,13 @@ public class TotalAllocatedDiagnoser : IDiagnoser
 
 /// <summary>
 /// BenchmarkDotNet config for component isolation benchmarks.
-/// Builds in Debug so project references resolve (Worker → Core).
 /// </summary>
 public class ComponentBenchmarkConfig : ManualConfig
 {
     public ComponentBenchmarkConfig()
     {
-        WithOptions(ConfigOptions.DisableOptimizationsValidator);
         AddDiagnoser(new MemoryDiagnoser(new MemoryDiagnoserConfig(false)));
-        AddJob(Job.ShortRun.WithCustomBuildConfiguration("Debug"));
+        AddJob(Job.ShortRun);
     }
 }
 
@@ -100,11 +98,9 @@ public class ServerBenchmarkConfig : ManualConfig
 {
     public ServerBenchmarkConfig()
     {
-        WithOptions(ConfigOptions.DisableOptimizationsValidator);
         AddDiagnoser(new MemoryDiagnoser(new MemoryDiagnoserConfig(false)));
         AddDiagnoser(new TotalAllocatedDiagnoser());
         AddJob(Job.ShortRun
-            .WithCustomBuildConfiguration("Debug")
             .WithWarmupCount(1)
             .WithIterationCount(3));
     }

@@ -20,14 +20,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<InternalsVisibleTo Include="Jobly.Tests" />
-	</ItemGroup>
-
-	<ItemGroup Condition="'$(Configuration)'!='Debug'">
-		<PackageReference Include="Moberg.Jobly.Core" Version="$(PackageVersion)" />
-	</ItemGroup>
-
-	<ItemGroup Condition="'$(Configuration)'=='Debug'">
 		<ProjectReference Include="..\Jobly.Core\Jobly.Core.csproj" />
 		<ProjectReference Include="..\Jobly.SourceGenerator\Jobly.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 	</ItemGroup>

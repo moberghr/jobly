@@ -94,7 +94,7 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
         batch.IsFull.ShouldBeTrue();
 
         // Act
-        await batch.FlushAsync(CancellationToken.None);
+        await batch.FlushAsync();
 
         // Assert
         var ctx = _fixture.CreateContext();
@@ -130,7 +130,7 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
         var batch = new CompletionBatch<TestContext>(scopeFactory, _time, NullLogger.Instance, batchSize: 10, flushInterval: TimeSpan.FromSeconds(1));
 
         // Act
-        await batch.FlushAsync(CancellationToken.None);
+        await batch.FlushAsync();
 
         // Assert
         var ctx = _fixture.CreateContext();
@@ -150,10 +150,10 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
         batch.Add(MakeEntry(job));
 
         // Act
-        await batch.FlushAsync(CancellationToken.None);
+        await batch.FlushAsync();
         var countersAfterFirst = await _fixture.CreateContext().Set<Counter>().CountAsync();
 
-        await batch.FlushAsync(CancellationToken.None);
+        await batch.FlushAsync();
 
         // Assert
         var countersAfterSecond = await _fixture.CreateContext().Set<Counter>().CountAsync();
@@ -183,7 +183,7 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
         batch.IsTimeElapsed.ShouldBeTrue();
 
         // Act — flush resets the timestamp
-        await batch.FlushAsync(CancellationToken.None);
+        await batch.FlushAsync();
 
         // Assert — empty buffer, no timestamp
         batch.IsTimeElapsed.ShouldBeFalse();
@@ -218,7 +218,7 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
             [new JobLog { JobId = phantomJob.Id, EventType = "Completed", Timestamp = DateTime.UtcNow, Level = "Information", Message = "phantom" }]));
 
         // Act
-        await batch.FlushAsync(CancellationToken.None);
+        await batch.FlushAsync();
 
         // Assert — real job committed, phantom dropped, buffer drained.
         var ctx = _fixture.CreateContext();
@@ -268,7 +268,7 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
         batch.Add(MakeEntry(good4));
 
         // Act
-        await batch.FlushAsync(CancellationToken.None);
+        await batch.FlushAsync();
 
         // Assert — all four real jobs commit as Completed; phantom is gone.
         var ctx = _fixture.CreateContext();
@@ -279,6 +279,34 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
 
         (await ctx.Set<Job>().AnyAsync(x => x.Id == phantom.Id)).ShouldBeFalse();
 
+        batch.Count.ShouldBe(0);
+    }
+
+    [TimedFact]
+    public async Task FlushAsync_CommitsBufferedCompletions_RegardlessOfCallerCancellation()
+    {
+        // Regression for PR #127 review finding: under the pre-fix code path, FlushAsync drained
+        // the buffer before observing cancellation. If the token was cancelled (e.g. SIGTERM mid-
+        // flush), BeginTransactionAsync threw OCE, the drained entries were lost, and the caller's
+        // subsequent FlushAsync was a noop on an empty buffer. Jobs stayed Processing and only
+        // StaleJobRecoveryTask would later requeue them.
+        //
+        // The fix removed the CancellationToken parameter entirely from FlushAsync so callers
+        // cannot accidentally abort an in-flight commit. This test documents the new contract:
+        // calling FlushAsync always commits the buffered entries, there's no caller-visible way
+        // to cancel a drained flush mid-commit.
+        var scopeFactory = CreateScopeFactory();
+        var batch = new CompletionBatch<TestContext>(scopeFactory, _time, NullLogger.Instance, batchSize: 10, flushInterval: TimeSpan.FromSeconds(10));
+
+        var job = await InsertProcessingJob();
+        batch.Add(MakeEntry(job));
+
+        await batch.FlushAsync();
+
+        var persisted = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == job.Id);
+        persisted.CurrentState.ShouldBe(State.Completed);
+        persisted.CurrentWorkerId.ShouldBeNull();
+        persisted.LastKeepAlive.ShouldBeNull();
         batch.Count.ShouldBe(0);
     }
 
@@ -299,7 +327,7 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
         batch.Count.ShouldBe(1);
 
         // Flush commits the single entry
-        await batch.FlushAsync(CancellationToken.None);
+        await batch.FlushAsync();
         var persisted = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == job.Id);
         persisted.CurrentState.ShouldBe(State.Completed);
     }
