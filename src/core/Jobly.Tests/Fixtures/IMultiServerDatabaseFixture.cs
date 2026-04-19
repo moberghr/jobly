@@ -1,4 +1,4 @@
-using Jobly.Tests.Integration;
+using Jobly.Tests.Fixtures;
 
 namespace Jobly.Tests.Fixtures;
 

@@ -27,15 +27,29 @@ public class WorkerDispatchBenchmark
         var services = new ServiceCollection();
         services.AddTransient<IJobHandler<BenchmarkJob>, BenchmarkJobHandler>();
         if (PipelineDepth >= 1)
+        {
             services.AddTransient<IPipelineBehavior<BenchmarkJob, Unit>, JobBehavior1>();
+        }
+
         if (PipelineDepth >= 2)
+        {
             services.AddTransient<IPipelineBehavior<BenchmarkJob, Unit>, JobBehavior2>();
+        }
+
         if (PipelineDepth >= 3)
+        {
             services.AddTransient<IPipelineBehavior<BenchmarkJob, Unit>, JobBehavior3>();
+        }
+
         if (PipelineDepth >= 4)
+        {
             services.AddTransient<IPipelineBehavior<BenchmarkJob, Unit>, JobBehavior4>();
+        }
+
         if (PipelineDepth >= 5)
+        {
             services.AddTransient<IPipelineBehavior<BenchmarkJob, Unit>, JobBehavior5>();
+        }
 
         var provider = services.BuildServiceProvider();
         _scope = provider.CreateScope();

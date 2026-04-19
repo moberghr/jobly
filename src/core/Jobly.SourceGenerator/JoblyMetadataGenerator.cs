@@ -72,10 +72,16 @@ public sealed class JoblyMetadataGenerator : IIncrementalGenerator
                 : interfaceName + "Impl";
 
             var source = GenerateImplementation(ns, interfaceName, implName, properties);
-            var fileName = (ns != null ? ns + "." : "") + implName + ".g.cs";
+            var fileName = (ns != null ? ns + "." : string.Empty) + implName + ".g.cs";
             context.AddSource(fileName, source);
         }
     }
+
+    private static readonly SymbolDisplayFormat NullableAwareFormat =
+        SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+            SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers
+            | SymbolDisplayMiscellaneousOptions.UseSpecialTypes
+            | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     private static List<(string Name, string TypeFullName)> GetProperties(INamedTypeSymbol interfaceSymbol)
     {
@@ -85,7 +91,7 @@ public sealed class JoblyMetadataGenerator : IIncrementalGenerator
         {
             if (member is IPropertySymbol prop && prop.GetMethod is not null && prop.SetMethod is not null)
             {
-                var typeFullName = prop.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                var typeFullName = prop.Type.ToDisplayString(NullableAwareFormat);
                 properties.Add((prop.Name, typeFullName));
             }
         }
@@ -116,7 +122,7 @@ public sealed class JoblyMetadataGenerator : IIncrementalGenerator
         sb.AppendLine();
 
         // Generate the implementation class
-        sb.AppendLine($"    internal sealed class {implName} : global::System.Collections.Generic.Dictionary<string, object>, {(ns != null ? ns + "." : "")}{interfaceName}");
+        sb.AppendLine($"    internal sealed class {implName} : global::System.Collections.Generic.Dictionary<string, object>, {(ns != null ? ns + "." : string.Empty)}{interfaceName}");
         sb.AppendLine("    {");
         sb.AppendLine($"        public {implName}() {{ }}");
         sb.AppendLine();
@@ -133,8 +139,8 @@ public sealed class JoblyMetadataGenerator : IIncrementalGenerator
             sb.AppendLine();
             sb.AppendLine($"        public {typeFullName} {name}");
             sb.AppendLine("        {");
-            sb.AppendLine($"            get => TryGetValue(\"{name}\", out var v) ? global::Jobly.Core.Handlers.MetadataConvert.To<{typeFullName}>(v) : default!;");
-            sb.AppendLine($"            set => this[\"{name}\"] = value;");
+            sb.AppendLine($"            get => TryGetValue(\"{name}\", out var v) ? global::Jobly.Core.Handlers.MetadataConvert.To<{typeFullName}>(v)! : default!;");
+            sb.AppendLine($"            set => this[\"{name}\"] = value!;");
             sb.AppendLine("        }");
         }
 

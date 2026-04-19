@@ -1,0 +1,17 @@
+<Project>
+
+  <!-- Library-only assembly-version strategy. AssemblyVersion pinned to major.0.0.0 for
+       binding stability across patch bumps. FileVersion tracks major.minor.build,
+       InformationalVersion keeps the full semver (including prerelease tags). -->
+  <PropertyGroup Condition="'$(PackageId)' != ''">
+    <AssemblyVersion Condition="'$(Version)' != ''">$([System.Version]::Parse('$(Version.Split(`-`)[0])').Major).0.0.0</AssemblyVersion>
+    <FileVersion Condition="'$(Version)' != ''">$([System.Version]::Parse('$(Version.Split(`-`)[0])').Major).$([System.Version]::Parse('$(Version.Split(`-`)[0])').Minor).$([System.Version]::Parse('$(Version.Split(`-`)[0])').Build).0</FileVersion>
+    <InformationalVersion Condition="'$(Version)' != ''">$(Version)</InformationalVersion>
+  </PropertyGroup>
+
+  <!-- Source Link for library packages so consumers can step into Jobly source while debugging. -->
+  <ItemGroup Condition="'$(PackageId)' != ''">
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

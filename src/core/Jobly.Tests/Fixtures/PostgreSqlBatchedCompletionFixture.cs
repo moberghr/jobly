@@ -1,5 +1,5 @@
 using Jobly.Core.Interceptors;
-using Jobly.Tests.Integration;
+using Jobly.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Respawn;
@@ -20,14 +20,14 @@ public class PostgreSqlBatchedCompletionFixture : IAsyncLifetime, IDatabaseFixtu
 
     public async ValueTask InitializeAsync()
     {
-        await _container.StartAsync();
+        await _container.StartAsync(Xunit.TestContext.Current.CancellationToken);
         _connectionString = _container.GetConnectionString();
 
         await using var context = CreateContext();
-        await context.Database.EnsureCreatedAsync();
+        await context.Database.EnsureCreatedAsync(Xunit.TestContext.Current.CancellationToken);
 
         await using var conn = new NpgsqlConnection(_connectionString);
-        await conn.OpenAsync();
+        await conn.OpenAsync(Xunit.TestContext.Current.CancellationToken);
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
@@ -46,7 +46,7 @@ public class PostgreSqlBatchedCompletionFixture : IAsyncLifetime, IDatabaseFixtu
     public async Task ResetAsync()
     {
         await using var conn = new NpgsqlConnection(_connectionString);
-        await conn.OpenAsync();
+        await conn.OpenAsync(Xunit.TestContext.Current.CancellationToken);
         await _respawner.ResetAsync(conn);
     }
 

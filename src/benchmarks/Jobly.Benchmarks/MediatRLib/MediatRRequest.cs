@@ -26,7 +26,7 @@ public sealed class MediatRPassthroughBehavior1 : MediatR.IPipelineBehavior<Medi
 {
     public Task<MediatRPingResponse> Handle(MediatRPingRequest request, MediatR.RequestHandlerDelegate<MediatRPingResponse> next, CancellationToken cancellationToken)
     {
-        return next();
+        return next(cancellationToken);
     }
 }
 
@@ -34,7 +34,7 @@ public sealed class MediatRPassthroughBehavior2 : MediatR.IPipelineBehavior<Medi
 {
     public Task<MediatRPingResponse> Handle(MediatRPingRequest request, MediatR.RequestHandlerDelegate<MediatRPingResponse> next, CancellationToken cancellationToken)
     {
-        return next();
+        return next(cancellationToken);
     }
 }
 
@@ -42,7 +42,7 @@ public sealed class MediatRPassthroughBehavior3 : MediatR.IPipelineBehavior<Medi
 {
     public Task<MediatRPingResponse> Handle(MediatRPingRequest request, MediatR.RequestHandlerDelegate<MediatRPingResponse> next, CancellationToken cancellationToken)
     {
-        return next();
+        return next(cancellationToken);
     }
 }
 
@@ -50,7 +50,7 @@ public sealed class MediatRPassthroughBehavior4 : MediatR.IPipelineBehavior<Medi
 {
     public Task<MediatRPingResponse> Handle(MediatRPingRequest request, MediatR.RequestHandlerDelegate<MediatRPingResponse> next, CancellationToken cancellationToken)
     {
-        return next();
+        return next(cancellationToken);
     }
 }
 
@@ -58,6 +58,6 @@ public sealed class MediatRPassthroughBehavior5 : MediatR.IPipelineBehavior<Medi
 {
     public Task<MediatRPingResponse> Handle(MediatRPingRequest request, MediatR.RequestHandlerDelegate<MediatRPingResponse> next, CancellationToken cancellationToken)
     {
-        return next();
+        return next(cancellationToken);
     }
 }

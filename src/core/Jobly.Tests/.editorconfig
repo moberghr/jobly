@@ -1,0 +1,20 @@
+# Test-project overrides. Merges with src/.editorconfig (root = true at src).
+
+[*.cs]
+# CA1816 — GC.SuppressFinalize(this) in DisposeAsync.
+# Disabled in tests: test base classes (IAsyncLifetime fixtures) never introduce finalizers,
+# so the suppress-finalize pattern is pure noise and pollutes every DisposeAsync in the suite.
+dotnet_diagnostic.CA1816.severity = none
+
+# RCS1118 — mark local variable as const.
+# Disabled in tests: marginal micro-perf that adds noise to Arrange blocks.
+dotnet_diagnostic.RCS1118.severity = none
+
+# CA1861 — prefer static readonly fields over constant array arguments.
+# Disabled in tests: tests are setup-driven, not hot paths; repeated allocation is a non-issue.
+dotnet_diagnostic.CA1861.severity = none
+
+# xUnit3003 — FactAttribute subclasses should declare a public ctor for source-info capture.
+# Our TimedFactAttribute / TimedTheoryAttribute subclasses exist to apply a timeout default;
+# they inherit source-info handling from the base FactAttribute/TheoryAttribute.
+dotnet_diagnostic.xUnit3003.severity = none

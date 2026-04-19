@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using Jobly.Core;
@@ -15,6 +16,7 @@ namespace Jobly.ServerBenchmarks.Benchmarks;
 /// that could leak if scopes are not properly disposed.
 /// </summary>
 [Config(typeof(ComponentBenchmarkConfig))]
+[SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification = "BenchmarkDotNet manages lifecycle via [GlobalCleanup].")]
 public class ScopeMemoryBenchmark
 {
     private PostgresServerFixture _fixture = null!;
@@ -40,7 +42,7 @@ public class ScopeMemoryBenchmark
     public void CreateAndDisposeScope()
     {
         using var scope = _fixture.Host.Services.CreateScope();
-        var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
+        _ = scope.ServiceProvider.GetRequiredService<TestContext>();
     }
 
     /// <summary>
@@ -50,7 +52,7 @@ public class ScopeMemoryBenchmark
     [Benchmark]
     public async Task CreateScopeAndQuery()
     {
-        using var scope = _fixture.Host.Services.CreateScope();
+        await using var scope = _fixture.Host.Services.CreateAsyncScope();
         var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
         await ctx.Set<JobEntity>().CountAsync();
     }
@@ -63,6 +65,6 @@ public class ScopeMemoryBenchmark
     public void CreateScopeAndResolvePublisher()
     {
         using var scope = _fixture.Host.Services.CreateScope();
-        var publisher = scope.ServiceProvider.GetRequiredService<IPublisher>();
+        _ = scope.ServiceProvider.GetRequiredService<IPublisher>();
     }
 }
