@@ -6,7 +6,7 @@ sidebar_position: 6
 
 ## 0.8.0
 
-*Unreleased*
+*2026-04-19*
 
 ### New Features
 
