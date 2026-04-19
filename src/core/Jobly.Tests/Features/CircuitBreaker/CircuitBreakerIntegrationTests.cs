@@ -22,7 +22,7 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenFailingHandler_WhenThresholdHit_ThenCircuitOpensAndSubsequentJobsRescheduled()
     {
-        var groupKey = nameof(ThrowExceptionRequest);
+        const string groupKey = nameof(ThrowExceptionRequest);
 
         // Seed the state to threshold - 1, then drive one more failure to open the circuit.
         // This avoids waiting through the global Retry (MaxRetries=3) on every failure.
@@ -33,13 +33,13 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
             FailureCount = 999,
             LastFailureAt = DateTime.UtcNow,
         });
-        await seedCtx.SaveChangesAsync();
+        await seedCtx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var failingPublisher = Server.CreatePublisher();
         var failingJobId = await failingPublisher.Enqueue(
             new ThrowExceptionRequest(),
             new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 0));
-        await failingPublisher.SaveChangesAsync();
+        await failingPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(failingJobId, State.Failed, timeout: TimeSpan.FromSeconds(30));
 
@@ -55,7 +55,7 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
         // Publish a subsequent job — circuit is open so it should be rescheduled
         var nextPublisher = Server.CreatePublisher();
         var nextJobId = await nextPublisher.Enqueue(new ThrowExceptionRequest());
-        await nextPublisher.SaveChangesAsync();
+        await nextPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobLog(nextJobId, "Requeued", timeout: TimeSpan.FromSeconds(15));
 
@@ -82,7 +82,7 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenSuccessAfterFailures_WhenJobSucceeds_ThenCounterResets()
     {
-        var groupKey = nameof(UnitRequest);
+        const string groupKey = nameof(UnitRequest);
 
         var seedCtx = Server.CreateContext();
         seedCtx.Set<CircuitBreakerState>().Add(new CircuitBreakerState
@@ -91,11 +91,11 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
             FailureCount = 2,
             LastFailureAt = DateTime.UtcNow,
         });
-        await seedCtx.SaveChangesAsync();
+        await seedCtx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Completed, timeout: TimeSpan.FromSeconds(30));
 

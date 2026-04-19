@@ -46,7 +46,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobGroupQueryService<TestContext>(_fixture.CreateContext());
@@ -84,7 +84,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobGroupQueryService<TestContext>(_fixture.CreateContext());
@@ -117,7 +117,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobGroupQueryService<TestContext>(_fixture.CreateContext());
@@ -157,7 +157,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobGroupQueryService<TestContext>(_fixture.CreateContext());
@@ -209,7 +209,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobGroupQueryService<TestContext>(_fixture.CreateContext());
@@ -259,7 +259,7 @@ public abstract class JobGroupQueryServiceTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = batchId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobGroupQueryService<TestContext>(_fixture.CreateContext());

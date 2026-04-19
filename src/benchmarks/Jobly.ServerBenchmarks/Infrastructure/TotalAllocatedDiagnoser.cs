@@ -58,7 +58,9 @@ public class TotalAllocatedDiagnoser : IDiagnoser
         }
     }
 
-    public void DisplayResults(ILogger logger) { }
+    public void DisplayResults(ILogger logger)
+    {
+    }
 
     public IEnumerable<ValidationError> Validate(ValidationParameters validationParameters) => [];
 
@@ -67,13 +69,21 @@ public class TotalAllocatedDiagnoser : IDiagnoser
         public static readonly TotalAllocatedMetricDescriptor Instance = new();
 
         public string Id => "TotalAllocated";
+
         public string DisplayName => "Total Allocated (all threads)";
+
         public string Legend => "Total bytes allocated across all threads per iteration (GC.GetTotalAllocatedBytes)";
+
         public string NumberFormat => "0.##";
+
         public UnitType UnitType => UnitType.Size;
+
         public string Unit => "B";
+
         public bool TheGreaterTheBetter => false;
+
         public int PriorityInCategory => 0;
+
         public bool GetIsAvailable(Metric metric) => true;
     }
 }

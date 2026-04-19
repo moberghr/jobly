@@ -13,17 +13,17 @@ public class SqliteFixture : IAsyncLifetime, IDatabaseFixture
     public async ValueTask InitializeAsync()
     {
         _connection = new SqliteConnection("DataSource=:memory:");
-        await _connection.OpenAsync();
+        await _connection.OpenAsync(Xunit.TestContext.Current.CancellationToken);
 
         await using var context = CreateContext();
-        await context.Database.EnsureCreatedAsync();
+        await context.Database.EnsureCreatedAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public async Task ResetAsync()
     {
         await using var context = CreateContext();
-        await context.Database.EnsureDeletedAsync();
-        await context.Database.EnsureCreatedAsync();
+        await context.Database.EnsureDeletedAsync(Xunit.TestContext.Current.CancellationToken);
+        await context.Database.EnsureCreatedAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public TestContext CreateContext()

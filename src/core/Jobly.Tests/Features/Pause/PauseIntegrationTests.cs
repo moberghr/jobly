@@ -20,7 +20,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         var ctx = Server.CreateContext();
         var group = await ctx.Set<WorkerGroup>()
             .Where(g => g.ServerId == Server.ServerId)
-            .FirstAsync();
+            .FirstAsync(Xunit.TestContext.Current.CancellationToken);
         return group.Id;
     }
 
@@ -52,7 +52,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         // Publish a job
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait — job should NOT be picked up (poll DB to confirm it stays Enqueued)
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
@@ -60,7 +60,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         {
             var job = await Server.GetJob(jobId);
             job.CurrentState.ShouldBe(State.Enqueued);
-            await Task.Delay(200);
+            await Task.Delay(200, Xunit.TestContext.Current.CancellationToken);
         }
 
         // Resume and let it process
@@ -80,7 +80,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
 
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Resume — job should complete
         await svc.ResumeServer(Server.ServerId);
@@ -103,7 +103,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         // Publish a job
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait — job should NOT be picked up
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
@@ -111,7 +111,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         {
             var job = await Server.GetJob(jobId);
             job.CurrentState.ShouldBe(State.Enqueued);
-            await Task.Delay(200);
+            await Task.Delay(200, Xunit.TestContext.Current.CancellationToken);
         }
 
         // Resume and let it process
@@ -131,7 +131,7 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
 
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await svc.ResumeWorkerGroup(groupId);
         await Server.WaitForCompletion();

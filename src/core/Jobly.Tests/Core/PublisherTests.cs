@@ -26,7 +26,7 @@ public abstract class PublisherTestsBase : IAsyncLifetime
 
     private static Publisher<TestContext> CreatePublisher(TestContext ctx)
     {
-        return new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+        return new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
     }
 
     [TimedFact]
@@ -38,11 +38,11 @@ public abstract class PublisherTestsBase : IAsyncLifetime
 
         // Act
         var id = await publisher.Publish(new SingleHandlerMessage());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.Kind.ShouldBe(JobKind.Message);
         job.CurrentState.ShouldBe(State.Enqueued);
@@ -57,11 +57,11 @@ public abstract class PublisherTestsBase : IAsyncLifetime
 
         // Act
         var id = await publisher.Publish(new SingleHandlerMessage(), "critical");
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.Queue.ShouldBe("critical");
     }
@@ -75,11 +75,11 @@ public abstract class PublisherTestsBase : IAsyncLifetime
 
         // Act
         var id = await publisher.Publish(new SingleHandlerMessage());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.TraceId.ShouldBe(job.Id);
     }
@@ -93,11 +93,11 @@ public abstract class PublisherTestsBase : IAsyncLifetime
 
         // Act
         var id = await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.Kind.ShouldBe(JobKind.Job);
         job.CurrentState.ShouldBe(State.Enqueued);
@@ -121,15 +121,15 @@ public abstract class PublisherTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var id = await publisher.Enqueue(new UnitRequest(), parentId);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.ParentJobId.ShouldBe(parentId);
         job.CurrentState.ShouldBe(State.Awaiting);
@@ -144,11 +144,11 @@ public abstract class PublisherTestsBase : IAsyncLifetime
 
         // Act
         var id = await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var logs = await readCtx.Set<JobLog>().Where(l => l.JobId == id).ToListAsync();
+        var logs = await readCtx.Set<JobLog>().Where(l => l.JobId == id).ToListAsync(Xunit.TestContext.Current.CancellationToken);
         logs.Count.ShouldBe(1);
         logs[0].EventType.ShouldBe("Created");
     }
@@ -163,11 +163,11 @@ public abstract class PublisherTestsBase : IAsyncLifetime
 
         // Act
         var id = await publisher.Schedule(new UnitRequest(), futureTime);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.ScheduleTime.ShouldBeGreaterThan(DateTime.UtcNow.AddHours(1));
     }
@@ -182,12 +182,12 @@ public abstract class PublisherTestsBase : IAsyncLifetime
 
         var parentId = await publisher.Enqueue(new UnitRequest());
         var childId = await publisher.Enqueue(new UnitRequest(), parentId);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var parent = await readCtx.Set<Job>().FindAsync(parentId);
-        var child = await readCtx.Set<Job>().FindAsync(childId);
+        var parent = await readCtx.Set<Job>().FindAsync([parentId], Xunit.TestContext.Current.CancellationToken);
+        var child = await readCtx.Set<Job>().FindAsync([childId], Xunit.TestContext.Current.CancellationToken);
         parent.ShouldNotBeNull();
         child.ShouldNotBeNull();
         child.TraceId.ShouldBe(parent.TraceId);
@@ -200,18 +200,18 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         var setupCtx = _fixture.CreateContext();
         var setupPublisher = CreatePublisher(setupCtx);
         var parentId = await setupPublisher.Enqueue(new UnitRequest());
-        await setupCtx.SaveChangesAsync();
+        await setupCtx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act: child created in new context
         var actCtx = _fixture.CreateContext();
         var actPublisher = CreatePublisher(actCtx);
         var childId = await actPublisher.Enqueue(new UnitRequest(), parentId);
-        await actCtx.SaveChangesAsync();
+        await actCtx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var parent = await readCtx.Set<Job>().FindAsync(parentId);
-        var child = await readCtx.Set<Job>().FindAsync(childId);
+        var parent = await readCtx.Set<Job>().FindAsync([parentId], Xunit.TestContext.Current.CancellationToken);
+        var child = await readCtx.Set<Job>().FindAsync([childId], Xunit.TestContext.Current.CancellationToken);
         parent.ShouldNotBeNull();
         child.ShouldNotBeNull();
         child.TraceId.ShouldBe(parent.TraceId);
@@ -226,11 +226,11 @@ public abstract class PublisherTestsBase : IAsyncLifetime
 
         // Act
         var jobId = await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.TraceId.ShouldBe(jobId);
     }
@@ -254,11 +254,11 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         {
             // Act
             var id = await publisher.Publish(new SingleHandlerMessage());
-            await ctx.SaveChangesAsync();
+            await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
             // Assert
             var readCtx = _fixture.CreateContext();
-            var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id);
+            var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
             job.ShouldNotBeNull();
             job.TraceId.ShouldBe(parentTraceId);
             job.SpawnedByJobId.ShouldBe(parentJobId);
@@ -278,11 +278,11 @@ public abstract class PublisherTestsBase : IAsyncLifetime
         var id = await publisher.Enqueue(new UnitRequest());
 
         // Act
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(id);
+        var job = await readCtx.Set<Job>().FindAsync([id], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Enqueued);
     }

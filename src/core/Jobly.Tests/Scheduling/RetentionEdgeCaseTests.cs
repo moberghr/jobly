@@ -4,11 +4,11 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Retry;
 using Jobly.Core.Services;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
-using Jobly.Core.Retry;
 using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -48,7 +48,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -116,7 +116,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             Queue = "default",
             MaxRetries = 2,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -129,7 +129,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         var failedStat = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:failed")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         failedStat.ShouldBe(0);
     }
@@ -151,7 +151,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             ExpireAt = DateTime.UtcNow.AddHours(-1),
         });
         ctx.Set<Statistic>().Add(new Statistic { Key = "stats:succeeded", Value = 10 });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -159,10 +159,10 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert — job is deleted, but statistics survive
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldBeNull();
 
-        var stat = await readCtx.Set<Statistic>().FindAsync("stats:succeeded");
+        var stat = await readCtx.Set<Statistic>().FindAsync(["stats:succeeded"], Xunit.TestContext.Current.CancellationToken);
         stat.ShouldNotBeNull();
         stat.Value.ShouldBe(10);
     }
@@ -172,9 +172,9 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
     {
         // Arrange — create a completed job with existing stats
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
         var jobId = await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
         await worker.GetAndProcessJob(CancellationToken.None);
@@ -184,12 +184,12 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         var succeededBefore = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         var deletedBefore = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:deleted")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -201,12 +201,12 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         var succeededAfter = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         var deletedAfter = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:deleted")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         succeededAfter.ShouldBe(succeededBefore - 1);
         deletedAfter.ShouldBe(deletedBefore + 1);
@@ -230,7 +230,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             Queue = "default",
             Metadata = JsonSerializer.Serialize(new Dictionary<string, object> { ["MaxRetries"] = 0 }),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
         await worker.GetAndProcessJob(CancellationToken.None);
@@ -240,7 +240,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         var failedBefore = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:failed")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -252,7 +252,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         var failedAfter = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:failed")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         failedAfter.ShouldBe(failedBefore - 1);
     }

@@ -46,12 +46,12 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         var first = new AppendMetadataBehavior("key-a", "value-a");
         var second = new AppendMetadataBehavior("key-b", "value-b");
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, BuildProvider(first, second));
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, BuildProvider(first, second));
 
         var id = await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
+        var job = await _fixture.CreateContext().Set<Job>().FindAsync([id], Xunit.TestContext.Current.CancellationToken);
         job!.Metadata.ShouldNotBeNull();
         var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
         metadata["key-a"].ShouldBe("value-a");
@@ -64,12 +64,12 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         var first = new AppendMessageMetadataBehavior("msg-key-a", "msg-val-a");
         var second = new AppendMessageMetadataBehavior("msg-key-b", "msg-val-b");
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, BuildProvider(first, second));
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, BuildProvider(first, second));
 
         var id = await publisher.Publish(new SingleHandlerMessage());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
+        var job = await _fixture.CreateContext().Set<Job>().FindAsync([id], Xunit.TestContext.Current.CancellationToken);
         job!.Metadata.ShouldNotBeNull();
         var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
         metadata["msg-key-a"].ShouldBe("msg-val-a");
@@ -82,7 +82,7 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     {
         var ctx = _fixture.CreateContext();
         var behavior = new CancellationTokenCaptureBehavior();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, BuildProvider(behavior));
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, BuildProvider(behavior));
 
         await publisher.Enqueue(new UnitRequest());
         await ctx.SaveChangesAsync(CancellationToken.None);
@@ -98,12 +98,12 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     public async Task Enqueue_NoBehaviors_MetadataIsNull()
     {
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
 
         var id = await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
+        var job = await _fixture.CreateContext().Set<Job>().FindAsync([id], Xunit.TestContext.Current.CancellationToken);
         job!.Metadata.ShouldBeNull();
     }
 
@@ -112,15 +112,15 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     public async Task Enqueue_WithJobParametersMetadata_MetadataPersisted()
     {
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
 
         var id = await publisher.Enqueue(new UnitRequest(), new JobParameters
         {
             Metadata = new Dictionary<string, object> { ["ad-hoc"] = "value" },
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
+        var job = await _fixture.CreateContext().Set<Job>().FindAsync([id], Xunit.TestContext.Current.CancellationToken);
         job!.Metadata.ShouldNotBeNull();
         var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
         metadata["ad-hoc"].ShouldBe("value");
@@ -131,15 +131,15 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     {
         var ctx = _fixture.CreateContext();
         var behavior = new AppendMetadataBehavior("pipeline-key", "pipeline-val");
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, BuildProvider(behavior));
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, BuildProvider(behavior));
 
         var id = await publisher.Enqueue(new UnitRequest(), new JobParameters
         {
             Metadata = new Dictionary<string, object> { ["ad-hoc"] = "value" },
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
+        var job = await _fixture.CreateContext().Set<Job>().FindAsync([id], Xunit.TestContext.Current.CancellationToken);
         job!.Metadata.ShouldNotBeNull();
         var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
         metadata["pipeline-key"].ShouldBe("pipeline-val");
@@ -200,11 +200,11 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
 
         var jobs = new List<UnitRequest> { new(), new(), new() };
         var batchId = await publisher.StartNew(jobs);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var children = await _fixture.CreateContext().Set<Job>()
             .Where(j => j.ParentJobId == batchId && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         children.Count.ShouldBe(3);
         foreach (var child in children)
@@ -230,12 +230,12 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
         try
         {
             var ctx = _fixture.CreateContext();
-            var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+            var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
 
             var id = await publisher.Enqueue(new UnitRequest());
-            await ctx.SaveChangesAsync();
+            await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-            var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
+            var job = await _fixture.CreateContext().Set<Job>().FindAsync([id], Xunit.TestContext.Current.CancellationToken);
             job!.Metadata.ShouldNotBeNull();
             var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
             metadata["inherited"].ShouldBe("from-parent");
@@ -255,11 +255,11 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
 
         var jobs = new List<UnitRequest> { new(), new() };
         var batchId = await publisher.StartNew(jobs, metadata: new Dictionary<string, object> { ["ad-hoc-batch"] = "yes" });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var children = await _fixture.CreateContext().Set<Job>()
             .Where(j => j.ParentJobId == batchId && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         children.Count.ShouldBe(2);
         foreach (var child in children)
@@ -276,12 +276,12 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     {
         var ctx = _fixture.CreateContext();
         var behavior = new PostNextBehavior();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, BuildProvider(behavior));
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, BuildProvider(behavior));
 
         var id = await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
+        var job = await _fixture.CreateContext().Set<Job>().FindAsync([id], Xunit.TestContext.Current.CancellationToken);
         job!.Metadata.ShouldNotBeNull();
         var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
         metadata["post-next"].ShouldBe("written-after");
@@ -293,12 +293,12 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     {
         var ctx = _fixture.CreateContext();
         var behavior = new ShortCircuitBehavior();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, BuildProvider(behavior));
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, BuildProvider(behavior));
 
         var id = await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
+        var job = await _fixture.CreateContext().Set<Job>().FindAsync([id], Xunit.TestContext.Current.CancellationToken);
         job!.Metadata.ShouldNotBeNull();
         var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
         metadata["short-circuit"].ShouldBe("yes");
@@ -310,13 +310,13 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
     {
         var ctx = _fixture.CreateContext();
         var behavior = new ThrowingBehavior();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, BuildProvider(behavior));
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, BuildProvider(behavior));
 
         await Should.ThrowAsync<InvalidOperationException>(async () => await publisher.Enqueue(new UnitRequest()));
 
         // Job should not have been created
-        await ctx.SaveChangesAsync();
-        var jobs = await _fixture.CreateContext().Set<Job>().CountAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+        var jobs = await _fixture.CreateContext().Set<Job>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         jobs.ShouldBe(0);
     }
 
@@ -328,10 +328,10 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
         var executionLog = new List<string>();
         var outer = new OrderTrackingBehavior(executionLog, "outer");
         var inner = new OrderTrackingBehavior(executionLog, "inner");
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, BuildProvider(outer, inner));
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, BuildProvider(outer, inner));
 
         await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Outer enters first, then inner enters, then inner exits, then outer exits
         executionLog.ShouldBe(["outer:before", "inner:before", "inner:after", "outer:after"]);
@@ -351,15 +351,15 @@ public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
         try
         {
             var ctx = _fixture.CreateContext();
-            var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+            var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
 
             var id = await publisher.Enqueue(new UnitRequest(), new JobParameters
             {
                 Metadata = new Dictionary<string, object> { ["shared"] = "ad-hoc-value" },
             });
-            await ctx.SaveChangesAsync();
+            await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-            var job = await _fixture.CreateContext().Set<Job>().FindAsync(id);
+            var job = await _fixture.CreateContext().Set<Job>().FindAsync([id], Xunit.TestContext.Current.CancellationToken);
             job!.Metadata.ShouldNotBeNull();
             var metadata = MetadataSerializer.Deserialize(job.Metadata)!;
             metadata["shared"].ShouldBe("ad-hoc-value", "Ad-hoc should override inherited");

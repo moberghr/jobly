@@ -20,7 +20,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CancellableRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait for worker to pick it up
         await Server.WaitForJobState(jobId, State.Processing);
@@ -42,7 +42,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CancellableRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Processing);
 
@@ -66,7 +66,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CancellableRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Processing);
 
@@ -91,7 +91,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CancellableRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Processing);
 

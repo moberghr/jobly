@@ -21,18 +21,18 @@ public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
         // Arrange
         var publisher = Server.CreatePublisher();
         var parentId = await publisher.Enqueue(new SpawnChildJobRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         await Server.WaitForCompletion();
 
         // Assert
         var ctx = Server.CreateContext();
-        var parent = await ctx.Set<Job>().FirstAsync(j => j.Id == parentId);
+        var parent = await ctx.Set<Job>().FirstAsync(j => j.Id == parentId, Xunit.TestContext.Current.CancellationToken);
         parent.CurrentState.ShouldBe(State.Completed);
 
         var child = await ctx.Set<Job>()
-            .FirstAsync(j => j.SpawnedByJobId == parentId);
+            .FirstAsync(j => j.SpawnedByJobId == parentId, Xunit.TestContext.Current.CancellationToken);
         child.SpawnedByJobId.ShouldBe(parentId);
         child.CurrentState.ShouldBe(State.Completed);
     }
@@ -43,26 +43,26 @@ public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
         // Arrange
         var publisher = Server.CreatePublisher();
         var parentId = await publisher.Enqueue(new SpawnBatchRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         await Server.WaitForCompletion();
 
         // Assert
         var ctx = Server.CreateContext();
-        var parent = await ctx.Set<Job>().FirstAsync(j => j.Id == parentId);
+        var parent = await ctx.Set<Job>().FirstAsync(j => j.Id == parentId, Xunit.TestContext.Current.CancellationToken);
         parent.TraceId.ShouldNotBeNull();
         var traceId = parent.TraceId!.Value;
 
         // The batch job (Batch kind) spawned by the handler
         var batchJob = await ctx.Set<Job>()
-            .FirstAsync(j => j.Kind == JobKind.Batch && j.SpawnedByJobId == parentId);
+            .FirstAsync(j => j.Kind == JobKind.Batch && j.SpawnedByJobId == parentId, Xunit.TestContext.Current.CancellationToken);
         batchJob.TraceId.ShouldBe(traceId);
 
         // Child jobs of the batch should also share the trace
         var batchChildren = await ctx.Set<Job>()
             .Where(j => j.ParentJobId == batchJob.Id && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         batchChildren.Count.ShouldBeGreaterThan(0);
         batchChildren.ShouldAllBe(j => j.TraceId == traceId);
     }
@@ -73,7 +73,7 @@ public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
         // Arrange
         var publisher = Server.CreatePublisher();
         var parentId = await publisher.Enqueue(new SpawnBatchRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         await Server.WaitForCompletion();
@@ -83,7 +83,7 @@ public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
 
         // The batch job spawned by the parent handler
         var batchJob = await ctx.Set<Job>()
-            .FirstAsync(j => j.Kind == JobKind.Batch && j.SpawnedByJobId == parentId);
+            .FirstAsync(j => j.Kind == JobKind.Batch && j.SpawnedByJobId == parentId, Xunit.TestContext.Current.CancellationToken);
         batchJob.SpawnedByJobId.ShouldBe(parentId);
     }
 }

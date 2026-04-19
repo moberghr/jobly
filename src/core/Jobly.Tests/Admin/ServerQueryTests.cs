@@ -39,7 +39,7 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
             IntervalSeconds = 60,
         };
         ctx.Set<ServerTask>().Add(task);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Insert 5 log entries
         for (var i = 0; i < 5; i++)
@@ -54,7 +54,7 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -96,7 +96,7 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
         };
         ctx.Set<ServerTask>().Add(task1);
         ctx.Set<ServerTask>().Add(task2);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Insert logs for task1
         for (var i = 0; i < 3; i++)
@@ -124,7 +124,7 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -171,7 +171,7 @@ public abstract class ServerQueryTestsBase : IAsyncLifetime
             LastRun = DateTime.UtcNow.AddMinutes(-2),
             LastDurationMs = 15.3,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);

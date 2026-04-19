@@ -21,21 +21,21 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var messageId = await publisher.Publish(new SingleHandlerMessage());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
         var ctx = Server.CreateContext();
 
         // Message should be completed
-        var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId);
+        var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
         message.CurrentState.ShouldBe(State.Completed);
         message.Kind.ShouldBe(JobKind.Message);
 
         // One handler job should have been created and completed
         var handlerJobs = await ctx.Set<Job>()
             .Where(j => j.Kind == JobKind.Job && j.ParentJobId == messageId)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         handlerJobs.Count.ShouldBe(1);
         handlerJobs[0].CurrentState.ShouldBe(State.Completed);
     }
@@ -45,20 +45,20 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var messageId = await publisher.Publish(new MultiRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
         var ctx = Server.CreateContext();
 
         // Message should be completed
-        var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId);
+        var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
         message.CurrentState.ShouldBe(State.Completed);
 
         // Two handler jobs (MultiHandlerA + MultiHandlerB) should be created and completed
         var handlerJobs = await ctx.Set<Job>()
             .Where(j => j.Kind == JobKind.Job && j.ParentJobId == messageId)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         handlerJobs.Count.ShouldBe(2);
         handlerJobs.ShouldAllBe(j => j.CurrentState == State.Completed);
     }
@@ -68,18 +68,18 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var messageId = await publisher.Publish(new SingleHandlerMessage(), "a-critical");
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
         var ctx = Server.CreateContext();
 
-        var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId);
+        var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
         message.Queue.ShouldBe("a-critical");
 
         var handlerJobs = await ctx.Set<Job>()
             .Where(j => j.Kind == JobKind.Job && j.ParentJobId == messageId)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         handlerJobs.Count.ShouldBe(1);
         handlerJobs[0].Queue.ShouldBe("a-critical");
     }
@@ -94,7 +94,7 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
             messageIds.Add(await publisher.Publish(new SingleHandlerMessage()));
         }
 
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
@@ -102,12 +102,12 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
 
         foreach (var messageId in messageIds)
         {
-            var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId);
+            var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
             message.CurrentState.ShouldBe(State.Completed);
 
             var handlerJobs = await ctx.Set<Job>()
                 .Where(j => j.Kind == JobKind.Job && j.ParentJobId == messageId)
-                .ToListAsync();
+                .ToListAsync(Xunit.TestContext.Current.CancellationToken);
             handlerJobs.Count.ShouldBe(1);
             handlerJobs[0].CurrentState.ShouldBe(State.Completed);
         }
@@ -136,7 +136,7 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
             messageIds.Add(await publisher.Publish(new MultiRequest()));
         }
 
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
@@ -145,14 +145,14 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
         // All messages should be in a terminal state
         var messages = await ctx.Set<Job>()
             .Where(j => messageIds.Contains(j.Id))
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         messages.Count.ShouldBe(3);
         messages.ShouldAllBe(m => m.CurrentState == State.Completed);
 
         // Total handler jobs = 3 messages x 2 handlers = 6
         var totalHandlerJobs = await ctx.Set<Job>()
-            .CountAsync(j => j.Kind == JobKind.Job && j.ParentJobId != null && messageIds.Contains(j.ParentJobId.Value));
+            .CountAsync(j => j.Kind == JobKind.Job && j.ParentJobId != null && messageIds.Contains(j.ParentJobId.Value), Xunit.TestContext.Current.CancellationToken);
         totalHandlerJobs.ShouldBe(6);
     }
 }

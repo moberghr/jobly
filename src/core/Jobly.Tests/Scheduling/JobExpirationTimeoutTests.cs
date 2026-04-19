@@ -36,7 +36,7 @@ public abstract class JobExpirationTimeoutTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var config = new JoblyConfiguration { JobExpirationTimeout = TimeSpan.FromHours(2) };
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(config));
@@ -48,7 +48,7 @@ public abstract class JobExpirationTimeoutTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.ExpireAt.ShouldNotBeNull();
         job.ExpireAt.Value.ShouldBeGreaterThanOrEqualTo(before.AddHours(2).AddSeconds(-1));
@@ -70,7 +70,7 @@ public abstract class JobExpirationTimeoutTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
 
@@ -80,7 +80,7 @@ public abstract class JobExpirationTimeoutTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.ExpireAt.ShouldNotBeNull();
         job.ExpireAt.Value.ShouldBeGreaterThanOrEqualTo(before.AddDays(1).AddSeconds(-1));

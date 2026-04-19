@@ -24,7 +24,7 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
 
     private static Publisher<TestContext> CreatePublisher(TestContext ctx)
     {
-        return new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+        return new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
     }
 
     [TimedFact]
@@ -45,7 +45,7 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var jobParams = new JobParameters
         {
@@ -56,11 +56,11 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
 
         // Act
         var id = await publisher.Enqueue(new UnitRequest(), jobParams);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.Queue.ShouldBe("high-priority");
         job.ParentJobId.ShouldBe(parentId);
@@ -77,11 +77,11 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
 
         // Act
         var id = await publisher.Schedule(new UnitRequest(), futureTime, "critical");
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.Queue.ShouldBe("critical");
         job.ScheduleTime.ShouldBeGreaterThan(DateTime.UtcNow.AddHours(1));
@@ -105,15 +105,15 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var id = await publisher.Schedule(new UnitRequest(), futureTime, parentId);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.ParentJobId.ShouldBe(parentId);
         job.ScheduleTime.ShouldBeGreaterThan(DateTime.UtcNow.AddHours(1));
@@ -138,15 +138,15 @@ public abstract class PublisherOverloadTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var id = await publisher.Schedule(new UnitRequest(), futureTime, parentId, "critical");
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.ParentJobId.ShouldBe(parentId);
         job.Queue.ShouldBe("critical");

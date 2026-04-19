@@ -36,7 +36,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -44,11 +44,11 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert — state should remain Enqueued, and no Requeued log should exist
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Enqueued);
 
-        var logs = await readCtx.Set<JobLog>().Where(l => l.JobId == jobId).ToListAsync();
+        var logs = await readCtx.Set<JobLog>().Where(l => l.JobId == jobId).ToListAsync(Xunit.TestContext.Current.CancellationToken);
         logs.ShouldNotContain(l => l.EventType == "Requeued");
     }
 
@@ -68,7 +68,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
             Queue = "default",
             ExpireAt = DateTime.UtcNow.AddDays(1),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -76,7 +76,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Enqueued);
         job.ExpireAt.ShouldBeNull();
@@ -111,7 +111,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = parentId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act — requeue should succeed even though parent exists (and handle it gracefully)
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -119,7 +119,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == childId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == childId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Enqueued);
     }
@@ -181,7 +181,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = parentId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act: requeue the failed child
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -189,13 +189,13 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert: parent should be back in Awaiting (for batch) and ExpireAt cleared
         var readCtx = _fixture.CreateContext();
-        var parent = await readCtx.Set<Job>().FindAsync(parentId);
+        var parent = await readCtx.Set<Job>().FindAsync([parentId], Xunit.TestContext.Current.CancellationToken);
         parent.ShouldNotBeNull();
         parent.CurrentState.ShouldBe(State.Awaiting);
         parent.ExpireAt.ShouldBeNull();
         parent.JobCount.ShouldBe(2); // incremented from 1
 
-        var child = await readCtx.Set<Job>().FindAsync(childId);
+        var child = await readCtx.Set<Job>().FindAsync([childId], Xunit.TestContext.Current.CancellationToken);
         child.ShouldNotBeNull();
         child.CurrentState.ShouldBe(State.Enqueued);
     }
@@ -219,13 +219,13 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
             Queue = "default",
             CurrentWorkerId = Guid.NewGuid(),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         await svc.RequeueJob(jobId);
 
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
 
         // Should NOT be Enqueued — that would cause double execution while worker is still running
@@ -276,7 +276,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = parentId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act: requeue child1
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -284,13 +284,13 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert: parent should be back in Awaiting, JobCount incremented, ExpireAt cleared
         var readCtx = _fixture.CreateContext();
-        var parent = await readCtx.Set<Job>().FindAsync(parentId);
+        var parent = await readCtx.Set<Job>().FindAsync([parentId], Xunit.TestContext.Current.CancellationToken);
         parent.ShouldNotBeNull();
         parent.CurrentState.ShouldBe(State.Awaiting);
         parent.ExpireAt.ShouldBeNull();
         parent.JobCount.ShouldBe(3);
 
-        var child1 = await readCtx.Set<Job>().FindAsync(child1Id);
+        var child1 = await readCtx.Set<Job>().FindAsync([child1Id], Xunit.TestContext.Current.CancellationToken);
         child1.ShouldNotBeNull();
         child1.CurrentState.ShouldBe(State.Enqueued);
         child1.ScheduleTime.ShouldBeLessThanOrEqualTo(DateTime.UtcNow.AddSeconds(5));

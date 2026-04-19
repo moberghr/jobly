@@ -140,7 +140,7 @@ public class MetadataSerializerTests
     [TimedFact]
     public void Deserialize_EmptyString_ReturnsEmptyDictionary()
     {
-        var dict = MetadataSerializer.Deserialize("");
+        var dict = MetadataSerializer.Deserialize(string.Empty);
 
         dict.ShouldNotBeNull();
         dict.ShouldBeEmpty();
@@ -176,7 +176,7 @@ public class MetadataSerializerTests
     [TimedFact]
     public void Serialize_EmptyDictionary_ReturnsNull()
     {
-        MetadataSerializer.Serialize(new Dictionary<string, object>()).ShouldBeNull();
+        MetadataSerializer.Serialize([]).ShouldBeNull();
     }
 
     [TimedFact]
@@ -226,7 +226,7 @@ public class MetadataSerializerTests
     [TimedFact]
     public void Deserialize_DeeplyNested_AllLevelsConverted()
     {
-        var json = """{"L1":{"L2":{"L3":"deep","Num":99}}}""";
+        const string json = """{"L1":{"L2":{"L3":"deep","Num":99}}}""";
         var dict = MetadataSerializer.Deserialize(json);
 
         var l1 = dict["L1"].ShouldBeOfType<Dictionary<string, object>>();
@@ -238,7 +238,7 @@ public class MetadataSerializerTests
     [TimedFact]
     public void Deserialize_ArrayOfObjects_ReturnsListOfDictionaries()
     {
-        var json = """{"Items":[{"Name":"A"},{"Name":"B"}]}""";
+        const string json = """{"Items":[{"Name":"A"},{"Name":"B"}]}""";
         var dict = MetadataSerializer.Deserialize(json);
 
         var list = dict["Items"].ShouldBeOfType<List<object>>();

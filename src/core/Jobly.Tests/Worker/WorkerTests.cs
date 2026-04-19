@@ -47,7 +47,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -123,7 +123,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var (worker, _) = CreateWorker();
 
@@ -133,7 +133,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
         // Assert
         result.ShouldBeTrue();
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Completed);
         job.HandlerType.ShouldNotBeNull();
@@ -156,7 +156,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var (worker, _) = CreateWorker();
 
@@ -166,7 +166,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
         // Assert
         result.ShouldBeTrue();
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Failed);
     }
@@ -188,7 +188,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow.AddHours(2),
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var (worker, _) = CreateWorker();
 
@@ -216,7 +216,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "other",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var (worker, _) = CreateWorker(["default"]);
 
@@ -259,7 +259,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var (worker, _) = CreateWorker();
 
@@ -269,7 +269,7 @@ public abstract class WorkerTestsBase : IAsyncLifetime
         // Assert
         result.ShouldBeTrue();
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Completed);
     }

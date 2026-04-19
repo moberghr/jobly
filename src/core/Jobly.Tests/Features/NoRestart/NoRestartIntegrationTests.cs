@@ -49,7 +49,7 @@ public abstract class NoRestartIntegrationTestsBase : IntegrationTestBase
             LastKeepAlive = staleKeepAlive,
             Metadata = metadata,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Failed);
 
@@ -67,7 +67,7 @@ public abstract class NoRestartIntegrationTestsBase : IntegrationTestBase
         // Publish through the real pipeline so NoRestartPublishBehavior writes CanBeRestarted=false.
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new NoRestartAttributeRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Let the worker run it to completion so we know the behavior wrote metadata that persisted.
         await Server.WaitForJobState(jobId, State.Completed);
@@ -81,9 +81,11 @@ public abstract class NoRestartIntegrationTestsBase : IntegrationTestBase
         var ctx = Server.CreateContext();
         await ctx.Set<Job>()
             .Where(x => x.Id == jobId)
-            .ExecuteUpdateAsync(x => x
-                .SetProperty(p => p.CurrentState, State.Processing)
-                .SetProperty(p => p.LastKeepAlive, DateTime.UtcNow.AddMinutes(-10)));
+            .ExecuteUpdateAsync(
+                x => x
+                    .SetProperty(p => p.CurrentState, State.Processing)
+                    .SetProperty(p => p.LastKeepAlive, DateTime.UtcNow.AddMinutes(-10)),
+                Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Failed);
 

@@ -10,6 +10,7 @@ namespace Jobly.Tests.TestData;
 // in CI instead of 10s. That is the cost of eliminating flaky timeout mismatches across the
 // integration suite. Tests that need a shorter fail-fast cap (e.g. JoblyWorkerResilienceTests
 // verifying no-hang behavior) pass an explicit smaller timeout.
+[AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
 public class TimedFactAttribute : FactAttribute
 {
     public TimedFactAttribute(int timeout = 30_000)
@@ -18,6 +19,7 @@ public class TimedFactAttribute : FactAttribute
     }
 }
 
+[AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
 public class TimedTheoryAttribute : TheoryAttribute
 {
     public TimedTheoryAttribute(int timeout = 30_000)

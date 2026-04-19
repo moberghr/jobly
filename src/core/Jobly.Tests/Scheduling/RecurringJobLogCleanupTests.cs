@@ -26,7 +26,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
         var rj1 = new RecurringJob { Name = "rj-1", Cron = "* * * * *", CreatedAt = DateTime.UtcNow };
         var rj2 = new RecurringJob { Name = "rj-2", Cron = "* * * * *", CreatedAt = DateTime.UtcNow };
         ctx.Set<RecurringJob>().AddRange(rj1, rj2);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         for (var i = 0; i < 150; i++)
         {
@@ -46,7 +46,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -54,8 +54,8 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var rj1Count = await readCtx.Set<RecurringJobLog>().CountAsync(l => l.RecurringJobId == rj1.Id);
-        var rj2Count = await readCtx.Set<RecurringJobLog>().CountAsync(l => l.RecurringJobId == rj2.Id);
+        var rj1Count = await readCtx.Set<RecurringJobLog>().CountAsync(l => l.RecurringJobId == rj1.Id, Xunit.TestContext.Current.CancellationToken);
+        var rj2Count = await readCtx.Set<RecurringJobLog>().CountAsync(l => l.RecurringJobId == rj2.Id, Xunit.TestContext.Current.CancellationToken);
 
         rj1Count.ShouldBe(100, "Should keep only last 100 for rj1");
         rj2Count.ShouldBe(50, "Should keep all 50 for rj2 (under limit)");
@@ -68,7 +68,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         var rj = new RecurringJob { Name = "oldest-test", Cron = "* * * * *", CreatedAt = DateTime.UtcNow };
         ctx.Set<RecurringJob>().Add(rj);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         for (var i = 0; i < 110; i++)
         {
@@ -79,12 +79,12 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Get the newest entry's CreatedAt before cleanup
         var newestBefore = await _fixture.CreateContext().Set<RecurringJobLog>()
             .Where(l => l.RecurringJobId == rj.Id)
-            .MaxAsync(l => l.CreatedAt);
+            .MaxAsync(l => l.CreatedAt, Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -94,11 +94,11 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var oldest = await readCtx.Set<RecurringJobLog>()
             .Where(l => l.RecurringJobId == rj.Id)
-            .MinAsync(l => l.CreatedAt);
+            .MinAsync(l => l.CreatedAt, Xunit.TestContext.Current.CancellationToken);
 
         var count = await readCtx.Set<RecurringJobLog>()
             .Where(l => l.RecurringJobId == rj.Id)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
 
         count.ShouldBe(100);
         oldest.ShouldBeGreaterThan(newestBefore.AddMinutes(-100), "Oldest surviving entry should be within the last 100");
@@ -111,7 +111,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         var rj = new RecurringJob { Name = "exact-100", Cron = "* * * * *", CreatedAt = DateTime.UtcNow };
         ctx.Set<RecurringJob>().Add(rj);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         for (var i = 0; i < 100; i++)
         {
@@ -122,7 +122,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -130,7 +130,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
 
         // Assert — all 100 should remain
         var readCtx = _fixture.CreateContext();
-        var count = await readCtx.Set<RecurringJobLog>().CountAsync(x => x.RecurringJobId == rj.Id);
+        var count = await readCtx.Set<RecurringJobLog>().CountAsync(x => x.RecurringJobId == rj.Id, Xunit.TestContext.Current.CancellationToken);
         count.ShouldBe(100);
     }
 
@@ -141,7 +141,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
         await ExpirationCleanupTask<TestContext>.CleanupRecurringJobLogs(cleanCtx);
 
         var readCtx = _fixture.CreateContext();
-        var count = await readCtx.Set<RecurringJobLog>().CountAsync();
+        var count = await readCtx.Set<RecurringJobLog>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         count.ShouldBe(0);
     }
 }

@@ -56,14 +56,12 @@ public class Publisher<TContext> : IPublisher
     where TContext : DbContext
 {
     private readonly TContext _context;
-    private readonly JoblyConfiguration _configuration;
     private readonly TimeProvider _timeProvider;
     private readonly IServiceProvider _serviceProvider;
 
-    public Publisher(TContext context, IOptions<JoblyConfiguration> configuration, TimeProvider timeProvider, IServiceProvider serviceProvider)
+    public Publisher(TContext context, TimeProvider timeProvider, IServiceProvider serviceProvider)
     {
         _context = context;
-        _configuration = configuration.Value;
         _timeProvider = timeProvider;
         _serviceProvider = serviceProvider;
     }

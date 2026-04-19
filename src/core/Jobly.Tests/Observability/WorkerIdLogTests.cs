@@ -36,14 +36,14 @@ public abstract class WorkerIdLogTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         await svc.DeleteJob(jobId);
 
         // Assert
-        var logs = await _fixture.CreateContext().Set<JobLog>().Where(x => x.JobId == jobId).ToListAsync();
+        var logs = await _fixture.CreateContext().Set<JobLog>().Where(x => x.JobId == jobId).ToListAsync(Xunit.TestContext.Current.CancellationToken);
         var deletedLog = logs.ShouldHaveSingleItem();
         deletedLog.EventType.ShouldBe("Deleted");
         deletedLog.WorkerId.ShouldBeNull();
@@ -64,14 +64,14 @@ public abstract class WorkerIdLogTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         await svc.RequeueJob(jobId);
 
         // Assert
-        var logs = await _fixture.CreateContext().Set<JobLog>().Where(x => x.JobId == jobId).ToListAsync();
+        var logs = await _fixture.CreateContext().Set<JobLog>().Where(x => x.JobId == jobId).ToListAsync(Xunit.TestContext.Current.CancellationToken);
         var requeuedLog = logs.ShouldHaveSingleItem();
         requeuedLog.EventType.ShouldBe("Requeued");
         requeuedLog.WorkerId.ShouldBeNull();

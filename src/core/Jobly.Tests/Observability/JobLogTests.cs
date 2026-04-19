@@ -46,7 +46,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -95,9 +95,9 @@ public abstract class JobLogTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
         var jobId = await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -108,7 +108,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var logs = await readCtx.Set<JobLog>()
             .Where(l => l.JobId == jobId)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         logs.ShouldContain(l => l.EventType == "Created");
     }
@@ -118,9 +118,9 @@ public abstract class JobLogTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
         var jobId = await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -132,7 +132,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
         var logs = await readCtx.Set<JobLog>()
             .Where(l => l.JobId == jobId)
             .OrderBy(l => l.Timestamp)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         logs.ShouldContain(l => l.EventType == "Created");
         logs.ShouldContain(l => l.EventType == "Processing");
@@ -162,7 +162,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -174,7 +174,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
         var logs = await readCtx.Set<JobLog>()
             .Where(l => l.JobId == jobId)
             .OrderBy(l => l.Timestamp)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         logs.ShouldContain(l => l.EventType == "Failed" && l.Level == "Error");
         logs.ShouldNotContain(l => l.EventType == "Completed");
@@ -195,7 +195,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -205,7 +205,7 @@ public abstract class JobLogTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var logs = await readCtx.Set<JobLog>()
             .Where(l => l.JobId == jobId)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         logs.ShouldContain(l => l.EventType == "Requeued");
     }

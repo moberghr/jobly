@@ -40,7 +40,7 @@ public sealed class DatabaseTestsGenerator : IIncrementalGenerator
         var provider = context.SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: static (node, _) => node is ClassDeclarationSyntax { AttributeLists.Count: > 0 } c
-                    && c.Modifiers.Any(m => m.ValueText == "abstract"),
+                    && c.Modifiers.Any(m => string.Equals(m.ValueText, "abstract", System.StringComparison.Ordinal)),
                 transform: static (ctx, _) => GetTargetOrNull(ctx))
             .Where(static x => x is not null)!
             .Collect();
@@ -64,7 +64,7 @@ public sealed class DatabaseTestsGenerator : IIncrementalGenerator
         }
 
         var attr = symbol.GetAttributes().FirstOrDefault(a =>
-            a.AttributeClass?.ToDisplayString() == "Jobly.Tests.GenerateDatabaseTestsAttribute");
+            string.Equals(a.AttributeClass?.ToDisplayString(), "Jobly.Tests.GenerateDatabaseTestsAttribute", System.StringComparison.Ordinal));
         if (attr is null)
         {
             return null;
@@ -133,17 +133,24 @@ public sealed class DatabaseTestsGenerator : IIncrementalGenerator
     private sealed class Target(string @namespace, string baseName, FixtureKind kind)
     {
         public string Namespace { get; } = @namespace;
+
         public string BaseName { get; } = baseName;
+
         public FixtureKind Kind { get; } = kind;
 
         public override int GetHashCode() => (Namespace, BaseName, Kind).GetHashCode();
 
         public override bool Equals(object? obj) =>
-            obj is Target other && Namespace == other.Namespace && BaseName == other.BaseName && Kind == other.Kind;
+            obj is Target other
+            && string.Equals(Namespace, other.Namespace, System.StringComparison.Ordinal)
+            && string.Equals(BaseName, other.BaseName, System.StringComparison.Ordinal)
+            && Kind == other.Kind;
 
         public void Deconstruct(out string ns, out string bn, out FixtureKind k)
         {
-            ns = Namespace; bn = BaseName; k = Kind;
+            ns = Namespace;
+            bn = BaseName;
+            k = Kind;
         }
     }
 }

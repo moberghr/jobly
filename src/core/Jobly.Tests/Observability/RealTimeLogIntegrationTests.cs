@@ -20,20 +20,20 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new ProgressLogRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Processing);
 
         // Wait for monitor to flush logs (ticks every 1s)
         // JoblyTestServer uses LogFlushInterval = 100ms, so 300ms is enough to see >= 2 flushes.
-        await Task.Delay(300);
+        await Task.Delay(300, Xunit.TestContext.Current.CancellationToken);
 
         // Verify logs are in DB while job is still processing
         var ctx = Server.CreateContext();
         var handlerLogs = await ctx.Set<JobLog>()
             .Where(x => x.JobId == jobId && x.EventType == "Log")
             .OrderBy(x => x.Timestamp)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         handlerLogs.Count.ShouldBeGreaterThanOrEqualTo(2);
         handlerLogs.ShouldContain(l => l.Message.Contains("Step 1 started"));
@@ -54,17 +54,17 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new ProgressLogRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Processing);
 
         // JoblyTestServer uses LogFlushInterval = 100ms, so 300ms is enough to see >= 2 flushes.
-        await Task.Delay(300);
+        await Task.Delay(300, Xunit.TestContext.Current.CancellationToken);
 
         var ctx = Server.CreateContext();
         var handlerLogs = await ctx.Set<JobLog>()
             .Where(x => x.JobId == jobId && x.EventType == "Log")
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         handlerLogs.ShouldContain(l => l.Level == "Information" && l.Message.Contains("Step 1 started"));
         handlerLogs.ShouldContain(l => l.Level == "Warning" && l.Message.Contains("Step 1 warning"));
@@ -79,7 +79,7 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new ProgressLogRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Processing);
 
@@ -97,7 +97,7 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
         var ctx = Server.CreateContext();
         var handlerLogs = await ctx.Set<JobLog>()
             .Where(x => x.JobId == jobId && x.EventType == "Log")
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         handlerLogs.Count.ShouldBeGreaterThanOrEqualTo(2);
         handlerLogs.ShouldContain(l => l.Message.Contains("Step 1 started"));

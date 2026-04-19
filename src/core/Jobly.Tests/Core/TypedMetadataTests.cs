@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
-using Jobly.Tests.TestData.Handlers;
 using Jobly.Core.Retry;
+using Jobly.Tests.TestData.Handlers;
 using Shouldly;
 
 namespace Jobly.Tests.Core;
@@ -10,6 +10,9 @@ namespace Jobly.Tests.Core;
 [Trait("Category", "NoDb")]
 public class TypedMetadataTests
 {
+    private static readonly int[] ExpectedDelaysTriple = [15, 60, 300];
+    private static readonly int[] ExpectedDelaysPair = [15, 60];
+
     [TimedFact]
     public void IRetryMetadata_GeneratedImpl_ExtendsFromDictionary()
     {
@@ -46,7 +49,7 @@ public class TypedMetadataTests
         impl.RetryDelays = [15, 60, 300];
 
         var dict = (Dictionary<string, object>)(object)impl;
-        dict["RetryDelays"].ShouldBe(new int[] { 15, 60, 300 });
+        dict["RetryDelays"].ShouldBe(ExpectedDelaysTriple);
 
         impl.RetryDelays.Length.ShouldBe(3);
         impl.RetryDelays[0].ShouldBe(15);
@@ -65,7 +68,7 @@ public class TypedMetadataTests
     [TimedFact]
     public void IRetryMetadata_FromSerializedJson_ConvertsNativeTypes()
     {
-        var json = """{"MaxRetries":3,"RetriedTimes":1,"RetryDelays":[15,60]}""";
+        const string json = """{"MaxRetries":3,"RetriedTimes":1,"RetryDelays":[15,60]}""";
         var dict = MetadataSerializer.Deserialize(json);
         var impl = MetadataFactory.Create<IRetryMetadata>(dict);
 
@@ -194,6 +197,6 @@ public class TypedMetadataTests
 
         parameters.Metadata.ShouldNotBeNull();
         parameters.Metadata["MaxRetries"].ShouldBe(5);
-        parameters.Metadata["RetryDelays"].ShouldBe(new int[] { 15, 60 });
+        parameters.Metadata["RetryDelays"].ShouldBe(ExpectedDelaysPair);
     }
 }

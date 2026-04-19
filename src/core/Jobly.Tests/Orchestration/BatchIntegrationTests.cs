@@ -22,14 +22,14 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         var batchPublisher = Server.CreateBatchPublisher();
         var jobs = Enumerable.Range(0, 5).Select(_ => new UnitRequest()).ToList();
         var batchId = await batchPublisher.StartNew(jobs);
-        await batchPublisher.SaveChangesAsync();
+        await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
         var ctx = Server.CreateContext();
 
         // Batch job should be completed
-        var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId);
+        var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
         batch.CurrentState.ShouldBe(State.Completed);
         batch.Kind.ShouldBe(JobKind.Batch);
         batch.JobCount.ShouldBe(5);
@@ -37,7 +37,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         // All child jobs should be completed
         var childJobs = await ctx.Set<Job>()
             .Where(j => j.ParentJobId == batchId && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         childJobs.Count.ShouldBe(5);
         childJobs.ShouldAllBe(j => j.CurrentState == State.Completed);
     }
@@ -53,25 +53,25 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         var continuationJobs = Enumerable.Range(0, 2).Select(_ => new UnitRequest()).ToList();
         var continuationBatchId = await batchPublisher.ContinueBatchWith(continuationJobs, batchId);
 
-        await batchPublisher.SaveChangesAsync();
+        await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
         var ctx = Server.CreateContext();
 
         // First batch completed
-        var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId);
+        var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
         batch.CurrentState.ShouldBe(State.Completed);
 
         // Continuation batch completed
-        var continuation = await ctx.Set<Job>().FirstAsync(j => j.Id == continuationBatchId);
+        var continuation = await ctx.Set<Job>().FirstAsync(j => j.Id == continuationBatchId, Xunit.TestContext.Current.CancellationToken);
         continuation.CurrentState.ShouldBe(State.Completed);
         continuation.ParentJobId.ShouldBe(batchId);
 
         // All continuation child jobs completed
         var continuationChildren = await ctx.Set<Job>()
             .Where(j => j.ParentJobId == continuationBatchId && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         continuationChildren.Count.ShouldBe(2);
         continuationChildren.ShouldAllBe(j => j.CurrentState == State.Completed);
     }
@@ -93,15 +93,15 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         var batch3Jobs = Enumerable.Range(0, 2).Select(_ => new UnitRequest()).ToList();
         var batch3Id = await batchPublisher.ContinueBatchWith(batch3Jobs, batch2Id);
 
-        await batchPublisher.SaveChangesAsync();
+        await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
         var ctx = Server.CreateContext();
 
-        var batch1 = await ctx.Set<Job>().FirstAsync(j => j.Id == batch1Id);
-        var batch2 = await ctx.Set<Job>().FirstAsync(j => j.Id == batch2Id);
-        var batch3 = await ctx.Set<Job>().FirstAsync(j => j.Id == batch3Id);
+        var batch1 = await ctx.Set<Job>().FirstAsync(j => j.Id == batch1Id, Xunit.TestContext.Current.CancellationToken);
+        var batch2 = await ctx.Set<Job>().FirstAsync(j => j.Id == batch2Id, Xunit.TestContext.Current.CancellationToken);
+        var batch3 = await ctx.Set<Job>().FirstAsync(j => j.Id == batch3Id, Xunit.TestContext.Current.CancellationToken);
 
         batch1.CurrentState.ShouldBe(State.Completed);
         batch2.CurrentState.ShouldBe(State.Completed);
@@ -125,23 +125,23 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         var continuationJobs = new List<UnitRequest> { new() };
         var continuationBatchId = await batchPublisher.ContinueBatchWith(continuationJobs, batchId);
 
-        await batchPublisher.SaveChangesAsync();
+        await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
         var ctx = Server.CreateContext();
 
         // Batch with OnAnyFinishedState completes even when children fail
-        var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId);
+        var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
         batch.CurrentState.ShouldBe(State.Completed);
 
         // Continuation should have activated and completed because OnAnyFinishedState
-        var continuation = await ctx.Set<Job>().FirstAsync(j => j.Id == continuationBatchId);
+        var continuation = await ctx.Set<Job>().FirstAsync(j => j.Id == continuationBatchId, Xunit.TestContext.Current.CancellationToken);
         continuation.CurrentState.ShouldBe(State.Completed);
 
         var continuationChildren = await ctx.Set<Job>()
             .Where(j => j.ParentJobId == continuationBatchId && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         continuationChildren.ShouldAllBe(j => j.CurrentState == State.Completed);
     }
 
@@ -161,7 +161,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         var continuationJobs = new List<UnitRequest> { new() };
         var continuationBatchId = await batchPublisher.ContinueBatchWith(continuationJobs, batchId);
 
-        await batchPublisher.SaveChangesAsync();
+        await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait for batch to fail
         await Server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(15));
@@ -169,22 +169,22 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         // Give orchestration a few ticks (100ms interval in the test server) to confirm the
         // continuation is not activated. 500ms covers ~5 passes — more than enough to catch
         // an erroneous activation without adding 2s to the test.
-        await Task.Delay(500);
+        await Task.Delay(500, Xunit.TestContext.Current.CancellationToken);
 
         var ctx = Server.CreateContext();
 
         // Batch should be failed
-        var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId);
+        var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
         batch.CurrentState.ShouldBe(State.Failed);
 
         // Continuation stays Awaiting — condition not met, but batch could be requeued
-        var continuation = await ctx.Set<Job>().FirstAsync(j => j.Id == continuationBatchId);
+        var continuation = await ctx.Set<Job>().FirstAsync(j => j.Id == continuationBatchId, Xunit.TestContext.Current.CancellationToken);
         continuation.CurrentState.ShouldBe(State.Awaiting);
 
         // Continuation children should also stay Awaiting
         var continuationChildren = await ctx.Set<Job>()
             .Where(j => j.ParentJobId == continuationBatchId && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         continuationChildren.ShouldAllBe(j => j.CurrentState == State.Awaiting);
     }
 
@@ -196,18 +196,18 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         // Batch with OnlyOnSucceeded (default) and all-failing children should fail
         var failingJobs = new List<ThrowExceptionRequest> { new(), new() };
         var batchId = await batchPublisher.StartNew(failingJobs);
-        await batchPublisher.SaveChangesAsync();
+        await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(15));
 
         var ctx = Server.CreateContext();
 
-        var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId);
+        var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
         batch.CurrentState.ShouldBe(State.Failed);
 
         var childJobs = await ctx.Set<Job>()
             .Where(j => j.ParentJobId == batchId && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         childJobs.ShouldAllBe(j => j.CurrentState == State.Failed);
     }
 }

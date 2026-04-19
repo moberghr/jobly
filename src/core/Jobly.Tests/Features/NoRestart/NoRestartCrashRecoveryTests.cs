@@ -45,7 +45,7 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
             LastKeepAlive = DateTime.UtcNow.AddMinutes(-10),
             Metadata = metadata,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         return jobId;
     }
@@ -60,7 +60,7 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
 
         result.Requeued.ShouldBe(1);
         result.Failed.ShouldBe(0);
-        var job = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == jobId);
+        var job = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Enqueued);
         job.ExpireAt.ShouldBeNull();
     }
@@ -76,18 +76,18 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
         result.Failed.ShouldBe(1);
         result.Requeued.ShouldBe(0);
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(x => x.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(x => x.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Failed);
         job.ExpireAt.ShouldBeNull();
 
-        var counter = await readCtx.Set<Counter>().FirstOrDefaultAsync(x => x.Key == "stats:failed");
+        var counter = await readCtx.Set<Counter>().FirstOrDefaultAsync(x => x.Key == "stats:failed", Xunit.TestContext.Current.CancellationToken);
         counter.ShouldNotBeNull();
         counter.Value.ShouldBe(1);
 
         var log = await readCtx.Set<JobLog>()
             .Where(x => x.JobId == jobId)
             .Where(x => x.EventType == "Failed")
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
         log.ShouldNotBeNull();
         log.Level.ShouldBe("Error");
         log.Message.ShouldContain("opted out of restart");
@@ -101,7 +101,7 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
         await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
             _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: false);
 
-        var job = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == jobId);
+        var job = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Enqueued);
     }
 
@@ -114,11 +114,11 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
             _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: true);
 
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(x => x.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(x => x.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Failed);
         job.ExpireAt.ShouldBeNull();
 
-        var counter = await readCtx.Set<Counter>().FirstOrDefaultAsync(x => x.Key == "stats:failed");
+        var counter = await readCtx.Set<Counter>().FirstOrDefaultAsync(x => x.Key == "stats:failed", Xunit.TestContext.Current.CancellationToken);
         counter.ShouldNotBeNull();
         counter.Value.ShouldBe(1);
     }
@@ -140,13 +140,13 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
             CancellationMode = CancellationMode.Graceful,
             Metadata = SerializeCanBeRestarted(false),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
             _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: true);
 
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(x => x.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(x => x.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Deleted);
         job.CancellationMode.ShouldBe(CancellationMode.None);
         job.ExpireAt.ShouldNotBeNull();
@@ -192,7 +192,7 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
             Queue = "default",
             LastKeepAlive = stale,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var result = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
             _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: true);
@@ -201,8 +201,8 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
         result.Requeued.ShouldBe(2);
         result.Failed.ShouldBe(1);
         var readCtx = _fixture.CreateContext();
-        (await readCtx.Set<Job>().FirstAsync(x => x.Id == requeuedId)).CurrentState.ShouldBe(State.Enqueued);
-        (await readCtx.Set<Job>().FirstAsync(x => x.Id == failedId)).CurrentState.ShouldBe(State.Failed);
-        (await readCtx.Set<Job>().FirstAsync(x => x.Id == defaultId)).CurrentState.ShouldBe(State.Enqueued);
+        (await readCtx.Set<Job>().FirstAsync(x => x.Id == requeuedId, Xunit.TestContext.Current.CancellationToken)).CurrentState.ShouldBe(State.Enqueued);
+        (await readCtx.Set<Job>().FirstAsync(x => x.Id == failedId, Xunit.TestContext.Current.CancellationToken)).CurrentState.ShouldBe(State.Failed);
+        (await readCtx.Set<Job>().FirstAsync(x => x.Id == defaultId, Xunit.TestContext.Current.CancellationToken)).CurrentState.ShouldBe(State.Enqueued);
     }
 }

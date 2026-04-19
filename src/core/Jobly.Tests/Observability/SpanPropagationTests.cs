@@ -28,7 +28,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
 
     private static Publisher<TestContext> CreatePublisher(TestContext ctx)
     {
-        return new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+        return new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
     }
 
     private static BatchPublisher<TestContext> CreateBatchPublisher(TestContext ctx)
@@ -60,13 +60,13 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
 
         // Act
         var id = await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
         var job = await readCtx.Set<Job>()
             .Where(x => x.Id == id)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         job.ShouldNotBeNull();
         job.ParentSpanId.ShouldBe(activity.SpanId.ToHexString());
@@ -86,13 +86,13 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
 
             // Act
             var id = await publisher.Enqueue(new UnitRequest());
-            await ctx.SaveChangesAsync();
+            await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
             // Assert
             var readCtx = _fixture.CreateContext();
             var job = await readCtx.Set<Job>()
                 .Where(x => x.Id == id)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
             job.ShouldNotBeNull();
             job.ParentSpanId.ShouldBeNull();
@@ -117,13 +117,13 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
 
         // Act
         var id = await publisher.Publish(new SingleHandlerMessage());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
         var job = await readCtx.Set<Job>()
             .Where(x => x.Id == id)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         job.ShouldNotBeNull();
         job.ParentSpanId.ShouldBe(activity.SpanId.ToHexString());
@@ -147,20 +147,20 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
             new(),
             new(),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
         var batch = await readCtx.Set<Job>()
             .Where(x => x.Id == batchId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         batch.ShouldNotBeNull();
         batch.ParentSpanId.ShouldBe(activity.SpanId.ToHexString());
 
         var children = await readCtx.Set<Job>()
             .Where(x => x.ParentJobId == batchId)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         children.Count.ShouldBe(2);
         foreach (var child in children)
@@ -190,7 +190,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
             TraceId = Guid.NewGuid(),
             ParentSpanId = parentSpanId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = BuildScopeFactory();
 
@@ -203,7 +203,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
         var children = await readCtx.Set<Job>()
             .Where(x => x.ParentJobId == messageId)
             .Where(x => x.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         children.Count.ShouldBeGreaterThan(0);
         foreach (var child in children)
@@ -231,7 +231,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
             TraceId = Guid.NewGuid(),
             ParentSpanId = null,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = BuildScopeFactory();
 
@@ -244,7 +244,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
         var children = await readCtx.Set<Job>()
             .Where(x => x.ParentJobId == messageId)
             .Where(x => x.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         children.Count.ShouldBeGreaterThan(0);
         foreach (var child in children)
@@ -277,13 +277,13 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
         {
             // Act
             var id = await publisher.Enqueue(new UnitRequest());
-            await ctx.SaveChangesAsync();
+            await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
             // Assert
             var readCtx = _fixture.CreateContext();
             var job = await readCtx.Set<Job>()
                 .Where(x => x.Id == id)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
             job.ShouldNotBeNull();
             job.ParentSpanId.ShouldBe(activity.SpanId.ToHexString());

@@ -53,7 +53,7 @@ public class JoblyWorkerResilienceTests
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
         await worker.StartAsync(cts.Token);
 
-        var reached = await reachedSteadyState.WaitAsync(TimeSpan.FromSeconds(3));
+        var reached = await reachedSteadyState.WaitAsync(TimeSpan.FromSeconds(3), Xunit.TestContext.Current.CancellationToken);
 
         await worker.StopAsync(CancellationToken.None);
 
@@ -116,7 +116,7 @@ public class JoblyWorkerResilienceTests
         var start = DateTime.UtcNow;
         await worker.StartAsync(CancellationToken.None);
 
-        var reached = await latch.WaitAsync(TimeSpan.FromSeconds(4));
+        var reached = await latch.WaitAsync(TimeSpan.FromSeconds(4), Xunit.TestContext.Current.CancellationToken);
         var elapsedAtTenth = DateTime.UtcNow - start;
 
         await worker.StopAsync(CancellationToken.None);

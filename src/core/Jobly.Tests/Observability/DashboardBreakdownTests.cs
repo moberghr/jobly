@@ -51,7 +51,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         // 1 Failed message
         ctx.Set<Job>().Add(CreateJob(JobKind.Message, State.Failed));
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -85,7 +85,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         // 1 Deleted batch
         ctx.Set<Job>().Add(CreateJob(JobKind.Batch, State.Deleted));
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -114,7 +114,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         ctx.Set<Job>().Add(CreateJob(JobKind.Job, State.Awaiting));
         ctx.Set<Job>().Add(CreateJob(JobKind.Job, State.Deleted));
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -141,7 +141,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         ctx.Set<Job>().Add(CreateJob(JobKind.Batch, State.Awaiting));
         ctx.Set<Job>().Add(CreateJob(JobKind.Batch, State.Completed));
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -168,7 +168,7 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
         ctx.Set<Counter>().Add(new Counter { Key = "stats:succeeded", Value = 2 });
         ctx.Set<Counter>().Add(new Counter { Key = "stats:succeeded", Value = 1 });
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);

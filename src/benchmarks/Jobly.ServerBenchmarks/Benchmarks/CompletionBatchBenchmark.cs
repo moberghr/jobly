@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using BenchmarkDotNet.Attributes;
 using Jobly.Core;
 using Jobly.Core.Handlers;
@@ -22,6 +23,7 @@ namespace Jobly.ServerBenchmarks.Benchmarks;
 /// </para>
 /// </summary>
 [Config(typeof(ServerBenchmarkConfig))]
+[SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification = "BenchmarkDotNet manages lifecycle via [GlobalCleanup].")]
 public class CompletionBatchBenchmark
 {
     private PostgresServerFixture _fixture = null!;

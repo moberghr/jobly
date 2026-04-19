@@ -4,10 +4,10 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Retry;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
-using Jobly.Core.Retry;
 using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,7 +47,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -131,7 +131,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 3);
 
@@ -143,7 +143,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Failed);
         GetRetriedTimes(job).ShouldBe(3);
     }
@@ -164,9 +164,8 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
-
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 0);
 
@@ -175,7 +174,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Failed);
         GetRetriedTimes(job).ShouldBe(0);
     }
@@ -196,9 +195,8 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
-
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 2);
 
@@ -211,13 +209,13 @@ public abstract class RetryTestsBase : IAsyncLifetime
         var failedStat = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:failed")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         failedStat.ShouldBe(0);
 
         // Verify job was requeued (not failed)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Enqueued);
         GetRetriedTimes(job).ShouldBe(1);
     }
@@ -238,9 +236,8 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
-
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 3);
 
@@ -251,17 +248,19 @@ public abstract class RetryTestsBase : IAsyncLifetime
         var updateCtx = _fixture.CreateContext();
         await updateCtx.Set<Job>()
             .Where(x => x.Id == jobId)
-            .ExecuteUpdateAsync(x => x
-                .SetProperty(p => p.Type, typeof(UnitRequest).AssemblyQualifiedName)
-                .SetProperty(p => p.Message, JsonSerializer.Serialize(new UnitRequest()))
-                .SetProperty(p => p.HandlerType, (string?)null));
+            .ExecuteUpdateAsync(
+                x => x
+                    .SetProperty(p => p.Type, typeof(UnitRequest).AssemblyQualifiedName)
+                    .SetProperty(p => p.Message, JsonSerializer.Serialize(new UnitRequest()))
+                    .SetProperty(p => p.HandlerType, (string?)null),
+                Xunit.TestContext.Current.CancellationToken);
 
         // Process again — should succeed
         await worker.GetAndProcessJob(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Completed);
         GetRetriedTimes(job).ShouldBe(1);
     }
@@ -283,9 +282,8 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = now,
             ScheduleTime = now,
             Queue = "default",
-
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 1, delays: [3600]);
 
@@ -294,7 +292,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         // Assert — job should be requeued with future ScheduleTime
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Enqueued);
         job.ScheduleTime.ShouldBeGreaterThan(now.AddSeconds(3500));
     }
@@ -315,9 +313,8 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
-
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 3, delays: [10, 20]);
 
@@ -329,14 +326,16 @@ public abstract class RetryTestsBase : IAsyncLifetime
             await resetCtx.Set<Job>()
                 .Where(x => x.Id == jobId)
                 .Where(x => x.CurrentState == State.Enqueued)
-                .ExecuteUpdateAsync(x => x.SetProperty(p => p.ScheduleTime, DateTime.UtcNow));
+                .ExecuteUpdateAsync(
+                    x => x.SetProperty(p => p.ScheduleTime, DateTime.UtcNow),
+                    Xunit.TestContext.Current.CancellationToken);
 
             await worker.GetAndProcessJob(CancellationToken.None);
         }
 
         // Assert — 3rd retry should use last delay (20s)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         GetRetriedTimes(job).ShouldBe(3);
         job.ScheduleTime.ShouldBeGreaterThan(DateTime.UtcNow.AddSeconds(15));
     }
@@ -358,9 +357,8 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = originalScheduleTime,
             ScheduleTime = originalScheduleTime,
             Queue = "default",
-
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 1, delays: []);
 
@@ -369,7 +367,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         // Assert — ScheduleTime should still be in the past (no delay applied)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Enqueued);
         job.ScheduleTime.ShouldBeLessThanOrEqualTo(TimeProvider.System.GetUtcNow().UtcDateTime);
     }
@@ -390,9 +388,8 @@ public abstract class RetryTestsBase : IAsyncLifetime
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
-
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 1, delays: [3600]);
 
@@ -430,7 +427,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
             Metadata = metadata,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Global config has 60s delay, but per-job has 7200s
         var worker = CreateWorker(maxRetries: 1, delays: [60]);
@@ -440,7 +437,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         // Assert — should use per-job delay (7200s), not global (60s)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ScheduleTime.ShouldBeGreaterThan(now.AddSeconds(7000));
     }
 
@@ -467,7 +464,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
             Metadata = metadata,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Global config has 0 retries, but per-job metadata has 2
         var worker = CreateWorker(maxRetries: 0);
@@ -480,7 +477,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         // Assert — should have retried 2 times (from metadata), then failed
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Failed);
         GetRetriedTimes(job).ShouldBe(2);
     }
@@ -502,7 +499,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 0);
 
@@ -511,7 +508,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Enqueued);
         GetRetriedTimes(job).ShouldBe(1);
     }
@@ -533,7 +530,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 0);
 
@@ -542,7 +539,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Enqueued);
         GetRetriedTimes(job).ShouldBe(1);
     }
@@ -564,7 +561,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 0);
 
@@ -575,14 +572,16 @@ public abstract class RetryTestsBase : IAsyncLifetime
             await resetCtx.Set<Job>()
                 .Where(x => x.Id == jobId)
                 .Where(x => x.CurrentState == State.Enqueued)
-                .ExecuteUpdateAsync(x => x.SetProperty(p => p.ScheduleTime, DateTime.UtcNow));
+                .ExecuteUpdateAsync(
+                    x => x.SetProperty(p => p.ScheduleTime, DateTime.UtcNow),
+                    Xunit.TestContext.Current.CancellationToken);
 
             await worker.GetAndProcessJob(CancellationToken.None);
         }
 
         // Assert — should have used handler's 7 retries (not job's 2)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Failed);
         GetRetriedTimes(job).ShouldBe(7);
     }
@@ -609,7 +608,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             Queue = "default",
             Metadata = metadata,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 0);
 
@@ -621,7 +620,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         // Assert — should have used metadata's 1 retry (not handler attribute's 5)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Failed);
         GetRetriedTimes(job).ShouldBe(1);
     }
@@ -644,7 +643,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             ScheduleTime = now,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Global has 10s delay, attribute has 100s
         var worker = CreateWorker(maxRetries: 0, delays: [10]);
@@ -654,7 +653,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         // Assert — should use attribute's 100s delay (not global 10s)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Enqueued);
         job.ScheduleTime.ShouldBeGreaterThan(now.AddSeconds(90));
     }
@@ -677,7 +676,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             ScheduleTime = now,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 1, delays: [100], jitterFactor: 0);
 
@@ -688,7 +687,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         // Assert — ScheduleTime ≈ now + 100s (no jitter)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(100).AddSeconds(-1));
         job.ScheduleTime.ShouldBeLessThanOrEqualTo(after.AddSeconds(100).AddSeconds(1));
     }
@@ -716,7 +715,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
                 ScheduleTime = now,
                 Queue = "default",
             });
-            await ctx.SaveChangesAsync();
+            await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
             var before = DateTime.UtcNow;
 
@@ -727,7 +726,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
             // Assert — each ScheduleTime ∈ [now + 50s, now + 150s]
             var readCtx = _fixture.CreateContext();
-            var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+            var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
             job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(50).AddSeconds(-1));
             job.ScheduleTime.ShouldBeLessThanOrEqualTo(after.AddSeconds(150).AddSeconds(1));
             scheduleTimes.Add(job.ScheduleTime);
@@ -758,25 +757,26 @@ public abstract class RetryTestsBase : IAsyncLifetime
             ScheduleTime = now,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 3, delays: [30]);
 
         await worker.GetAndProcessJob(CancellationToken.None);
 
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         var log = await readCtx.Set<JobLog>()
             .Where(x => x.JobId == jobId)
             .Where(x => x.EventType == "Requeued")
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         log.ShouldNotBeNull();
+
         // Assert the log contains the scheduled-at marker and a parseable timestamp close to
         // the persisted ScheduleTime. Exact string equality is brittle across DB backends
         // (Postgres truncates to microseconds while .NET DateTime has 100-ns precision).
         log.Message.ShouldContain("next attempt scheduled:");
-        var marker = "next attempt scheduled: ";
+        const string marker = "next attempt scheduled: ";
         var startIndex = log.Message.IndexOf(marker, StringComparison.Ordinal) + marker.Length;
         var endIndex = log.Message.IndexOf(')', startIndex);
         var logged = DateTime.Parse(log.Message[startIndex..endIndex], System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind);
@@ -801,7 +801,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             ScheduleTime = now,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 1, delays: [100], jitterFactor: 5.0);
 
@@ -814,7 +814,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         // `before` (not `before.AddSeconds(-1)`): jitter must never produce a delay so
         // negative that the schedule lands in the past, otherwise the job runs immediately.
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(before);
         job.ScheduleTime.ShouldBeLessThanOrEqualTo(after.AddSeconds(200).AddSeconds(1));
     }
@@ -837,7 +837,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             ScheduleTime = now,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 1, delays: [100], jitterFactor: -1.0);
 
@@ -848,7 +848,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         // Assert — clamped to 0, so ScheduleTime ≈ now + 100s (no jitter)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(100).AddSeconds(-1));
         job.ScheduleTime.ShouldBeLessThanOrEqualTo(after.AddSeconds(100).AddSeconds(1));
     }
@@ -875,7 +875,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
                 ScheduleTime = now,
                 Queue = "default",
             });
-            await ctx.SaveChangesAsync();
+            await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
             var before = DateTime.UtcNow;
 
@@ -884,7 +884,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
             // Assert — ScheduleTime must never be before 'before' (no negative delay)
             var readCtx = _fixture.CreateContext();
-            var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+            var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
             job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(-1));
         }
     }
@@ -907,7 +907,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
             ScheduleTime = originalScheduleTime,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(maxRetries: 1, delays: [], jitterFactor: 0.5);
 
@@ -916,7 +916,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         // Assert — ScheduleTime should remain in the past (empty-delays short-circuit preserved)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Enqueued);
         job.ScheduleTime.ShouldBeLessThanOrEqualTo(TimeProvider.System.GetUtcNow().UtcDateTime);
     }

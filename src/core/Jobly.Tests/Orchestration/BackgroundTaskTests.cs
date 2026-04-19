@@ -28,7 +28,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         ctx.Set<Counter>().Add(new Counter { Key = "stats:succeeded", Value = 3 });
         ctx.Set<Counter>().Add(new Counter { Key = "stats:succeeded", Value = 5 });
         ctx.Set<Counter>().Add(new Counter { Key = "stats:failed", Value = 2 });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var aggCtx = _fixture.CreateContext();
@@ -36,11 +36,11 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var succeeded = await readCtx.Set<Statistic>().FindAsync("stats:succeeded");
+        var succeeded = await readCtx.Set<Statistic>().FindAsync(["stats:succeeded"], Xunit.TestContext.Current.CancellationToken);
         succeeded.ShouldNotBeNull();
         succeeded.Value.ShouldBe(8);
 
-        var failed = await readCtx.Set<Statistic>().FindAsync("stats:failed");
+        var failed = await readCtx.Set<Statistic>().FindAsync(["stats:failed"], Xunit.TestContext.Current.CancellationToken);
         failed.ShouldNotBeNull();
         failed.Value.ShouldBe(2);
     }
@@ -52,7 +52,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         ctx.Set<Counter>().Add(new Counter { Key = "stats:succeeded", Value = 1 });
         ctx.Set<Counter>().Add(new Counter { Key = "stats:failed", Value = 1 });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var aggCtx = _fixture.CreateContext();
@@ -60,7 +60,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var counters = await readCtx.Set<Counter>().ToListAsync();
+        var counters = await readCtx.Set<Counter>().ToListAsync(Xunit.TestContext.Current.CancellationToken);
         counters.Count.ShouldBe(0);
     }
 
@@ -81,7 +81,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ExpireAt = DateTime.UtcNow.AddHours(-1),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -89,7 +89,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldBeNull();
     }
 
@@ -109,7 +109,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ExpireAt = DateTime.UtcNow.AddHours(2),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -117,7 +117,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
     }
 
@@ -137,7 +137,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ExpireAt = null,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -145,7 +145,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
     }
 
@@ -166,7 +166,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
             Queue = "default",
             LastKeepAlive = DateTime.UtcNow.AddMinutes(-10),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var recoveryCtx = _fixture.CreateContext();
@@ -175,7 +175,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         // Assert
         result.Requeued.ShouldBe(1);
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Enqueued);
     }
@@ -196,7 +196,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
             Queue = "default",
             LastKeepAlive = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var recoveryCtx = _fixture.CreateContext();
@@ -205,7 +205,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         // Assert
         result.Total.ShouldBe(0);
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Processing);
     }
@@ -224,7 +224,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
             LastHeartbeatTime = DateTime.UtcNow.AddMinutes(-10),
             ServiceCount = 1,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -233,7 +233,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         // Assert
         count.ShouldBe(1);
         var readCtx = _fixture.CreateContext();
-        var server = await readCtx.Set<Server>().FirstOrDefaultAsync(s => s.Id == serverId);
+        var server = await readCtx.Set<Server>().FirstOrDefaultAsync(s => s.Id == serverId, Xunit.TestContext.Current.CancellationToken);
         server.ShouldBeNull();
     }
 
@@ -257,7 +257,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         ctx.Set<Statistic>().Add(new Statistic { Key = "stats:completed", Value = 100 });
         ctx.Set<Counter>().Add(new Counter { Key = "stats:completed", Value = 5 });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var aggCtx = _fixture.CreateContext();
@@ -265,11 +265,11 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Assert — should increment existing stat, not create a new one
         var readCtx = _fixture.CreateContext();
-        var stat = await readCtx.Set<Statistic>().FindAsync("stats:completed");
+        var stat = await readCtx.Set<Statistic>().FindAsync(["stats:completed"], Xunit.TestContext.Current.CancellationToken);
         stat.ShouldNotBeNull();
         stat.Value.ShouldBe(105);
 
-        var statCount = await readCtx.Set<Statistic>().CountAsync(x => x.Key == "stats:completed");
+        var statCount = await readCtx.Set<Statistic>().CountAsync(x => x.Key == "stats:completed", Xunit.TestContext.Current.CancellationToken);
         statCount.ShouldBe(1);
     }
 
@@ -279,7 +279,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         // Arrange — counter for a key that has no existing stat
         var ctx = _fixture.CreateContext();
         ctx.Set<Counter>().Add(new Counter { Key = "stats:new-key", Value = 3 });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var aggCtx = _fixture.CreateContext();
@@ -287,7 +287,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Assert — should create new stat with correct value
         var readCtx = _fixture.CreateContext();
-        var stat = await readCtx.Set<Statistic>().FindAsync("stats:new-key");
+        var stat = await readCtx.Set<Statistic>().FindAsync(["stats:new-key"], Xunit.TestContext.Current.CancellationToken);
         stat.ShouldNotBeNull();
         stat.Value.ShouldBe(3);
     }

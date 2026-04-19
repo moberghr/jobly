@@ -46,7 +46,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -95,9 +95,9 @@ public abstract class RetentionTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
         var jobId = await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -106,7 +106,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Completed);
         job.ExpireAt.ShouldNotBeNull();
@@ -130,7 +130,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -139,7 +139,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Failed);
         job.ExpireAt.ShouldBeNull();
@@ -150,15 +150,15 @@ public abstract class RetentionTestsBase : IAsyncLifetime
     {
         // Arrange
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
 
         var statBefore = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -171,7 +171,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         var statAfter = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         statAfter.ShouldBe(statBefore + 1);
     }
@@ -186,7 +186,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         var statBefore = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:failed")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         ctx.Set<Job>().Add(new Job
         {
@@ -199,7 +199,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -212,7 +212,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         var statAfter = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:failed")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         statAfter.ShouldBe(statBefore + 1);
     }
@@ -232,12 +232,12 @@ public abstract class RetentionTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var statBefore = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:deleted")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -249,7 +249,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         var statAfter = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:deleted")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         statAfter.ShouldBe(statBefore + 1);
     }
@@ -259,9 +259,9 @@ public abstract class RetentionTestsBase : IAsyncLifetime
     {
         // Arrange — enqueue and process a job so stats:succeeded is incremented
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
         var jobId = await publisher.Enqueue(new UnitRequest());
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
         await worker.GetAndProcessJob(CancellationToken.None);
@@ -271,7 +271,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         var succeededBefore = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -283,7 +283,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         var succeededAfter = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         succeededAfter.ShouldBe(succeededBefore - 1);
     }
@@ -313,7 +313,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
             Level = "Information",
             Message = "Test log entry",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -323,10 +323,10 @@ public abstract class RetentionTestsBase : IAsyncLifetime
         cleaned.ShouldBeGreaterThanOrEqualTo(1);
 
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldBeNull();
 
-        var logs = await readCtx.Set<JobLog>().Where(l => l.JobId == jobId).ToListAsync();
+        var logs = await readCtx.Set<JobLog>().Where(l => l.JobId == jobId).ToListAsync(Xunit.TestContext.Current.CancellationToken);
         logs.ShouldBeEmpty();
     }
 }

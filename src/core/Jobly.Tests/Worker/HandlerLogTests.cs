@@ -46,7 +46,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -108,7 +108,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -119,7 +119,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var logs = await readCtx.Set<JobLog>()
             .Where(l => l.JobId == jobId && l.EventType == "Log")
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         logs.Count.ShouldBeGreaterThanOrEqualTo(2);
         logs.ShouldContain(l => l.Message.Contains("Processing logging request", StringComparison.Ordinal));
@@ -143,7 +143,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -154,7 +154,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var logs = await readCtx.Set<JobLog>()
             .Where(l => l.JobId == jobId && l.EventType == "Log")
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         var infoLog = logs.First(l => l.Message.Contains("Processing logging request", StringComparison.Ordinal));
         infoLog.Level.ShouldBe("Information");
@@ -180,7 +180,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -189,12 +189,12 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Failed);
 
         var handlerLogs = await readCtx.Set<JobLog>()
             .Where(l => l.JobId == jobId && l.EventType == "Log")
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         handlerLogs.ShouldContain(l => l.Message.Contains("About to fail", StringComparison.Ordinal));
     }
@@ -229,7 +229,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow.AddMilliseconds(1),
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -242,11 +242,11 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
 
         var logs1 = await readCtx.Set<JobLog>()
             .Where(l => l.JobId == jobId1 && l.EventType == "Log")
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         var logs2 = await _fixture.CreateContext().Set<JobLog>()
             .Where(l => l.JobId == jobId2 && l.EventType == "Log")
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Job 1 (LoggingRequest) should not contain "About to fail" from ErrorLoggingRequest
         logs1.ShouldNotContain(l => l.Message.Contains("About to fail", StringComparison.Ordinal));
@@ -276,7 +276,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(enableHandlerLogging: false);
 
@@ -288,7 +288,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
         var handlerLogs = await readCtx.Set<JobLog>()
             .Where(x => x.JobId == jobId)
             .Where(x => x.EventType == "Log")
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         handlerLogs.ShouldBeEmpty();
     }
@@ -310,7 +310,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(enableHandlerLogging: false);
 
@@ -321,7 +321,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var allLogs = await readCtx.Set<JobLog>()
             .Where(x => x.JobId == jobId)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         allLogs.ShouldContain(x => string.Equals(x.EventType, "Processing", StringComparison.Ordinal));
         allLogs.ShouldContain(x => string.Equals(x.EventType, "Completed", StringComparison.Ordinal));

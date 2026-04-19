@@ -50,7 +50,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             NextExecution = pastTime,
         };
         ctx.Set<RecurringJob>().Add(recurringJob);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
         {
@@ -58,9 +58,9 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             JobId = nextJobId,
             CreatedAt = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var jobCountBefore = await _fixture.CreateContext().Set<Job>().CountAsync();
+        var jobCountBefore = await _fixture.CreateContext().Set<Job>().CountAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var schedCtx = _fixture.CreateContext();
@@ -69,7 +69,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         // Assert — should skip because the pending job still exists
         count.ShouldBe(0);
 
-        var jobCountAfter = await _fixture.CreateContext().Set<Job>().CountAsync();
+        var jobCountAfter = await _fixture.CreateContext().Set<Job>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         jobCountAfter.ShouldBe(jobCountBefore);
     }
 
@@ -104,7 +104,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
                 NextExecution = pastTime,
             };
             ctx.Set<RecurringJob>().Add(recurringJob);
-            await ctx.SaveChangesAsync();
+            await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
             ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
             {
@@ -114,7 +114,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var schedCtx = _fixture.CreateContext();
@@ -153,7 +153,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             NextExecution = pastTime,
         };
         ctx.Set<RecurringJob>().Add(recurringJob);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
         {
@@ -161,7 +161,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             JobId = nextJobId,
             CreatedAt = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var schedCtx = _fixture.CreateContext();
@@ -169,7 +169,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert — NextExecution should be updated to a future time
         var readCtx = _fixture.CreateContext();
-        var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "next-exec-test");
+        var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "next-exec-test", Xunit.TestContext.Current.CancellationToken);
         rj.NextExecution.ShouldNotBeNull();
         rj.NextExecution.Value.ShouldBeGreaterThan(DateTime.UtcNow);
     }
@@ -203,7 +203,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             NextExecution = pastTime,
         };
         ctx.Set<RecurringJob>().Add(recurringJob);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
         {
@@ -211,7 +211,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             JobId = nextJobId,
             CreatedAt = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var schedCtx = _fixture.CreateContext();
@@ -219,7 +219,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert — LastExecution should be set (was the previous NextExecution)
         var readCtx = _fixture.CreateContext();
-        var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "last-exec-test");
+        var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "last-exec-test", Xunit.TestContext.Current.CancellationToken);
         rj.LastExecution.ShouldNotBeNull();
         rj.LastExecution.Value.ShouldBe(pastTime, TimeSpan.FromSeconds(1));
     }
@@ -241,7 +241,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             DisabledAt = DateTime.UtcNow.AddMinutes(-20),
         };
         ctx.Set<RecurringJob>().Add(recurringJob);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var schedCtx = _fixture.CreateContext();
@@ -253,7 +253,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var log = await readCtx.Set<RecurringJobLog>()
             .Where(l => l.RecurringJobId == recurringJob.Id)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
         log.ShouldNotBeNull();
         log.Skipped.ShouldBeTrue();
         log.JobId.ShouldBeNull();
@@ -275,16 +275,16 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             NextExecution = pastTime,
             DisabledAt = DateTime.UtcNow.AddMinutes(-20),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var jobCountBefore = await _fixture.CreateContext().Set<Job>().CountAsync();
+        var jobCountBefore = await _fixture.CreateContext().Set<Job>().CountAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var schedCtx = _fixture.CreateContext();
         await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
 
         // Assert
-        var jobCountAfter = await _fixture.CreateContext().Set<Job>().CountAsync();
+        var jobCountAfter = await _fixture.CreateContext().Set<Job>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         jobCountAfter.ShouldBe(jobCountBefore);
     }
 
@@ -304,7 +304,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             NextExecution = pastTime,
             DisabledAt = DateTime.UtcNow.AddMinutes(-20),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var schedCtx = _fixture.CreateContext();
@@ -312,7 +312,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "disabled-next-exec-test");
+        var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "disabled-next-exec-test", Xunit.TestContext.Current.CancellationToken);
         rj.NextExecution.ShouldNotBeNull();
         rj.NextExecution.Value.ShouldBeGreaterThan(DateTime.UtcNow);
     }
@@ -333,7 +333,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             NextExecution = pastTime,
             DisabledAt = DateTime.UtcNow.AddMinutes(-20),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var schedCtx = _fixture.CreateContext();
@@ -341,7 +341,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "disabled-last-exec-test");
+        var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "disabled-last-exec-test", Xunit.TestContext.Current.CancellationToken);
         rj.LastExecution.ShouldNotBeNull();
         rj.LastExecution.Value.ShouldBe(pastTime, TimeSpan.FromSeconds(1));
     }
@@ -376,7 +376,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             DisabledAt = null,
         };
         ctx.Set<RecurringJob>().Add(recurringJob);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
         {
@@ -384,9 +384,9 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             JobId = nextJobId,
             CreatedAt = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var jobCountBefore = await _fixture.CreateContext().Set<Job>().CountAsync();
+        var jobCountBefore = await _fixture.CreateContext().Set<Job>().CountAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var schedCtx = _fixture.CreateContext();
@@ -395,13 +395,13 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         // Assert — should create a real job
         count.ShouldBe(1);
 
-        var jobCountAfter = await _fixture.CreateContext().Set<Job>().CountAsync();
+        var jobCountAfter = await _fixture.CreateContext().Set<Job>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         jobCountAfter.ShouldBe(jobCountBefore + 1);
 
         var log = await _fixture.CreateContext().Set<RecurringJobLog>()
             .Where(l => l.RecurringJobId == recurringJob.Id)
             .OrderByDescending(l => l.CreatedAt)
-            .FirstAsync();
+            .FirstAsync(Xunit.TestContext.Current.CancellationToken);
         log.Skipped.ShouldBeFalse();
         log.JobId.ShouldNotBeNull();
     }
@@ -423,7 +423,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             NextExecution = now,
         };
         ctx.Set<RecurringJob>().Add(recurringJob);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var tp = new FakeTimeProvider(now);
@@ -451,7 +451,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             NextExecution = now.AddMinutes(5),
         };
         ctx.Set<RecurringJob>().Add(recurringJob);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var schedCtx = _fixture.CreateContext();
@@ -504,7 +504,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             NextExecution = now.AddMinutes(-1),
         };
         ctx.Set<RecurringJob>().Add(recurringJob);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Old log (completed job) — should NOT be the one checked
         ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
@@ -513,6 +513,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             JobId = oldJobId,
             CreatedAt = now.AddMinutes(-10),
         });
+
         // Latest log (enqueued job) — should BE the one checked
         ctx.Set<RecurringJobLog>().Add(new RecurringJobLog
         {
@@ -520,7 +521,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
             JobId = newJobId,
             CreatedAt = now.AddMinutes(-1),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var schedCtx = _fixture.CreateContext();

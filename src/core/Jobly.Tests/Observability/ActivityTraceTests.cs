@@ -47,7 +47,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -115,7 +115,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
             Queue = "default",
             TraceId = traceId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var (worker, capture) = CreateWorker();
 
@@ -144,7 +144,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
             Queue = "default",
             TraceId = Guid.NewGuid(),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var (worker, capture) = CreateWorker();
 
@@ -174,7 +174,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
             Queue = "default",
             TraceId = null,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var (worker, capture) = CreateWorker();
 
@@ -205,7 +205,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
             TraceId = Guid.NewGuid(),
             ParentSpanId = parentSpanId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var (worker, capture) = CreateWorker();
 
@@ -235,7 +235,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
             TraceId = Guid.NewGuid(),
             ParentSpanId = null,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var (worker, capture) = CreateWorker();
 
@@ -264,7 +264,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
             Queue = "default",
             TraceId = Guid.NewGuid(),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var (worker, _) = CreateWorker();
 
@@ -293,7 +293,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
             Queue = "default",
             TraceId = Guid.NewGuid(),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var (worker, _) = CreateWorker();
 
@@ -335,7 +335,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
             Queue = "default",
             TraceId = traceId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Use shared capture — second execution overwrites first
         var (worker, capture) = CreateWorker();
@@ -372,7 +372,7 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
             Queue = "default",
             TraceId = Guid.NewGuid(),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var (worker, capture) = CreateWorker();
 

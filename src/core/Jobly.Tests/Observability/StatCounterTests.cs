@@ -36,7 +36,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -46,7 +46,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var counterSum = await readCtx.Set<Counter>()
             .Where(c => c.Key == "stats:succeeded")
-            .SumAsync(c => c.Value);
+            .SumAsync(c => c.Value, Xunit.TestContext.Current.CancellationToken);
         counterSum.ShouldBe(-1);
     }
 
@@ -65,7 +65,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -75,7 +75,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var counterSum = await readCtx.Set<Counter>()
             .Where(c => c.Key == "stats:failed")
-            .SumAsync(c => c.Value);
+            .SumAsync(c => c.Value, Xunit.TestContext.Current.CancellationToken);
         counterSum.ShouldBe(-1);
     }
 
@@ -95,7 +95,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
             Queue = "default",
             ExpireAt = DateTime.UtcNow.AddDays(1),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -103,7 +103,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
 
         // Assert — no counter rows should be created because it was already Deleted
         var readCtx = _fixture.CreateContext();
-        var counterCount = await readCtx.Set<Counter>().CountAsync();
+        var counterCount = await readCtx.Set<Counter>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         counterCount.ShouldBe(0);
     }
 
@@ -122,7 +122,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -132,7 +132,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var deletedCounterSum = await readCtx.Set<Counter>()
             .Where(c => c.Key == "stats:deleted")
-            .SumAsync(c => c.Value);
+            .SumAsync(c => c.Value, Xunit.TestContext.Current.CancellationToken);
         deletedCounterSum.ShouldBe(1);
     }
 
@@ -151,7 +151,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -161,7 +161,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var counterSum = await readCtx.Set<Counter>()
             .Where(c => c.Key == "stats:succeeded")
-            .SumAsync(c => c.Value);
+            .SumAsync(c => c.Value, Xunit.TestContext.Current.CancellationToken);
         counterSum.ShouldBe(-1);
     }
 
@@ -180,7 +180,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -190,7 +190,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var counterSum = await readCtx.Set<Counter>()
             .Where(c => c.Key == "stats:failed")
-            .SumAsync(c => c.Value);
+            .SumAsync(c => c.Value, Xunit.TestContext.Current.CancellationToken);
         counterSum.ShouldBe(-1);
     }
 
@@ -209,7 +209,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -217,7 +217,7 @@ public abstract class StatCounterTestsBase : IAsyncLifetime
 
         // Assert — no counter rows should be created because it was already Enqueued
         var readCtx = _fixture.CreateContext();
-        var counterCount = await readCtx.Set<Counter>().CountAsync();
+        var counterCount = await readCtx.Set<Counter>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         counterCount.ShouldBe(0);
     }
 }

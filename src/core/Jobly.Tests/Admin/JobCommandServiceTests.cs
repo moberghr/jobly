@@ -36,7 +36,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -44,7 +44,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Deleted);
     }
@@ -64,7 +64,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -72,7 +72,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.ExpireAt.ShouldNotBeNull();
     }
@@ -92,7 +92,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -100,7 +100,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var logs = await readCtx.Set<JobLog>().Where(l => l.JobId == jobId).ToListAsync();
+        var logs = await readCtx.Set<JobLog>().Where(l => l.JobId == jobId).ToListAsync(Xunit.TestContext.Current.CancellationToken);
         logs.ShouldContain(l => l.EventType == "Deleted");
     }
 
@@ -120,14 +120,14 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
             Queue = "default",
             ExpireAt = DateTime.UtcNow.AddDays(1),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act & Assert — should not throw
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
         await svc.DeleteJob(jobId);
 
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Deleted);
     }
@@ -147,7 +147,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -155,7 +155,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Enqueued);
     }
@@ -176,7 +176,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
             Queue = "default",
             ExpireAt = DateTime.UtcNow.AddDays(1),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -184,7 +184,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.ExpireAt.ShouldBeNull();
     }
@@ -218,7 +218,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
             ParentJobId = parentId,
             ExpireAt = DateTime.UtcNow.AddDays(1),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -226,7 +226,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var parent = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == parentId);
+        var parent = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == parentId, Xunit.TestContext.Current.CancellationToken);
         parent.ShouldNotBeNull();
         parent.CurrentState.ShouldBe(State.Processing);
     }
@@ -261,7 +261,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
             ParentJobId = parentId,
             ExpireAt = DateTime.UtcNow.AddDays(1),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -269,7 +269,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var parent = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == parentId);
+        var parent = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == parentId, Xunit.TestContext.Current.CancellationToken);
         parent.ShouldNotBeNull();
         parent.CurrentState.ShouldBe(State.Awaiting);
     }
@@ -303,7 +303,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
             ParentJobId = parentId,
             HandlerType = handlerType,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -311,7 +311,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == childId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == childId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.HandlerType.ShouldBe(handlerType);
     }
@@ -333,7 +333,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
             Queue = "default",
             HandlerType = "Some.Handler.Type, SomeAssembly",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -341,7 +341,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.HandlerType.ShouldBeNull();
     }
@@ -365,7 +365,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -374,7 +374,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         // Assert
         result.Succeeded.ShouldBe(3);
         var readCtx = _fixture.CreateContext();
-        var jobs = await readCtx.Set<Job>().Where(j => ids.Contains(j.Id)).ToListAsync();
+        var jobs = await readCtx.Set<Job>().Where(j => ids.Contains(j.Id)).ToListAsync(Xunit.TestContext.Current.CancellationToken);
         jobs.ShouldAllBe(j => j.CurrentState == State.Deleted);
     }
 
@@ -397,7 +397,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -406,7 +406,7 @@ public abstract class JobCommandServiceTestsBase : IAsyncLifetime
         // Assert
         result.Succeeded.ShouldBe(3);
         var readCtx = _fixture.CreateContext();
-        var jobs = await readCtx.Set<Job>().Where(j => ids.Contains(j.Id)).ToListAsync();
+        var jobs = await readCtx.Set<Job>().Where(j => ids.Contains(j.Id)).ToListAsync(Xunit.TestContext.Current.CancellationToken);
         jobs.ShouldAllBe(j => j.CurrentState == State.Enqueued);
     }
 }

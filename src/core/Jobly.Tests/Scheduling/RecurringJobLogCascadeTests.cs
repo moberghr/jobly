@@ -26,7 +26,7 @@ public abstract class RecurringJobLogCascadeTestsBase : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         var rj = new RecurringJob { Name = "cascade-test", Cron = "* * * * *", CreatedAt = DateTime.UtcNow };
         ctx.Set<RecurringJob>().Add(rj);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var jobId = Guid.NewGuid();
         ctx.Set<Job>().Add(new Job
@@ -45,7 +45,7 @@ public abstract class RecurringJobLogCascadeTestsBase : IAsyncLifetime
             JobId = jobId,
             CreatedAt = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act: delete the job via expiration cleanup (simulates real cleanup)
         var cleanCtx = _fixture.CreateContext();
@@ -53,11 +53,11 @@ public abstract class RecurringJobLogCascadeTestsBase : IAsyncLifetime
 
         // Assert: log entry survives with JobId set to null
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldBeNull("Job should be cleaned up");
 
         var log = await readCtx.Set<RecurringJobLog>()
-            .FirstOrDefaultAsync(l => l.RecurringJobId == rj.Id);
+            .FirstOrDefaultAsync(l => l.RecurringJobId == rj.Id, Xunit.TestContext.Current.CancellationToken);
         log.ShouldNotBeNull("Log entry should survive");
         log.JobId.ShouldBeNull("JobId should be set to null by cascade");
     }
@@ -69,7 +69,7 @@ public abstract class RecurringJobLogCascadeTestsBase : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         var rj = new RecurringJob { Name = "exists-test", Cron = "* * * * *", CreatedAt = DateTime.UtcNow };
         ctx.Set<RecurringJob>().Add(rj);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var jobId = Guid.NewGuid();
         ctx.Set<Job>().Add(new Job
@@ -87,12 +87,12 @@ public abstract class RecurringJobLogCascadeTestsBase : IAsyncLifetime
             JobId = jobId,
             CreatedAt = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert: log entry has JobId set
         var readCtx = _fixture.CreateContext();
         var log = await readCtx.Set<RecurringJobLog>()
-            .FirstOrDefaultAsync(l => l.RecurringJobId == rj.Id);
+            .FirstOrDefaultAsync(l => l.RecurringJobId == rj.Id, Xunit.TestContext.Current.CancellationToken);
         log.ShouldNotBeNull();
         log.JobId.ShouldBe(jobId);
     }

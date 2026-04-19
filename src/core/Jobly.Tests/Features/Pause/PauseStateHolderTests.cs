@@ -106,22 +106,24 @@ public class PauseStateHolderTests
         using var readerStarted = new ManualResetEventSlim(false);
 
         // Reader: continuously check IsPaused — should always be true
-        var readerTask = Task.Run(() =>
-        {
-            readerStarted.Set();
-            while (!Volatile.Read(ref readerDone))
+        var readerTask = Task.Run(
+            () =>
             {
-                if (!holder.IsPaused(groupId))
+                readerStarted.Set();
+                while (!Volatile.Read(ref readerDone))
                 {
-                    Interlocked.Increment(ref tornReadsDetected);
-                }
+                    if (!holder.IsPaused(groupId))
+                    {
+                        Interlocked.Increment(ref tornReadsDetected);
+                    }
 
-                Interlocked.Increment(ref iterations);
-            }
-        });
+                    Interlocked.Increment(ref iterations);
+                }
+            },
+            Xunit.TestContext.Current.CancellationToken);
 
         // Wait for reader to start before writing, so it doesn't starve under thread pool contention
-        readerStarted.Wait();
+        readerStarted.Wait(Xunit.TestContext.Current.CancellationToken);
 
         // Writer: rapidly alternate between state A and state B
         for (var i = 0; i < 100_000; i++)

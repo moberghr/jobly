@@ -38,7 +38,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -48,7 +48,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         deleted.ShouldBe(5);
 
         var readCtx = _fixture.CreateContext();
-        var remaining = await readCtx.Set<Job>().CountAsync();
+        var remaining = await readCtx.Set<Job>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         remaining.ShouldBe(20);
     }
 
@@ -71,7 +71,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -81,7 +81,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         deleted.ShouldBe(0);
 
         var readCtx = _fixture.CreateContext();
-        var remaining = await readCtx.Set<Job>().CountAsync();
+        var remaining = await readCtx.Set<Job>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         remaining.ShouldBe(15);
     }
 
@@ -104,7 +104,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -114,7 +114,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         deleted.ShouldBe(10);
 
         var readCtx = _fixture.CreateContext();
-        var remaining = await readCtx.Set<Job>().ToListAsync();
+        var remaining = await readCtx.Set<Job>().ToListAsync(Xunit.TestContext.Current.CancellationToken);
         remaining.Count.ShouldBe(20);
 
         // The 20 remaining should be the ones with the latest ExpireAt values
@@ -162,7 +162,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -176,11 +176,11 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         // All 10 null-ExpireAt jobs should be untouched
         var failedJobs = await readCtx.Set<Job>()
             .Where(j => failedJobIds.Contains(j.Id))
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         failedJobs.ShouldBe(10);
 
         // 20 expirable jobs remaining + 10 failed = 30 total
-        var totalRemaining = await readCtx.Set<Job>().CountAsync();
+        var totalRemaining = await readCtx.Set<Job>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         totalRemaining.ShouldBe(30);
     }
 
@@ -230,7 +230,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
             Message = "survivor",
         });
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -244,12 +244,12 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         // Logs for deleted jobs should be gone
         for (var i = 0; i < 5; i++)
         {
-            var logs = await readCtx.Set<JobLog>().Where(l => l.JobId == jobIds[i]).CountAsync();
+            var logs = await readCtx.Set<JobLog>().Where(l => l.JobId == jobIds[i]).CountAsync(Xunit.TestContext.Current.CancellationToken);
             logs.ShouldBe(0);
         }
 
         // Log for surviving job should remain
-        var survivorLogs = await readCtx.Set<JobLog>().Where(l => l.JobId == jobIds[20]).CountAsync();
+        var survivorLogs = await readCtx.Set<JobLog>().Where(l => l.JobId == jobIds[20]).CountAsync(Xunit.TestContext.Current.CancellationToken);
         survivorLogs.ShouldBe(1);
     }
 
@@ -272,7 +272,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act — maxCount == actual count
         var cleanCtx = _fixture.CreateContext();
@@ -282,7 +282,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         deleted.ShouldBe(0);
 
         var readCtx = _fixture.CreateContext();
-        var remaining = await readCtx.Set<Job>().CountAsync();
+        var remaining = await readCtx.Set<Job>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         remaining.ShouldBe(10);
     }
 
@@ -330,7 +330,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
             ExpireAt = DateTime.UtcNow.AddDays(1), // NOT expired
         });
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act: run count-based cleanup with threshold of 3
         var cleanCtx = _fixture.CreateContext();
@@ -339,12 +339,12 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
 
         // Assert: parent should survive (child not expired), standalone jobs reduced to 3
         var readCtx = _fixture.CreateContext();
-        var parent = await readCtx.Set<Job>().FindAsync(parentId);
+        var parent = await readCtx.Set<Job>().FindAsync([parentId], Xunit.TestContext.Current.CancellationToken);
         parent.ShouldNotBeNull("Parent with non-expired child should not be deleted");
 
         var standaloneCount = await readCtx.Set<Job>()
             .Where(j => j.ParentJobId == null && j.Kind == JobKind.Job)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         standaloneCount.ShouldBeLessThanOrEqualTo(3);
     }
 }

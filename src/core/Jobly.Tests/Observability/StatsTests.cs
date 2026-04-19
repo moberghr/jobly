@@ -26,7 +26,7 @@ public abstract class StatsTestsBase : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         var hourKey = $"stats:succeeded:{DateTime.UtcNow:yyyy-MM-dd-HH}";
         ctx.Set<Statistic>().Add(new Statistic { Key = hourKey, Value = 5 });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -78,7 +78,7 @@ public abstract class StatsTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -121,7 +121,7 @@ public abstract class StatsTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);

@@ -22,7 +22,7 @@ public class JobParameters
     public JobParameters Configure<T>(Action<T> configure)
         where T : class, IJobMetadata
     {
-        Metadata ??= new Dictionary<string, object>();
+        Metadata ??= [];
         var typed = MetadataFactory.Create<T>(Metadata);
         configure(typed);
         Metadata = (Dictionary<string, object>)(object)typed;

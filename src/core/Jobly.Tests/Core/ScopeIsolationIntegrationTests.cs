@@ -13,6 +13,8 @@ namespace Jobly.Tests.Core;
 [GenerateDatabaseTests(FixtureKind.Integration)]
 public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
 {
+    private static readonly int[] OneSecondDelay = [1];
+
     protected ScopeIsolationIntegrationTestsBase(IDatabaseFixture fixture)
         : base(fixture)
     {
@@ -26,14 +28,14 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
         {
             Metadata = new Dictionary<string, object> { ["MaxRetries"] = 0 },
         });
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Failed);
 
         var ctx = Server.CreateContext();
         var leaked = await ctx.Set<Counter>()
             .Where(x => x.Key == "handler-leaked-entity")
-            .AnyAsync();
+            .AnyAsync(Xunit.TestContext.Current.CancellationToken);
         leaked.ShouldBeFalse();
     }
 
@@ -45,14 +47,14 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
         {
             Metadata = new Dictionary<string, object> { ["MaxRetries"] = 0 },
         });
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Failed);
 
         var ctx = Server.CreateContext();
         var committed = await ctx.Set<Counter>()
             .Where(x => x.Key == "handler-committed-entity")
-            .AnyAsync();
+            .AnyAsync(Xunit.TestContext.Current.CancellationToken);
         committed.ShouldBeTrue();
     }
 
@@ -65,22 +67,22 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
             Metadata = new Dictionary<string, object>
             {
                 ["MaxRetries"] = 1,
-                ["RetryDelays"] = new[] { 1 },
+                ["RetryDelays"] = OneSecondDelay,
             },
         });
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(30));
 
         var ctx = Server.CreateContext();
         var leaked = await ctx.Set<Counter>()
             .Where(x => x.Key == "handler-leaked-entity")
-            .AnyAsync();
+            .AnyAsync(Xunit.TestContext.Current.CancellationToken);
         leaked.ShouldBeFalse();
 
         var job = await ctx.Set<Job>()
             .Where(x => x.Id == jobId)
-            .FirstAsync();
+            .FirstAsync(Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Failed);
     }
 
@@ -89,7 +91,7 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new SpawnChildJobRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
@@ -97,7 +99,7 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
         var childJobs = await ctx.Set<Job>()
             .Where(x => x.SpawnedByJobId == jobId)
             .Where(x => x.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         childJobs.Count.ShouldBeGreaterThan(0);
     }
 
@@ -106,14 +108,14 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Completed);
 
         var ctx = Server.CreateContext();
         var job = await ctx.Set<Job>()
             .Where(x => x.Id == jobId)
-            .FirstAsync();
+            .FirstAsync(Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Completed);
 
         // Metadata should be persisted even on success (RetryPublishBehavior injects $maxRetries)

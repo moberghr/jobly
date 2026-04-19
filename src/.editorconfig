@@ -11,6 +11,14 @@ insert_final_newline = true
 
 [*.cs]
 # ============================================================
+# Global analyzer suppressions
+# ============================================================
+
+# MA0038 — mark method as static. Deprecated by the analyzer (superseded by CA1822),
+# and fires on interface-implementation methods where static conversion isn't possible.
+dotnet_diagnostic.MA0038.severity = none
+
+# ============================================================
 # C# Code Style
 # ============================================================
 

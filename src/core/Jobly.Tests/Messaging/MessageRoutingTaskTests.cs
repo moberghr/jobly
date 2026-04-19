@@ -59,7 +59,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = BuildScopeFactory();
 
@@ -72,7 +72,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var children = await readCtx.Set<Job>()
             .Where(j => j.ParentJobId == messageId && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         children.Count.ShouldBeGreaterThan(0);
     }
 
@@ -93,7 +93,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = BuildScopeFactory();
 
@@ -103,7 +103,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var message = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == messageId);
+        var message = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
         message.ShouldNotBeNull();
         message.CurrentState.ShouldBe(State.Processing);
     }
@@ -125,7 +125,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "critical",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = BuildScopeFactory();
 
@@ -137,7 +137,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var children = await readCtx.Set<Job>()
             .Where(j => j.ParentJobId == messageId && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         children.ShouldAllBe(c => c.Queue == "critical");
     }
 
@@ -178,7 +178,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = BuildScopeFactory();
 
@@ -191,7 +191,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         foreach (var mid in messageIds)
         {
-            var msg = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == mid);
+            var msg = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == mid, Xunit.TestContext.Current.CancellationToken);
             msg.ShouldNotBeNull();
             msg.CurrentState.ShouldBe(State.Processing);
         }
@@ -218,7 +218,7 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act: run message routing
         var routeCtx = _fixture.CreateContext();
@@ -227,11 +227,11 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
 
         // Assert: message should be Failed with a log entry explaining why
         var readCtx = _fixture.CreateContext();
-        var message = await readCtx.Set<Job>().FindAsync(messageId);
+        var message = await readCtx.Set<Job>().FindAsync([messageId], Xunit.TestContext.Current.CancellationToken);
         message.ShouldNotBeNull();
         message.CurrentState.ShouldBe(State.Failed);
 
-        var logs = await readCtx.Set<JobLog>().Where(l => l.JobId == messageId).ToListAsync();
+        var logs = await readCtx.Set<JobLog>().Where(l => l.JobId == messageId).ToListAsync(Xunit.TestContext.Current.CancellationToken);
         logs.ShouldNotBeEmpty("Failed message should have a log entry explaining the failure");
         logs.ShouldContain(l => l.EventType == "Failed");
     }

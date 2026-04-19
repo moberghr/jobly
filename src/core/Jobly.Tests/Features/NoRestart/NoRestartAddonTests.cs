@@ -48,12 +48,12 @@ public abstract class NoRestartAddonTestsBase : IAsyncLifetime
         var provider = BuildProvider(registerAddon: true);
         await using var scope = provider.CreateAsyncScope();
         var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, scope.ServiceProvider);
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, scope.ServiceProvider);
 
         var jobId = await publisher.Enqueue(new NoRestartAttributeRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var job = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == jobId);
+        var job = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.Metadata.ShouldNotBeNull();
         var metadata = MetadataSerializer.Deserialize(job.Metadata);
         metadata.ShouldContainKey(nameof(ICanBeRestartedMetadata.CanBeRestarted));
@@ -66,12 +66,12 @@ public abstract class NoRestartAddonTestsBase : IAsyncLifetime
         var provider = BuildProvider(registerAddon: true);
         await using var scope = provider.CreateAsyncScope();
         var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, scope.ServiceProvider);
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, scope.ServiceProvider);
 
         var jobId = await publisher.Enqueue(new RestartAttributeRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var job = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == jobId);
+        var job = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.Metadata.ShouldNotBeNull();
         var metadata = MetadataSerializer.Deserialize(job.Metadata);
         metadata[nameof(ICanBeRestartedMetadata.CanBeRestarted)].ShouldBe(true);
@@ -85,12 +85,12 @@ public abstract class NoRestartAddonTestsBase : IAsyncLifetime
         var provider = BuildProvider(registerAddon: false);
         await using var scope = provider.CreateAsyncScope();
         var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, scope.ServiceProvider);
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, scope.ServiceProvider);
 
         var jobId = await publisher.Enqueue(new NoRestartAttributeRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var job = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == jobId);
+        var job = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.Metadata.ShouldBeNull();
     }
 
@@ -102,12 +102,12 @@ public abstract class NoRestartAddonTestsBase : IAsyncLifetime
         var provider = BuildProvider(registerAddon: false);
         await using var scope = provider.CreateAsyncScope();
         var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration()), TimeProvider.System, scope.ServiceProvider);
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, scope.ServiceProvider);
 
         var jobId = await publisher.Enqueue(new UnitRequest(), new Jobly.Core.Helper.JobParameters().WithRestart(canBeRestarted: false));
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var job = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == jobId);
+        var job = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.Metadata.ShouldNotBeNull();
         var metadata = MetadataSerializer.Deserialize(job.Metadata);
         metadata[nameof(ICanBeRestartedMetadata.CanBeRestarted)].ShouldBe(false);

@@ -29,7 +29,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new ServerCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -37,7 +37,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
 
         // Assert
         result.ShouldBeTrue();
-        var server = await _fixture.CreateContext().Set<Server>().FindAsync(serverId);
+        var server = await _fixture.CreateContext().Set<Server>().FindAsync([serverId], Xunit.TestContext.Current.CancellationToken);
         server.ShouldNotBeNull();
         server.PausedAt.ShouldNotBeNull();
     }
@@ -55,7 +55,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
             LastHeartbeatTime = DateTime.UtcNow,
             PausedAt = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new ServerCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -63,7 +63,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
 
         // Assert
         result.ShouldBeTrue();
-        var server = await _fixture.CreateContext().Set<Server>().FindAsync(serverId);
+        var server = await _fixture.CreateContext().Set<Server>().FindAsync([serverId], Xunit.TestContext.Current.CancellationToken);
         server.ShouldNotBeNull();
         server.PausedAt.ShouldBeNull();
     }
@@ -96,7 +96,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
             ServerId = serverId,
             WorkerCount = 1,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new ServerCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -104,7 +104,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
 
         // Assert
         result.ShouldBeTrue();
-        var group = await _fixture.CreateContext().Set<WorkerGroup>().FindAsync(groupId);
+        var group = await _fixture.CreateContext().Set<WorkerGroup>().FindAsync([groupId], Xunit.TestContext.Current.CancellationToken);
         group.ShouldNotBeNull();
         group.PausedAt.ShouldNotBeNull();
     }
@@ -130,7 +130,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
             WorkerCount = 1,
             PausedAt = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new ServerCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -138,7 +138,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
 
         // Assert
         result.ShouldBeTrue();
-        var group = await _fixture.CreateContext().Set<WorkerGroup>().FindAsync(groupId);
+        var group = await _fixture.CreateContext().Set<WorkerGroup>().FindAsync([groupId], Xunit.TestContext.Current.CancellationToken);
         group.ShouldNotBeNull();
         group.PausedAt.ShouldBeNull();
     }
@@ -181,7 +181,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
             LastHeartbeatTime = DateTime.UtcNow,
             PausedAt = originalPausedAt,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act — pause again
         var svc = new ServerCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -189,7 +189,7 @@ public abstract class ServerCommandServiceTestsBase : IAsyncLifetime
 
         // Assert — timestamp should be updated (idempotent but refreshes time)
         result.ShouldBeTrue();
-        var server = await _fixture.CreateContext().Set<Server>().FindAsync(serverId);
+        var server = await _fixture.CreateContext().Set<Server>().FindAsync([serverId], Xunit.TestContext.Current.CancellationToken);
         server.ShouldNotBeNull();
         server.PausedAt.ShouldNotBeNull();
         server.PausedAt.ShouldNotBe(originalPausedAt);

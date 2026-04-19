@@ -33,10 +33,10 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
         await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "no-job-test", "* * * * *");
 
         var readCtx = _fixture.CreateContext();
-        var jobs = await readCtx.Set<Job>().Where(j => j.Kind == JobKind.Job).ToListAsync();
+        var jobs = await readCtx.Set<Job>().Where(j => j.Kind == JobKind.Job).ToListAsync(Xunit.TestContext.Current.CancellationToken);
         jobs.Count.ShouldBe(0, "AddOrUpdateRecurringJob should not create any jobs");
 
-        var recurring = await readCtx.Set<RecurringJob>().FirstOrDefaultAsync(r => r.Name == "no-job-test");
+        var recurring = await readCtx.Set<RecurringJob>().FirstOrDefaultAsync(r => r.Name == "no-job-test", Xunit.TestContext.Current.CancellationToken);
         recurring.ShouldNotBeNull();
         recurring.NextExecution.ShouldNotBeNull();
     }
@@ -51,9 +51,9 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
 
         // Set NextExecution to the past so the scheduler picks it up
         var setupCtx = _fixture.CreateContext();
-        var recurring = await setupCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "schedule-now-test");
+        var recurring = await setupCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "schedule-now-test", Xunit.TestContext.Current.CancellationToken);
         recurring.NextExecution = DateTime.UtcNow.AddMinutes(-5);
-        await setupCtx.SaveChangesAsync();
+        await setupCtx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var schedCtx = _fixture.CreateContext();
@@ -61,12 +61,12 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
 
         // Assert: the created job should have ScheduleTime <= now (ready for execution)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().Where(j => j.Kind == JobKind.Job).FirstOrDefaultAsync();
+        var job = await readCtx.Set<Job>().Where(j => j.Kind == JobKind.Job).FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.ScheduleTime.ShouldBeLessThanOrEqualTo(DateTime.UtcNow, "Job should be ready for immediate execution");
 
         // NextExecution should be updated to a future time
-        var updatedRecurring = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "schedule-now-test");
+        var updatedRecurring = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "schedule-now-test", Xunit.TestContext.Current.CancellationToken);
         updatedRecurring.NextExecution.ShouldNotBeNull();
         updatedRecurring.NextExecution.Value.ShouldBeGreaterThan(DateTime.UtcNow, "NextExecution should be in the future");
     }
@@ -86,7 +86,7 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow.AddHours(5), // future
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -94,7 +94,7 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
 
         // Assert: ScheduleTime should be reset to now (not stay in the future)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Enqueued);
         job.ScheduleTime.ShouldBeLessThanOrEqualTo(DateTime.UtcNow.AddSeconds(5), "Requeued job should execute immediately, not stay future-scheduled");

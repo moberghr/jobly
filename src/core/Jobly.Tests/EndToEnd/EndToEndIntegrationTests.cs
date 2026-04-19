@@ -80,7 +80,7 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
             await publisher.Enqueue(new UnitRequest(), parentId);
         }
 
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait for everything to complete
         await Server.WaitForCompletion(timeout: TimeSpan.FromSeconds(60));
@@ -94,47 +94,49 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
 
         // No stuck jobs
         var stuckJobs = await jobs
-            .CountAsync(j => j.CurrentState == State.Enqueued ||
-                            j.CurrentState == State.Processing ||
-                            j.CurrentState == State.Awaiting);
+            .CountAsync(
+                j => j.CurrentState == State.Enqueued
+                    || j.CurrentState == State.Processing
+                    || j.CurrentState == State.Awaiting,
+                Xunit.TestContext.Current.CancellationToken);
         stuckJobs.ShouldBe(0, "No jobs should be stuck in non-terminal states");
 
         // All messages completed
         var incompleteMessages = await ctx.Set<Job>()
-            .CountAsync(m => m.Kind == JobKind.Message && m.CurrentState != State.Completed);
+            .CountAsync(m => m.Kind == JobKind.Message && m.CurrentState != State.Completed, Xunit.TestContext.Current.CancellationToken);
         incompleteMessages.ShouldBe(0, "All messages should be completed");
 
         // Job counts
-        var completedJobs = await jobs.CountAsync(j => j.CurrentState == State.Completed);
+        var completedJobs = await jobs.CountAsync(j => j.CurrentState == State.Completed, Xunit.TestContext.Current.CancellationToken);
         completedJobs.ShouldBeGreaterThan(100);
 
-        var failedJobs = await jobs.CountAsync(j => j.CurrentState == State.Failed);
+        var failedJobs = await jobs.CountAsync(j => j.CurrentState == State.Failed, Xunit.TestContext.Current.CancellationToken);
         failedJobs.ShouldBe(15, "10 no-retry + 5 with-retry = 15 failed");
 
         // All batches completed
         var incompleteBatches = await ctx.Set<Job>()
-            .CountAsync(b => b.Kind == JobKind.Batch && b.CurrentState != State.Completed);
+            .CountAsync(b => b.Kind == JobKind.Batch && b.CurrentState != State.Completed, Xunit.TestContext.Current.CancellationToken);
         incompleteBatches.ShouldBe(0, "All batches should be completed");
 
         // Trace integrity
-        var jobsWithoutTrace = await jobs.CountAsync(j => j.TraceId == null);
+        var jobsWithoutTrace = await jobs.CountAsync(j => j.TraceId == null, Xunit.TestContext.Current.CancellationToken);
         jobsWithoutTrace.ShouldBe(0, "All jobs should have a TraceId");
 
-        var spawnedJobs = await jobs.CountAsync(j => j.SpawnedByJobId != null);
+        var spawnedJobs = await jobs.CountAsync(j => j.SpawnedByJobId != null, Xunit.TestContext.Current.CancellationToken);
         spawnedJobs.ShouldBeGreaterThan(0, "Should have spawned jobs");
 
         // Cleanup integrity
-        var jobsWithWorker = await jobs.CountAsync(j => j.CurrentWorkerId != null);
+        var jobsWithWorker = await jobs.CountAsync(j => j.CurrentWorkerId != null, Xunit.TestContext.Current.CancellationToken);
         jobsWithWorker.ShouldBe(0, "No terminal jobs should have a CurrentWorkerId");
 
-        var jobsWithKeepAlive = await jobs.CountAsync(j => j.LastKeepAlive != null);
+        var jobsWithKeepAlive = await jobs.CountAsync(j => j.LastKeepAlive != null, Xunit.TestContext.Current.CancellationToken);
         jobsWithKeepAlive.ShouldBe(0, "No terminal jobs should have a LastKeepAlive");
 
         // Statistics
         var statsSucceeded = await ctx.Set<Statistic>()
-            .Where(x => x.Key == "stats:succeeded").Select(x => x.Value).FirstOrDefaultAsync();
+            .Where(x => x.Key == "stats:succeeded").Select(x => x.Value).FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
         var statsFailed = await ctx.Set<Statistic>()
-            .Where(x => x.Key == "stats:failed").Select(x => x.Value).FirstOrDefaultAsync();
+            .Where(x => x.Key == "stats:failed").Select(x => x.Value).FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         statsSucceeded.ShouldBe(completedJobs, "stats:succeeded should match completed job count");
         statsFailed.ShouldBe(failedJobs, "stats:failed should match failed job count");

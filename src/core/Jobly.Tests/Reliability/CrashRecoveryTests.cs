@@ -41,7 +41,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var result = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
@@ -52,7 +52,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         foreach (var id in jobIds)
         {
-            var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == id);
+            var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
             job.CurrentState.ShouldBe(State.Enqueued);
         }
     }
@@ -99,7 +99,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
             Queue = "default",
             LastKeepAlive = staleTime,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var result = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
@@ -109,9 +109,9 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         result.Total.ShouldBe(0);
 
         var readCtx = _fixture.CreateContext();
-        (await readCtx.Set<Job>().FirstAsync(j => j.Id == completedId)).CurrentState.ShouldBe(State.Completed);
-        (await readCtx.Set<Job>().FirstAsync(j => j.Id == failedId)).CurrentState.ShouldBe(State.Failed);
-        (await readCtx.Set<Job>().FirstAsync(j => j.Id == enqueuedId)).CurrentState.ShouldBe(State.Enqueued);
+        (await readCtx.Set<Job>().FirstAsync(j => j.Id == completedId, Xunit.TestContext.Current.CancellationToken)).CurrentState.ShouldBe(State.Completed);
+        (await readCtx.Set<Job>().FirstAsync(j => j.Id == failedId, Xunit.TestContext.Current.CancellationToken)).CurrentState.ShouldBe(State.Failed);
+        (await readCtx.Set<Job>().FirstAsync(j => j.Id == enqueuedId, Xunit.TestContext.Current.CancellationToken)).CurrentState.ShouldBe(State.Enqueued);
     }
 
     [TimedFact]
@@ -132,7 +132,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
             RetriedTimes = 2,
             MaxRetries = 5,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
@@ -140,7 +140,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Enqueued);
         job.RetriedTimes.ShouldBe(2); // Unchanged
     }
@@ -161,7 +161,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
             Queue = "default",
             LastKeepAlive = DateTime.UtcNow.AddMinutes(-10),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act — run 5 concurrent requeue attempts
         var tasks = Enumerable.Range(0, 5)
@@ -176,7 +176,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         var logs = await _fixture.CreateContext().Set<JobLog>()
             .Where(x => x.JobId == jobId && x.EventType == "Requeued")
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         logs.Count.ShouldBe(1);
     }
 
@@ -215,7 +215,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
             CurrentWorkerId = workerId,
             LastKeepAlive = DateTime.UtcNow.AddMinutes(-10),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act — cleanup only removes server/workers, not jobs
         await ServerCleanupTask<TestContext>.CleanUpServers(
@@ -223,7 +223,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Processing); // Unchanged — StaleJobRecovery handles this
     }
 
@@ -262,7 +262,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
             CurrentWorkerId = workerId,
             LastKeepAlive = DateTime.UtcNow.AddMinutes(-10),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act — run both cleanup + recovery (as health manager would)
         var recovery = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
@@ -275,10 +275,10 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         removed.ShouldBe(1);
 
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Enqueued);
 
-        var servers = await readCtx.Set<Server>().CountAsync();
+        var servers = await readCtx.Set<Server>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         servers.ShouldBe(0);
     }
 
@@ -302,7 +302,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
             Queue = "default",
             LastKeepAlive = exactCutoff,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var tp = new FakeTimeProvider(now);
@@ -312,7 +312,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         // Assert — should NOT be requeued (at boundary, not past it)
         result.Total.ShouldBe(0);
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Processing);
     }
@@ -338,7 +338,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
             LastHeartbeatTime = now - timeout,
             ServiceCount = 1,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var tp = new FakeTimeProvider(now);
@@ -347,7 +347,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Assert — server should still exist
         var readCtx = _fixture.CreateContext();
-        var server = await readCtx.Set<Server>().FindAsync(serverId);
+        var server = await readCtx.Set<Server>().FindAsync([serverId], Xunit.TestContext.Current.CancellationToken);
         server.ShouldNotBeNull();
     }
 
@@ -373,7 +373,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
             Queue = "default",
             LastKeepAlive = DateTime.UtcNow.AddMinutes(-10), // stale
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act: run stale recovery
         var recoveryCtx = _fixture.CreateContext();
@@ -381,7 +381,7 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Assert: job should be Deleted (not Enqueued) because user intended to cancel it
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Deleted, "Stale job with CancellationMode=Graceful should be Deleted, not requeued");
         job.CancellationMode.ShouldBe(CancellationMode.None);

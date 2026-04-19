@@ -21,13 +21,12 @@ public interface IRecurringJobPublisher
 file static class RecurringJobPublisherConstants
 {
     public static readonly char[] SplitChars = [' ', '\t'];
+    public static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(15);
 }
 
 public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
     where TContext : DbContext
 {
-    private static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(15);
-
     private readonly TContext _context;
     private readonly TimeProvider _timeProvider;
     private readonly IJoblyLockProvider _lockProvider;
@@ -44,10 +43,10 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
     {
         ValidateCronExpression(cron);
 
-        var handle = await _lockProvider.TryAcquireAsync($"jobly:recurring:{name}", LockTimeout, CancellationToken.None);
+        var handle = await _lockProvider.TryAcquireAsync($"jobly:recurring:{name}", RecurringJobPublisherConstants.LockTimeout, CancellationToken.None);
         if (handle == null)
         {
-            throw new TimeoutException($"Could not acquire lock for recurring job '{name}' within {LockTimeout.TotalSeconds}s.");
+            throw new TimeoutException($"Could not acquire lock for recurring job '{name}' within {RecurringJobPublisherConstants.LockTimeout.TotalSeconds}s.");
         }
 
         await using (handle)

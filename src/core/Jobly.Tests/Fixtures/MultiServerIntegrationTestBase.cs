@@ -25,7 +25,7 @@ public abstract class MultiServerIntegrationTestBase : IAsyncLifetime
         }
         catch
         {
-            await Task.Delay(100);
+            await Task.Delay(100, Xunit.TestContext.Current.CancellationToken);
             await _fixture.ResetAsync();
         }
     }

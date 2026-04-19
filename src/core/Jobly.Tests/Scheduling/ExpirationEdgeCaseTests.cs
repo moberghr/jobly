@@ -29,7 +29,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             LastHeartbeatTime = DateTime.UtcNow,
             ServiceCount = 1,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -49,7 +49,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             Queue = "default",
             ExpireAt = DateTime.UtcNow.AddHours(-1),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     [TimedFact]
@@ -62,7 +62,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         const string oldKey = "stats:failed:2020-01-01-10";
         ctx.Set<Statistic>().Add(new Statistic { Key = oldKey, Value = 5 });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -70,7 +70,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var stat = await readCtx.Set<Statistic>().FirstOrDefaultAsync(s => s.Key == oldKey);
+        var stat = await readCtx.Set<Statistic>().FirstOrDefaultAsync(s => s.Key == oldKey, Xunit.TestContext.Current.CancellationToken);
         stat.ShouldBeNull();
     }
 
@@ -83,7 +83,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         var recentKey = $"stats:failed:{DateTime.UtcNow:yyyy-MM-dd-HH}";
         ctx.Set<Statistic>().Add(new Statistic { Key = recentKey, Value = 7 });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -91,7 +91,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var stat = await readCtx.Set<Statistic>().FirstOrDefaultAsync(s => s.Key == recentKey);
+        var stat = await readCtx.Set<Statistic>().FirstOrDefaultAsync(s => s.Key == recentKey, Xunit.TestContext.Current.CancellationToken);
         stat.ShouldNotBeNull();
         stat.Value.ShouldBe(7);
     }
@@ -110,7 +110,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             IntervalSeconds = 60,
         };
         ctx.Set<ServerTask>().Add(serverTask);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Insert an old server log well beyond the retention window
         var oldLog = new ServerLog
@@ -122,7 +122,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             Timestamp = DateTime.UtcNow.AddSeconds(-20000), // Older than 18000s retention
         };
         ctx.Set<ServerLog>().Add(oldLog);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
         var logId = oldLog.Id;
 
         // Act
@@ -131,7 +131,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var log = await readCtx.Set<ServerLog>().FirstOrDefaultAsync(l => l.Id == logId);
+        var log = await readCtx.Set<ServerLog>().FirstOrDefaultAsync(l => l.Id == logId, Xunit.TestContext.Current.CancellationToken);
         log.ShouldBeNull();
     }
 
@@ -149,7 +149,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             IntervalSeconds = 60,
         };
         ctx.Set<ServerTask>().Add(serverTask);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Insert a recent server log
         var recentLog = new ServerLog
@@ -161,7 +161,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             Timestamp = DateTime.UtcNow.AddSeconds(-10), // Very recent
         };
         ctx.Set<ServerLog>().Add(recentLog);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
         var logId = recentLog.Id;
 
         // Act
@@ -170,7 +170,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var log = await readCtx.Set<ServerLog>().FirstOrDefaultAsync(l => l.Id == logId);
+        var log = await readCtx.Set<ServerLog>().FirstOrDefaultAsync(l => l.Id == logId, Xunit.TestContext.Current.CancellationToken);
         log.ShouldNotBeNull();
     }
 
@@ -191,7 +191,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             Queue = "default",
             ExpireAt = fixedTime,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act — use a FakeTimeProvider that returns the same fixedTime
         var tp = new FakeTimeProvider(fixedTime);
@@ -200,7 +200,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert — job should still exist (ExpireAt is NOT < now, it's equal)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
     }
 
@@ -233,7 +233,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             ParentJobId = parentId,
             ExpireAt = DateTime.UtcNow.AddHours(1),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -241,7 +241,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert — parent should still exist
         var readCtx = _fixture.CreateContext();
-        var parent = await readCtx.Set<Job>().FindAsync(parentId);
+        var parent = await readCtx.Set<Job>().FindAsync([parentId], Xunit.TestContext.Current.CancellationToken);
         parent.ShouldNotBeNull();
     }
 
@@ -260,7 +260,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             Queue = "default",
             ExpireAt = DateTime.UtcNow.AddHours(1),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var cleanCtx = _fixture.CreateContext();
@@ -286,7 +286,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             Timestamp = DateTime.UtcNow.AddHours(-1),
         };
         ctx.Set<ServerLog>().Add(recentOrphanedLog);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
         var logId = recentOrphanedLog.Id;
 
         // Act
@@ -295,7 +295,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var log = await readCtx.Set<ServerLog>().FirstOrDefaultAsync(x => x.Id == logId);
+        var log = await readCtx.Set<ServerLog>().FirstOrDefaultAsync(x => x.Id == logId, Xunit.TestContext.Current.CancellationToken);
         log.ShouldNotBeNull();
     }
 
@@ -313,7 +313,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             IntervalSeconds = null,
         };
         ctx.Set<ServerTask>().Add(serverTask);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Insert a log older than default retention (18000s ≈ 5 hours)
         var oldLog = new ServerLog
@@ -325,7 +325,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             Timestamp = DateTime.UtcNow.AddHours(-6),
         };
         ctx.Set<ServerLog>().Add(oldLog);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
         var logId = oldLog.Id;
 
         // Act
@@ -334,7 +334,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var log = await readCtx.Set<ServerLog>().FirstOrDefaultAsync(x => x.Id == logId);
+        var log = await readCtx.Set<ServerLog>().FirstOrDefaultAsync(x => x.Id == logId, Xunit.TestContext.Current.CancellationToken);
         log.ShouldBeNull();
     }
 
@@ -355,7 +355,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             Timestamp = DateTime.UtcNow.AddDays(-2),
         };
         ctx.Set<ServerLog>().Add(orphanedLog);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
         var logId = orphanedLog.Id;
 
         // Act
@@ -364,7 +364,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var log = await readCtx.Set<ServerLog>().FirstOrDefaultAsync(l => l.Id == logId);
+        var log = await readCtx.Set<ServerLog>().FirstOrDefaultAsync(l => l.Id == logId, Xunit.TestContext.Current.CancellationToken);
         log.ShouldBeNull();
     }
 
@@ -401,7 +401,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             ParentJobId = parentId,
             ExpireAt = DateTime.UtcNow.AddHours(-1), // also expired
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act: should not throw FK violation
         var cleanCtx = _fixture.CreateContext();
@@ -410,8 +410,8 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert: both should be deleted
         var readCtx = _fixture.CreateContext();
-        var parent = await readCtx.Set<Job>().FindAsync(parentId);
-        var child = await readCtx.Set<Job>().FindAsync(childId);
+        var parent = await readCtx.Set<Job>().FindAsync([parentId], Xunit.TestContext.Current.CancellationToken);
+        var child = await readCtx.Set<Job>().FindAsync([childId], Xunit.TestContext.Current.CancellationToken);
         parent.ShouldBeNull("Parent should be cleaned up");
         child.ShouldBeNull("Child should be cleaned up");
     }
@@ -449,7 +449,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
             ParentJobId = parentId,
             ExpireAt = DateTime.UtcNow.AddDays(1), // NOT expired
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act: should not throw
         var cleanCtx = _fixture.CreateContext();
@@ -459,11 +459,11 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         // Assert: parent should NOT be deleted (child still references it)
         // OR both deleted together — either way no FK error
         var readCtx = _fixture.CreateContext();
-        var child = await readCtx.Set<Job>().FindAsync(childId);
+        var child = await readCtx.Set<Job>().FindAsync([childId], Xunit.TestContext.Current.CancellationToken);
         if (child != null)
         {
             // Child survived — parent must also survive (FK intact)
-            var parent = await readCtx.Set<Job>().FindAsync(parentId);
+            var parent = await readCtx.Set<Job>().FindAsync([parentId], Xunit.TestContext.Current.CancellationToken);
             parent.ShouldNotBeNull("Parent can't be deleted while child exists");
         }
     }

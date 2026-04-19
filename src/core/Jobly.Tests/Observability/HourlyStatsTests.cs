@@ -46,7 +46,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -107,7 +107,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -119,7 +119,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         // Assert
         var hourKey = $"stats:succeeded:{DateTime.UtcNow:yyyy-MM-dd-HH}";
         var stat = await _fixture.CreateContext().Set<Statistic>()
-            .FindAsync(hourKey);
+            .FindAsync([hourKey], Xunit.TestContext.Current.CancellationToken);
 
         stat.ShouldNotBeNull();
         stat.Value.ShouldBeGreaterThanOrEqualTo(1);
@@ -142,7 +142,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -154,7 +154,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         // Assert
         var hourKey = $"stats:failed:{DateTime.UtcNow:yyyy-MM-dd-HH}";
         var stat = await _fixture.CreateContext().Set<Statistic>()
-            .FindAsync(hourKey);
+            .FindAsync([hourKey], Xunit.TestContext.Current.CancellationToken);
 
         stat.ShouldNotBeNull();
         stat.Value.ShouldBeGreaterThanOrEqualTo(1);
@@ -180,7 +180,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
 
@@ -194,7 +194,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         // Assert
         var hourKey = $"stats:succeeded:{DateTime.UtcNow:yyyy-MM-dd-HH}";
         var stat = await _fixture.CreateContext().Set<Statistic>()
-            .FindAsync(hourKey);
+            .FindAsync([hourKey], Xunit.TestContext.Current.CancellationToken);
 
         stat.ShouldNotBeNull();
         stat.Value.ShouldBe(3);
@@ -208,7 +208,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         ctx.Set<Statistic>().Add(new Statistic { Key = "stats:succeeded", Value = 42 });
         ctx.Set<Statistic>().Add(new Statistic { Key = "stats:failed", Value = 7 });
         ctx.Set<Statistic>().Add(new Statistic { Key = "stats:deleted", Value = 3 });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);

@@ -13,6 +13,8 @@ namespace Jobly.Tests.Core;
 [GenerateDatabaseTests(FixtureKind.Integration)]
 public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestBase
 {
+    private static readonly int[] OneSecondDelay = [1];
+
     protected MetadataPropagationIntegrationTestsBase(IDatabaseFixture fixture)
         : base(fixture)
     {
@@ -23,14 +25,14 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
     {
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new MetadataWriterRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Completed);
 
         var ctx = Server.CreateContext();
         var job = await ctx.Set<Job>()
             .Where(x => x.Id == jobId)
-            .FirstAsync();
+            .FirstAsync(Xunit.TestContext.Current.CancellationToken);
 
         var metadata = MetadataSerializer.Deserialize(job.Metadata);
         metadata.ShouldContainKey("HandlerWrote");
@@ -44,14 +46,14 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
         // Handler sets HandlerWrote at execution time
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new MetadataWriterRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Completed);
 
         var ctx = Server.CreateContext();
         var job = await ctx.Set<Job>()
             .Where(x => x.Id == jobId)
-            .FirstAsync();
+            .FirstAsync(Xunit.TestContext.Current.CancellationToken);
 
         var metadata = MetadataSerializer.Deserialize(job.Metadata);
 
@@ -71,14 +73,14 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
         {
             Metadata = new Dictionary<string, object> { ["UserKey"] = "user-value" },
         });
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Completed);
 
         var ctx = Server.CreateContext();
         var job = await ctx.Set<Job>()
             .Where(x => x.Id == jobId)
-            .FirstAsync();
+            .FirstAsync(Xunit.TestContext.Current.CancellationToken);
 
         var metadata = MetadataSerializer.Deserialize(job.Metadata);
 
@@ -102,17 +104,17 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
             Metadata = new Dictionary<string, object>
             {
                 ["MaxRetries"] = 1,
-                ["RetryDelays"] = new[] { 1 },
+                ["RetryDelays"] = OneSecondDelay,
             },
         });
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(30));
 
         var ctx = Server.CreateContext();
         var job = await ctx.Set<Job>()
             .Where(x => x.Id == jobId)
-            .FirstAsync();
+            .FirstAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Retry behavior wrote RetriedTimes to metadata during failure handling
         var metadata = MetadataSerializer.Deserialize(job.Metadata);
@@ -128,7 +130,7 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
         {
             Metadata = new Dictionary<string, object> { ["ParentKey"] = "inherited" },
         });
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
@@ -136,7 +138,7 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
         var children = await ctx.Set<Job>()
             .Where(x => x.SpawnedByJobId == jobId)
             .Where(x => x.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         children.Count.ShouldBeGreaterThan(0);
 

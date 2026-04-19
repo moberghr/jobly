@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
@@ -23,10 +24,11 @@ namespace Jobly.ServerBenchmarks.Benchmarks;
 /// No hosted services running — isolates the worker path from background task noise.
 /// </summary>
 [Config(typeof(ComponentBenchmarkConfig))]
+[SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable", Justification = "BenchmarkDotNet manages lifecycle via [GlobalCleanup].")]
 public class WorkerMemoryBenchmark
 {
     private PostgresServerFixture _fixture = null!;
-    private IJoblyWorkerService _workerService = null!;
+    private JoblyWorkerService<TestContext> _workerService = null!;
 
     [GlobalSetup]
     public async Task Setup()

@@ -44,7 +44,7 @@ public abstract class ServerMonitoringTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -78,7 +78,7 @@ public abstract class ServerMonitoringTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);

@@ -1,0 +1,6 @@
+# Benchmarks-project overrides. Merges with src/.editorconfig (root = true at src).
+
+[*.cs]
+# S1215 — GC.Collect() calls. Intentional in memory benchmarks where we need to force
+# a clean baseline before measuring allocation.
+dotnet_diagnostic.S1215.severity = none

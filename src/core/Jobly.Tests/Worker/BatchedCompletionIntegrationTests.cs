@@ -26,7 +26,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
         }
         catch
         {
-            await Task.Delay(100);
+            await Task.Delay(100, Xunit.TestContext.Current.CancellationToken);
             await _fixture.ResetAsync();
         }
 
@@ -46,7 +46,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
             await publisher.Enqueue(new UnitRequest());
         }
 
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         await Server.WaitForCompletion(TimeSpan.FromSeconds(45));
@@ -57,13 +57,13 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
         var ctx = Server.CreateContext();
         var completedCount = await ctx.Set<Job>()
             .Where(j => j.Kind == JobKind.Job && j.CurrentState == State.Completed)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         completedCount.ShouldBe(jobCount);
 
         var jobs = await ctx.Set<Job>()
             .Where(j => j.Kind == JobKind.Job)
             .AsNoTracking()
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         jobs.ShouldAllBe(j => j.CurrentWorkerId == null);
         jobs.ShouldAllBe(j => j.LastKeepAlive == null);
         jobs.ShouldAllBe(j => j.CancellationMode == CancellationMode.None);
@@ -71,7 +71,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
 
         var completedLogs = await ctx.Set<JobLog>()
             .Where(l => l.EventType == "Completed")
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         completedLogs.ShouldBe(jobCount);
     }
 
@@ -95,7 +95,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
             await publisher.Enqueue(new ThrowExceptionRequest());
         }
 
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         await Server.WaitForCompletion(TimeSpan.FromSeconds(45));
@@ -103,11 +103,11 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
         // Assert
         var ctx = Server.CreateContext();
         var completed = await ctx.Set<Job>()
-            .CountAsync(j => j.Type == successType && j.CurrentState == State.Completed);
+            .CountAsync(j => j.Type == successType && j.CurrentState == State.Completed, Xunit.TestContext.Current.CancellationToken);
         completed.ShouldBe(successCount);
 
         var failed = await ctx.Set<Job>()
-            .CountAsync(j => j.Type == failType && j.CurrentState == State.Failed);
+            .CountAsync(j => j.Type == failType && j.CurrentState == State.Failed, Xunit.TestContext.Current.CancellationToken);
         failed.ShouldBe(failCount);
     }
 
@@ -122,7 +122,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
             await publisher.Enqueue(new UnitRequest());
         }
 
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         await Server.WaitForCompletion(TimeSpan.FromSeconds(15));
@@ -130,7 +130,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
         // Assert
         var ctx = Server.CreateContext();
         var completed = await ctx.Set<Job>()
-            .CountAsync(j => j.Kind == JobKind.Job && j.CurrentState == State.Completed);
+            .CountAsync(j => j.Kind == JobKind.Job && j.CurrentState == State.Completed, Xunit.TestContext.Current.CancellationToken);
         completed.ShouldBe(3);
     }
 
@@ -157,7 +157,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
                 await publisher.Enqueue(new UnitRequest(), queue: isolatedQueue);
             }
 
-            await publisher.SaveChangesAsync();
+            await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
             // Wait for handlers to run (empty handlers complete ~instantly).
             // Completions are buffered; the long flush interval means they won't auto-flush.
@@ -174,7 +174,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
         var jobs = await ctx.Set<Job>()
             .Where(j => j.Queue == isolatedQueue)
             .AsNoTracking()
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         jobs.Count.ShouldBe(5);
         jobs.ShouldAllBe(j => j.CurrentState == State.Completed);
     }
@@ -185,7 +185,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
         // Arrange — fixture server runs in dispatcher mode. Enqueue a handler that blocks on cancellation.
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CancellableRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Processing);
 
@@ -211,12 +211,12 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
         var hourSuffix = DateTime.UtcNow.ToString("yyyy-MM-dd-HH", System.Globalization.CultureInfo.InvariantCulture);
         var aggregateSum = await ctx.Set<Counter>()
             .Where(c => c.Key == "stats:deleted")
-            .SumAsync(c => c.Value);
+            .SumAsync(c => c.Value, Xunit.TestContext.Current.CancellationToken);
         aggregateSum.ShouldBeGreaterThanOrEqualTo(1);
 
         var hourlySum = await ctx.Set<Counter>()
             .Where(c => c.Key == $"stats:deleted:{hourSuffix}")
-            .SumAsync(c => c.Value);
+            .SumAsync(c => c.Value, Xunit.TestContext.Current.CancellationToken);
         hourlySum.ShouldBeGreaterThanOrEqualTo(1);
     }
 
@@ -240,7 +240,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
             await publisher.Enqueue(new UnitRequest(), queue: isolatedQueue);
         }
 
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         await server.WaitForCompletion(TimeSpan.FromSeconds(30));
@@ -249,8 +249,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         var jobs = await ctx.Set<Job>()
             .Where(j => j.Queue == isolatedQueue)
-            .CountAsync(j => j.CurrentState == State.Completed);
+            .CountAsync(j => j.CurrentState == State.Completed, Xunit.TestContext.Current.CancellationToken);
         jobs.ShouldBe(8);
     }
-
 }

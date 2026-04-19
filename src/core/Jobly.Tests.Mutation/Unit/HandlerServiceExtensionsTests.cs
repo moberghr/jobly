@@ -43,7 +43,7 @@ public class ConcreteTestJob : IJob;
 
 public class ConcreteTestHandler : IJobHandler<ConcreteTestJob>
 {
-    public Task HandleAsync(ConcreteTestJob message, CancellationToken ct) => Task.CompletedTask;
+    public Task HandleAsync(ConcreteTestJob message, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 public class TypeWithUnrelatedGenericInterface : IComparable<string>

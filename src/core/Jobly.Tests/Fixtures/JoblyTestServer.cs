@@ -83,7 +83,7 @@ public class JoblyTestServer : IAsyncDisposable
                 return;
             }
 
-            await Task.Delay(50);
+            await Task.Delay(50, Xunit.TestContext.Current.CancellationToken);
         }
 
         throw new TimeoutException($"PauseStateHolder did not reach expected state (paused={expectedPaused}) for group {groupId} within {timeout ?? TimeSpan.FromSeconds(5)}");
@@ -140,12 +140,14 @@ public class JoblyTestServer : IAsyncDisposable
                     config.InvisibilityTimeout = TimeSpan.FromMinutes(1);
                     config.HealthCheckInterval = TimeSpan.FromMilliseconds(200);
                     config.LogFlushInterval = TimeSpan.FromMilliseconds(100);
+
                     // Disable idle-polling backoff in tests: workers must pick up a new job
                     // within PollingInterval, not up to MaxPollingInterval (30s default).
                     // Without this, the first job enqueued after an idle period waits for
                     // the exponentially-grown sleep to expire.
                     config.MaxPollingInterval = TimeSpan.FromMilliseconds(100);
                     config.PollingIntervalFactor = 1.0;
+
                     // Run stale-recovery fast so crash-recovery tests don't need multi-second
                     // waits. Production default is 30s; 1s is 30x faster without being so
                     // aggressive that it races worker keep-alive refreshes under two-server load.
@@ -171,7 +173,7 @@ public class JoblyTestServer : IAsyncDisposable
             })
             .Build();
 
-        await host.StartAsync();
+        await host.StartAsync(Xunit.TestContext.Current.CancellationToken);
 
         return new JoblyTestServer(host, fixture);
     }
@@ -187,7 +189,7 @@ public class JoblyTestServer : IAsyncDisposable
 
         // Check if server still exists (Respawn may have deleted it)
         var config = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<JoblyWorkerConfiguration>>().Value;
-        var serverExists = await context.Set<Server>().AnyAsync(s => s.Id == config.ServerId);
+        var serverExists = await context.Set<Server>().AnyAsync(s => s.Id == config.ServerId, Xunit.TestContext.Current.CancellationToken);
         if (serverExists)
         {
             return;
@@ -215,7 +217,7 @@ public class JoblyTestServer : IAsyncDisposable
             });
         }
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public async Task WaitForJobState(Guid jobId, State state, TimeSpan? timeout = null)
@@ -231,20 +233,20 @@ public class JoblyTestServer : IAsyncDisposable
             var currentState = await CreateContext().Set<Job>()
                 .Where(x => x.Id == jobId)
                 .Select(x => x.CurrentState)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
             if (currentState == state)
             {
                 return;
             }
 
-            await Task.Delay(100);
+            await Task.Delay(100, Xunit.TestContext.Current.CancellationToken);
         }
 
         var finalState = await CreateContext().Set<Job>()
             .Where(x => x.Id == jobId)
             .Select(x => x.CurrentState)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         throw new TimeoutException($"Job {jobId} did not reach state {state} within {effectiveTimeout}. Current state: {finalState}");
     }
@@ -255,14 +257,14 @@ public class JoblyTestServer : IAsyncDisposable
         while (DateTime.UtcNow < deadline)
         {
             var hasLog = await CreateContext().Set<JobLog>()
-                .AnyAsync(x => x.JobId == jobId && x.EventType == eventType);
+                .AnyAsync(x => x.JobId == jobId && x.EventType == eventType, Xunit.TestContext.Current.CancellationToken);
 
             if (hasLog)
             {
                 return;
             }
 
-            await Task.Delay(200);
+            await Task.Delay(200, Xunit.TestContext.Current.CancellationToken);
         }
 
         var logs = await GetJobLogs(jobId);
@@ -281,15 +283,15 @@ public class JoblyTestServer : IAsyncDisposable
         while (DateTime.UtcNow < deadline)
         {
             var ctx = CreateContext();
-            var totalSeen = await ctx.Set<Job>().CountAsync(j => j.Queue == queue);
+            var totalSeen = await ctx.Set<Job>().CountAsync(j => j.Queue == queue, Xunit.TestContext.Current.CancellationToken);
             var stillEnqueued = await ctx.Set<Job>()
-                .CountAsync(j => j.Queue == queue && j.CurrentState == State.Enqueued);
+                .CountAsync(j => j.Queue == queue && j.CurrentState == State.Enqueued, Xunit.TestContext.Current.CancellationToken);
             if (totalSeen >= expectedCount && stillEnqueued == 0)
             {
                 return;
             }
 
-            await Task.Delay(100);
+            await Task.Delay(100, Xunit.TestContext.Current.CancellationToken);
         }
 
         throw new TimeoutException($"Jobs on queue {queue} did not leave Enqueued within {timeout ?? TimeSpan.FromSeconds(15)}");
@@ -303,21 +305,22 @@ public class JoblyTestServer : IAsyncDisposable
             var ctx = CreateContext();
 
             var activeJobs = await ctx.Set<Job>()
-                .CountAsync(j =>
-                    j.CurrentState == State.Enqueued ||
-                    j.CurrentState == State.Processing ||
-                    j.CurrentState == State.Awaiting);
+                .CountAsync(
+                    j => j.CurrentState == State.Enqueued
+                        || j.CurrentState == State.Processing
+                        || j.CurrentState == State.Awaiting,
+                    Xunit.TestContext.Current.CancellationToken);
 
             var activeMessages = await ctx.Set<Job>()
                 .Where(j => j.Kind == JobKind.Message)
-                .CountAsync(m => m.CurrentState != State.Completed && m.CurrentState != State.Failed);
+                .CountAsync(m => m.CurrentState != State.Completed && m.CurrentState != State.Failed, Xunit.TestContext.Current.CancellationToken);
 
             if (activeJobs == 0 && activeMessages == 0)
             {
                 return;
             }
 
-            await Task.Delay(200);
+            await Task.Delay(200, Xunit.TestContext.Current.CancellationToken);
         }
 
         var debugCtx = CreateContext();
@@ -325,7 +328,7 @@ public class JoblyTestServer : IAsyncDisposable
             .Where(j => j.CurrentState == State.Enqueued || j.CurrentState == State.Processing || j.CurrentState == State.Awaiting)
             .Select(j => new { j.Id, j.Kind, j.CurrentState, j.ParentJobId })
             .Take(10)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         var stuckInfo = string.Join(", ", stuck.Select(s => $"{s.Kind}:{s.CurrentState}(parent={s.ParentJobId})"));
 
         throw new TimeoutException($"Not all jobs completed within timeout. Stuck: {stuckInfo}");
@@ -337,7 +340,7 @@ public class JoblyTestServer : IAsyncDisposable
             .Where(x => x.JobId == jobId)
             .OrderBy(x => x.Timestamp)
             .AsNoTracking()
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public T GetService<T>()
@@ -349,13 +352,13 @@ public class JoblyTestServer : IAsyncDisposable
         return await CreateContext().Set<Job>()
             .Where(x => x.Id == jobId)
             .AsNoTracking()
-            .FirstAsync();
+            .FirstAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public async ValueTask DisposeAsync()
     {
         GC.SuppressFinalize(this);
-        await _host.StopAsync();
+        await _host.StopAsync(Xunit.TestContext.Current.CancellationToken);
         _host.Dispose();
     }
 }

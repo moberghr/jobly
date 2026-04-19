@@ -17,7 +17,7 @@ public class MediatorTests
         var provider = services.BuildServiceProvider();
 
         var mediator = provider.GetRequiredService<IMediator>();
-        var result = await mediator.Send(new GetGreetingRequest { Name = "Jobly" });
+        var result = await mediator.Send(new GetGreetingRequest { Name = "Jobly" }, Xunit.TestContext.Current.CancellationToken);
 
         result.ShouldBe("Hello, Jobly!");
     }
@@ -32,7 +32,7 @@ public class MediatorTests
         var mediator = provider.GetRequiredService<IMediator>();
 
         await Should.ThrowAsync<InvalidOperationException>(
-            () => mediator.Send(new GetGreetingRequest { Name = "Jobly" }));
+            () => mediator.Send(new GetGreetingRequest { Name = "Jobly" }, Xunit.TestContext.Current.CancellationToken));
     }
 
     [TimedFact]
@@ -48,7 +48,7 @@ public class MediatorTests
         var provider = services.BuildServiceProvider();
 
         var mediator = provider.GetRequiredService<IMediator>();
-        var result = await mediator.Send(new GetGreetingRequest { Name = "World" });
+        var result = await mediator.Send(new GetGreetingRequest { Name = "World" }, Xunit.TestContext.Current.CancellationToken);
 
         result.ShouldBe("Hello, World!");
         log.ShouldBe(["before", "after"]);
@@ -64,7 +64,7 @@ public class MediatorTests
 
         var mediator = provider.GetRequiredService<IMediator>();
         var items = new List<int>();
-        await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 5 }))
+        await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 5 }, Xunit.TestContext.Current.CancellationToken).WithCancellation(Xunit.TestContext.Current.CancellationToken))
         {
             items.Add(item);
         }
@@ -82,7 +82,7 @@ public class MediatorTests
         var mediator = provider.GetRequiredService<IMediator>();
 
         Should.Throw<InvalidOperationException>(
-            () => mediator.CreateStream(new GetNumbersStreamRequest { Count = 1 }));
+            () => mediator.CreateStream(new GetNumbersStreamRequest { Count = 1 }, Xunit.TestContext.Current.CancellationToken));
     }
 
     [TimedFact]
@@ -99,7 +99,7 @@ public class MediatorTests
 
         var mediator = provider.GetRequiredService<IMediator>();
         var items = new List<int>();
-        await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 3 }))
+        await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 3 }, Xunit.TestContext.Current.CancellationToken).WithCancellation(Xunit.TestContext.Current.CancellationToken))
         {
             items.Add(item);
         }
@@ -122,7 +122,7 @@ public class MediatorTests
 
         await Should.ThrowAsync<OperationCanceledException>(async () =>
         {
-            await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 100 }, cts.Token))
+            await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 100 }, cts.Token).WithCancellation(Xunit.TestContext.Current.CancellationToken))
             {
                 items.Add(item);
                 if (items.Count == 3)
@@ -145,7 +145,7 @@ public class MediatorTests
 
         var mediator = provider.GetRequiredService<IMediator>();
         var items = new List<int>();
-        await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 0 }))
+        await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 0 }, Xunit.TestContext.Current.CancellationToken).WithCancellation(Xunit.TestContext.Current.CancellationToken))
         {
             items.Add(item);
         }
@@ -169,7 +169,7 @@ public class MediatorTests
 
         var mediator = provider.GetRequiredService<IMediator>();
         var items = new List<int>();
-        await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 2 }))
+        await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 2 }, Xunit.TestContext.Current.CancellationToken).WithCancellation(Xunit.TestContext.Current.CancellationToken))
         {
             items.Add(item);
         }
@@ -191,7 +191,7 @@ public class MediatorTests
 
         await Should.ThrowAsync<InvalidOperationException>(async () =>
         {
-            await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 5 }))
+            await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 5 }, Xunit.TestContext.Current.CancellationToken).WithCancellation(Xunit.TestContext.Current.CancellationToken))
             {
                 items.Add(item);
             }
@@ -214,7 +214,7 @@ public class MediatorTests
 
         var mediator = provider.GetRequiredService<IMediator>();
         var items = new List<int>();
-        await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 3 }))
+        await foreach (var item in mediator.CreateStream(new GetNumbersStreamRequest { Count = 3 }, Xunit.TestContext.Current.CancellationToken).WithCancellation(Xunit.TestContext.Current.CancellationToken))
         {
             items.Add(item);
         }

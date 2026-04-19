@@ -30,7 +30,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             jobIds.Add(await publisher.Enqueue(new CounterRequest()));
         }
 
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server1.WaitForCompletion();
 
@@ -40,7 +40,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         var completedCount = await ctx.Set<Job>()
             .Where(x => jobIds.Contains(x.Id))
             .Where(x => x.CurrentState == State.Completed)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         completedCount.ShouldBe(50);
 
         // No stuck jobs
@@ -49,7 +49,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             .Where(x => x.CurrentState == State.Enqueued
                 || x.CurrentState == State.Processing
                 || x.CurrentState == State.Awaiting)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         activeCount.ShouldBe(0);
 
         // Each job processed exactly once — one Processing log and one Completed log per job
@@ -58,13 +58,13 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             var processingLogs = await ctx.Set<JobLog>()
                 .Where(x => x.JobId == jobId)
                 .Where(x => x.EventType == "Processing")
-                .CountAsync();
+                .CountAsync(Xunit.TestContext.Current.CancellationToken);
             processingLogs.ShouldBe(1, $"Job {jobId} should have exactly one Processing log");
 
             var completedLogs = await ctx.Set<JobLog>()
                 .Where(x => x.JobId == jobId)
                 .Where(x => x.EventType == "Completed")
-                .CountAsync();
+                .CountAsync(Xunit.TestContext.Current.CancellationToken);
             completedLogs.ShouldBe(1, $"Job {jobId} should have exactly one Completed log");
         }
     }
@@ -79,7 +79,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             messageIds.Add(await publisher.Publish(new SingleHandlerMessage()));
         }
 
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server1.WaitForCompletion();
 
@@ -90,7 +90,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         {
             var message = await ctx.Set<Job>()
                 .Where(x => x.Id == messageId)
-                .FirstAsync();
+                .FirstAsync(Xunit.TestContext.Current.CancellationToken);
             message.CurrentState.ShouldBe(State.Completed);
             message.Kind.ShouldBe(JobKind.Message);
 
@@ -99,7 +99,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             var childCount = await ctx.Set<Job>()
                 .Where(x => x.ParentJobId == messageId)
                 .Where(x => x.Kind == JobKind.Job)
-                .CountAsync();
+                .CountAsync(Xunit.TestContext.Current.CancellationToken);
             childCount.ShouldBe(1, $"Message {messageId} should have exactly 1 child job (not double-routed)");
         }
     }
@@ -114,7 +114,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             messageIds.Add(await publisher.Publish(new MultiRequest()));
         }
 
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server1.WaitForCompletion();
 
@@ -124,7 +124,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         {
             var message = await ctx.Set<Job>()
                 .Where(x => x.Id == messageId)
-                .FirstAsync();
+                .FirstAsync(Xunit.TestContext.Current.CancellationToken);
             message.CurrentState.ShouldBe(State.Completed);
 
             // MultiRequest has 2 handlers (MultiHandlerA + MultiHandlerB)
@@ -132,7 +132,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             var childCount = await ctx.Set<Job>()
                 .Where(x => x.ParentJobId == messageId)
                 .Where(x => x.Kind == JobKind.Job)
-                .CountAsync();
+                .CountAsync(Xunit.TestContext.Current.CancellationToken);
             childCount.ShouldBe(2, $"Message {messageId} should have exactly 2 children (not double-routed)");
         }
     }
@@ -151,7 +151,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             .Select(_ => new UnitRequest())
             .ToList();
         await batchPublisher.ContinueBatchWith(continuationJobs, batchId);
-        await batchPublisher.SaveChangesAsync();
+        await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server1.WaitForCompletion(timeout: TimeSpan.FromSeconds(30));
 
@@ -160,7 +160,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         // Batch parent should be completed
         var batch = await ctx.Set<Job>()
             .Where(x => x.Id == batchId)
-            .FirstAsync();
+            .FirstAsync(Xunit.TestContext.Current.CancellationToken);
         batch.CurrentState.ShouldBe(State.Completed);
         batch.Kind.ShouldBe(JobKind.Batch);
 
@@ -168,7 +168,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         var batchChildren = await ctx.Set<Job>()
             .Where(x => x.ParentJobId == batchId)
             .Where(x => x.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         batchChildren.Count.ShouldBe(20);
         batchChildren.ShouldAllBe(x => x.CurrentState == State.Completed);
 
@@ -176,14 +176,14 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         var continuationBatch = await ctx.Set<Job>()
             .Where(x => x.ParentJobId == batchId)
             .Where(x => x.Kind == JobKind.Batch)
-            .FirstAsync();
+            .FirstAsync(Xunit.TestContext.Current.CancellationToken);
         continuationBatch.CurrentState.ShouldBe(State.Completed);
 
         // Continuation batch's 3 children should be completed
         var continuationChildren = await ctx.Set<Job>()
             .Where(x => x.ParentJobId == continuationBatch.Id)
             .Where(x => x.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         continuationChildren.Count.ShouldBe(3);
         continuationChildren.ShouldAllBe(x => x.CurrentState == State.Completed);
     }
@@ -202,7 +202,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             parentIds.Add(parentId);
         }
 
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server1.WaitForCompletion();
 
@@ -213,13 +213,13 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             // Parent should be completed
             var parent = await ctx.Set<Job>()
                 .Where(x => x.Id == parentId)
-                .FirstAsync();
+                .FirstAsync(Xunit.TestContext.Current.CancellationToken);
             parent.CurrentState.ShouldBe(State.Completed);
 
             // Continuation child should be completed
             var children = await ctx.Set<Job>()
                 .Where(x => x.ParentJobId == parentId)
-                .ToListAsync();
+                .ToListAsync(Xunit.TestContext.Current.CancellationToken);
             children.Count.ShouldBe(1);
             children[0].CurrentState.ShouldBe(State.Completed);
         }
@@ -231,7 +231,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         // Enqueue a slow job that holds the mutex — published via Server1
         var publisher1 = Server1.CreatePublisher();
         var job1Id = await publisher1.Enqueue(new CancellableRequest(), new JobParameters().WithMutex("multi-server-mutex"));
-        await publisher1.SaveChangesAsync();
+        await publisher1.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait for it to start processing
         await Server1.WaitForJobState(job1Id, State.Processing);
@@ -239,7 +239,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         // Enqueue a second job with the same mutex — published via Server2
         var publisher2 = Server2.CreatePublisher();
         var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("multi-server-mutex"));
-        await publisher2.SaveChangesAsync();
+        await publisher2.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Job2 should be deleted due to mutex (regardless of which server picks it up).
         await Server1.WaitForJobState(job2Id, State.Deleted);
@@ -303,7 +303,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             .Select(_ => new UnitRequest())
             .ToList();
         await batchPublisher.ContinueBatchWith(continuationJobs, batchId);
-        await batchPublisher.SaveChangesAsync();
+        await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // 7. Parent → child continuations (5 chains)
         for (var i = 0; i < 5; i++)
@@ -312,7 +312,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             await publisher.Enqueue(new UnitRequest(), parentId);
         }
 
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server1.WaitForCompletion(timeout: TimeSpan.FromSeconds(60));
 
@@ -327,53 +327,53 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             .Where(x => x.CurrentState == State.Enqueued
                 || x.CurrentState == State.Processing
                 || x.CurrentState == State.Awaiting)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         stuckJobs.ShouldBe(0, "No jobs should be stuck in non-terminal states");
 
         // All messages completed
         var incompleteMessages = await ctx.Set<Job>()
             .Where(x => x.Kind == JobKind.Message)
             .Where(x => x.CurrentState != State.Completed)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         incompleteMessages.ShouldBe(0, "All messages should be completed");
 
         // All batches completed
         var incompleteBatches = await ctx.Set<Job>()
             .Where(x => x.Kind == JobKind.Batch)
             .Where(x => x.CurrentState != State.Completed)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         incompleteBatches.ShouldBe(0, "All batches should be completed");
 
         // Failed count: 5 no-retry + 3 with-retry = 8 failed
         var failedJobs = await ctx.Set<Job>()
             .Where(x => x.Kind == JobKind.Job)
             .Where(x => x.CurrentState == State.Failed)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         failedJobs.ShouldBe(8, "5 no-retry + 3 with-retry = 8 failed");
 
         // Completed count should be > 0
         var completedJobs = await ctx.Set<Job>()
             .Where(x => x.Kind == JobKind.Job)
             .Where(x => x.CurrentState == State.Completed)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         completedJobs.ShouldBeGreaterThan(50, "Should have many completed jobs");
 
         // No terminal jobs should have a CurrentWorkerId
         var jobsWithWorker = await ctx.Set<Job>()
             .Where(x => x.Kind == JobKind.Job)
             .Where(x => x.CurrentWorkerId != null)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         jobsWithWorker.ShouldBe(0, "No terminal jobs should have a CurrentWorkerId");
 
         // Statistics integrity
         var statsSucceeded = await ctx.Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
         var statsFailed = await ctx.Set<Statistic>()
             .Where(x => x.Key == "stats:failed")
             .Select(x => x.Value)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         statsSucceeded.ShouldBe(completedJobs, "stats:succeeded should match completed job count");
         statsFailed.ShouldBe(failedJobs, "stats:failed should match failed job count");
@@ -387,7 +387,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         var server1GroupId = await ctx.Set<WorkerGroup>()
             .Where(x => x.ServerId == Server1.ServerId)
             .Select(x => x.Id)
-            .FirstAsync();
+            .FirstAsync(Xunit.TestContext.Current.CancellationToken);
 
         var svc = Server1.CreateServerCommandService();
         await svc.PauseServer(Server1.ServerId);
@@ -401,7 +401,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             jobIds.Add(await publisher.Enqueue(new UnitRequest()));
         }
 
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Jobs should be processed by Server2
         await Server2.WaitForCompletion();
@@ -412,14 +412,14 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         var completedCount = await ctx.Set<Job>()
             .Where(x => jobIds.Contains(x.Id))
             .Where(x => x.CurrentState == State.Completed)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         completedCount.ShouldBe(10);
 
         // All jobs should have been processed by Server2's workers (Server1 is paused)
         var server2WorkerIds = await ctx.Set<Jobly.Core.Data.Entities.Worker>()
             .Where(x => x.ServerId == Server2.ServerId)
             .Select(x => x.Id)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         var processingWorkerIds = await ctx.Set<JobLog>()
             .Where(x => jobIds.Contains(x.JobId))
@@ -427,7 +427,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             .Where(x => x.WorkerId != null)
             .Select(x => x.WorkerId!.Value)
             .Distinct()
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         processingWorkerIds.ShouldAllBe(
             x => server2WorkerIds.Contains(x),

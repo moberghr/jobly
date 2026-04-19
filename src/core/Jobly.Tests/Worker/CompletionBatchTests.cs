@@ -47,7 +47,7 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
             LastKeepAlive = _time.GetUtcNow().UtcDateTime,
         };
         ctx.Set<Job>().Add(job);
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
         return job;
     }
 
@@ -103,7 +103,7 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
             .Where(x => x.Id == job1.Id || x.Id == job2.Id || x.Id == job3.Id)
             .OrderBy(x => x.Id)
             .AsNoTracking()
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         jobs.Count.ShouldBe(3);
         foreach (var job in jobs)
         {
@@ -112,12 +112,12 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
             job.LastKeepAlive.ShouldBeNull();
         }
 
-        var counters = await ctx.Set<Counter>().CountAsync();
+        var counters = await ctx.Set<Counter>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         counters.ShouldBe(6);
 
         var logs = await ctx.Set<JobLog>()
             .Where(x => x.EventType == "Completed")
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         logs.ShouldBe(3);
 
         batch.Count.ShouldBe(0);
@@ -135,8 +135,8 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
 
         // Assert
         var ctx = _fixture.CreateContext();
-        (await ctx.Set<Counter>().CountAsync()).ShouldBe(0);
-        (await ctx.Set<JobLog>().CountAsync()).ShouldBe(0);
+        (await ctx.Set<Counter>().CountAsync(Xunit.TestContext.Current.CancellationToken)).ShouldBe(0);
+        (await ctx.Set<JobLog>().CountAsync(Xunit.TestContext.Current.CancellationToken)).ShouldBe(0);
         batch.Count.ShouldBe(0);
     }
 
@@ -152,12 +152,12 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
 
         // Act
         await batch.FlushAsync();
-        var countersAfterFirst = await _fixture.CreateContext().Set<Counter>().CountAsync();
+        var countersAfterFirst = await _fixture.CreateContext().Set<Counter>().CountAsync(Xunit.TestContext.Current.CancellationToken);
 
         await batch.FlushAsync();
 
         // Assert
-        var countersAfterSecond = await _fixture.CreateContext().Set<Counter>().CountAsync();
+        var countersAfterSecond = await _fixture.CreateContext().Set<Counter>().CountAsync(Xunit.TestContext.Current.CancellationToken);
         countersAfterSecond.ShouldBe(countersAfterFirst);
         batch.Count.ShouldBe(0);
     }
@@ -223,14 +223,14 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
 
         // Assert — real job committed, phantom dropped, buffer drained.
         var ctx = _fixture.CreateContext();
-        var persisted = await ctx.Set<Job>().FirstAsync(x => x.Id == realJob.Id);
+        var persisted = await ctx.Set<Job>().FirstAsync(x => x.Id == realJob.Id, Xunit.TestContext.Current.CancellationToken);
         persisted.CurrentState.ShouldBe(State.Completed);
         persisted.CurrentWorkerId.ShouldBeNull();
 
-        (await ctx.Set<Job>().AnyAsync(x => x.Id == phantomJob.Id)).ShouldBeFalse();
+        (await ctx.Set<Job>().AnyAsync(x => x.Id == phantomJob.Id, Xunit.TestContext.Current.CancellationToken)).ShouldBeFalse();
 
-        var counters = await ctx.Set<Counter>().ToListAsync();
-        counters.Count(c => c.Key == "stats:succeeded").ShouldBe(1);
+        var counters = await ctx.Set<Counter>().ToListAsync(Xunit.TestContext.Current.CancellationToken);
+        counters.Count(c => string.Equals(c.Key, "stats:succeeded", StringComparison.Ordinal)).ShouldBe(1);
         counters.ShouldNotContain(c => c.Value == 1 && c.Key == "stats:succeeded" && c.Id == 0 && string.Equals(c.Key, "phantom", StringComparison.Ordinal));
 
         batch.Count.ShouldBe(0);
@@ -275,10 +275,10 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
         var ctx = _fixture.CreateContext();
         var committed = await ctx.Set<Job>()
             .Where(x => x.Id == good1.Id || x.Id == good2.Id || x.Id == good3.Id || x.Id == good4.Id)
-            .CountAsync(x => x.CurrentState == State.Completed);
+            .CountAsync(x => x.CurrentState == State.Completed, Xunit.TestContext.Current.CancellationToken);
         committed.ShouldBe(4);
 
-        (await ctx.Set<Job>().AnyAsync(x => x.Id == phantom.Id)).ShouldBeFalse();
+        (await ctx.Set<Job>().AnyAsync(x => x.Id == phantom.Id, Xunit.TestContext.Current.CancellationToken)).ShouldBeFalse();
 
         batch.Count.ShouldBe(0);
     }
@@ -304,7 +304,7 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
 
         await batch.FlushAsync();
 
-        var persisted = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == job.Id);
+        var persisted = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == job.Id, Xunit.TestContext.Current.CancellationToken);
         persisted.CurrentState.ShouldBe(State.Completed);
         persisted.CurrentWorkerId.ShouldBeNull();
         persisted.LastKeepAlive.ShouldBeNull();
@@ -329,7 +329,7 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
 
         // Flush commits the single entry
         await batch.FlushAsync();
-        var persisted = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == job.Id);
+        var persisted = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == job.Id, Xunit.TestContext.Current.CancellationToken);
         persisted.CurrentState.ShouldBe(State.Completed);
     }
 }

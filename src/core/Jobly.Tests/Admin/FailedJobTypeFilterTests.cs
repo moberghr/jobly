@@ -65,7 +65,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
             Queue = "default",
             Type = "TypeC",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -120,7 +120,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
             Queue = "default",
             Type = "TypeB",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -165,7 +165,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -210,7 +210,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -222,12 +222,12 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var remainingTypeA = await readCtx.Set<Job>()
             .Where(j => j.Type == "TypeA" && j.CurrentState == State.Failed)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         remainingTypeA.ShouldBe(0);
 
         var remainingTypeB = await readCtx.Set<Job>()
             .Where(j => j.Type == "TypeB" && j.CurrentState == State.Failed)
-            .CountAsync();
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
         remainingTypeB.ShouldBe(3);
     }
 
@@ -253,7 +253,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
@@ -265,7 +265,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         foreach (var id in typeAIds)
         {
-            var job = await readCtx.Set<Job>().FindAsync(id);
+            var job = await readCtx.Set<Job>().FindAsync([id], Xunit.TestContext.Current.CancellationToken);
             job.ShouldNotBeNull();
             job.CurrentState.ShouldBe(State.Enqueued);
         }

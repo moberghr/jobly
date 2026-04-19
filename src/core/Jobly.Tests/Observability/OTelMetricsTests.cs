@@ -6,10 +6,10 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Logging;
+using Jobly.Core.Retry;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
-using Jobly.Core.Retry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -48,7 +48,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -133,7 +133,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = queue,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(queue);
         double recordedDuration = -1;
@@ -180,7 +180,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = queue,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(queue);
         long completedCount = 0;
@@ -228,7 +228,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
             Queue = queue,
             Metadata = JsonSerializer.Serialize(new Dictionary<string, object> { ["MaxRetries"] = 0 }),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(queue);
         long failedCount = 0;
@@ -264,7 +264,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
         // Arrange — publisher uses unique queue, no worker needed
         var queue = $"metrics-enqueue-{Guid.NewGuid():N}";
         var ctx = _fixture.CreateContext();
-        var publisher = new Publisher<TestContext>(ctx, Options.Create(new JoblyConfiguration { DefaultQueue = queue }), TimeProvider.System, new ServiceCollection().BuildServiceProvider());
+        var publisher = new Publisher<TestContext>(ctx, TimeProvider.System, new ServiceCollection().BuildServiceProvider());
         long enqueuedCount = 0;
 
         using var listener = new MeterListener();
@@ -309,7 +309,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = queue,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(queue);
         long activeNet = 0;
@@ -369,7 +369,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow.AddMilliseconds(1),
             Queue = queue,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker1 = CreateWorker(queue, barrier);
         var worker2 = CreateWorker(queue, barrier);
@@ -405,8 +405,8 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
         var task2 = worker2.GetAndProcessJob(CancellationToken.None);
 
         // Wait for both handlers to be running
-        await barrier.Running.WaitAsync();
-        await barrier.Running.WaitAsync();
+        await barrier.Running.WaitAsync(Xunit.TestContext.Current.CancellationToken);
+        await barrier.Running.WaitAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Both are active now — release them
         barrier.CanFinish.Release(2);
@@ -436,7 +436,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
             MaxRetries = 3,
             RetriedTimes = 0,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(queue);
         long retriedCount = 0;

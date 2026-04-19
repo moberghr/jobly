@@ -20,14 +20,14 @@ public class SqlServerBatchedCompletionFixture : IAsyncLifetime, IDatabaseFixtur
 
     public async ValueTask InitializeAsync()
     {
-        await _container.StartAsync();
+        await _container.StartAsync(Xunit.TestContext.Current.CancellationToken);
         _connectionString = _container.GetConnectionString() + ";Encrypt=False;";
 
         await using var context = CreateContext();
-        await context.Database.EnsureCreatedAsync();
+        await context.Database.EnsureCreatedAsync(Xunit.TestContext.Current.CancellationToken);
 
         await using var conn = new SqlConnection(_connectionString);
-        await conn.OpenAsync();
+        await conn.OpenAsync(Xunit.TestContext.Current.CancellationToken);
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.SqlServer,
@@ -46,7 +46,7 @@ public class SqlServerBatchedCompletionFixture : IAsyncLifetime, IDatabaseFixtur
     public async Task ResetAsync()
     {
         await using var conn = new SqlConnection(_connectionString);
-        await conn.OpenAsync();
+        await conn.OpenAsync(Xunit.TestContext.Current.CancellationToken);
         await _respawner.ResetAsync(conn);
     }
 

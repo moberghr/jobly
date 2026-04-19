@@ -24,7 +24,7 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
 
         // Enqueue a slow job that holds the mutex
         var job1Id = await publisher.Enqueue(new CancellableRequest(), new JobParameters().WithMutex("test-mutex"));
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait for it to start processing
         await Server.WaitForJobState(job1Id, State.Processing);
@@ -32,7 +32,7 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
         // Enqueue a second job with the same mutex
         var publisher2 = Server.CreatePublisher();
         var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("test-mutex"));
-        await publisher2.SaveChangesAsync();
+        await publisher2.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(job2Id, State.Deleted);
 

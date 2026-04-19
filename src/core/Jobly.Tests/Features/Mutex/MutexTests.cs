@@ -68,7 +68,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
             Message = "{}",
             Metadata = SerializeMutexMetadata("payment:123"),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Pre-hold the lock (simulating job1 is being processed by another worker)
         var lockProvider = new FakeLockProvider();
@@ -125,7 +125,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
             Message = "{}",
             Metadata = SerializeMutexMetadata("payment:456"),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var worker = CreateWorker();
@@ -133,7 +133,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
 
         // Assert: job2 should be processing (not cancelled)
         var readCtx = _fixture.CreateContext();
-        var job2 = await readCtx.Set<Job>().FindAsync(job2Id);
+        var job2 = await readCtx.Set<Job>().FindAsync([job2Id], Xunit.TestContext.Current.CancellationToken);
         job2.ShouldNotBeNull();
         job2.CurrentState.ShouldNotBe(State.Deleted);
     }
@@ -155,7 +155,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
             Type = typeof(UnitRequest).AssemblyQualifiedName,
             Message = "{}",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var worker = CreateWorker();
@@ -163,7 +163,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
 
         // Assert: job should complete normally (no mutex cancellation)
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Completed);
     }
@@ -186,7 +186,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
             Message = "{}",
             Metadata = SerializeMutexMetadata("payment:123"),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var worker = CreateWorker();
@@ -194,7 +194,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
 
         // Assert: should complete
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Completed);
     }
@@ -230,7 +230,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
             Message = "{}",
             Metadata = SerializeMutexMetadata("payment:789"),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var lockProvider = new FakeLockProvider();
         var heldHandle = lockProvider.HoldLock("jobly:mutex:payment:789");
@@ -258,9 +258,6 @@ public abstract class MutexTestsBase : IAsyncLifetime
     public async Task MutexAttribute_SetsKeyAtPublishTime()
     {
         // Arrange: MutexAttributeRequest has [Mutex("static-key")] on the job class
-        var ctx = _fixture.CreateContext();
-
-        // Create a publisher that runs through the publish pipeline
         var services = new ServiceCollection();
         services.AddHandlers(typeof(MutexTestsBase).Assembly);
         services.AddLogging();
@@ -273,13 +270,13 @@ public abstract class MutexTestsBase : IAsyncLifetime
         services.AddSingleton<IOptions<JoblyConfiguration>>(new OptionsWrapper<JoblyConfiguration>(new JoblyConfiguration()));
 
         var provider = services.BuildServiceProvider();
-        using var scope = provider.CreateScope();
+        await using var scope = provider.CreateAsyncScope();
         var publisherCtx = scope.ServiceProvider.GetRequiredService<TestContext>();
-        var publisher = new Publisher<TestContext>(publisherCtx, Options.Create(new JoblyConfiguration()), TimeProvider.System, scope.ServiceProvider);
+        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider);
 
         // Act: enqueue a job type that has [Mutex("static-key")]
         var jobId = await publisher.Enqueue(new MutexAttributeRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert: metadata should contain the mutex key from the attribute
         var readCtx = _fixture.CreateContext();
@@ -297,8 +294,6 @@ public abstract class MutexTestsBase : IAsyncLifetime
     public async Task WithMutex_SetsKeyInMetadata()
     {
         // Arrange
-        var ctx = _fixture.CreateContext();
-
         var services = new ServiceCollection();
         services.AddHandlers(typeof(MutexTestsBase).Assembly);
         services.AddLogging();
@@ -311,13 +306,13 @@ public abstract class MutexTestsBase : IAsyncLifetime
         services.AddSingleton<IOptions<JoblyConfiguration>>(new OptionsWrapper<JoblyConfiguration>(new JoblyConfiguration()));
 
         var provider = services.BuildServiceProvider();
-        using var scope = provider.CreateScope();
+        await using var scope = provider.CreateAsyncScope();
         var publisherCtx = scope.ServiceProvider.GetRequiredService<TestContext>();
-        var publisher = new Publisher<TestContext>(publisherCtx, Options.Create(new JoblyConfiguration()), TimeProvider.System, scope.ServiceProvider);
+        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider);
 
         // Act: enqueue with WithMutex extension
         var jobId = await publisher.Enqueue(new UnitRequest(), new JobParameters().WithMutex("dynamic-key"));
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert: metadata should contain the mutex key
         var readCtx = _fixture.CreateContext();

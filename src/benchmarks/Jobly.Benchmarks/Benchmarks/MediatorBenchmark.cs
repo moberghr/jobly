@@ -93,18 +93,32 @@ public class MediatorBenchmark
     private static void RegisterJoblyBehaviors(IServiceCollection services, int depth)
     {
         if (depth >= 1)
+        {
             services.AddTransient<Jobly.Core.Handlers.IPipelineBehavior<JoblyPingRequest, JoblyPingResponse>, JoblyPassthroughBehavior1>();
+        }
+
         if (depth >= 2)
+        {
             services.AddTransient<Jobly.Core.Handlers.IPipelineBehavior<JoblyPingRequest, JoblyPingResponse>, JoblyPassthroughBehavior2>();
+        }
+
         if (depth >= 3)
+        {
             services.AddTransient<Jobly.Core.Handlers.IPipelineBehavior<JoblyPingRequest, JoblyPingResponse>, JoblyPassthroughBehavior3>();
+        }
+
         if (depth >= 4)
+        {
             services.AddTransient<Jobly.Core.Handlers.IPipelineBehavior<JoblyPingRequest, JoblyPingResponse>, JoblyPassthroughBehavior4>();
+        }
+
         if (depth >= 5)
+        {
             services.AddTransient<Jobly.Core.Handlers.IPipelineBehavior<JoblyPingRequest, JoblyPingResponse>, JoblyPassthroughBehavior5>();
+        }
     }
 
-    private static void RemoveAllMediatRBehaviors(IServiceCollection services)
+    private static void RemoveAllMediatRBehaviors(ServiceCollection services)
     {
         for (var i = services.Count - 1; i >= 0; i--)
         {
@@ -119,18 +133,32 @@ public class MediatorBenchmark
     private static void RegisterMediatRBehaviors(IServiceCollection services, int depth)
     {
         if (depth >= 1)
+        {
             services.AddTransient<MediatR.IPipelineBehavior<MediatRPingRequest, MediatRPingResponse>, MediatRPassthroughBehavior1>();
+        }
+
         if (depth >= 2)
+        {
             services.AddTransient<MediatR.IPipelineBehavior<MediatRPingRequest, MediatRPingResponse>, MediatRPassthroughBehavior2>();
+        }
+
         if (depth >= 3)
+        {
             services.AddTransient<MediatR.IPipelineBehavior<MediatRPingRequest, MediatRPingResponse>, MediatRPassthroughBehavior3>();
+        }
+
         if (depth >= 4)
+        {
             services.AddTransient<MediatR.IPipelineBehavior<MediatRPingRequest, MediatRPingResponse>, MediatRPassthroughBehavior4>();
+        }
+
         if (depth >= 5)
+        {
             services.AddTransient<MediatR.IPipelineBehavior<MediatRPingRequest, MediatRPingResponse>, MediatRPassthroughBehavior5>();
+        }
     }
 
-    private static void RemoveAllSourceGenBehaviors(IServiceCollection services)
+    private static void RemoveAllSourceGenBehaviors(ServiceCollection services)
     {
         for (var i = services.Count - 1; i >= 0; i--)
         {
@@ -145,14 +173,28 @@ public class MediatorBenchmark
     private static void RegisterSourceGenBehaviors(IServiceCollection services, int depth)
     {
         if (depth >= 1)
+        {
             services.AddTransient<Mediator.IPipelineBehavior<SourceGenPingRequest, SourceGenPingResponse>, SourceGenPassthroughBehavior1>();
+        }
+
         if (depth >= 2)
+        {
             services.AddTransient<Mediator.IPipelineBehavior<SourceGenPingRequest, SourceGenPingResponse>, SourceGenPassthroughBehavior2>();
+        }
+
         if (depth >= 3)
+        {
             services.AddTransient<Mediator.IPipelineBehavior<SourceGenPingRequest, SourceGenPingResponse>, SourceGenPassthroughBehavior3>();
+        }
+
         if (depth >= 4)
+        {
             services.AddTransient<Mediator.IPipelineBehavior<SourceGenPingRequest, SourceGenPingResponse>, SourceGenPassthroughBehavior4>();
+        }
+
         if (depth >= 5)
+        {
             services.AddTransient<Mediator.IPipelineBehavior<SourceGenPingRequest, SourceGenPingResponse>, SourceGenPassthroughBehavior5>();
+        }
     }
 }

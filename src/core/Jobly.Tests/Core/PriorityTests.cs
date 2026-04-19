@@ -43,7 +43,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
             StartedTime = DateTime.UtcNow,
             LastHeartbeatTime = DateTime.UtcNow,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -122,7 +122,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "a-critical",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(["a-critical", "b-default"]);
 
@@ -131,10 +131,10 @@ public abstract class PriorityTestsBase : IAsyncLifetime
 
         // Assert — "a-critical" job should be processed first
         var readCtx = _fixture.CreateContext();
-        var criticalJob = await readCtx.Set<Job>().FirstAsync(j => j.Id == criticalJobId);
+        var criticalJob = await readCtx.Set<Job>().FirstAsync(j => j.Id == criticalJobId, Xunit.TestContext.Current.CancellationToken);
         criticalJob.CurrentState.ShouldBe(State.Completed);
 
-        var defaultJob = await readCtx.Set<Job>().FirstAsync(j => j.Id == defaultJobId);
+        var defaultJob = await readCtx.Set<Job>().FirstAsync(j => j.Id == defaultJobId, Xunit.TestContext.Current.CancellationToken);
         defaultJob.CurrentState.ShouldBe(State.Enqueued);
     }
 
@@ -169,7 +169,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow.AddSeconds(-10),
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(["default"]);
 
@@ -178,10 +178,10 @@ public abstract class PriorityTestsBase : IAsyncLifetime
 
         // Assert — earlier scheduled job should be processed first
         var readCtx = _fixture.CreateContext();
-        var earlierJob = await readCtx.Set<Job>().FirstAsync(j => j.Id == earlierJobId);
+        var earlierJob = await readCtx.Set<Job>().FirstAsync(j => j.Id == earlierJobId, Xunit.TestContext.Current.CancellationToken);
         earlierJob.CurrentState.ShouldBe(State.Completed);
 
-        var laterJob = await readCtx.Set<Job>().FirstAsync(j => j.Id == laterJobId);
+        var laterJob = await readCtx.Set<Job>().FirstAsync(j => j.Id == laterJobId, Xunit.TestContext.Current.CancellationToken);
         laterJob.CurrentState.ShouldBe(State.Enqueued);
     }
 
@@ -202,7 +202,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(["default"]);
 
@@ -212,7 +212,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
         // Assert
         result.ShouldBeTrue();
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Completed);
     }
 
@@ -233,7 +233,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow.AddHours(-1),
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(["default"]);
 
@@ -243,7 +243,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
         // Assert
         result.ShouldBeTrue();
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId);
+        var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Completed);
     }
 }

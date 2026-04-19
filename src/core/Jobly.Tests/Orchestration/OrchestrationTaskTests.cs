@@ -50,7 +50,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var orchCtx = _fixture.CreateContext();
@@ -58,7 +58,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var batch = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == batchId);
+        var batch = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
         batch.ShouldNotBeNull();
         batch.CurrentState.ShouldBe(State.Completed);
     }
@@ -100,7 +100,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = batchId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var orchCtx = _fixture.CreateContext();
@@ -108,7 +108,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var batch = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == batchId);
+        var batch = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
         batch.ShouldNotBeNull();
         batch.CurrentState.ShouldBe(State.Awaiting);
     }
@@ -151,7 +151,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = batchId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var orchCtx = _fixture.CreateContext();
@@ -159,7 +159,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var batch = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == batchId);
+        var batch = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
         batch.ShouldNotBeNull();
         batch.CurrentState.ShouldBe(State.Failed);
     }
@@ -202,7 +202,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = batchId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var orchCtx = _fixture.CreateContext();
@@ -210,7 +210,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var batch = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == batchId);
+        var batch = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
         batch.ShouldNotBeNull();
         batch.CurrentState.ShouldBe(State.Completed);
     }
@@ -245,7 +245,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var orchCtx = _fixture.CreateContext();
@@ -253,7 +253,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var message = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == messageId);
+        var message = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
         message.ShouldNotBeNull();
         message.CurrentState.ShouldBe(State.Completed);
         message.ExpireAt.ShouldNotBeNull();
@@ -322,7 +322,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act — run orchestration multiple times to finalize parent and then activate continuation
         var orchCtx1 = _fixture.CreateContext();
@@ -334,7 +334,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         foreach (var gcId in grandchildIds)
         {
-            var gc = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == gcId);
+            var gc = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == gcId, Xunit.TestContext.Current.CancellationToken);
             gc.ShouldNotBeNull();
             gc.CurrentState.ShouldBe(State.Enqueued);
         }
@@ -383,7 +383,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = parentBatchId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act — finalize parent, then run again
         var orchCtx1 = _fixture.CreateContext();
@@ -394,7 +394,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Assert: continuation stays Awaiting (condition not met, but parent could be requeued)
         var readCtx = _fixture.CreateContext();
-        var continuation = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == continuationId);
+        var continuation = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == continuationId, Xunit.TestContext.Current.CancellationToken);
         continuation.ShouldNotBeNull();
         continuation.CurrentState.ShouldBe(State.Awaiting);
     }
@@ -425,7 +425,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = batchId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var orchCtx = _fixture.CreateContext();
@@ -462,7 +462,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = parentId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var orchCtx = _fixture.CreateContext();
@@ -471,12 +471,12 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
         // Assert
         workDone.ShouldBeTrue();
         var readCtx = _fixture.CreateContext();
-        var child = await readCtx.Set<Job>().FindAsync(childId);
+        var child = await readCtx.Set<Job>().FindAsync([childId], Xunit.TestContext.Current.CancellationToken);
         child.ShouldNotBeNull();
         child.CurrentState.ShouldBe(State.Failed);
         child.ExpireAt.ShouldNotBeNull();
 
-        var log = await readCtx.Set<JobLog>().FirstOrDefaultAsync(x => x.JobId == childId);
+        var log = await readCtx.Set<JobLog>().FirstOrDefaultAsync(x => x.JobId == childId, Xunit.TestContext.Current.CancellationToken);
         log.ShouldNotBeNull();
         log.EventType.ShouldBe("Failed");
     }
@@ -519,7 +519,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = batchChildId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var orchCtx = _fixture.CreateContext();
@@ -527,11 +527,11 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var batchChild = await readCtx.Set<Job>().FindAsync(batchChildId);
+        var batchChild = await readCtx.Set<Job>().FindAsync([batchChildId], Xunit.TestContext.Current.CancellationToken);
         batchChild.ShouldNotBeNull();
         batchChild.CurrentState.ShouldBe(State.Failed);
 
-        var grandchild = await readCtx.Set<Job>().FindAsync(grandchildId);
+        var grandchild = await readCtx.Set<Job>().FindAsync([grandchildId], Xunit.TestContext.Current.CancellationToken);
         grandchild.ShouldNotBeNull();
         grandchild.CurrentState.ShouldBe(State.Failed);
     }
@@ -575,7 +575,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = parentBatchId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act — finalize parent (Failed but OnAnyFinished → Completed), then activate continuation
         var orchCtx1 = _fixture.CreateContext();
@@ -585,7 +585,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var continuation = await readCtx.Set<Job>().FindAsync(continuationId);
+        var continuation = await readCtx.Set<Job>().FindAsync([continuationId], Xunit.TestContext.Current.CancellationToken);
         continuation.ShouldNotBeNull();
         continuation.CurrentState.ShouldBe(State.Enqueued);
     }
@@ -617,7 +617,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = parentId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var orchCtx = _fixture.CreateContext();
@@ -625,7 +625,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var child = await readCtx.Set<Job>().FindAsync(childId);
+        var child = await readCtx.Set<Job>().FindAsync([childId], Xunit.TestContext.Current.CancellationToken);
         child.ShouldNotBeNull();
         child.CurrentState.ShouldBe(State.Awaiting);
     }
@@ -662,7 +662,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var orchCtx = _fixture.CreateContext();
@@ -703,14 +703,14 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = parentId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Run orchestration
         var orchCtx = _fixture.CreateContext();
         await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
 
         var readCtx = _fixture.CreateContext();
-        var child = await readCtx.Set<Job>().FindAsync(childId);
+        var child = await readCtx.Set<Job>().FindAsync([childId], Xunit.TestContext.Current.CancellationToken);
         child.ShouldNotBeNull();
         child.CurrentState.ShouldBe(State.Failed, "Awaiting child of a Deleted parent should be Failed");
     }
@@ -770,7 +770,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
             Queue = "default",
             ParentJobId = continuationBatchId,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Run orchestration twice (first finalizes parent, second should clean up continuations)
         var orchCtx1 = _fixture.CreateContext();
@@ -781,16 +781,16 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
 
         // Parent should be Failed (child failed, OnlyOnSucceeded)
-        var parent = await readCtx.Set<Job>().FindAsync(parentId);
+        var parent = await readCtx.Set<Job>().FindAsync([parentId], Xunit.TestContext.Current.CancellationToken);
         parent.ShouldNotBeNull();
         parent.CurrentState.ShouldBe(State.Failed);
 
         // Continuation batch and its child should stay Awaiting (condition not met, but parent could be requeued)
-        var contBatch = await readCtx.Set<Job>().FindAsync(continuationBatchId);
+        var contBatch = await readCtx.Set<Job>().FindAsync([continuationBatchId], Xunit.TestContext.Current.CancellationToken);
         contBatch.ShouldNotBeNull();
         contBatch.CurrentState.ShouldBe(State.Awaiting, "Continuation of failed OnlyOnSucceeded parent should stay Awaiting");
 
-        var contChild = await readCtx.Set<Job>().FindAsync(continuationChildId);
+        var contChild = await readCtx.Set<Job>().FindAsync([continuationChildId], Xunit.TestContext.Current.CancellationToken);
         contChild.ShouldNotBeNull();
         contChild.CurrentState.ShouldBe(State.Awaiting, "Children of awaiting continuation should also stay Awaiting");
     }

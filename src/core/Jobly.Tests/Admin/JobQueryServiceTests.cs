@@ -51,7 +51,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -89,7 +89,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
             Queue = "default",
         });
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -122,7 +122,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -174,7 +174,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -214,7 +214,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -257,7 +257,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
@@ -287,7 +287,7 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
             Type = "MyApp.Jobs.SendEmail, MyApp",
             HandlerType = "MyApp.Handlers.SendEmailHandler, MyApp",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
         var svc = new JobQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);

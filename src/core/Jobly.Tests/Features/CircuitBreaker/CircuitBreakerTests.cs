@@ -57,7 +57,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
             Message = "{}",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
         await worker.GetAndProcessJob(CancellationToken.None);
@@ -94,7 +94,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
             Message = "{}",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var duration = TimeSpan.FromMinutes(1);
         var worker = CreateWorker(duration: duration);
@@ -139,14 +139,14 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             Type = typeof(UnitRequest).AssemblyQualifiedName,
             Message = "{}",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var jitter = TimeSpan.FromSeconds(10);
         var worker = CreateWorker(resetJitter: jitter);
         await worker.GetAndProcessJob(CancellationToken.None);
 
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Enqueued);
         job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(openUntil);
@@ -183,7 +183,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             Type = typeof(UnitRequest).AssemblyQualifiedName,
             Message = "{}",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
         await worker.GetAndProcessJob(CancellationToken.None);
@@ -220,7 +220,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
             Message = "{}",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(retryMaxRetries: 5);
         await worker.GetAndProcessJob(CancellationToken.None);
@@ -250,7 +250,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             Type = typeof(CircuitBreakerGroupRequest).AssemblyQualifiedName,
             Message = "{}",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
         await worker.GetAndProcessJob(CancellationToken.None);
@@ -285,7 +285,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
             Message = "{}",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
         await worker.GetAndProcessJob(CancellationToken.None);
@@ -333,7 +333,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             });
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker(resetJitter: jitter);
         for (var i = 0; i < 20; i++)
@@ -378,7 +378,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             Message = "{}",
             Metadata = JsonSerializer.Serialize(new Dictionary<string, object> { ["ConcurrencyKey"] = "static-key" }),
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var lockProvider = new FakeLockProvider();
         var heldHandle = lockProvider.HoldLock("jobly:mutex:static-key");
@@ -388,7 +388,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         await heldHandle.DisposeAsync();
 
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Deleted);
 
@@ -463,13 +463,13 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             Type = typeof(UnitRequest).AssemblyQualifiedName,
             Message = "{}",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var worker = CreateWorker();
         await worker.GetAndProcessJob(CancellationToken.None);
 
         var readCtx = _fixture.CreateContext();
-        var job = await readCtx.Set<Job>().FindAsync(jobId);
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
         job.CurrentState.ShouldBe(State.Completed);
 
@@ -511,7 +511,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
             Message = "{}",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var before = DateTime.UtcNow;
         var worker = CreateWorker(duration: duration);
@@ -548,7 +548,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             OpenUntil = now.AddSeconds(-1),
             State = CircuitState.Open,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = CreateStoreScopeFactory();
         var tasks = Enumerable.Range(0, 10).Select(_ =>
@@ -583,7 +583,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             OpenUntil = now.AddMinutes(1),
             State = CircuitState.Open,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = CreateStoreScopeFactory();
         var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory);
@@ -613,7 +613,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             OpenUntil = now.AddSeconds(-1),
             State = CircuitState.HalfOpen,
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = CreateStoreScopeFactory();
         var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory);

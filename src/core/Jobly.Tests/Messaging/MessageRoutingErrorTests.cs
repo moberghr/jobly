@@ -54,7 +54,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = BuildScopeFactoryWithHandlers();
 
@@ -64,7 +64,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var message = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == messageId);
+        var message = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
         message.ShouldNotBeNull();
         message.CurrentState.ShouldBe(State.Failed);
     }
@@ -86,7 +86,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Empty scope factory — no handlers registered
         var scopeFactory = BuildEmptyScopeFactory();
@@ -97,7 +97,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var message = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == messageId);
+        var message = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
         message.ShouldNotBeNull();
         message.CurrentState.ShouldBe(State.Failed);
     }
@@ -119,7 +119,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = BuildScopeFactoryWithHandlers();
 
@@ -131,7 +131,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var children = await readCtx.Set<Job>()
             .Where(j => j.ParentJobId == messageId && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         children.Count.ShouldBe(2);
     }
 
@@ -152,7 +152,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
             ScheduleTime = DateTime.UtcNow,
             Queue = "default",
         });
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = BuildScopeFactoryWithHandlers();
 
@@ -164,7 +164,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
         var readCtx = _fixture.CreateContext();
         var children = await readCtx.Set<Job>()
             .Where(j => j.ParentJobId == messageId && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         children.Count.ShouldBe(2);
         children.ShouldAllBe(c => !string.IsNullOrEmpty(c.HandlerType));

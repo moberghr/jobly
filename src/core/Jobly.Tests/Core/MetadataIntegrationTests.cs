@@ -1,7 +1,7 @@
 using Jobly.Core.Data.Entities;
-using Jobly.Core.Handlers;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
+using Jobly.Core.Handlers;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +22,7 @@ public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var jobId = await publisher.Enqueue(new MetadataRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForJobState(jobId, State.Completed);
 
@@ -45,7 +45,7 @@ public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
     {
         var publisher = Server.CreatePublisher();
         var messageId = await publisher.Publish(new MultiRequest());
-        await publisher.SaveChangesAsync();
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
@@ -53,7 +53,7 @@ public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
         var ctx = Server.CreateContext();
         var childJobs = await ctx.Set<Job>()
             .Where(j => j.ParentJobId == messageId && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         childJobs.Count.ShouldBeGreaterThan(0);
         foreach (var child in childJobs)
@@ -70,14 +70,14 @@ public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
         var batchPublisher = Server.CreateBatchPublisher();
         var jobs = Enumerable.Range(0, 3).Select(_ => new UnitRequest()).ToList();
         var batchId = await batchPublisher.StartNew(jobs);
-        await batchPublisher.SaveChangesAsync();
+        await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
         var ctx = Server.CreateContext();
         var childJobs = await ctx.Set<Job>()
             .Where(j => j.ParentJobId == batchId && j.Kind == JobKind.Job)
-            .ToListAsync();
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
         childJobs.Count.ShouldBe(3);
         foreach (var child in childJobs)
