@@ -1,7 +1,10 @@
 using Jobly.Core;
+using Jobly.Core.Data;
 using Jobly.Core.Data.Queries;
 using Jobly.Core.Notifications;
 using Jobly.Core.Services;
+using Jobly.PostgreSql;
+using Jobly.SqlServer;
 using Jobly.Worker;
 using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
@@ -29,7 +32,24 @@ public static class TestTasks
     public static IJoblySqlQueries<TContext> QueriesFor<TContext>(TContext context)
         where TContext : DbContext
     {
-        return JoblySqlQueriesFactory.Create(context);
+        var names = JoblyJobTableNames.FromModel(context.Model);
+        return IsPostgres(context)
+            ? new PostgresJoblySqlQueries<TContext>(names)
+            : new SqlServerJoblySqlQueries<TContext>(names);
+    }
+
+    public static IDatabaseExceptionClassifier ClassifierFor<TContext>(TContext context)
+        where TContext : DbContext
+    {
+        return IsPostgres(context)
+            ? new PostgresExceptionClassifier()
+            : new SqlServerExceptionClassifier();
+    }
+
+    private static bool IsPostgres<TContext>(TContext context)
+        where TContext : DbContext
+    {
+        return context.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     public static IJoblySqlQueries<TContext> QueriesFromScope<TContext>(IServiceScopeFactory scopeFactory)
@@ -37,7 +57,7 @@ public static class TestTasks
     {
         using var scope = scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
-        return JoblySqlQueriesFactory.Create(context);
+        return QueriesFor(context);
     }
 
     public static JobCommandService<TContext> CreateJobCommandService<TContext>(TContext context)
@@ -48,7 +68,7 @@ public static class TestTasks
             TimeProvider.System,
             Options.Create(new JoblyConfiguration()),
             NullTransport,
-            JoblySqlQueriesFactory.Create(context));
+            Jobly.Tests.Helpers.TestTasks.QueriesFor(context));
     }
 
     public static MessageRoutingTask<TContext> CreateMessageRoutingTask<TContext>(
@@ -63,7 +83,7 @@ public static class TestTasks
             Options.Create(new JoblyWorkerConfiguration()),
             NoOpLockProvider.Instance,
             timeProvider,
-            JoblySqlQueriesFactory.Create(context));
+            Jobly.Tests.Helpers.TestTasks.QueriesFor(context));
     }
 
     public static StaleJobRecoveryTask<TContext> CreateStaleJobRecoveryTask<TContext>(
@@ -83,7 +103,7 @@ public static class TestTasks
             }),
             NoOpLockProvider.Instance,
             timeProvider,
-            JoblySqlQueriesFactory.Create(context));
+            Jobly.Tests.Helpers.TestTasks.QueriesFor(context));
     }
 
     public static ServerCleanupTask<TContext> CreateServerCleanupTask<TContext>(
@@ -98,7 +118,7 @@ public static class TestTasks
             Options.Create(new JoblyWorkerConfiguration { HealthCheckTimeout = healthCheckTimeout }),
             NoOpLockProvider.Instance,
             timeProvider,
-            JoblySqlQueriesFactory.Create(context));
+            Jobly.Tests.Helpers.TestTasks.QueriesFor(context));
     }
 
     // Tests call the instance methods (CleanUpServersAsync, etc.) directly — they never hit

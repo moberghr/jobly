@@ -1,11 +1,7 @@
 using Jobly.Core;
 using Jobly.Core.Logging;
 using Jobly.Worker.Services;
-using Medallion.Threading;
-using Medallion.Threading.Postgres;
-using Medallion.Threading.SqlServer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -67,31 +63,10 @@ public static class ServiceConfiguration
             });
         });
 
-        // Register distributed locks — resolved from DbContextOptions to preserve credentials.
-        // Database.GetConnectionString() may strip passwords (Npgsql PersistSecurityInfo=false).
-        services.AddSingleton<IDistributedLockProvider>(sp =>
-        {
-            using var scope = sp.CreateScope();
-            var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<TContext>>();
-            var relationalExtension = dbOptions.Extensions.OfType<RelationalOptionsExtension>().FirstOrDefault();
-            var connectionString = relationalExtension?.ConnectionString;
-
-            if (connectionString is null)
-            {
-                var context = scope.ServiceProvider.GetRequiredService<TContext>();
-                connectionString = context.Database.GetConnectionString()
-                    ?? throw new InvalidOperationException("Cannot resolve connection string for distributed locks.");
-            }
-
-            var isPostgres = relationalExtension?.GetType().FullName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
-            if (isPostgres)
-            {
-                return new PostgresDistributedSynchronizationProvider(connectionString);
-            }
-
-            return new SqlDistributedSynchronizationProvider(connectionString);
-        });
-
+        // IDistributedLockProvider is registered by the provider package (Jobly.PostgreSql /
+        // Jobly.SqlServer) via their UsePostgreSql / UseSqlServer builder extensions. If the
+        // user never calls one, IJoblyLockProvider resolution fails fast with a clear message
+        // the first time a lock is requested.
         services.AddSingleton<IJoblyLockProvider, JoblyLockProvider>();
 
         services.AddSingleton<ServerRegistrationState>();

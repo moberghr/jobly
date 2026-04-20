@@ -1,4 +1,5 @@
 using Jobly.Core.Notifications;
+using Jobly.SqlServer;
 using Jobly.Tests.Fixtures;
 using Shouldly;
 

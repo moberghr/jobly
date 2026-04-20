@@ -1,9 +1,10 @@
 using System.Runtime.CompilerServices;
 using Jobly.Core.Logging;
+using Jobly.Core.Notifications;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
-namespace Jobly.Core.Notifications;
+namespace Jobly.PostgreSql;
 
 /// <summary>
 /// PostgreSQL LISTEN/NOTIFY transport. <see cref="PublishAsync"/> opens a short-lived

@@ -1,9 +1,10 @@
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Queries;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
-namespace Jobly.Core.Data.Queries;
+namespace Jobly.PostgreSql;
 
 /// <summary>
 /// PostgreSQL-specific SQL queries that use <c>FOR UPDATE [SKIP LOCKED]</c> directly in the

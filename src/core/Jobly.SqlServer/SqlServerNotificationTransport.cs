@@ -1,10 +1,11 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using Jobly.Core.Logging;
+using Jobly.Core.Notifications;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 
-namespace Jobly.Core.Notifications;
+namespace Jobly.SqlServer;
 
 /// <summary>
 /// SQL Server Service Broker transport. Sets up <c>ENABLE_BROKER</c> + message type / contract /

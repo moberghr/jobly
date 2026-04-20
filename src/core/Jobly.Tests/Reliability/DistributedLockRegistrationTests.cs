@@ -1,3 +1,5 @@
+using Jobly.PostgreSql;
+using Jobly.SqlServer;
 using Jobly.Worker;
 using Medallion.Threading;
 using Medallion.Threading.Postgres;
@@ -17,7 +19,7 @@ public class DistributedLockRegistrationTests
     {
         var services = new ServiceCollection();
         services.AddDbContext<TestContext>(o => o.UseNpgsql("Host=localhost;Database=test;Username=user;Password=secret"));
-        services.AddJoblyWorker<TestContext>();
+        services.AddJoblyWorker<TestContext>(opt => opt.UsePostgreSql());
 
         using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var provider = sp.GetRequiredService<IDistributedLockProvider>();
@@ -30,7 +32,7 @@ public class DistributedLockRegistrationTests
     {
         var services = new ServiceCollection();
         services.AddDbContext<TestContext>(o => o.UseSqlServer("Server=localhost;Database=test;User Id=sa;Password=secret;TrustServerCertificate=True"));
-        services.AddJoblyWorker<TestContext>();
+        services.AddJoblyWorker<TestContext>(opt => opt.UseSqlServer());
 
         using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var provider = sp.GetRequiredService<IDistributedLockProvider>();
@@ -52,7 +54,7 @@ public class DistributedLockRegistrationTests
     {
         var services = new ServiceCollection();
         services.AddDbContext<TestContext>(o => o.UseNpgsql("Host=localhost;Database=test;Username=user;Password=secret"));
-        services.AddJoblyWorker<TestContext>();
+        services.AddJoblyWorker<TestContext>(opt => opt.UsePostgreSql());
 
         // Poison: any attempt to resolve TestContext will throw
         services.AddScoped<TestContext>(_ => throw new InvalidOperationException("DbContext should not be resolved for connection string"));
@@ -71,7 +73,7 @@ public class DistributedLockRegistrationTests
     {
         var services = new ServiceCollection();
         services.AddDbContext<TestContext>(o => o.UseSqlServer("Server=localhost;Database=test;User Id=sa;Password=secret;TrustServerCertificate=True"));
-        services.AddJoblyWorker<TestContext>();
+        services.AddJoblyWorker<TestContext>(opt => opt.UseSqlServer());
 
         // Poison: any attempt to resolve TestContext will throw
         services.AddScoped<TestContext>(_ => throw new InvalidOperationException("DbContext should not be resolved for connection string"));
@@ -88,7 +90,7 @@ public class DistributedLockRegistrationTests
         const string connectionString = "Host=localhost;Database=test;Username=user;Password=secret123";
         var services = new ServiceCollection();
         services.AddDbContext<TestContext>(o => o.UseNpgsql(connectionString));
-        services.AddJoblyWorker<TestContext>();
+        services.AddJoblyWorker<TestContext>(opt => opt.UsePostgreSql());
 
         using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         using var scope = sp.CreateScope();
@@ -104,7 +106,7 @@ public class DistributedLockRegistrationTests
     {
         var services = new ServiceCollection();
         services.AddDbContext<TestContext>(o => o.UseNpgsql("Host=localhost;Database=test;Username=user;Password=secret"));
-        services.AddJoblyWorker<TestContext>();
+        services.AddJoblyWorker<TestContext>(opt => opt.UsePostgreSql());
 
         using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var provider = sp.GetRequiredService<IDistributedLockProvider>();

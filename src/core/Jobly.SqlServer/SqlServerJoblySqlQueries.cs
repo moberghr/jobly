@@ -1,9 +1,10 @@
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Queries;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
-namespace Jobly.Core.Data.Queries;
+namespace Jobly.SqlServer;
 
 /// <summary>
 /// SQL Server-specific SQL queries using <c>WITH (ROWLOCK, UPDLOCK, READPAST)</c> directly in

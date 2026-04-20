@@ -418,7 +418,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
 
         var tasks = Enumerable.Range(0, 10).Select(_ =>
         {
-            var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory);
+            var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory, Jobly.Tests.Helpers.TestTasks.ClassifierFor(_fixture.CreateContext()));
 
             return store.RecordFailureAsync(key, threshold: 100, duration: TimeSpan.FromMinutes(1), now, CancellationToken.None);
         }).ToArray();
@@ -555,7 +555,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         var scopeFactory = CreateStoreScopeFactory();
         var tasks = Enumerable.Range(0, 10).Select(_ =>
         {
-            var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory);
+            var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory, Jobly.Tests.Helpers.TestTasks.ClassifierFor(_fixture.CreateContext()));
 
             return store.TryBeginProbeAsync(key, now, CancellationToken.None);
         }).ToArray();
@@ -588,7 +588,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = CreateStoreScopeFactory();
-        var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory);
+        var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory, Jobly.Tests.Helpers.TestTasks.ClassifierFor(_fixture.CreateContext()));
 
         var won = await store.TryBeginProbeAsync(key, now, CancellationToken.None);
 
@@ -618,7 +618,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = CreateStoreScopeFactory();
-        var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory);
+        var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory, Jobly.Tests.Helpers.TestTasks.ClassifierFor(_fixture.CreateContext()));
 
         var won = await store.TryBeginProbeAsync(key, now, CancellationToken.None);
 
@@ -646,6 +646,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
         services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton(Jobly.Tests.Helpers.TestTasks.ClassifierFor(_fixture.CreateContext()));
         new Jobly.Core.JoblyBuilder<TestContext>(services).AddCircuitBreaker(o =>
         {
             if (duration != null)

@@ -18,6 +18,8 @@
     <Project Path="tests/Jobly.TestWorker/Jobly.Test.Worker.csproj" />
   </Folder>
   <Project Path="core/Jobly.Core/Jobly.Core.csproj" />
+  <Project Path="core/Jobly.PostgreSql/Jobly.PostgreSql.csproj" />
+  <Project Path="core/Jobly.SqlServer/Jobly.SqlServer.csproj" />
   <Project Path="core/Jobly.Tests/Jobly.Tests.csproj" />
   <Project Path="core/Jobly.Tests.Mutation/Jobly.Tests.Mutation.csproj" />
   <Project Path="core/Jobly.UI/Jobly.UI.csproj" />

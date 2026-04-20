@@ -8,6 +8,8 @@ using Jobly.Core.Mutex;
 using Jobly.Core.NoRestart;
 using Jobly.Core.Retry;
 using Jobly.Core.Services;
+using Jobly.PostgreSql;
+using Jobly.SqlServer;
 using Jobly.Tests.Fixtures;
 using Jobly.Worker;
 using Microsoft.EntityFrameworkCore;
@@ -142,6 +144,15 @@ public class JoblyTestServer : IAsyncDisposable
 
                 services.AddJoblyWorker<TestContext>(config =>
                 {
+                    if (isPostgres)
+                    {
+                        config.UsePostgreSql();
+                    }
+                    else
+                    {
+                        config.UseSqlServer();
+                    }
+
                     config.WorkerCount = 5;
                     config.Queues = ["a-critical", "b-default", "c-low", "default", "high"];
                     config.PollingInterval = TimeSpan.FromMilliseconds(100);

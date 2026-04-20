@@ -47,6 +47,8 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Jobly.Core\Jobly.Core.csproj" />
+		<ProjectReference Include="..\Jobly.PostgreSql\Jobly.PostgreSql.csproj" />
+		<ProjectReference Include="..\Jobly.SqlServer\Jobly.SqlServer.csproj" />
 		<ProjectReference Include="..\Jobly.Worker\Jobly.Worker.csproj" />
 		<ProjectReference Include="..\Jobly.UI\Jobly.UI.csproj" />
 		<ProjectReference Include="..\Jobly.SourceGenerator\Jobly.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />

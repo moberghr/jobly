@@ -158,7 +158,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
         {
             using var scope = sp.CreateScope();
             var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
-            return JoblySqlQueriesFactory.Create(ctx);
+            return Jobly.Tests.Helpers.TestTasks.QueriesFor(ctx);
         });
         return services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
     }

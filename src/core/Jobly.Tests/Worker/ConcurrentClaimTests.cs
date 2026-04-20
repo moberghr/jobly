@@ -109,7 +109,7 @@ public abstract class ConcurrentClaimTestsBase : IAsyncLifetime
         // into Transaction B.
         var holderCtx = _fixture.CreateContext();
         await holderCtx.Database.OpenConnectionAsync(ct);
-        var holderQueries = JoblySqlQueriesFactory.Create(holderCtx);
+        var holderQueries = Jobly.Tests.Helpers.TestTasks.QueriesFor(holderCtx);
         await using var holderTx = await holderCtx.Database.BeginTransactionAsync(ct);
 
         var held = await holderQueries.LockJobByIdWaitAsync(holderCtx, lockedId, ct);
@@ -121,7 +121,7 @@ public abstract class ConcurrentClaimTestsBase : IAsyncLifetime
         // must never appear in the result.
         var claimerCtx = _fixture.CreateContext();
         await claimerCtx.Database.OpenConnectionAsync(ct);
-        var claimerQueries = JoblySqlQueriesFactory.Create(claimerCtx);
+        var claimerQueries = Jobly.Tests.Helpers.TestTasks.QueriesFor(claimerCtx);
 
         var claimed = await claimerQueries.ClaimEnqueuedJobsAsync(
             claimerCtx,
@@ -199,7 +199,7 @@ public abstract class ConcurrentClaimTestsBase : IAsyncLifetime
                 await gate.Task;
                 var workerId = Guid.NewGuid();
                 var ctx = _fixture.CreateContext();
-                var sqlQueries = JoblySqlQueriesFactory.Create(ctx);
+                var sqlQueries = Jobly.Tests.Helpers.TestTasks.QueriesFor(ctx);
                 var claimed = await sqlQueries.ClaimEnqueuedJobsAsync(
                     ctx,
                     [queue],

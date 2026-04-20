@@ -52,7 +52,7 @@
        props evaluation — PackageId isn't set yet at that point, but MSBuildProjectName is.
        Settings that don't need to land during props phase (TreatWarningsAsErrors, Source Link
        package reference, assembly-version strategy) live in Directory.Build.targets. -->
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Jobly.Core' Or '$(MSBuildProjectName)' == 'Jobly.Worker' Or '$(MSBuildProjectName)' == 'Jobly.UI'">
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Jobly.Core' Or '$(MSBuildProjectName)' == 'Jobly.Worker' Or '$(MSBuildProjectName)' == 'Jobly.UI' Or '$(MSBuildProjectName)' == 'Jobly.PostgreSql' Or '$(MSBuildProjectName)' == 'Jobly.SqlServer'">
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
