@@ -112,10 +112,12 @@ public class JoblyTestServer : IAsyncDisposable
         var host = Host.CreateDefaultBuilder()
             .ConfigureLogging(logging =>
             {
-                // EF Core logs every command at Information level — fine in an app, but
-                // catastrophic in CI where every test run dumps thousands of SQL lines.
-                // Filter just the DB layer to Warning; Jobly's own logs stay at default.
-                logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+                // Tests log at Warning+ only. Information-level traces (worker fetched/executing/
+                // completed, pipeline-before/after, application-shutting-down, etc.) dump megabytes
+                // of noise into CI output without adding diagnostic value — the authoritative
+                // record is the JobLog table, which every assertion queries directly. Individual
+                // tests that need verbose logs can re-raise via configureServices.
+                logging.SetMinimumLevel(LogLevel.Warning);
             })
             .ConfigureServices(services =>
             {
