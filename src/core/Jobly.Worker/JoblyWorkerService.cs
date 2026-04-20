@@ -312,7 +312,13 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             JoblyTelemetry.JobsCompleted.Add(1, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", errorStatus));
             JobLogContext.Current = null;
             JobExecutionContext.Current = null;
-            _logger.LogError(e, "Error executing job {id}", job.Id);
+
+            // Handler exceptions (including intentional test-case throws) are logged at the
+            // user's chosen level — Information is enough because the job state transition
+            // is recorded separately and the exception message is stored in the JobLog.
+            // Full stack traces at Error level during dense multi-server test scenarios produce
+            // many MB of log output per CI run without adding diagnostic value.
+            _logger.LogInformation("Error executing job {id}: {exceptionType}: {message}", job.Id, e.GetType().Name, e.Message);
             await jobCts.CancelAsync();
             await monitorTask;
 
