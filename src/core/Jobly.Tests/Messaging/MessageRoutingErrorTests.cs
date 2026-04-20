@@ -1,7 +1,9 @@
+using Jobly.Core.Data.Queries;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Tests.Fixtures;
+using Jobly.Tests.Helpers;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
@@ -60,7 +62,8 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, TimeProvider.System, CancellationToken.None);
+        var task = TestTasks.CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System);
+        await task.RunMessageRoutingAsync(routeCtx, CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -93,7 +96,8 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, TimeProvider.System, CancellationToken.None);
+        var task = TestTasks.CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System);
+        await task.RunMessageRoutingAsync(routeCtx, CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -125,7 +129,8 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, TimeProvider.System, CancellationToken.None);
+        var task = TestTasks.CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System);
+        await task.RunMessageRoutingAsync(routeCtx, CancellationToken.None);
 
         // Assert — MultiRequest has MultiHandlerA and MultiHandlerB => 2 child jobs
         var readCtx = _fixture.CreateContext();
@@ -158,7 +163,8 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, TimeProvider.System, CancellationToken.None);
+        var task = TestTasks.CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System);
+        await task.RunMessageRoutingAsync(routeCtx, CancellationToken.None);
 
         // Assert — each child should have a distinct HandlerType
         var readCtx = _fixture.CreateContext();

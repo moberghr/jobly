@@ -1,7 +1,9 @@
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Queries;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Tests.Fixtures;
+using Jobly.Tests.Helpers;
 using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -44,8 +46,9 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var result = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
-            _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
+        var result = await TestTasks
+            .CreateStaleJobRecoveryTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5))
+            .RecoverStaleJobsAsync(_fixture.CreateContext(), CancellationToken.None);
 
         // Assert
         result.Requeued.ShouldBe(5);
@@ -102,8 +105,9 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var result = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
-            _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
+        var result = await TestTasks
+            .CreateStaleJobRecoveryTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5))
+            .RecoverStaleJobsAsync(_fixture.CreateContext(), CancellationToken.None);
 
         // Assert
         result.Total.ShouldBe(0);
@@ -135,8 +139,9 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
-            _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
+        await TestTasks
+            .CreateStaleJobRecoveryTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5))
+            .RecoverStaleJobsAsync(_fixture.CreateContext(), CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -165,8 +170,12 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Act — run 5 concurrent requeue attempts
         var tasks = Enumerable.Range(0, 5)
-            .Select(_ => StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
-                _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5)))
+            .Select(_ =>
+            {
+                var ctx = _fixture.CreateContext();
+                return TestTasks.CreateStaleJobRecoveryTask(ctx, TimeProvider.System, TimeSpan.FromMinutes(5))
+                    .RecoverStaleJobsAsync(ctx, CancellationToken.None);
+            })
             .ToList();
 
         var results = await Task.WhenAll(tasks);
@@ -218,8 +227,9 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act — cleanup only removes server/workers, not jobs
-        await ServerCleanupTask<TestContext>.CleanUpServers(
-            _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
+        await TestTasks
+            .CreateServerCleanupTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5))
+            .CleanUpServersAsync(_fixture.CreateContext(), CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -265,10 +275,12 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act — run both cleanup + recovery (as health manager would)
-        var recovery = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
-            _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
-        var removed = await ServerCleanupTask<TestContext>.CleanUpServers(
-            _fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5));
+        var recovery = await TestTasks
+            .CreateStaleJobRecoveryTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5))
+            .RecoverStaleJobsAsync(_fixture.CreateContext(), CancellationToken.None);
+        var removed = await TestTasks
+            .CreateServerCleanupTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5))
+            .CleanUpServersAsync(_fixture.CreateContext(), CancellationToken.None);
 
         // Assert
         recovery.Requeued.ShouldBe(1);
@@ -306,8 +318,9 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Act
         var tp = new FakeTimeProvider(now);
-        var result = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(
-            _fixture.CreateContext(), tp, timeout);
+        var result = await TestTasks
+            .CreateStaleJobRecoveryTask(_fixture.CreateContext(), tp, timeout)
+            .RecoverStaleJobsAsync(_fixture.CreateContext(), CancellationToken.None);
 
         // Assert — should NOT be requeued (at boundary, not past it)
         result.Total.ShouldBe(0);
@@ -342,8 +355,9 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Act
         var tp = new FakeTimeProvider(now);
-        await ServerCleanupTask<TestContext>.CleanUpServers(
-            _fixture.CreateContext(), tp, timeout);
+        await TestTasks
+            .CreateServerCleanupTask(_fixture.CreateContext(), tp, timeout)
+            .CleanUpServersAsync(_fixture.CreateContext(), CancellationToken.None);
 
         // Assert — server should still exist
         var readCtx = _fixture.CreateContext();
@@ -377,7 +391,9 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Act: run stale recovery
         var recoveryCtx = _fixture.CreateContext();
-        await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5));
+        await TestTasks
+            .CreateStaleJobRecoveryTask(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
+            .RecoverStaleJobsAsync(recoveryCtx, CancellationToken.None);
 
         // Assert: job should be Deleted (not Enqueued) because user intended to cancel it
         var readCtx = _fixture.CreateContext();

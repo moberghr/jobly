@@ -89,7 +89,7 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         await svc.RequeueJob(jobId);
 
         // Assert: ScheduleTime should be reset to now (not stay in the future)

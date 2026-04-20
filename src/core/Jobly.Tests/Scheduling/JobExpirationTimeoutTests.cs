@@ -39,7 +39,13 @@ public abstract class JobExpirationTimeoutTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var config = new JoblyConfiguration { JobExpirationTimeout = TimeSpan.FromHours(2) };
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(config));
+        var ctxForSvc = _fixture.CreateContext();
+        var svc = new JobCommandService<TestContext>(
+            ctxForSvc,
+            TimeProvider.System,
+            Options.Create(config),
+            Jobly.Tests.Helpers.TestTasks.NullTransport,
+            Jobly.Tests.Helpers.TestTasks.QueriesFor(ctxForSvc));
 
         // Act
         var before = DateTime.UtcNow;
@@ -72,7 +78,7 @@ public abstract class JobExpirationTimeoutTestsBase : IAsyncLifetime
         });
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
 
         // Act
         var before = DateTime.UtcNow;

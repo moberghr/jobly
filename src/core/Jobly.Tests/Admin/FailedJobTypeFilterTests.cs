@@ -213,7 +213,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         var result = await svc.DeleteFailedJobsByType("TypeA");
 
         // Assert
@@ -256,7 +256,7 @@ public abstract class FailedJobTypeFilterTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         var result = await svc.RequeueFailedJobsByType("TypeA");
 
         // Assert

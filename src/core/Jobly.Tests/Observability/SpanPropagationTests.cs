@@ -6,6 +6,7 @@ using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Logging;
 using Jobly.Tests.Fixtures;
+using Jobly.Tests.Helpers;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
@@ -196,7 +197,9 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, TimeProvider.System, CancellationToken.None);
+        await TestTasks
+            .CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System)
+            .RunMessageRoutingAsync(routeCtx, CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -237,7 +240,9 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        await MessageRoutingTask<TestContext>.RunMessageRouting(routeCtx, scopeFactory, TimeProvider.System, CancellationToken.None);
+        await TestTasks
+            .CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System)
+            .RunMessageRoutingAsync(routeCtx, CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();

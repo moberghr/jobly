@@ -91,7 +91,9 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
             groupConfig,
-            TimeProvider.System);
+            TimeProvider.System,
+            Jobly.Tests.Helpers.TestTasks.QueriesFromScope<TestContext>(scopeFactory),
+            Jobly.Tests.Helpers.TestTasks.NullTransport);
 
         return (worker, capture);
     }

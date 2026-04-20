@@ -31,24 +31,22 @@ public class JobCommandService<TContext> : IJobCommandService
     private readonly TimeProvider _timeProvider;
     private readonly JoblyConfiguration _configuration;
     private readonly IJoblyNotificationTransport _notificationTransport;
-    private IJoblySqlQueries<TContext>? _sqlQueries;
+    private readonly IJoblySqlQueries<TContext> _sqlQueries;
 
-    public JobCommandService(TContext context, TimeProvider timeProvider, IOptions<JoblyConfiguration> configuration, IJoblyNotificationTransport? notificationTransport = null, IJoblySqlQueries<TContext>? sqlQueries = null)
+    public JobCommandService(TContext context, TimeProvider timeProvider, IOptions<JoblyConfiguration> configuration, IJoblyNotificationTransport notificationTransport, IJoblySqlQueries<TContext> sqlQueries)
     {
         _context = context;
         _timeProvider = timeProvider;
         _configuration = configuration.Value;
-        _notificationTransport = notificationTransport ?? new NullNotificationTransport();
+        _notificationTransport = notificationTransport;
         _sqlQueries = sqlQueries;
     }
-
-    private IJoblySqlQueries<TContext> SqlQueries => _sqlQueries ??= JoblySqlQueriesFactory.Create(_context);
 
     public async Task DeleteJob(Guid jobId)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var job = await SqlQueries.LockJobByIdAsync(_context, jobId, default);
+        var job = await _sqlQueries.LockJobByIdAsync(_context, jobId, default);
 
         if (job == null)
         {
@@ -106,7 +104,7 @@ public class JobCommandService<TContext> : IJobCommandService
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var job = await SqlQueries.LockJobByIdAsync(_context, jobId, default);
+        var job = await _sqlQueries.LockJobByIdAsync(_context, jobId, default);
 
         if (job == null)
         {
@@ -138,7 +136,7 @@ public class JobCommandService<TContext> : IJobCommandService
         Job? parent = null;
         if (job.ParentJobId != null)
         {
-            parent = await SqlQueries.LockJobByIdWaitAsync(_context, job.ParentJobId.Value, default);
+            parent = await _sqlQueries.LockJobByIdWaitAsync(_context, job.ParentJobId.Value, default);
             if (parent != null)
             {
                 parent.JobCount++;

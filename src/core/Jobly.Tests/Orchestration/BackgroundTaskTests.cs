@@ -1,7 +1,9 @@
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Queries;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Tests.Fixtures;
+using Jobly.Tests.Helpers;
 using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -170,7 +172,9 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var recoveryCtx = _fixture.CreateContext();
-        var result = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5));
+        var result = await TestTasks
+            .CreateStaleJobRecoveryTask(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
+            .RecoverStaleJobsAsync(recoveryCtx, Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         result.Requeued.ShouldBe(1);
@@ -200,7 +204,9 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var recoveryCtx = _fixture.CreateContext();
-        var result = await StaleJobRecoveryTask<TestContext>.RecoverStaleJobs(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5));
+        var result = await TestTasks
+            .CreateStaleJobRecoveryTask(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
+            .RecoverStaleJobsAsync(recoveryCtx, Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         result.Total.ShouldBe(0);
@@ -228,7 +234,9 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        var count = await ServerCleanupTask<TestContext>.CleanUpServers(cleanCtx, TimeProvider.System, TimeSpan.FromMinutes(5));
+        var count = await TestTasks
+            .CreateServerCleanupTask(cleanCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
+            .CleanUpServersAsync(cleanCtx, Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         count.ShouldBe(1);

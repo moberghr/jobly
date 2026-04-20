@@ -118,7 +118,10 @@ public static class ServiceConfiguration
 
         services.AddSingleton<IJoblyLockProvider, JoblyLockProvider>();
 
-        services.AddHostedService<JoblyWorkerSetup<TContext>>();
+        services.AddSingleton<ServerRegistrationState>();
+        services.AddHostedService<JoblyServerRegistration<TContext>>();
+        services.AddHostedService<JoblyDispatcherHost<TContext>>();
+        services.AddHostedService<JoblySingleWorkerHost<TContext>>();
         services.AddHostedService<HeartbeatTask<TContext>>();
         services.AddHostedService<CounterAggregatorTask<TContext>>();
         services.AddHostedService<ServerCleanupTask<TContext>>();

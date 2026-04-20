@@ -39,7 +39,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         await svc.RequeueJob(jobId);
 
         // Assert — state should remain Enqueued, and no Requeued log should exist
@@ -71,7 +71,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         await svc.RequeueJob(jobId);
 
         // Assert
@@ -114,7 +114,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act — requeue should succeed even though parent exists (and handle it gracefully)
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         await svc.RequeueJob(childId);
 
         // Assert
@@ -128,7 +128,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
     public async Task RequeueJob_NonExistentJob_Throws()
     {
         // Act & Assert
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         var ex = await Should.ThrowAsync<ArgumentException>(async () =>
             await svc.RequeueJob(Guid.NewGuid()));
 
@@ -139,7 +139,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
     public async Task DeleteJob_NonExistentJob_Throws()
     {
         // Act & Assert
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         var ex = await Should.ThrowAsync<ArgumentException>(async () =>
             await svc.DeleteJob(Guid.NewGuid()));
 
@@ -184,7 +184,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act: requeue the failed child
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         await svc.RequeueJob(childId);
 
         // Assert: parent should be back in Awaiting (for batch) and ExpireAt cleared
@@ -221,7 +221,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
         });
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         await svc.RequeueJob(jobId);
 
         var readCtx = _fixture.CreateContext();
@@ -279,7 +279,7 @@ public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act: requeue child1
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         await svc.RequeueJob(child1Id);
 
         // Assert: parent should be back in Awaiting, JobCount incremented, ExpireAt cleared

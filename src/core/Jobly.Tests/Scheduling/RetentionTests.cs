@@ -87,7 +87,9 @@ public abstract class RetentionTestsBase : IAsyncLifetime
             new NullLogger<JoblyWorkerService<TestContext>>(),
             workerConfig,
             groupConfig,
-            TimeProvider.System);
+            TimeProvider.System,
+            Jobly.Tests.Helpers.TestTasks.QueriesFromScope<TestContext>(scopeFactory),
+            Jobly.Tests.Helpers.TestTasks.NullTransport);
     }
 
     [TimedFact]
@@ -240,7 +242,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
             .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         await svc.DeleteJob(jobId);
 
         await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
@@ -274,7 +276,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
             .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         await svc.RequeueJob(jobId);
 
         await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
