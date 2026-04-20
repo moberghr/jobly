@@ -8,4 +8,10 @@ public enum State
     Completed = 4,
     Failed = 5,
     Deleted = 6,
+
+    // Future-dated jobs land here and are promoted to Enqueued by ScheduledJobActivationTask
+    // when ScheduleTime <= now. Separating this from Enqueued keeps the worker fetch query
+    // a pure "State=Enqueued" check (no time predicate) so DB-push notifications fire only on
+    // real runnable transitions.
+    Scheduled = 7,
 }

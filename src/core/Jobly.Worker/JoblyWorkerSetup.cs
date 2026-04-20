@@ -1,4 +1,5 @@
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -133,7 +134,8 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                         _serviceScopeFactory,
                         _serviceProvider.GetRequiredService<ILogger<JoblyDispatcherWorker<TContext>>>(),
                         _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>(),
-                        _timeProvider);
+                        _timeProvider,
+                        _serviceProvider.GetRequiredService<IJoblyNotificationTransport>());
 
                     await worker.StartAsync(cancellationToken);
                     _workers.Add(worker);
@@ -150,7 +152,8 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                         _serviceProvider.GetRequiredService<ILogger<JoblyWorkerService<TContext>>>(),
                         _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>(),
                         group,
-                        _timeProvider);
+                        _timeProvider,
+                        _serviceProvider.GetRequiredService<IJoblyNotificationTransport>());
 
                     var worker = new JoblyWorker<TContext>(
                         workerService,

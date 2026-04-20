@@ -6,6 +6,7 @@ using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
 using Jobly.Core.Logging;
+using Jobly.Core.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -58,12 +59,14 @@ public class Publisher<TContext> : IPublisher
     private readonly TContext _context;
     private readonly TimeProvider _timeProvider;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IJoblyNotificationTransport _notificationTransport;
 
-    public Publisher(TContext context, TimeProvider timeProvider, IServiceProvider serviceProvider)
+    public Publisher(TContext context, TimeProvider timeProvider, IServiceProvider serviceProvider, IJoblyNotificationTransport? notificationTransport = null)
     {
         _context = context;
         _timeProvider = timeProvider;
         _serviceProvider = serviceProvider;
+        _notificationTransport = notificationTransport ?? new NullNotificationTransport();
     }
 
     // --- IMessage: create Message-kind Job ---
@@ -233,9 +236,11 @@ public class Publisher<TContext> : IPublisher
         return newJob.Id;
     }
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        return _context.SaveChangesAsync(cancellationToken);
+        var pending = NotificationDispatch.CapturePending(_context);
+        await _context.SaveChangesAsync(cancellationToken);
+        await NotificationDispatch.FireAsync(_notificationTransport, pending, cancellationToken);
     }
 
     private async Task<PublishContext<T>> RunPublishPipeline<T>(T job, Dictionary<string, object>? seed, CancellationToken ct)

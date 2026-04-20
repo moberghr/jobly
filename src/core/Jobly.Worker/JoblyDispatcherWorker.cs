@@ -8,6 +8,7 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Logging;
+using Jobly.Core.Notifications;
 using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,6 +34,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
     private readonly JoblyWorkerConfiguration _configuration;
     private readonly TimeProvider _timeProvider;
     private readonly CompletionBatch<TContext> _batch;
+    private readonly IJoblyNotificationTransport _notificationTransport;
 
     public JoblyDispatcherWorker(
         Guid workerId,
@@ -40,7 +42,8 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         IServiceScopeFactory scopeFactory,
         ILogger<JoblyDispatcherWorker<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IJoblyNotificationTransport? notificationTransport = null)
     {
         _workerId = workerId;
         _jobReader = jobReader;
@@ -48,6 +51,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         _logger = logger;
         _configuration = configuration.Value;
         _timeProvider = timeProvider;
+        _notificationTransport = notificationTransport ?? new NullNotificationTransport();
         _batch = new CompletionBatch<TContext>(
             scopeFactory,
             timeProvider,
@@ -107,6 +111,10 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         {
             await _batch.FlushAsync();
             OrchestrationTask<TContext>.SignalOrchestrator();
+            await NotificationDispatch.FireAsync(
+                _notificationTransport,
+                [new Notification(NotificationKind.JobFinalized, null)],
+                cancellationToken);
         }
         catch (Exception ex)
         {
@@ -125,6 +133,9 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         {
             await _batch.FlushAsync();
             OrchestrationTask<TContext>.SignalOrchestrator();
+            await NotificationDispatch.FireAsync(
+                _notificationTransport,
+                [new Notification(NotificationKind.JobFinalized, null)]);
         }
         catch (OperationCanceledException)
         {
@@ -191,9 +202,12 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             await ExecuteJob(job, handlerScope.ServiceProvider, jobCts.Token);
             handlerStopwatch.Stop();
 
-            // Commit handler's work (outbox: published jobs + business entities) before disposing
+            // Commit handler's work (outbox: published jobs + business entities) before disposing.
+            // Capture pending push notifications for any child jobs the handler added, fire post-commit.
             var handlerContext = handlerScope.ServiceProvider.GetRequiredService<TContext>();
+            var handlerPending = NotificationDispatch.CapturePending(handlerContext);
             await handlerContext.SaveChangesAsync(default);
+            await NotificationDispatch.FireAsync(_notificationTransport, handlerPending, cancellationToken);
 
             // Read metadata and outcome from handler scope before disposing
             job.Metadata = JsonSerializer.Serialize(jobContext.Metadata);

@@ -12,7 +12,9 @@ namespace Jobly.Worker.Services;
 public class OrchestrationTask<TContext> : ServerTaskBase<TContext>
     where TContext : DbContext
 {
-    private static OrchestrationTask<TContext>? _instance;
+    // Multi-host-in-process support: see MessageRoutingTask for rationale. A bare static field
+    // would silently detach earlier instances from signals; the locked list signals every one.
+    private static readonly List<OrchestrationTask<TContext>> _instances = [];
 
     public OrchestrationTask(
         IServiceScopeFactory scopeFactory,
@@ -22,7 +24,10 @@ public class OrchestrationTask<TContext> : ServerTaskBase<TContext>
         TimeProvider timeProvider)
         : base(scopeFactory, logger, configuration, timeProvider, "jobly:orchestration", lockProvider)
     {
-        _instance = this;
+        lock (_instances)
+        {
+            _instances.Add(this);
+        }
     }
 
     protected override string TaskName => "Orchestration";
@@ -30,10 +35,28 @@ public class OrchestrationTask<TContext> : ServerTaskBase<TContext>
     protected override TimeSpan DefaultInterval => Configuration.OrchestrationInterval;
 
     /// <summary>
-    /// Signal the orchestrator to wake up and check for work.
+    /// Signal every live orchestrator to wake up and check for work.
     /// Called by workers after job completion.
     /// </summary>
-    public static void SignalOrchestrator() => _instance?.Signal();
+    public static void SignalOrchestrator()
+    {
+        lock (_instances)
+        {
+            foreach (var instance in _instances)
+            {
+                instance.Signal();
+            }
+        }
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await base.StopAsync(cancellationToken);
+        lock (_instances)
+        {
+            _instances.Remove(this);
+        }
+    }
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {

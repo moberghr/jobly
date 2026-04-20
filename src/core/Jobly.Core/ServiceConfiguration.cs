@@ -2,6 +2,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Handlers;
 using Jobly.Core.Interceptors;
+using Jobly.Core.Notifications;
 using Jobly.Core.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -60,14 +61,15 @@ public static class ServiceConfiguration
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(
             x.GetRequiredService<TContext>(),
             x.GetRequiredService<TimeProvider>(),
-            x));
+            x,
+            x.GetRequiredService<IJoblyNotificationTransport>()));
 
         services.AddScoped<IMediator>(x => new Mediator(x));
 
         services.AddScoped<IRecurringJobPublisher>(x =>
             new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IJoblyLockProvider>()));
         services.AddScoped<IJobQueryService>(x => new JobQueryService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
-        services.AddScoped<IJobCommandService>(x => new JobCommandService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IOptions<JoblyConfiguration>>()));
+        services.AddScoped<IJobCommandService>(x => new JobCommandService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IOptions<JoblyConfiguration>>(), x.GetRequiredService<IJoblyNotificationTransport>()));
         services.AddScoped<IJobGroupQueryService>(x => new JobGroupQueryService<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IRecurringJobService>(x => new RecurringJobService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
         services.AddScoped<IDashboardStatsService>(x => new DashboardStatsService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
@@ -76,10 +78,15 @@ public static class ServiceConfiguration
             x.GetRequiredService<TContext>(),
             x.GetRequiredService<IOptions<JoblyConfiguration>>(),
             x.GetRequiredService<TimeProvider>(),
-            x));
+            x,
+            x.GetRequiredService<IJoblyNotificationTransport>()));
 
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
+
+        // Default no-op transport. AddJoblyDatabasePush<TContext>() replaces this with a
+        // provider-specific implementation (Postgres LISTEN/NOTIFY or SQL Server Service Broker).
+        services.TryAddSingleton<IJoblyNotificationTransport, NullNotificationTransport>();
 
         return services;
     }

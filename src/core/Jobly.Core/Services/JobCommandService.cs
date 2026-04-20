@@ -3,6 +3,7 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Interceptors;
 using Jobly.Core.Models;
+using Jobly.Core.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -29,12 +30,14 @@ public class JobCommandService<TContext> : IJobCommandService
     private readonly TContext _context;
     private readonly TimeProvider _timeProvider;
     private readonly JoblyConfiguration _configuration;
+    private readonly IJoblyNotificationTransport _notificationTransport;
 
-    public JobCommandService(TContext context, TimeProvider timeProvider, IOptions<JoblyConfiguration> configuration)
+    public JobCommandService(TContext context, TimeProvider timeProvider, IOptions<JoblyConfiguration> configuration, IJoblyNotificationTransport? notificationTransport = null)
     {
         _context = context;
         _timeProvider = timeProvider;
         _configuration = configuration.Value;
+        _notificationTransport = notificationTransport ?? new NullNotificationTransport();
     }
 
     public async Task DeleteJob(Guid jobId)
@@ -168,6 +171,12 @@ public class JobCommandService<TContext> : IJobCommandService
         });
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
+
+        // Requeue lands the row in Enqueued with ScheduleTime=now — wake dispatcher immediately.
+        var queue = string.IsNullOrEmpty(job.Queue) ? "default" : job.Queue;
+        await NotificationDispatch.FireAsync(
+            _notificationTransport,
+            [new Notification(NotificationKind.JobEnqueued, queue)]);
     }
 
     public async Task<BulkResultModel> BulkDeleteJobs(Guid[] jobIds)

@@ -365,9 +365,8 @@ public class JobQueryService<TContext> : IJobQueryService
 
     private IQueryable<JobModel> GetScheduledJobsQuery()
     {
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var query = Jobs()
-            .Where(x => x.ScheduleTime > now)
+            .Where(x => x.CurrentState == State.Scheduled)
             .Select(x =>
                 new JobModel
                 {

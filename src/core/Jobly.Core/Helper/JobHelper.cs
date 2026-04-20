@@ -9,13 +9,14 @@ internal static class JobHelper
 {
     private static Job CreateJobInternal(string message, string type, DateTime? scheduleTime, string? queue, Guid? parentId, State? state, DateTime now, string? metadata = null)
     {
+        var effectiveScheduleTime = scheduleTime ?? now;
         var job = new Job
         {
             CreateTime = now,
             Message = message,
             Type = type,
-            ScheduleTime = scheduleTime ?? now,
-            CurrentState = state ?? (parentId == null ? State.Enqueued : State.Awaiting),
+            ScheduleTime = effectiveScheduleTime,
+            CurrentState = state ?? DefaultState(parentId, effectiveScheduleTime, now),
             Queue = queue ?? "default",
             ParentJobId = parentId,
             Metadata = metadata,
@@ -43,5 +44,20 @@ internal static class JobHelper
     public static Job CreateJob(string message, string type, DateTime? scheduleTime, string? queue, Guid? parentId, State? state, DateTime now, string? metadata = null)
     {
         return CreateJobInternal(message, type, scheduleTime, queue, parentId, state, now, metadata);
+    }
+
+    private static State DefaultState(Guid? parentId, DateTime scheduleTime, DateTime now)
+    {
+        if (parentId != null)
+        {
+            return State.Awaiting;
+        }
+
+        if (scheduleTime > now)
+        {
+            return State.Scheduled;
+        }
+
+        return State.Enqueued;
     }
 }

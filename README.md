@@ -34,6 +34,7 @@ A distributed job processing, message queue, and in-memory mediator library for 
 - **Configurable Handler Logging** — `EnableHandlerLogging` option (default true) to suppress handler ILogger output from the JobLog table when not needed.
 - **Dashboard** — React-based web UI with realtime graph, historical graph, dark mode, clickable metric cards, bulk actions, batch progress bars, worker detail page.
 - **TimeProvider** — All production code uses injectable `TimeProvider` for testability.
+- **DB Push (optional)** — Opt-in `AddJoblyDatabasePush<TContext>()` replaces polling wake-up with PostgreSQL `LISTEN`/`NOTIFY` or SQL Server Service Broker, cutting dispatcher pickup latency from ~500ms to <50ms without tight polling.
 
 ## Integration Guide
 
@@ -320,6 +321,40 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     options.HealthCheckInterval = TimeSpan.FromSeconds(10);
     options.CounterAggregationInterval = TimeSpan.FromSeconds(5);
 });
+```
+
+### 11. DB Push (optional)
+
+Replaces polling wake-up with push notifications — PostgreSQL `LISTEN`/`NOTIFY` or SQL Server Service Broker. The dispatcher, `MessageRoutingTask`, and `OrchestrationTask` wake instantly on relevant events instead of waiting for their next poll. Opt-in; default behavior (polling) is unchanged if you don't call `AddJoblyDatabasePush`.
+
+```csharp
+builder.Services.AddJoblyWorker<AppDbContext>(options =>
+{
+    // Push benefits the dispatcher's batch-fetch path; individual workers still poll.
+    options.UseDispatcher = true;
+    options.PollingInterval = TimeSpan.FromSeconds(5); // loose polling is fine when push is on
+});
+
+builder.Services.AddJoblyDatabasePush<AppDbContext>();
+```
+
+Provider is auto-detected from the `DbContextOptions`. Transports are resilient to connection drops — the listener reconnects with exponential backoff and fires a drain signal on every reconnect so jobs enqueued during the gap are picked up.
+
+**SQL Server setup requirements**: Service Broker must be enabled on the target database. Jobly creates the message type / contract / queue / service idempotently on first publish, but it cannot run `ALTER DATABASE ... SET ENABLE_BROKER` for you (that requires exclusive DB access). If broker isn't enabled, the transport logs an actionable error and degrades silently to polling:
+
+```sql
+ALTER DATABASE [YourDb] SET ENABLE_BROKER WITH ROLLBACK IMMEDIATE;
+```
+
+**Observability**: transport failures are logged at Warning and incremented on `jobly.notifications.publish_failures` (OpenTelemetry counter). Successful publishes increment `jobly.notifications.published`. Alert on the failure counter if push health matters to your SLOs.
+
+**Upgrading from <0.9**: the `Scheduled` state was introduced alongside DB push. Future-dated jobs published on the old codebase land in `Enqueued` with `ScheduleTime > now` and are correctly gated by a defensive predicate in worker queries — but they won't appear in the dashboard's Scheduled list until their time arrives. To migrate them eagerly, run once after upgrade:
+
+```sql
+UPDATE jobly.job
+SET    current_state = 7  -- State.Scheduled
+WHERE  current_state = 1  -- State.Enqueued
+  AND  schedule_time > now();
 ```
 
 ## How It Works

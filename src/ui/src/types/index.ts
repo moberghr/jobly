@@ -5,6 +5,7 @@ export const State = {
   Completed: 4,
   Failed: 5,
   Deleted: 6,
+  Scheduled: 7,
 } as const;
 export type State = (typeof State)[keyof typeof State];
 

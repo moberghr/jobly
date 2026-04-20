@@ -30,6 +30,16 @@ public static class JoblyTelemetry
         unit: "{job}",
         description: "Total jobs enqueued for processing");
 
+    public static readonly Counter<long> NotificationsPublished = Meter.CreateCounter<long>(
+        "jobly.notifications.published",
+        unit: "{notification}",
+        description: "Total DB-push notifications successfully emitted by the transport");
+
+    public static readonly Counter<long> NotificationPublishFailures = Meter.CreateCounter<long>(
+        "jobly.notifications.publish_failures",
+        unit: "{notification}",
+        description: "Total DB-push notifications that failed to publish (transport error). Each failure is also logged at Warning.");
+
     public static Activity StartJobActivity(Guid traceId, string? parentSpanId)
     {
         var activityTraceId = ActivityTraceId.CreateFromString(traceId.ToString("N").AsSpan());

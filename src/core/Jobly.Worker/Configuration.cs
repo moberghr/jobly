@@ -80,6 +80,12 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     public TimeSpan MessageRoutingInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     /// <summary>
+    /// How often the scheduled-job activation task checks for rows in <see cref="Core.Enums.State.Scheduled"/>
+    /// whose <c>ScheduleTime</c> has elapsed and flips them to <see cref="Core.Enums.State.Enqueued"/>.
+    /// </summary>
+    public TimeSpan ScheduledActivationInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
     /// How often the worker checks if a running job has been cancelled (deleted).
     /// Also refreshes the keep-alive timestamp on each check.
     /// </summary>

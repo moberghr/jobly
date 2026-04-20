@@ -7,6 +7,7 @@ using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Interceptors;
 using Jobly.Core.Logging;
+using Jobly.Core.Notifications;
 using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,8 +30,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     private readonly JoblyWorkerConfiguration _configuration;
     private readonly WorkerGroupConfiguration _groupConfiguration;
     private readonly TimeProvider _timeProvider;
+    private readonly IJoblyNotificationTransport _notificationTransport;
 
-    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration, TimeProvider timeProvider)
+    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration, TimeProvider timeProvider, IJoblyNotificationTransport? notificationTransport = null)
     {
         _workerId = workerId;
         _serviceScopeFactory = serviceScopeFactory;
@@ -38,6 +40,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         _configuration = configuration.Value;
         _groupConfiguration = groupConfiguration;
         _timeProvider = timeProvider;
+        _notificationTransport = notificationTransport ?? new NullNotificationTransport();
     }
 
     public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
@@ -137,9 +140,12 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             await ExecuteJob(job, handlerScope.ServiceProvider, jobCts.Token);
             handlerStopwatch.Stop();
 
-            // Commit handler's work (outbox: published jobs + business entities) before disposing
+            // Commit handler's work (outbox: published jobs + business entities) before disposing.
+            // Capture pending push notifications for any child jobs the handler added, fire post-commit.
             var handlerContext = handlerScope.ServiceProvider.GetRequiredService<TContext>();
+            var handlerPending = NotificationDispatch.CapturePending(handlerContext);
             await handlerContext.SaveChangesAsync(default);
+            await NotificationDispatch.FireAsync(_notificationTransport, handlerPending, cancellationToken);
 
             // Read metadata and outcome from handler scope before disposing
             job.Metadata = JsonSerializer.Serialize(jobContext.Metadata);
@@ -331,8 +337,13 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         }
 
         // Signal orchestrator — this job may have a parent that needs finalization,
-        // or children that need activation
+        // or children that need activation. Local signal wakes the in-process task; the
+        // push notification fans out to other servers' OrchestrationTask via the listener.
         OrchestrationTask<TContext>.SignalOrchestrator();
+        await NotificationDispatch.FireAsync(
+            _notificationTransport,
+            [new Notification(NotificationKind.JobFinalized, null)],
+            cancellationToken);
 
         PerfTrace.Mark(PerfTrace.Done);
         PerfTrace.End();

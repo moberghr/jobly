@@ -94,7 +94,15 @@ public class JoblyTestServer : IAsyncDisposable
         return StartAsync(fixture, configure: null);
     }
 
-    public static async Task<JoblyTestServer> StartAsync(IDatabaseFixture fixture, Action<JoblyWorkerConfiguration>? configure)
+    public static Task<JoblyTestServer> StartAsync(IDatabaseFixture fixture, Action<JoblyWorkerConfiguration>? configure)
+    {
+        return StartAsync(fixture, configure, configureServices: null);
+    }
+
+    public static async Task<JoblyTestServer> StartAsync(
+        IDatabaseFixture fixture,
+        Action<JoblyWorkerConfiguration>? configure,
+        Action<IServiceCollection>? configureServices)
     {
         var tempCtx = fixture.CreateContext();
         var connectionString = tempCtx.Database.GetConnectionString()!;
@@ -170,6 +178,8 @@ public class JoblyTestServer : IAsyncDisposable
                     o.Duration = TimeSpan.FromHours(1);
                     o.ResetJitter = TimeSpan.FromSeconds(1);
                 });
+
+                configureServices?.Invoke(services);
             })
             .Build();
 
