@@ -54,7 +54,7 @@ public class SqlServerMultiServerFixture : IAsyncLifetime, IMultiServerDatabaseF
     {
         return new TestContext(new DbContextOptionsBuilder<TestContext>()
             .UseSqlServer(_connectionString)
-            .AddInterceptors(new SqlServerRowLockInterceptor(), new SaveChangesConcurrencyTokenInterceptor())
+            .AddInterceptors(new SaveChangesConcurrencyTokenInterceptor())
             .Options);
     }
 

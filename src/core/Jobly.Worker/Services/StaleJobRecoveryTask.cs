@@ -1,9 +1,9 @@
 using Jobly.Core;
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Queries;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
-using Jobly.Core.Interceptors;
 using Jobly.Core.NoRestart;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,14 +15,18 @@ namespace Jobly.Worker.Services;
 public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
     where TContext : DbContext
 {
+    private readonly IJoblySqlQueries<TContext> _sqlQueries;
+
     public StaleJobRecoveryTask(
         IServiceScopeFactory scopeFactory,
         ILogger<StaleJobRecoveryTask<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
         IJoblyLockProvider lockProvider,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IJoblySqlQueries<TContext> sqlQueries)
         : base(scopeFactory, logger, configuration, timeProvider, "jobly:stale-job-recovery", lockProvider)
     {
+        _sqlQueries = sqlQueries;
     }
 
     protected override string TaskName => "StaleJobRecovery";
@@ -33,7 +37,7 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
-        var result = await RecoverStaleJobs(context, TimeProvider, Configuration.InvisibilityTimeout, Configuration.RestartStaleJobsByDefault);
+        var result = await RecoverStaleJobs(context, TimeProvider, Configuration.InvisibilityTimeout, Configuration.RestartStaleJobsByDefault, _sqlQueries, ct);
         if (result.Total == 0)
         {
             return null;
@@ -45,24 +49,25 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
     /// <summary>
     /// Finds jobs stuck in Processing with stale LastKeepAlive and recovers them —
     /// requeueing, failing (per <see cref="ICanBeRestartedMetadata.CanBeRestarted"/>),
-    /// or deleting (when cancellation was pending). Public static so tests can call it directly.
+    /// or deleting (when cancellation was pending). Public static so tests can call it directly;
+    /// pass <paramref name="sqlQueries"/> to reuse a cached instance, otherwise one is built from
+    /// the context on every invocation.
     /// </summary>
     public static async Task<StaleJobRecoveryResult> RecoverStaleJobs<TCtx>(
         TCtx context,
         TimeProvider timeProvider,
         TimeSpan invisibilityTimeout,
-        bool restartByDefault = true)
+        bool restartByDefault = true,
+        IJoblySqlQueries<TCtx>? sqlQueries = null,
+        CancellationToken ct = default)
         where TCtx : DbContext
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var cutoff = now - invisibilityTimeout;
+        var queries = sqlQueries ?? JoblySqlQueriesFactory.Create(context);
 
-        await using var transaction = await context.Database.BeginTransactionAsync();
-        var staleJobs = await context.Set<Job>()
-            .Where(x => x.CurrentState == State.Processing)
-            .Where(x => x.LastKeepAlive != null && x.LastKeepAlive < cutoff)
-            .TagWith(InterceptorConstants.RowLockTableJob)
-            .ToListAsync();
+        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+        var staleJobs = await queries.LockStaleProcessingJobsAsync(context, cutoff, ct);
 
         var requeued = 0;
         var failed = 0;
@@ -125,8 +130,8 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
             }
         }
 
-        await context.SaveChangesAsync();
-        await transaction.CommitAsync();
+        await context.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
 
         return new StaleJobRecoveryResult(requeued, failed, deleted);
     }

@@ -68,38 +68,40 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         // can flush any buffered completions BEFORE suspending on the next WaitToReadAsync —
         // otherwise a small batch (below CompletionBatchSize) would wait for the time trigger
         // or forever if no more jobs arrive.
-        try
+        //
+        // WaitToReadAsync does NOT observe stoppingToken: if we exited on cancellation while the
+        // channel still had buffered items, those jobs would be DB-orphaned as Processing (the
+        // dispatcher wrote them but nobody consumed them). Instead we drain the channel fully
+        // and exit only when the dispatcher completes its writer on its own shutdown. The host's
+        // shutdown timeout (30s default) still bounds this — a stuck handler eventually gets
+        // killed — and stoppingToken is still propagated into ProcessJob so individual
+        // handler-path awaits can react if they want to.
+        while (await _jobReader.WaitToReadAsync(CancellationToken.None).ConfigureAwait(false))
         {
-            while (await _jobReader.WaitToReadAsync(stoppingToken).ConfigureAwait(false))
+            while (_jobReader.TryRead(out var job))
             {
-                while (_jobReader.TryRead(out var job))
+                try
                 {
-                    try
-                    {
-                        await ProcessJob(job, stoppingToken);
-                    }
-                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Dispatcher worker failed on job {id}", job.Id);
-                    }
-
-                    if (_batch.IsFull || _batch.IsTimeElapsed)
-                    {
-                        await FlushBatchSafely();
-                    }
+                    await ProcessJob(job, stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    // Handler (or a pipeline await point) observed shutdown. Keep draining the
+                    // channel — returning would orphan every remaining buffered job.
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Dispatcher worker failed on job {id}", job.Id);
                 }
 
-                // Idle — drain any buffered completions before suspending on WaitToReadAsync
-                await FlushBatchSafely();
+                if (_batch.IsFull || _batch.IsTimeElapsed)
+                {
+                    await FlushBatchSafely();
+                }
             }
-        }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-        {
-            // Graceful stop — StopAsync handles the final flush
+
+            // Idle — drain any buffered completions before suspending on WaitToReadAsync
+            await FlushBatchSafely();
         }
     }
 
@@ -153,7 +155,10 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
 
         // Operational observability — Dashboard/incident response needs to see "worker X holds job Y"
         // while it runs. Single UPDATE (no SELECT, no change tracker). Scope disposes when the helper returns.
-        await MarkWorkerOwnership(job, cancellationToken);
+        // CancellationToken.None: the claim already committed State=Processing, so aborting this
+        // UPDATE on shutdown would orphan the row without clearing the worker stamp. Fast UPDATE,
+        // uncancellable is cheap insurance.
+        await MarkWorkerOwnership(job, CancellationToken.None);
         job.CurrentWorkerId = _workerId;
 
         var logCollector = new JobLogCollector { JobId = job.Id, TimeProvider = _timeProvider, WorkerId = _workerId };
@@ -204,10 +209,14 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
 
             // Commit handler's work (outbox: published jobs + business entities) before disposing.
             // Capture pending push notifications for any child jobs the handler added, fire post-commit.
+            // CancellationToken.None on FireAsync: the handler already committed; cancelling the
+            // notification throw on shutdown would skip _batch.Add below and orphan this job as
+            // Processing. Notifications are fast (in-DB LISTEN/NOTIFY or Service Broker) and
+            // idempotent — uncancellable is safer than losing the completion.
             var handlerContext = handlerScope.ServiceProvider.GetRequiredService<TContext>();
             var handlerPending = NotificationDispatch.CapturePending(handlerContext);
             await handlerContext.SaveChangesAsync(default);
-            await NotificationDispatch.FireAsync(_notificationTransport, handlerPending, cancellationToken);
+            await NotificationDispatch.FireAsync(_notificationTransport, handlerPending, CancellationToken.None);
 
             // Read metadata and outcome from handler scope before disposing
             job.Metadata = JsonSerializer.Serialize(jobContext.Metadata);
@@ -539,18 +548,21 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
             ?? (error != null ? error.Message : $"Job {job.Id} completed");
         var logException = error?.ToString();
 
+        // Both Enqueued (immediate retry) and Scheduled (delayed retry) log as "Requeued" —
+        // operators reading the dashboard think in terms of "the job was retried", not its
+        // transient EF-state spelling.
         var eventType = state switch
         {
             State.Completed => "Completed",
             State.Failed => "Failed",
-            State.Enqueued => "Requeued",
+            State.Enqueued or State.Scheduled => "Requeued",
             State.Deleted => "Deleted",
             _ => state.ToString(),
         };
 
         // Retries apply jitter to ScheduleTime; recording it here so operators debugging a
         // retry storm can see the actual delay applied (otherwise the factor is invisible).
-        if (state == State.Enqueued)
+        if (state == State.Enqueued || state == State.Scheduled)
         {
             var scheduledAt = job.ScheduleTime.ToString("o", CultureInfo.InvariantCulture);
             logMessage = $"{logMessage} (next attempt scheduled: {scheduledAt})";

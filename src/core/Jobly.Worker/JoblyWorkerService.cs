@@ -2,10 +2,10 @@ using System.Diagnostics;
 using System.Text.Json;
 using Jobly.Core;
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Queries;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
-using Jobly.Core.Interceptors;
 using Jobly.Core.Logging;
 using Jobly.Core.Notifications;
 using Jobly.Worker.Services;
@@ -31,8 +31,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     private readonly WorkerGroupConfiguration _groupConfiguration;
     private readonly TimeProvider _timeProvider;
     private readonly IJoblyNotificationTransport _notificationTransport;
+    private IJoblySqlQueries<TContext>? _sqlQueries;
 
-    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration, TimeProvider timeProvider, IJoblyNotificationTransport? notificationTransport = null)
+    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration, TimeProvider timeProvider, IJoblySqlQueries<TContext>? sqlQueries = null, IJoblyNotificationTransport? notificationTransport = null)
     {
         _workerId = workerId;
         _serviceScopeFactory = serviceScopeFactory;
@@ -40,7 +41,32 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         _configuration = configuration.Value;
         _groupConfiguration = groupConfiguration;
         _timeProvider = timeProvider;
+        _sqlQueries = sqlQueries;
         _notificationTransport = notificationTransport ?? new NullNotificationTransport();
+    }
+
+    // Lazy resolution so tests that build a partial DI container without IJoblySqlQueries
+    // still work: first call tries the scope's registered instance, falls back to constructing
+    // one from the context's model. Subsequent calls reuse the cached instance.
+    private IJoblySqlQueries<TContext> GetOrResolveSqlQueries(IServiceScope scope, TContext context)
+    {
+        if (_sqlQueries != null)
+        {
+            return _sqlQueries;
+        }
+
+        var resolved = scope.ServiceProvider.GetService<IJoblySqlQueries<TContext>>();
+        if (resolved == null)
+        {
+            var names = JoblyJobTableNames.FromModel(context.Model);
+            var isPostgres = context.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
+            resolved = isPostgres
+                ? new PostgresJoblySqlQueries<TContext>(names)
+                : new SqlServerJoblySqlQueries<TContext>(names);
+        }
+
+        _sqlQueries = resolved;
+        return resolved;
     }
 
     public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
@@ -51,33 +77,33 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         using var workerScope = _serviceScopeFactory.CreateScope();
         var workerContext = workerScope.ServiceProvider.GetRequiredService<TContext>();
 
-        PerfTrace.Mark(PerfTrace.BeginTransaction1);
-        await using var transaction = await workerContext.Database.BeginTransactionAsync(cancellationToken);
-
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
-        // Fetch only Kind=Job (messages are routed by MessageRoutingTask)
+        // Atomic claim: UPDATE ... RETURNING (PG) / UPDATE ... OUTPUT (MSSQL) with
+        // FOR UPDATE SKIP LOCKED / ROWLOCK+UPDLOCK+READPAST baked into the SQL. No SELECT→UPDATE
+        // window, no dependency on a regex-rewriting interceptor. Concurrent workers across
+        // servers get distinct rows or nothing at all — never the same row.
         PerfTrace.Mark(PerfTrace.FetchJob);
-        var job = await workerContext.Set<Job>()
-            .Where(x => x.Kind == JobKind.Job && x.CurrentState == State.Enqueued && x.ScheduleTime < now)
-            .Where(x => _groupConfiguration.Queues.Contains(x.Queue))
-            .OrderBy(x => x.Queue)
-            .ThenBy(x => x.ScheduleTime)
-            .TagWith(InterceptorConstants.RowLockTableJob)
-            .FirstOrDefaultAsync(cancellationToken);
+        var sqlQueries = GetOrResolveSqlQueries(workerScope, workerContext);
+        var claimed = await sqlQueries.ClaimEnqueuedJobsAsync(
+            workerContext,
+            _groupConfiguration.Queues,
+            _workerId,
+            now,
+            limit: 1,
+            cancellationToken);
 
-        if (job == null)
+        if (claimed.Count == 0)
         {
-            await transaction.CommitAsync(cancellationToken);
             return false;
         }
 
+        var job = claimed[0];
         _logger.LogInformation("Worker {workerId} fetched job {id}", _workerId, job.Id);
 
-        job.CurrentState = State.Processing;
-        job.CurrentWorkerId = _workerId;
-        job.LastKeepAlive = now;
-
+        // The claim itself is committed atomically via UPDATE RETURNING. Persist the Processing
+        // log entry in a separate round-trip; failure here leaves the job Processing with
+        // LastKeepAlive set, which is fine — the worker carries on and the log is cosmetic.
         workerContext.Set<JobLog>().Add(new JobLog
         {
             JobId = job.Id,
@@ -90,9 +116,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         PerfTrace.Mark(PerfTrace.SaveProcessing);
         await workerContext.SaveChangesAsync(cancellationToken);
-
         PerfTrace.Mark(PerfTrace.CommitTransaction1);
-        await transaction.CommitAsync(cancellationToken);
 
         var logCollector = new JobLogCollector { JobId = job.Id, TimeProvider = _timeProvider, WorkerId = _workerId };
         using var jobCts = new CancellationTokenSource();
@@ -492,18 +516,21 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
             ?? (error != null ? error.Message : $"Job {job.Id} completed");
         var logException = error?.ToString();
 
+        // Both Enqueued (immediate retry) and Scheduled (delayed retry) log as "Requeued" —
+        // operators reading the dashboard think in terms of "the job was retried", not its
+        // transient EF-state spelling.
         var eventType = state switch
         {
             State.Completed => "Completed",
             State.Failed => "Failed",
-            State.Enqueued => "Requeued",
+            State.Enqueued or State.Scheduled => "Requeued",
             State.Deleted => "Deleted",
             _ => state.ToString(),
         };
 
         // Retries apply jitter to ScheduleTime; recording it here so operators debugging a
         // retry storm can see the actual delay applied (otherwise the factor is invisible).
-        if (state == State.Enqueued)
+        if (state == State.Enqueued || state == State.Scheduled)
         {
             var scheduledAt = job.ScheduleTime.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
             logMessage = $"{logMessage} (next attempt scheduled: {scheduledAt})";

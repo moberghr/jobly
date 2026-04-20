@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Reflection;
-using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Microsoft.Extensions.Options;
 
@@ -40,7 +39,7 @@ public class CircuitBreakerPipelineBehavior<TRequest, TResponse> : IPipelineBeha
         // HalfOpen: another worker is already probing. Reschedule; do not run the handler.
         if (state?.State == CircuitState.HalfOpen)
         {
-            _jobContext.Outcome = BuildReschedule(now, attr, options, groupKey, "probe-in-progress");
+            _jobContext.Outcome = BuildReschedule(now, now, attr, options, groupKey, "probe-in-progress");
 
             return default!;
         }
@@ -50,7 +49,7 @@ public class CircuitBreakerPipelineBehavior<TRequest, TResponse> : IPipelineBeha
         // correctly (State defaults to Closed for those rows).
         if (state?.OpenUntil is { } openUntil && openUntil > now)
         {
-            _jobContext.Outcome = BuildReschedule(openUntil, attr, options, groupKey, "open");
+            _jobContext.Outcome = BuildReschedule(openUntil, now, attr, options, groupKey, "open");
 
             return default!;
         }
@@ -63,7 +62,7 @@ public class CircuitBreakerPipelineBehavior<TRequest, TResponse> : IPipelineBeha
             var probeWon = await _store.TryBeginProbeAsync(groupKey, now, cancellationToken);
             if (!probeWon)
             {
-                _jobContext.Outcome = BuildReschedule(now, attr, options, groupKey, "probe-lost");
+                _jobContext.Outcome = BuildReschedule(now, now, attr, options, groupKey, "probe-lost");
 
                 return default!;
             }
@@ -108,16 +107,17 @@ public class CircuitBreakerPipelineBehavior<TRequest, TResponse> : IPipelineBeha
         }
     }
 
-    private static JobOutcome BuildReschedule(DateTime baseTime, CircuitBreakerAttribute? attr, CircuitBreakerOptions options, string groupKey, string reason)
+    private static JobOutcome BuildReschedule(DateTime baseTime, DateTime now, CircuitBreakerAttribute? attr, CircuitBreakerOptions options, string groupKey, string reason)
     {
         var jitter = attr?.GetResetJitter(options) ?? options.ResetJitter;
         var jitterMs = (int)jitter.TotalMilliseconds;
         var delayMs = jitterMs > 0 ? Random.Shared.Next(0, jitterMs + 1) : 0;
+        var scheduleTime = baseTime.AddMilliseconds(delayMs);
 
         return new JobOutcome
         {
-            State = State.Enqueued,
-            ScheduleTime = baseTime.AddMilliseconds(delayMs),
+            State = JobOutcome.RescheduledState(scheduleTime, now),
+            ScheduleTime = scheduleTime,
             LogMessage = $"Rescheduled due to circuit breaker '{groupKey}' ({reason})",
         };
     }

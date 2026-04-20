@@ -1,8 +1,8 @@
 using System.Threading.Channels;
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Queries;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
-using Jobly.Core.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -149,55 +149,99 @@ public class JoblyDispatcher<TContext> : BackgroundService
 
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
-
-        await using var transaction = await context.Database.BeginTransactionAsync(ct);
+        var sqlQueries = scope.ServiceProvider.GetRequiredService<IJoblySqlQueries<TContext>>();
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
-        // Fetch only Kind=Job (messages are routed by MessageRoutingTask)
-        var jobs = await context.Set<Job>()
-            .Where(x => x.Kind == JobKind.Job && x.CurrentState == State.Enqueued && x.ScheduleTime < now)
-            .Where(x => _groupConfiguration.Queues.Contains(x.Queue))
-            .OrderBy(x => x.Queue)
-            .ThenBy(x => x.ScheduleTime)
-            .Take(available)
-            .TagWith(InterceptorConstants.RowLockTableJob)
-            .ToListAsync(ct);
+        // Atomic batch claim. One round-trip, no SELECT→UPDATE window — returns up to
+        // `available` rows already transitioned to Processing. Workers across servers get
+        // distinct rows via FOR UPDATE SKIP LOCKED (PG) / ROWLOCK+UPDLOCK+READPAST (MSSQL)
+        // in the claim subquery.
+        // Mutex enforcement runs inside the handler pipeline (MutexPipelineBehavior) — same
+        // as before; it short-circuits to Deleted if the concurrency key is held.
+        var jobs = await sqlQueries.ClaimEnqueuedJobsAsync(
+            context,
+            _groupConfiguration.Queues,
+            _workerGroupId,
+            now,
+            available,
+            ct);
 
         if (jobs.Count == 0)
         {
-            await transaction.CommitAsync(ct);
             return FetchResult.Empty;
         }
 
-        // Batch mark all fetched jobs as Processing
-        foreach (var job in jobs)
+        // The atomic claim already committed State=Processing for every row in `jobs`. Delivering
+        // them to the channel is a separate, interruptible phase: the JobLog SaveChangesAsync and
+        // each WriteAsync are await points where a shutdown-triggered cancellation can fire. If
+        // we don't recover, claimed-but-undelivered rows stay as Processing orphans until
+        // StaleJobRecoveryTask finds them. The try/catch here restores undelivered rows back to
+        // Enqueued so shutdown leaves the DB in a clean state.
+        var delivered = 0;
+        try
         {
-            job.CurrentState = State.Processing;
-            job.LastKeepAlive = now;
-
-            context.Set<JobLog>().Add(new JobLog
+            context.Set<JobLog>().AddRange(jobs.Select(job => new JobLog
             {
                 JobId = job.Id,
                 EventType = "Processing",
                 Timestamp = now,
                 Level = "Information",
                 Message = $"The job {job.Id} is being processed",
-            });
+            }));
+
+            await context.SaveChangesAsync(ct);
+
+            foreach (var job in jobs)
+            {
+                await _jobChannel.Writer.WriteAsync(job, ct);
+                delivered++;
+            }
         }
-
-        // Mutex enforcement is not done here. MutexPipelineBehavior (registered via
-        // AddJoblyMutex) runs inside the handler pipeline in JoblyDispatcherWorker.ExecuteJob
-        // and short-circuits to Deleted via IJobContext.Outcome if the concurrency key is held.
-        await context.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-
-        foreach (var job in jobs)
+        catch
         {
-            await _jobChannel.Writer.WriteAsync(job, ct);
+            if (delivered < jobs.Count)
+            {
+                await UnclaimUndelivered(jobs, delivered);
+            }
+
+            throw;
         }
 
         return FetchResult.Fetched;
+    }
+
+    /// <summary>
+    /// Flips the tail of <paramref name="jobs"/> (rows starting at index <paramref name="delivered"/>)
+    /// back to <see cref="State.Enqueued"/> in the DB, clearing the claim stamp. Used when delivery
+    /// to the channel is interrupted — most commonly by shutdown cancellation — so the rows don't
+    /// linger as Processing orphans. Uses a fresh scope + <see cref="CancellationToken.None"/> so
+    /// the cleanup is never itself cancelled.
+    /// </summary>
+    private async Task UnclaimUndelivered(List<Job> jobs, int delivered)
+    {
+        try
+        {
+            var undeliveredIds = jobs.Skip(delivered).Select(j => j.Id).ToArray();
+            using var cleanupScope = _scopeFactory.CreateScope();
+            var cleanupContext = cleanupScope.ServiceProvider.GetRequiredService<TContext>();
+
+            await cleanupContext.Set<Job>()
+                .Where(x => undeliveredIds.Contains(x.Id))
+                .ExecuteUpdateAsync(
+                    x => x
+                        .SetProperty(p => p.CurrentState, State.Enqueued)
+                        .SetProperty(p => p.CurrentWorkerId, (Guid?)null)
+                        .SetProperty(p => p.LastKeepAlive, (DateTime?)null),
+                    CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            // Cleanup failure is not fatal — StaleJobRecoveryTask will still recover the orphaned
+            // Processing rows on its normal cadence. Log loudly because it means the DB was in
+            // a bad state (connection lost, timeout) exactly when we needed it.
+            _logger.LogError(ex, "Failed to un-claim {Count} undelivered jobs; StaleJobRecoveryTask will recover", jobs.Count - delivered);
+        }
     }
 
     private enum FetchResult

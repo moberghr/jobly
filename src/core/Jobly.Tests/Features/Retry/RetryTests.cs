@@ -290,10 +290,11 @@ public abstract class RetryTestsBase : IAsyncLifetime
         // Act
         await worker.GetAndProcessJob(CancellationToken.None);
 
-        // Assert — job should be requeued with future ScheduleTime
+        // Assert — retries with a future ScheduleTime land in Scheduled so the worker fetch
+        // (State=Enqueued only) doesn't pick them up early.
         var readCtx = _fixture.CreateContext();
         var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
-        job.CurrentState.ShouldBe(State.Enqueued);
+        job.CurrentState.ShouldBe(State.Scheduled);
         job.ScheduleTime.ShouldBeGreaterThan(now.AddSeconds(3500));
     }
 
@@ -321,13 +322,15 @@ public abstract class RetryTestsBase : IAsyncLifetime
         // Act — process 3 times (1 initial + 2 retries)
         for (var i = 0; i < 3; i++)
         {
-            // Reset ScheduleTime so the worker can pick up the job again
+            // Reset ScheduleTime and flip Scheduled → Enqueued so the worker picks it up again
+            // (delayed retries land in Scheduled; the activation task isn't running in this unit test).
             var resetCtx = _fixture.CreateContext();
             await resetCtx.Set<Job>()
                 .Where(x => x.Id == jobId)
-                .Where(x => x.CurrentState == State.Enqueued)
+                .Where(x => x.CurrentState == State.Enqueued || x.CurrentState == State.Scheduled)
                 .ExecuteUpdateAsync(
-                    x => x.SetProperty(p => p.ScheduleTime, DateTime.UtcNow),
+                    x => x.SetProperty(p => p.ScheduleTime, DateTime.UtcNow)
+                          .SetProperty(p => p.CurrentState, State.Enqueued),
                     Xunit.TestContext.Current.CancellationToken);
 
             await worker.GetAndProcessJob(CancellationToken.None);
@@ -651,10 +654,10 @@ public abstract class RetryTestsBase : IAsyncLifetime
         // Act
         await worker.GetAndProcessJob(CancellationToken.None);
 
-        // Assert — should use attribute's 100s delay (not global 10s)
+        // Assert — should use attribute's 100s delay (not global 10s); delayed retries land in Scheduled.
         var readCtx = _fixture.CreateContext();
         var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
-        job.CurrentState.ShouldBe(State.Enqueued);
+        job.CurrentState.ShouldBe(State.Scheduled);
         job.ScheduleTime.ShouldBeGreaterThan(now.AddSeconds(90));
     }
 

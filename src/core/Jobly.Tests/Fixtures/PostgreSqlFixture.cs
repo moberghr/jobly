@@ -1,5 +1,4 @@
 using Jobly.Core.Interceptors;
-using Jobly.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Respawn;
@@ -19,8 +18,6 @@ public class PostgreSqlFixture : IAsyncLifetime, IDatabaseFixture
     public string ConnectionString => _connectionString;
 
     public JoblyTestServer? TestServer => null;
-
-    internal PostgresRowLockInterceptor Interceptor { get; } = new();
 
     internal SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();
 
@@ -52,7 +49,7 @@ public class PostgreSqlFixture : IAsyncLifetime, IDatabaseFixture
         return new TestContext(new DbContextOptionsBuilder<TestContext>()
             .UseNpgsql(_connectionString)
             .UseSnakeCaseNamingConvention()
-            .AddInterceptors(Interceptor, ConcurrencyInterceptor)
+            .AddInterceptors(ConcurrencyInterceptor)
             .Options);
     }
 

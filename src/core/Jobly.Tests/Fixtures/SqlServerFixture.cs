@@ -20,8 +20,6 @@ public class SqlServerFixture : IAsyncLifetime, IDatabaseFixture
 
     public JoblyTestServer? TestServer => null;
 
-    internal SqlServerRowLockInterceptor Interceptor { get; } = new();
-
     internal SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();
 
     public async ValueTask InitializeAsync()
@@ -65,7 +63,7 @@ public class SqlServerFixture : IAsyncLifetime, IDatabaseFixture
     {
         return new TestContext(new DbContextOptionsBuilder<TestContext>()
             .UseSqlServer(_connectionString)
-            .AddInterceptors(Interceptor, ConcurrencyInterceptor)
+            .AddInterceptors(ConcurrencyInterceptor)
             .Options);
     }
 

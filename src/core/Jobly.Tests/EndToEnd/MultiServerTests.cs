@@ -325,6 +325,7 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         var stuckJobs = await ctx.Set<Job>()
             .Where(x => x.Kind == JobKind.Job)
             .Where(x => x.CurrentState == State.Enqueued
+                || x.CurrentState == State.Scheduled
                 || x.CurrentState == State.Processing
                 || x.CurrentState == State.Awaiting)
             .CountAsync(Xunit.TestContext.Current.CancellationToken);

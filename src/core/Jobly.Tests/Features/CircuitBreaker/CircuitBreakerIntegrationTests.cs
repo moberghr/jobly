@@ -59,12 +59,14 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
 
         await Server.WaitForJobLog(nextJobId, "Requeued", timeout: TimeSpan.FromSeconds(15));
 
+        // Worker writes Scheduled when the reschedule time is in the future; the activation
+        // task only flips it back to Enqueued once OpenUntil has elapsed (several minutes here).
         var readCtx = Server.CreateContext();
         var nextJob = await readCtx.Set<Job>()
             .Where(x => x.Id == nextJobId)
             .FirstOrDefaultAsync(CancellationToken.None);
         nextJob.ShouldNotBeNull();
-        nextJob.CurrentState.ShouldBe(State.Enqueued);
+        nextJob.CurrentState.ShouldBe(State.Scheduled);
         nextJob.ScheduleTime.ShouldBeGreaterThanOrEqualTo(state.OpenUntil!.Value);
 
         var log = await readCtx.Set<JobLog>()

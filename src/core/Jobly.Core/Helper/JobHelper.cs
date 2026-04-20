@@ -7,8 +7,22 @@ namespace Jobly.Core.Helper;
 
 internal static class JobHelper
 {
+    // SqlServerJoblySqlQueries serializes the per-fetch queue list as a \x1F-separated string
+    // and reconstructs it via STRING_SPLIT. A queue name containing the separator would be
+    // silently split into multiple matches — fail fast at publish time so the bug surfaces near
+    // the caller instead of quietly widening their fetch filter in production.
+    private const char QueueSeparatorChar = '\x1F';
+
     private static Job CreateJobInternal(string message, string type, DateTime? scheduleTime, string? queue, Guid? parentId, State? state, DateTime now, string? metadata = null)
     {
+        var effectiveQueue = queue ?? "default";
+        if (effectiveQueue.Contains(QueueSeparatorChar, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "Queue name must not contain the ASCII unit separator (\\x1F) — it's reserved for internal SQL Server queue-list encoding.",
+                nameof(queue));
+        }
+
         var effectiveScheduleTime = scheduleTime ?? now;
         var job = new Job
         {
@@ -17,7 +31,7 @@ internal static class JobHelper
             Type = type,
             ScheduleTime = effectiveScheduleTime,
             CurrentState = state ?? DefaultState(parentId, effectiveScheduleTime, now),
-            Queue = queue ?? "default",
+            Queue = effectiveQueue,
             ParentJobId = parentId,
             Metadata = metadata,
         };

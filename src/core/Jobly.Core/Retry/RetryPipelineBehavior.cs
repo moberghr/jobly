@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Reflection;
-using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Microsoft.Extensions.Options;
 
@@ -67,7 +66,7 @@ public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
 
                 _jobContext.Outcome = new JobOutcome
                 {
-                    State = State.Enqueued,
+                    State = JobOutcome.RescheduledState(scheduleTime ?? now, now),
                     ScheduleTime = scheduleTime,
                     ClearHandlerType = true,
                 };
