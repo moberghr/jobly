@@ -112,12 +112,13 @@ public class JoblyTestServer : IAsyncDisposable
         var host = Host.CreateDefaultBuilder()
             .ConfigureLogging(logging =>
             {
-                // Tests log at Warning+ only. Information-level traces (worker fetched/executing/
-                // completed, pipeline-before/after, application-shutting-down, etc.) dump megabytes
-                // of noise into CI output without adding diagnostic value — the authoritative
-                // record is the JobLog table, which every assertion queries directly. Individual
-                // tests that need verbose logs can re-raise via configureServices.
-                logging.SetMinimumLevel(LogLevel.Warning);
+                // Silence worker-infrastructure and hosting-lifetime chatter in CI. We can't use
+                // SetMinimumLevel(Warning) globally because RealTimeLogIntegrationTests and
+                // JobLogTests exercise the handler log capture path, which depends on
+                // Information-level logs flowing through JobLoggerProvider to JobLog.
+                logging.AddFilter("Microsoft", LogLevel.Warning);
+                logging.AddFilter("Jobly.Worker", LogLevel.Warning);
+                logging.AddFilter("Jobly.Tests.TestData.Handlers.LoggingPipelineBehavior", LogLevel.Warning);
             })
             .ConfigureServices(services =>
             {
