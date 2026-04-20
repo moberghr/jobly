@@ -35,6 +35,13 @@
     <PackageReference Include="Meziantou.Analyzer" Version="3.0.29" PrivateAssets="all" />
   </ItemGroup>
 
+  <!-- TRX report extension for test projects using the Microsoft Testing Platform runner.
+       Enables the report-trx flag so CI can publish structured results via the GitHub test
+       reporter action (EnricoMi/publish-unit-test-result-action). -->
+  <ItemGroup Condition="'$(UseMicrosoftTestingPlatformRunner)' == 'true'">
+    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" Version="2.2.1" />
+  </ItemGroup>
+
   <!-- Include README.md in all packages -->
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)../README.md" Pack="true" PackagePath="/" />

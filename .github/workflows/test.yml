@@ -61,24 +61,20 @@ jobs:
           dotnet test --project core/Jobly.Tests/Jobly.Tests.csproj --no-build --configuration Debug -- \
             ${{ matrix.filter }} \
             --report-trx --report-trx-filename test-results.trx \
-            --results-directory "$GITHUB_WORKSPACE/test-results/${{ matrix.database }}"
+            --results-directory "$GITHUB_WORKSPACE/test-results"
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.database }}
-          path: test-results/${{ matrix.database }}/*.trx
+          path: test-results/*.trx
           retention-days: 7
 
-      - name: Publish test report
+      - name: Publish test results
         if: always()
-        uses: dorny/test-reporter@v1
+        uses: EnricoMi/publish-unit-test-result-action@v2.23.0
         with:
-          name: ${{ matrix.database }} tests
-          path: test-results/${{ matrix.database }}/*.trx
-          reporter: dotnet-trx
-          fail-on-error: false
-          only-summary: false
-          list-suites: failed
-          list-tests: failed
+          check_name: ${{ matrix.database }} tests
+          files: test-results/**/*.trx
+          comment_mode: off
