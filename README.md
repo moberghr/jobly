@@ -320,6 +320,14 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     options.MessageRoutingInterval = TimeSpan.FromSeconds(1);
     options.HealthCheckInterval = TimeSpan.FromSeconds(10);
     options.CounterAggregationInterval = TimeSpan.FromSeconds(5);
+
+    // Scheduled-job activation. Future-dated jobs (`Schedule(job, at)`) sit in `State.Scheduled`
+    // until this task flips them to `Enqueued`. The interval is the worst-case lag between
+    // `ScheduleTime` and the job becoming pickup-eligible — e.g., default 5s means a job
+    // scheduled for 12:00:00 runs somewhere in [12:00:00, 12:00:05]. Lower this for tighter
+    // scheduled-job latency; the task is time-driven (no event trigger exists for "time has
+    // passed"), so push notifications don't help here.
+    options.ScheduledActivationInterval = TimeSpan.FromSeconds(5);
 });
 ```
 
@@ -339,6 +347,8 @@ builder.Services.AddJoblyDatabasePush<AppDbContext>();
 ```
 
 Provider is auto-detected from the `DbContextOptions`. Transports are resilient to connection drops — the listener reconnects with exponential backoff and fires a drain signal on every reconnect so jobs enqueued during the gap are picked up.
+
+**Scheduled jobs**: push accelerates *immediate* enqueues. Jobs published via `Schedule(job, at)` sit in `State.Scheduled` until `ScheduledJobActivationTask` flips them to `Enqueued` — only then does the `JobEnqueued` notification fire. Dispatcher pickup after activation is <50ms via push, but the activation itself is time-driven and bounded by `ScheduledActivationInterval` (default 5s, see §10). If you need sub-second precision on scheduled jobs, lower that interval — polling is the only mechanism, since there's no event for "wall-clock time has advanced."
 
 **SQL Server setup requirements**: Service Broker must be enabled on the target database. Jobly creates the message type / contract / queue / service idempotently on first publish, but it cannot run `ALTER DATABASE ... SET ENABLE_BROKER` for you (that requires exclusive DB access). If broker isn't enabled, the transport logs an actionable error and degrades silently to polling:
 
