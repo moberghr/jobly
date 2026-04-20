@@ -145,10 +145,12 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         var worker = CreateWorker(resetJitter: jitter);
         await worker.GetAndProcessJob(CancellationToken.None);
 
+        // Future-dated reschedule lands in Scheduled so the worker fetch (State=Enqueued only)
+        // doesn't pick it up before OpenUntil — ScheduledJobActivationTask flips it back.
         var readCtx = _fixture.CreateContext();
         var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
         job.ShouldNotBeNull();
-        job.CurrentState.ShouldBe(State.Enqueued);
+        job.CurrentState.ShouldBe(State.Scheduled);
         job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(openUntil);
         job.ScheduleTime.ShouldBeLessThanOrEqualTo(openUntil + jitter);
 
@@ -348,7 +350,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         jobs.Count.ShouldBe(20);
         foreach (var job in jobs)
         {
-            job.CurrentState.ShouldBe(State.Enqueued);
+            job.CurrentState.ShouldBe(State.Scheduled);
             job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(openUntil);
             job.ScheduleTime.ShouldBeLessThanOrEqualTo(openUntil + jitter);
         }

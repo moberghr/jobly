@@ -1,4 +1,5 @@
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Queries;
 using Jobly.Core.Entities;
 using Jobly.Core.Handlers;
 using Jobly.Core.Interceptors;
@@ -7,20 +8,15 @@ using Jobly.Core.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.SqlServer.Infrastructure.Internal;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.Internal;
 
 namespace Jobly.Core;
 
 public static class ServiceConfiguration
 {
-    private static readonly PostgresRowLockInterceptor _postgresInterceptor = new();
-    private static readonly SqlServerRowLockInterceptor _sqlServerInterceptor = new();
-
     private static readonly SaveChangesConcurrencyTokenInterceptor _saveChangesInterceptor = new();
 
     public static IServiceCollection AddJobly<TContext>(this IServiceCollection services)
@@ -69,7 +65,7 @@ public static class ServiceConfiguration
         services.AddScoped<IRecurringJobPublisher>(x =>
             new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IJoblyLockProvider>()));
         services.AddScoped<IJobQueryService>(x => new JobQueryService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
-        services.AddScoped<IJobCommandService>(x => new JobCommandService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IOptions<JoblyConfiguration>>(), x.GetRequiredService<IJoblyNotificationTransport>()));
+        services.AddScoped<IJobCommandService>(x => new JobCommandService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IOptions<JoblyConfiguration>>(), x.GetRequiredService<IJoblyNotificationTransport>(), x.GetRequiredService<IJoblySqlQueries<TContext>>()));
         services.AddScoped<IJobGroupQueryService>(x => new JobGroupQueryService<TContext>(x.GetRequiredService<TContext>()));
         services.AddScoped<IRecurringJobService>(x => new RecurringJobService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
         services.AddScoped<IDashboardStatsService>(x => new DashboardStatsService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
@@ -87,6 +83,17 @@ public static class ServiceConfiguration
         // Default no-op transport. AddJoblyDatabasePush<TContext>() replaces this with a
         // provider-specific implementation (Postgres LISTEN/NOTIFY or SQL Server Service Broker).
         services.TryAddSingleton<IJoblyNotificationTransport, NullNotificationTransport>();
+
+        // Provider-specific hand-written SQL for row-locking Job queries. Replaces the legacy
+        // regex-rewriting RowLockInterceptor. Singleton — caches SQL strings read from the
+        // EF model at first resolution.
+        services.TryAddSingleton<IJoblySqlQueries<TContext>>(sp =>
+        {
+            using var scope = sp.CreateScope();
+            var ctx = scope.ServiceProvider.GetRequiredService<TContext>();
+
+            return JoblySqlQueriesFactory.Create(ctx);
+        });
 
         return services;
     }
@@ -117,29 +124,6 @@ public static class ServiceConfiguration
 
     public static DbContextOptionsBuilder AddJoblyInterceptors(this DbContextOptionsBuilder optionsBuilder)
     {
-        var extensions = optionsBuilder.Options.Extensions;
-
-        foreach (var extension in extensions)
-        {
-            if (extension is NpgsqlOptionsExtension)
-            {
-                optionsBuilder.AddInterceptors(_postgresInterceptor);
-                break;
-            }
-
-            if (extension is SqlServerOptionsExtension)
-            {
-                optionsBuilder.AddInterceptors(_sqlServerInterceptor);
-                break;
-            }
-        }
-
-        var builderExtension = optionsBuilder.Options.FindExtension<CoreOptionsExtension>() ?? throw new ArgumentException("No CoreOptionsExtension found", nameof(optionsBuilder));
-        if (builderExtension.Interceptors == null)
-        {
-            throw new ArgumentException("Interceptors don't contains the configuration for this database type", nameof(optionsBuilder));
-        }
-
         optionsBuilder.AddInterceptors(_saveChangesInterceptor);
 
         optionsBuilder.ConfigureWarnings(w => w.Ignore(SqlServerEventId.SavepointsDisabledBecauseOfMARS));

@@ -55,7 +55,7 @@ public class PostgreSqlBatchedCompletionFixture : IAsyncLifetime, IDatabaseFixtu
         return new TestContext(new DbContextOptionsBuilder<TestContext>()
             .UseNpgsql(_connectionString)
             .UseSnakeCaseNamingConvention()
-            .AddInterceptors(new PostgresRowLockInterceptor(), new SaveChangesConcurrencyTokenInterceptor())
+            .AddInterceptors(new SaveChangesConcurrencyTokenInterceptor())
             .Options);
     }
 

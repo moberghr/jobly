@@ -163,6 +163,10 @@ public class JoblyTestServer : IAsyncDisposable
                     // waits. Production default is 30s; 1s is 30x faster without being so
                     // aggressive that it races worker keep-alive refreshes under two-server load.
                     config.StaleJobRecoveryInterval = TimeSpan.FromSeconds(1);
+
+                    // Tests configure short retry delays (1s); keep the Scheduled→Enqueued
+                    // sweep tight so retry loops don't stall waiting for the 5s default.
+                    config.ScheduledActivationInterval = TimeSpan.FromMilliseconds(250);
                     config.UseDispatcher = false;
 
                     configure?.Invoke(config);
@@ -320,6 +324,7 @@ public class JoblyTestServer : IAsyncDisposable
             var activeJobs = await ctx.Set<Job>()
                 .CountAsync(
                     j => j.CurrentState == State.Enqueued
+                        || j.CurrentState == State.Scheduled
                         || j.CurrentState == State.Processing
                         || j.CurrentState == State.Awaiting,
                     Xunit.TestContext.Current.CancellationToken);

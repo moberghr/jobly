@@ -55,7 +55,7 @@ public class PostgreSqlMultiServerFixture : IAsyncLifetime, IMultiServerDatabase
         return new TestContext(new DbContextOptionsBuilder<TestContext>()
             .UseNpgsql(_connectionString)
             .UseSnakeCaseNamingConvention()
-            .AddInterceptors(new PostgresRowLockInterceptor(), new SaveChangesConcurrencyTokenInterceptor())
+            .AddInterceptors(new SaveChangesConcurrencyTokenInterceptor())
             .Options);
     }
 

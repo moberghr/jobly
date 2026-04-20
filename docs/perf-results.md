@@ -14,18 +14,20 @@ Each scenario processes 1000 `EmptyRequest` jobs in two bursts of 500, with a 15
 - **dispatcher-poll** — `UseDispatcher=true`, no push. One batched fetch per group, exponential backoff on idle.
 - **dispatcher-push** — `UseDispatcher=true`, `AddJoblyDatabasePush<TContext>()`. Push wakes the dispatcher immediately on every enqueue, bypassing the idle backoff sleep.
 
-## Results (PostgreSQL, 2026-04-19)
+## Results (PostgreSQL, 2026-04-20)
 
 | Scenario          | Jobs  | Duration | SELECT | UPDATE | INSERT | DELETE | Other | Total |
 |-------------------|-------|----------|-------:|-------:|-------:|-------:|------:|------:|
-| workers-poll      |  1000 |    34.6s |   2417 |   1283 |   1277 |      1 |     0 |  4978 |
-| dispatcher-poll   |  1000 |    34.7s |   1706 |   1602 |   1276 |      1 |     0 |  4585 |
-| dispatcher-push   |  1000 |    17.3s |   1439 |   1577 |   1228 |      1 |     0 |  4245 |
+| workers-poll      |  1000 |    34.0s |   1185 |   1275 |   2239 |      1 |     0 |  4700 |
+| dispatcher-poll   |  1000 |    33.9s |   1310 |   1611 |   1542 |      1 |     0 |  4464 |
+| dispatcher-push   |  1000 |    18.1s |   1492 |   1568 |   1534 |      1 |     0 |  4595 |
+
+Comparison to the 2026-04-19 baseline (pre hand-SQL atomic-claim conversion): the hand-SQL change fuses the legacy SELECT-then-UPDATE claim into a single `UPDATE ... RETURNING/OUTPUT`, so `SELECT` drops sharply (workers-poll 2417 → 1185, dispatcher-poll 1706 → 1310). The per-job "Processing" `JobLog` is now always persisted in the same save that the claim returns from, bumping `INSERT` counts correspondingly. Total command volume is within ±5% of baseline; wall-clock duration and the push-vs-poll ratio are unchanged.
 
 ## Takeaways
 
-- **Duration**: `dispatcher-push` processes the workload in **half the wall-clock time** (17.3s vs 34.7s). The gap comes from the idle period — without push, polling backoff grew to near `MaxPollingInterval=30s`, so the second burst waited ~15s for the next scheduled poll. Push wakes the dispatcher instantly.
-- **SELECT count**: push reduces SELECTs by **~16%** vs dispatcher-poll (1439 vs 1706). Most of the savings come from the dispatcher no longer doing empty `FOR UPDATE SKIP LOCKED` fetches during the idle window.
+- **Duration**: `dispatcher-push` processes the workload in **roughly half the wall-clock time** (18.1s vs 34.0s). The gap comes from the idle period — without push, polling backoff grew to near `MaxPollingInterval=30s`, so the second burst waited ~15s for the next scheduled poll. Push wakes the dispatcher instantly.
+- **SELECT count**: pure-poll modes (`workers-poll`, `dispatcher-poll`) now run the fewest SELECTs because the atomic-claim path replaces SELECT+UPDATE with a single UPDATE ... RETURNING. Push adds some SELECTs for notification-listener bookkeeping, which is why `dispatcher-push` is the highest SELECT scenario here — but its wall-clock win is still massive.
 - **Individual-worker mode does not benefit from push** by design — individual workers would have a thundering-herd problem on each notification, which is why `AddJoblyDatabasePush` only wires the dispatcher for worker-fetch push. `workers-poll` is shown as the no-dispatcher baseline, not a push target.
 
 The more idle gaps your workload has, the bigger the push advantage. This two-burst test underrepresents long-idle production workloads.

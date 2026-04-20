@@ -1,4 +1,5 @@
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Queries;
 using Jobly.Core.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -153,6 +154,7 @@ public class JoblyWorkerSetup<TContext> : IHostedService
                         _serviceProvider.GetRequiredService<IOptions<JoblyWorkerConfiguration>>(),
                         group,
                         _timeProvider,
+                        _serviceProvider.GetRequiredService<IJoblySqlQueries<TContext>>(),
                         _serviceProvider.GetRequiredService<IJoblyNotificationTransport>());
 
                     var worker = new JoblyWorker<TContext>(

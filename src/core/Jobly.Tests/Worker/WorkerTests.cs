@@ -172,16 +172,18 @@ public abstract class WorkerTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
-    public async Task GetAndProcessJob_SkipsFutureScheduledJob()
+    public async Task GetAndProcessJob_SkipsScheduledStateJob()
     {
-        // Arrange
+        // Future-dated jobs live in State.Scheduled and are promoted to Enqueued by
+        // ScheduledJobActivationTask. The worker only queries State.Enqueued rows, so a
+        // Scheduled row (regardless of its ScheduleTime) must be invisible to fetch.
         var ctx = _fixture.CreateContext();
         var jobId = Guid.NewGuid();
         ctx.Set<Job>().Add(new Job
         {
             Id = jobId,
             Kind = JobKind.Job,
-            CurrentState = State.Enqueued,
+            CurrentState = State.Scheduled,
             Type = typeof(UnitRequest).AssemblyQualifiedName,
             Message = JsonSerializer.Serialize(new UnitRequest()),
             CreateTime = DateTime.UtcNow,

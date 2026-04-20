@@ -64,7 +64,7 @@ public class SqlServerIntegrationFixture : IAsyncLifetime, IDatabaseFixture
     {
         return new TestContext(new DbContextOptionsBuilder<TestContext>()
             .UseSqlServer(_connectionString)
-            .AddInterceptors(new SqlServerRowLockInterceptor(), new SaveChangesConcurrencyTokenInterceptor())
+            .AddInterceptors(new SaveChangesConcurrencyTokenInterceptor())
             .Options);
     }
 

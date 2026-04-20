@@ -96,6 +96,7 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
         var stuckJobs = await jobs
             .CountAsync(
                 j => j.CurrentState == State.Enqueued
+                    || j.CurrentState == State.Scheduled
                     || j.CurrentState == State.Processing
                     || j.CurrentState == State.Awaiting,
                 Xunit.TestContext.Current.CancellationToken);

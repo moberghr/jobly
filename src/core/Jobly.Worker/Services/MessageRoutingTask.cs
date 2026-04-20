@@ -1,10 +1,10 @@
 using Jobly.Core;
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Queries;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
-using Jobly.Core.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -22,16 +22,19 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
     private static readonly List<MessageRoutingTask<TContext>> _instances = [];
 
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IJoblySqlQueries<TContext> _sqlQueries;
 
     public MessageRoutingTask(
         IServiceScopeFactory scopeFactory,
         ILogger<MessageRoutingTask<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
         IJoblyLockProvider lockProvider,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IJoblySqlQueries<TContext> sqlQueries)
         : base(scopeFactory, logger, configuration, timeProvider, "jobly:message-routing", lockProvider)
     {
         _scopeFactory = scopeFactory;
+        _sqlQueries = sqlQueries;
         lock (_instances)
         {
             _instances.Add(this);
@@ -67,27 +70,29 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
-        var routed = await RunMessageRouting(context, _scopeFactory, TimeProvider, ct);
+        var routed = await RunMessageRouting(context, _scopeFactory, TimeProvider, ct, _sqlQueries);
         return routed > 0 ? $"Routed {routed} messages" : null;
     }
 
     /// <summary>
-    /// Routes all pending messages. Creates child jobs for each handler.
-    /// Public static so tests can call it directly.
+    /// Routes all pending messages. Creates child jobs for each handler. Public static so tests
+    /// can call it directly; pass <paramref name="sqlQueries"/> to reuse a cached instance,
+    /// otherwise one is built from the context on every invocation.
     /// </summary>
-    public static async Task<int> RunMessageRouting<TCtx>(TCtx context, IServiceScopeFactory scopeFactory, TimeProvider timeProvider, CancellationToken ct)
+    public static async Task<int> RunMessageRouting<TCtx>(
+        TCtx context,
+        IServiceScopeFactory scopeFactory,
+        TimeProvider timeProvider,
+        CancellationToken ct,
+        IJoblySqlQueries<TCtx>? sqlQueries = null)
         where TCtx : DbContext
     {
         var totalRouted = 0;
+        var queries = sqlQueries ?? JoblySqlQueriesFactory.Create(context);
 
         while (true)
         {
-            var message = await context.Set<Job>()
-                .Where(x => x.Kind == JobKind.Message && x.CurrentState == State.Enqueued)
-                .OrderBy(x => x.Queue)
-                .ThenBy(x => x.ScheduleTime)
-                .TagWith(InterceptorConstants.RowLockTableJob)
-                .FirstOrDefaultAsync(ct);
+            var message = await queries.LockNextEnqueuedMessageAsync(context, ct);
 
             if (message == null)
             {
