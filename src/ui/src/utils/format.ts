@@ -26,6 +26,7 @@ const stateNames: Record<number, string> = {
   [State.Completed]: 'Completed',
   [State.Failed]: 'Failed',
   [State.Deleted]: 'Deleted',
+  [State.Scheduled]: 'Scheduled',
 };
 
 export function stateName(state: State): string {
@@ -40,6 +41,7 @@ export function stateColor(state: State): string {
     case State.Completed: return 'bg-green-100 text-green-800';
     case State.Failed: return 'bg-red-100 text-red-800';
     case State.Deleted: return 'bg-gray-100 text-gray-800';
+    case State.Scheduled: return 'bg-amber-100 text-amber-800';
     default: return 'bg-gray-100 text-gray-800';
   }
 }

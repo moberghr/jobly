@@ -385,9 +385,8 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
 
     private async Task<int> GetScheduledJobsCount()
     {
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
         return await Jobs()
-            .Where(x => x.ScheduleTime > now)
+            .Where(x => x.CurrentState == State.Scheduled)
             .CountAsync();
     }
 

@@ -11,6 +11,8 @@ Jobly is a distributed job processing and message queue library for .NET 10. Fou
 - **Requests** (`IRequest<TResponse>`) — In-memory request/response. Single handler, no database persistence, returns typed response immediately via `IMediator.Send()`.
 - **Streams** (`IStreamRequest<TResponse>`) — In-memory streaming. Single handler, no database persistence, returns `IAsyncEnumerable<TResponse>` via `IMediator.CreateStream()`.
 
+**Optional DB push**: `services.AddJoblyDatabasePush<TContext>()` replaces polling wake-up with push notifications (Postgres LISTEN/NOTIFY, SQL Server Service Broker) for the dispatcher, `MessageRoutingTask`, and `OrchestrationTask`. Worker fetch push requires `UseDispatcher = true` — individual-worker mode has a thundering-herd problem and is left on polling. See §2.9 and the DB Push section in `README.md`.
+
 Ships as NuGet packages (Jobly.Core, Jobly.UI, Jobly.Worker). Supports PostgreSQL and SQL Server.
 
 ## Build & Test Commands
@@ -366,6 +368,8 @@ Workers can be split into groups with independent queues and polling intervals. 
 - **§2.5** `AddJobly<TContext>()` / `AddJoblyWorker<TContext>()` auto-configure the user's DbContext. Users register their DbContext normally — no manual Jobly configuration needed.
 - **§2.6** In-memory requests (`IRequest<TResponse>`) go through `IMediator.Send()` — same `IPipelineBehavior` pipeline as jobs/messages, but no database persistence.
 - **§2.7** In-memory streams (`IStreamRequest<TResponse>`) go through `IMediator.CreateStream()` — `IPipelineBehavior` applies at request level, `IStreamPipelineBehavior` wraps enumeration, returns `IAsyncEnumerable<TResponse>`, no database persistence.
+- **§2.8** Future-dated jobs land in `State.Scheduled`; `ScheduledJobActivationTask` flips them to `Enqueued` when `ScheduleTime <= now`. Activation cadence is controlled by `JoblyWorkerConfiguration.ScheduledActivationInterval` (default 5s) — this is the worst-case latency between `ScheduleTime` and pickup eligibility. The task is time-driven and does not participate in DB-push wake-up; push only accelerates what happens *after* activation. Worker fetch queries always check `CurrentState == Enqueued` with a defensive `ScheduleTime <= now` predicate for pre-upgrade legacy rows. Adding new query sites that filter by `Enqueued` without the time predicate is a latent bug on upgraded deployments.
+- **§2.9** DB push is an opt-in addon. `AddJoblyDatabasePush<TContext>()` replaces the default `NullNotificationTransport` with a provider-specific one (Postgres LISTEN/NOTIFY or SQL Server Service Broker) and registers `NotificationListenerTask`. Worker-fetch push only fires when `UseDispatcher = true`. Transports must not throw from `PublishAsync` — they log + increment `JoblyTelemetry.NotificationPublishFailures` instead. Missed notifications are caught by drain-on-reconnect in the listener.
 
 ### §3 — Coding Style
 
@@ -422,7 +426,7 @@ var activeJobs = await _context.Set<Job>()
 
 ### §5 — Data Layer
 
-- **§5.1** No raw SQL. All queries use EF Core LINQ. This ensures dual-database compatibility.
+- **§5.1** No raw SQL. All queries use EF Core LINQ. This ensures dual-database compatibility. **Exception**: provider-native APIs with no EF Core abstraction are allowed inside `src/core/Jobly.Core/Notifications/` (Postgres LISTEN/NOTIFY via `NpgsqlConnection`, SQL Server Service Broker via `SqlConnection`) and in the row-lock `DbCommandInterceptor`s. No other app-code escape hatches.
 - **§5.2** No `_context.Set<>()` subqueries inside `.Select()` projections. Use navigation properties or two-step fetch.
 - **§5.3** `AsNoTracking()` on read-only queries. `Select()` projections over `Include()` for reads.
 - **§5.4** EF Core entity configurations applied via `JoblyModelCustomizer` (auto-registered by `AddJobly`). Fluent API in `OnModelCreating` overrides.

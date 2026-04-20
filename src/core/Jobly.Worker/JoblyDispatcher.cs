@@ -18,6 +18,11 @@ namespace Jobly.Worker;
 public class JoblyDispatcher<TContext> : BackgroundService
     where TContext : DbContext
 {
+    // Push-path wake-up: the NotificationListenerTask holds no reference to dispatcher instances,
+    // so we register ourselves in a static list and SignalAll fans out. Fine because dispatchers
+    // are per-group and there's typically a handful. SemaphoreSlim is cross-thread safe.
+    private static readonly List<JoblyDispatcher<TContext>> _instances = [];
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<JoblyDispatcher<TContext>> _logger;
     private readonly WorkerGroupConfiguration _groupConfiguration;
@@ -26,6 +31,7 @@ public class JoblyDispatcher<TContext> : BackgroundService
     private readonly int _workerCount;
     private readonly PauseStateHolder _pauseStateHolder;
     private readonly Guid _workerGroupId;
+    private readonly SemaphoreSlim _signal = new(0);
 
     public JoblyDispatcher(
         IServiceScopeFactory scopeFactory,
@@ -49,9 +55,32 @@ public class JoblyDispatcher<TContext> : BackgroundService
             FullMode = BoundedChannelFullMode.Wait,
             SingleWriter = true,
         });
+
+        lock (_instances)
+        {
+            _instances.Add(this);
+        }
     }
 
     public ChannelReader<Job> JobReader => _jobChannel.Reader;
+
+    /// <summary>
+    /// Wakes all registered dispatchers — used by the notification listener so a <c>JobEnqueued</c>
+    /// push shortcuts the current exponential-backoff sleep.
+    /// </summary>
+    public static void SignalAll()
+    {
+        lock (_instances)
+        {
+            foreach (var signal in _instances.Select(instance => instance._signal))
+            {
+                if (signal.CurrentCount == 0)
+                {
+                    signal.Release();
+                }
+            }
+        }
+    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -67,7 +96,7 @@ public class JoblyDispatcher<TContext> : BackgroundService
                 if (_pauseStateHolder.IsPaused(_workerGroupId))
                 {
                     currentDelay = floor;
-                    await Task.Delay(floor, stoppingToken);
+                    await _signal.WaitAsync(floor, stoppingToken);
                     continue;
                 }
 
@@ -75,7 +104,7 @@ public class JoblyDispatcher<TContext> : BackgroundService
                 if (result == FetchResult.Empty)
                 {
                     currentDelay = PollingBackoff.Next(currentDelay, floor, max, factor);
-                    await Task.Delay(currentDelay, stoppingToken);
+                    await _signal.WaitAsync(currentDelay, stoppingToken);
                     continue;
                 }
 
@@ -102,6 +131,11 @@ public class JoblyDispatcher<TContext> : BackgroundService
         }
 
         _jobChannel.Writer.Complete();
+
+        lock (_instances)
+        {
+            _instances.Remove(this);
+        }
     }
 
     private async Task<FetchResult> FetchAndDistribute(CancellationToken ct)

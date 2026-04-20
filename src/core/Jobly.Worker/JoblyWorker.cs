@@ -54,6 +54,14 @@ public class JoblyWorker<TContext> : BackgroundService
             {
                 break;
             }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                // Routine in multi-server deployments: another worker/server updated the row
+                // first (row lock raced or concurrency token bumped). Not a handler failure —
+                // don't spam stack traces at Error level. Short delay, re-fetch.
+                _logger.LogDebug(ex, "Worker fetch hit optimistic concurrency; another worker won the row.");
+                await Task.Delay(floor, stoppingToken);
+            }
             catch (Exception ex)
             {
                 // Exception is a transient signal, not an idle-queue signal — do not compound

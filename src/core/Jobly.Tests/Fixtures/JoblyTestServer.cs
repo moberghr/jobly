@@ -94,7 +94,15 @@ public class JoblyTestServer : IAsyncDisposable
         return StartAsync(fixture, configure: null);
     }
 
-    public static async Task<JoblyTestServer> StartAsync(IDatabaseFixture fixture, Action<JoblyWorkerConfiguration>? configure)
+    public static Task<JoblyTestServer> StartAsync(IDatabaseFixture fixture, Action<JoblyWorkerConfiguration>? configure)
+    {
+        return StartAsync(fixture, configure, configureServices: null);
+    }
+
+    public static async Task<JoblyTestServer> StartAsync(
+        IDatabaseFixture fixture,
+        Action<JoblyWorkerConfiguration>? configure,
+        Action<IServiceCollection>? configureServices)
     {
         var tempCtx = fixture.CreateContext();
         var connectionString = tempCtx.Database.GetConnectionString()!;
@@ -104,10 +112,13 @@ public class JoblyTestServer : IAsyncDisposable
         var host = Host.CreateDefaultBuilder()
             .ConfigureLogging(logging =>
             {
-                // EF Core logs every command at Information level — fine in an app, but
-                // catastrophic in CI where every test run dumps thousands of SQL lines.
-                // Filter just the DB layer to Warning; Jobly's own logs stay at default.
-                logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+                // Silence worker-infrastructure and hosting-lifetime chatter in CI. We can't use
+                // SetMinimumLevel(Warning) globally because RealTimeLogIntegrationTests and
+                // JobLogTests exercise the handler log capture path, which depends on
+                // Information-level logs flowing through JobLoggerProvider to JobLog.
+                logging.AddFilter("Microsoft", LogLevel.Warning);
+                logging.AddFilter("Jobly.Worker", LogLevel.Warning);
+                logging.AddFilter("Jobly.Tests.TestData.Handlers.LoggingPipelineBehavior", LogLevel.Warning);
             })
             .ConfigureServices(services =>
             {
@@ -170,6 +181,8 @@ public class JoblyTestServer : IAsyncDisposable
                     o.Duration = TimeSpan.FromHours(1);
                     o.ResetJitter = TimeSpan.FromSeconds(1);
                 });
+
+                configureServices?.Invoke(services);
             })
             .Build();
 

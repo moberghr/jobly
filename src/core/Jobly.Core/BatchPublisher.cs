@@ -6,6 +6,7 @@ using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
 using Jobly.Core.Logging;
+using Jobly.Core.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -30,13 +31,15 @@ public class BatchPublisher<TContext> : IBatchPublisher
     private readonly JoblyConfiguration _joblyConfiguration;
     private readonly TimeProvider _timeProvider;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IJoblyNotificationTransport _notificationTransport;
 
-    public BatchPublisher(TContext context, IOptions<JoblyConfiguration> configuration, TimeProvider timeProvider, IServiceProvider serviceProvider)
+    public BatchPublisher(TContext context, IOptions<JoblyConfiguration> configuration, TimeProvider timeProvider, IServiceProvider serviceProvider, IJoblyNotificationTransport? notificationTransport = null)
     {
         _context = context;
         _joblyConfiguration = configuration.Value;
         _timeProvider = timeProvider;
         _serviceProvider = serviceProvider;
+        _notificationTransport = notificationTransport ?? new NullNotificationTransport();
     }
 
     public async Task<Guid> StartNew<T>(List<T> batchJobMessages, string? name = null, ContinuationOptions options = ContinuationOptions.OnlyOnSucceeded, Dictionary<string, object>? metadata = null)
@@ -158,9 +161,11 @@ public class BatchPublisher<TContext> : IBatchPublisher
         return batchJob.Id;
     }
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        return _context.SaveChangesAsync(cancellationToken);
+        var pending = NotificationDispatch.CapturePending(_context);
+        await _context.SaveChangesAsync(cancellationToken);
+        await NotificationDispatch.FireAsync(_notificationTransport, pending, cancellationToken);
     }
 
     private async Task<Dictionary<string, object>> RunPublishPipeline<T>(T job, Dictionary<string, object>? seed = null, CancellationToken ct = default)

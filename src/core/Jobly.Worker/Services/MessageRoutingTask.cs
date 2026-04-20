@@ -15,6 +15,12 @@ namespace Jobly.Worker.Services;
 public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
     where TContext : DbContext
 {
+    // Multi-host-in-process support: tests (and rare production deployments) can run multiple
+    // IHost instances sharing TContext. A bare static field would be last-write-wins and silently
+    // detach earlier instances from push signals. The locked list ensures every active instance
+    // receives SignalRouting — matches the JoblyDispatcher pattern.
+    private static readonly List<MessageRoutingTask<TContext>> _instances = [];
+
     private readonly IServiceScopeFactory _scopeFactory;
 
     public MessageRoutingTask(
@@ -26,11 +32,38 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
         : base(scopeFactory, logger, configuration, timeProvider, "jobly:message-routing", lockProvider)
     {
         _scopeFactory = scopeFactory;
+        lock (_instances)
+        {
+            _instances.Add(this);
+        }
     }
 
     protected override string TaskName => "MessageRouting";
 
     protected override TimeSpan DefaultInterval => Configuration.MessageRoutingInterval;
+
+    /// <summary>
+    /// Wake every live routing task on a <c>MessageEnqueued</c> push notification.
+    /// </summary>
+    public static void SignalRouting()
+    {
+        lock (_instances)
+        {
+            foreach (var instance in _instances)
+            {
+                instance.Signal();
+            }
+        }
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await base.StopAsync(cancellationToken);
+        lock (_instances)
+        {
+            _instances.Remove(this);
+        }
+    }
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {

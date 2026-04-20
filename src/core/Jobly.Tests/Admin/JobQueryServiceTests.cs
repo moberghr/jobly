@@ -62,23 +62,23 @@ public abstract class JobQueryServiceTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
-    public async Task GetScheduledJobs_ReturnsFutureScheduledOnly()
+    public async Task GetScheduledJobs_ReturnsScheduledStateOnly()
     {
         // Arrange
         var ctx = _fixture.CreateContext();
 
-        // Future-scheduled job
+        // Future-dated job in Scheduled state (new routing via JobHelper)
         ctx.Set<Job>().Add(new Job
         {
             Id = Guid.NewGuid(),
             Kind = JobKind.Job,
-            CurrentState = State.Enqueued,
+            CurrentState = State.Scheduled,
             CreateTime = DateTime.UtcNow,
             ScheduleTime = DateTime.UtcNow.AddHours(2),
             Queue = "default",
         });
 
-        // Past-scheduled job (should not show in scheduled)
+        // Enqueued job (immediately runnable, not scheduled)
         ctx.Set<Job>().Add(new Job
         {
             Id = Guid.NewGuid(),
