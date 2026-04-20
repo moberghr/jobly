@@ -39,8 +39,8 @@ public class SqlServerDatabasePushIntegrationTests : IAsyncLifetime
                 cfg.PollingInterval = TimeSpan.FromSeconds(10);
                 cfg.MaxPollingInterval = TimeSpan.FromSeconds(10);
                 cfg.PollingIntervalFactor = 1.0;
-            },
-            configureServices: services => services.AddJoblyDatabasePush<TestContext>(o => o.ChannelName = "jobly_push_it_job_mssql"));
+                cfg.UseDatabasePush(o => o.ChannelName = "jobly_push_it_job_mssql");
+            });
 
         var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CounterRequest());
@@ -65,8 +65,8 @@ public class SqlServerDatabasePushIntegrationTests : IAsyncLifetime
                 cfg.MaxPollingInterval = TimeSpan.FromSeconds(10);
                 cfg.MessageRoutingInterval = TimeSpan.FromSeconds(10);
                 cfg.PollingIntervalFactor = 1.0;
-            },
-            configureServices: services => services.AddJoblyDatabasePush<TestContext>(o => o.ChannelName = "jobly_push_it_msg_mssql"));
+                cfg.UseDatabasePush(o => o.ChannelName = "jobly_push_it_msg_mssql");
+            });
 
         var publisher = server.CreatePublisher();
         var messageId = await publisher.Publish(new SingleHandlerMessage());
@@ -96,8 +96,8 @@ public class SqlServerDatabasePushIntegrationTests : IAsyncLifetime
             {
                 cfg.UseDispatcher = false;
                 cfg.PollingInterval = TimeSpan.FromMilliseconds(200);
-            },
-            configureServices: services => services.AddJoblyDatabasePush<TestContext>(o => o.ChannelName = "jobly_push_it_noDispatch_mssql"));
+                cfg.UseDatabasePush(o => o.ChannelName = "jobly_push_it_noDispatch_mssql");
+            });
 
         var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CounterRequest());

@@ -94,14 +94,14 @@ public class JoblyTestServer : IAsyncDisposable
         return StartAsync(fixture, configure: null);
     }
 
-    public static Task<JoblyTestServer> StartAsync(IDatabaseFixture fixture, Action<JoblyWorkerConfiguration>? configure)
+    public static Task<JoblyTestServer> StartAsync(IDatabaseFixture fixture, Action<JoblyWorkerBuilder<TestContext>>? configure)
     {
         return StartAsync(fixture, configure, configureServices: null);
     }
 
     public static async Task<JoblyTestServer> StartAsync(
         IDatabaseFixture fixture,
-        Action<JoblyWorkerConfiguration>? configure,
+        Action<JoblyWorkerBuilder<TestContext>>? configure,
         Action<IServiceCollection>? configureServices)
     {
         var tempCtx = fixture.CreateContext();
@@ -170,20 +170,20 @@ public class JoblyTestServer : IAsyncDisposable
                     config.UseDispatcher = false;
 
                     configure?.Invoke(config);
-                });
 
-                services.AddJoblyRetry(o =>
-                {
-                    o.MaxRetries = 3;
-                    o.Delays = [1];
-                });
-                services.AddJoblyMutex();
-                services.AddJoblyNoRestart();
-                services.AddJoblyCircuitBreaker<TestContext>(o =>
-                {
-                    o.Threshold = 1000;
-                    o.Duration = TimeSpan.FromHours(1);
-                    o.ResetJitter = TimeSpan.FromSeconds(1);
+                    config.AddRetry(o =>
+                    {
+                        o.MaxRetries = 3;
+                        o.Delays = [1];
+                    });
+                    config.AddMutex();
+                    config.AddNoRestart();
+                    config.AddCircuitBreaker(o =>
+                    {
+                        o.Threshold = 1000;
+                        o.Duration = TimeSpan.FromHours(1);
+                        o.ResetJitter = TimeSpan.FromSeconds(1);
+                    });
                 });
 
                 configureServices?.Invoke(services);

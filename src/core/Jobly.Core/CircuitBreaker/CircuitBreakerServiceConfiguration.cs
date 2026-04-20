@@ -6,25 +6,27 @@ namespace Jobly.Core.CircuitBreaker;
 
 public static class CircuitBreakerServiceConfiguration
 {
-    public static IServiceCollection AddJoblyCircuitBreaker<TContext>(
-        this IServiceCollection services,
+    public static IJoblyBuilder<TContext> AddCircuitBreaker<TContext>(
+        this IJoblyBuilder<TContext> builder,
         Action<CircuitBreakerOptions>? configure = null)
         where TContext : DbContext
     {
-        services.AddOptions<CircuitBreakerOptions>();
+        builder.Services.AddOptions<CircuitBreakerOptions>();
         if (configure != null)
         {
-            services.Configure(configure);
+            builder.Services.Configure(configure);
         }
 
         // Contribute the CircuitBreakerState entity only when the addon is opted in.
         // JoblyModelCustomizer invokes these during OnModelCreating so the schema is
-        // created exclusively for users of the addon.
-        services.Configure<JoblyConfiguration>(c => c.EntityConfigurators.Add(ServiceConfiguration.AddCircuitBreakerStateEntity));
+        // created exclusively for users of the addon. The builder IS the JoblyConfiguration
+        // registered as IOptions, so mutating its EntityConfigurators list here is enough —
+        // no extra Configure callback needed.
+        builder.Configuration.EntityConfigurators.Add(ServiceConfiguration.AddCircuitBreakerStateEntity);
 
-        services.AddScoped<ICircuitBreakerStore, CircuitBreakerStore<TContext>>();
-        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(CircuitBreakerPipelineBehavior<,>));
+        builder.Services.AddScoped<ICircuitBreakerStore, CircuitBreakerStore<TContext>>();
+        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(CircuitBreakerPipelineBehavior<,>));
 
-        return services;
+        return builder;
     }
 }

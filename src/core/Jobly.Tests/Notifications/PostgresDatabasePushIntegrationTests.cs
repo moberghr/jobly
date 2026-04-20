@@ -40,8 +40,8 @@ public class PostgresDatabasePushIntegrationTests : IAsyncLifetime
                 cfg.PollingInterval = TimeSpan.FromSeconds(10);
                 cfg.MaxPollingInterval = TimeSpan.FromSeconds(10);
                 cfg.PollingIntervalFactor = 1.0;
-            },
-            configureServices: services => services.AddJoblyDatabasePush<TestContext>(o => o.ChannelName = "jobly_push_it_job"));
+                cfg.UseDatabasePush(o => o.ChannelName = "jobly_push_it_job");
+            });
         var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CounterRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
@@ -65,8 +65,8 @@ public class PostgresDatabasePushIntegrationTests : IAsyncLifetime
                 cfg.MaxPollingInterval = TimeSpan.FromSeconds(10);
                 cfg.MessageRoutingInterval = TimeSpan.FromSeconds(10);
                 cfg.PollingIntervalFactor = 1.0;
-            },
-            configureServices: services => services.AddJoblyDatabasePush<TestContext>(o => o.ChannelName = "jobly_push_it_msg"));
+                cfg.UseDatabasePush(o => o.ChannelName = "jobly_push_it_msg");
+            });
         var publisher = server.CreatePublisher();
         var messageId = await publisher.Publish(new SingleHandlerMessage());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
@@ -95,8 +95,8 @@ public class PostgresDatabasePushIntegrationTests : IAsyncLifetime
             {
                 cfg.UseDispatcher = false;
                 cfg.PollingInterval = TimeSpan.FromMilliseconds(200);
-            },
-            configureServices: services => services.AddJoblyDatabasePush<TestContext>(o => o.ChannelName = "jobly_push_it_noDispatch"));
+                cfg.UseDatabasePush(o => o.ChannelName = "jobly_push_it_noDispatch");
+            });
         var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CounterRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);

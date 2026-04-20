@@ -1,24 +1,28 @@
 using Jobly.Core.Handlers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jobly.Core.Retry;
 
 public static class RetryServiceConfiguration
 {
-    public static IServiceCollection AddJoblyRetry(this IServiceCollection services, Action<RetryOptions>? configure = null)
+    public static IJoblyBuilder<TContext> AddRetry<TContext>(
+        this IJoblyBuilder<TContext> builder,
+        Action<RetryOptions>? configure = null)
+        where TContext : DbContext
     {
         if (configure != null)
         {
-            services.Configure(configure);
+            builder.Services.Configure(configure);
         }
         else
         {
-            services.AddOptions<RetryOptions>();
+            builder.Services.AddOptions<RetryOptions>();
         }
 
-        services.AddTransient(typeof(IPublishPipelineBehavior<>), typeof(RetryPublishBehavior<>));
-        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(RetryPipelineBehavior<,>));
+        builder.Services.AddTransient(typeof(IPublishPipelineBehavior<>), typeof(RetryPublishBehavior<>));
+        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(RetryPipelineBehavior<,>));
 
-        return services;
+        return builder;
     }
 }

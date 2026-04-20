@@ -7,11 +7,11 @@ var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
         services.AddServices(context.Configuration);
-        services.AddJoblyRetry(o => o.MaxRetries = 3);
         services.AddJoblyWorker<TestContext>(options =>
         {
             options.WorkerCount = 10;
             options.PollingInterval = TimeSpan.FromSeconds(5);
+            options.AddRetry(o => o.MaxRetries = 3);
         });
     })
     .Build();

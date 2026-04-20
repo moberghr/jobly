@@ -1,14 +1,16 @@
 using Jobly.Core.Handlers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jobly.Core.NoRestart;
 
 public static class NoRestartServiceConfiguration
 {
-    public static IServiceCollection AddJoblyNoRestart(this IServiceCollection services)
+    public static IJoblyBuilder<TContext> AddNoRestart<TContext>(this IJoblyBuilder<TContext> builder)
+        where TContext : DbContext
     {
-        services.AddTransient(typeof(IPublishPipelineBehavior<>), typeof(NoRestartPublishBehavior<>));
+        builder.Services.AddTransient(typeof(IPublishPipelineBehavior<>), typeof(NoRestartPublishBehavior<>));
 
-        return services;
+        return builder;
     }
 }

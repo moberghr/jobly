@@ -32,8 +32,6 @@ builder.Services.AddCors(options =>
         policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 
-builder.Services.AddJoblyRetry(o => o.MaxRetries = 3);
-builder.Services.AddJoblyMutex();
 builder.Services.AddSingleton<IJoblyUIExtension, RetryUIExtension>();
 builder.Services.AddJoblyWorker<TestContext>(options =>
 {
@@ -46,6 +44,9 @@ builder.Services.AddJoblyWorker<TestContext>(options =>
     options.HealthCheckTimeout = TimeSpan.FromSeconds(30);
     options.JobExpirationTimeout = TimeSpan.FromMinutes(30);
     options.UseDispatcher = false;
+
+    options.AddRetry(o => o.MaxRetries = 3);
+    options.AddMutex();
 
     // Second worker group — different queues and polling
     options.AddWorkerGroup(group =>

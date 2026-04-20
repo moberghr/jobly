@@ -36,7 +36,7 @@ public abstract class NoRestartAddonTestsBase : IAsyncLifetime
 
         if (registerAddon)
         {
-            services.AddJoblyNoRestart();
+            new Jobly.Core.JoblyBuilder<TestContext>(services).AddNoRestart();
         }
 
         return services.BuildServiceProvider();

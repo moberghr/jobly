@@ -646,7 +646,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
         services.TryAddSingleton(TimeProvider.System);
-        services.AddJoblyCircuitBreaker<TestContext>(o =>
+        new Jobly.Core.JoblyBuilder<TestContext>(services).AddCircuitBreaker(o =>
         {
             if (duration != null)
             {
@@ -661,13 +661,13 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
 
         if (retryMaxRetries != null)
         {
-            services.AddJoblyRetry(o => o.MaxRetries = retryMaxRetries.Value);
+            new Jobly.Core.JoblyBuilder<TestContext>(services).AddRetry(o => o.MaxRetries = retryMaxRetries.Value);
         }
 
         if (lockProvider != null)
         {
             services.AddSingleton<IJoblyLockProvider>(lockProvider);
-            services.AddJoblyMutex();
+            new Jobly.Core.JoblyBuilder<TestContext>(services).AddMutex();
         }
 
         var workerConfig = new OptionsWrapper<JoblyWorkerConfiguration>(new JoblyWorkerConfiguration

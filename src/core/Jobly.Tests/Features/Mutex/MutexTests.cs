@@ -265,7 +265,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
         services.AddSingleton<IJoblyLockProvider>(new FakeLockProvider());
-        services.AddJoblyMutex();
+        new Jobly.Core.JoblyBuilder<TestContext>(services).AddMutex();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IOptions<JoblyConfiguration>>(new OptionsWrapper<JoblyConfiguration>(new JoblyConfiguration()));
 
@@ -301,7 +301,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
         services.AddSingleton<IJoblyLockProvider>(new FakeLockProvider());
-        services.AddJoblyMutex();
+        new Jobly.Core.JoblyBuilder<TestContext>(services).AddMutex();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IOptions<JoblyConfiguration>>(new OptionsWrapper<JoblyConfiguration>(new JoblyConfiguration()));
 
@@ -336,7 +336,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
         services.AddSingleton<IJoblyLockProvider>(lockProvider);
-        services.AddJoblyMutex();
+        new Jobly.Core.JoblyBuilder<TestContext>(services).AddMutex();
 
         var workerConfig = new OptionsWrapper<JoblyWorkerConfiguration>(new JoblyWorkerConfiguration
         {

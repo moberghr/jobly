@@ -79,7 +79,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         services.AddSingleton<MultiHandlerCounter>();
         services.AddScoped<Jobly.Core.Handlers.JobContext>();
         services.AddScoped<Jobly.Core.Handlers.IJobContext>(x => x.GetRequiredService<Jobly.Core.Handlers.JobContext>());
-        services.AddJoblyRetry(o =>
+        new Jobly.Core.JoblyBuilder<TestContext>(services).AddRetry(o =>
         {
             o.MaxRetries = maxRetries;
             o.Delays = delays ?? [];

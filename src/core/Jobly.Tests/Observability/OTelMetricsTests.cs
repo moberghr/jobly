@@ -68,7 +68,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
         services.TryAddSingleton(TimeProvider.System);
-        services.AddJoblyRetry(o =>
+        new Jobly.Core.JoblyBuilder<TestContext>(services).AddRetry(o =>
         {
             o.MaxRetries = 3;
             o.Delays = [];

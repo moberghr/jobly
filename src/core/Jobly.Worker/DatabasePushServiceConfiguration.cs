@@ -9,32 +9,26 @@ using Microsoft.Extensions.Logging;
 namespace Jobly.Worker;
 
 /// <summary>
-/// Opt-in DB-push extension. Call <c>AddJoblyDatabasePush&lt;TContext&gt;()</c> after
-/// <c>AddJoblyWorker&lt;TContext&gt;()</c> to replace the default polling wake-up on the
-/// dispatcher / MessageRoutingTask / OrchestrationTask with push notifications delivered
-/// via PostgreSQL LISTEN/NOTIFY or SQL Server Service Broker.
+/// Opt-in DB-push extension on <see cref="JoblyWorkerBuilder{TContext}"/>. Call
+/// <c>opt.UseDatabasePush()</c> inside the <c>AddJoblyWorker</c> lambda to replace the default
+/// polling wake-up on the dispatcher / MessageRoutingTask / OrchestrationTask with push
+/// notifications delivered via PostgreSQL LISTEN/NOTIFY or SQL Server Service Broker.
 /// </summary>
 public static class DatabasePushServiceConfiguration
 {
-    public static IServiceCollection AddJoblyDatabasePush<TContext>(this IServiceCollection services)
-        where TContext : DbContext
-    {
-        return AddJoblyDatabasePush<TContext>(services, _ => { });
-    }
-
-    public static IServiceCollection AddJoblyDatabasePush<TContext>(
-        this IServiceCollection services,
-        Action<JoblyDatabasePushConfiguration> configure)
+    public static Jobly.Core.IJoblyBuilder<TContext> UseDatabasePush<TContext>(
+        this Jobly.Core.IJoblyBuilder<TContext> builder,
+        Action<JoblyDatabasePushConfiguration>? configure = null)
         where TContext : DbContext
     {
         var options = new JoblyDatabasePushConfiguration();
-        configure(options);
-        services.AddSingleton(options);
+        configure?.Invoke(options);
+        builder.Services.AddSingleton(options);
 
         // Replace the default NullNotificationTransport with a provider-specific one.
         // RemoveAll is required because the null transport was added via TryAddSingleton in AddJobly.
-        services.RemoveAll<IJoblyNotificationTransport>();
-        services.AddSingleton<IJoblyNotificationTransport>(sp =>
+        builder.Services.RemoveAll<IJoblyNotificationTransport>();
+        builder.Services.AddSingleton<IJoblyNotificationTransport>(sp =>
         {
             var dbOptions = sp.GetRequiredService<DbContextOptions<TContext>>();
             var relationalExtension = dbOptions.Extensions.OfType<RelationalOptionsExtension>().FirstOrDefault();
@@ -68,8 +62,8 @@ public static class DatabasePushServiceConfiguration
                     sp.GetService<ILogger<SqlServerNotificationTransport>>());
         });
 
-        services.AddHostedService<NotificationListenerTask<TContext>>();
+        builder.Services.AddHostedService<NotificationListenerTask<TContext>>();
 
-        return services;
+        return builder;
     }
 }

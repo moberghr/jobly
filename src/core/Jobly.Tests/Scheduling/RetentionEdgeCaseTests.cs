@@ -65,7 +65,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         services.AddScoped<Jobly.Core.Handlers.JobContext>();
         services.AddScoped<Jobly.Core.Handlers.IJobContext>(x => x.GetRequiredService<Jobly.Core.Handlers.JobContext>());
         services.TryAddSingleton(TimeProvider.System);
-        services.AddJoblyRetry(o =>
+        new Jobly.Core.JoblyBuilder<TestContext>(services).AddRetry(o =>
         {
             o.MaxRetries = 3;
             o.Delays = [];
