@@ -11,9 +11,9 @@ Jobly is a distributed job processing and message queue library for .NET 10. Fou
 - **Requests** (`IRequest<TResponse>`) — In-memory request/response. Single handler, no database persistence, returns typed response immediately via `IMediator.Send()`.
 - **Streams** (`IStreamRequest<TResponse>`) — In-memory streaming. Single handler, no database persistence, returns `IAsyncEnumerable<TResponse>` via `IMediator.CreateStream()`.
 
-**Optional DB push**: `services.AddJoblyDatabasePush<TContext>()` replaces polling wake-up with push notifications (Postgres LISTEN/NOTIFY, SQL Server Service Broker) for the dispatcher, `MessageRoutingTask`, and `OrchestrationTask`. Worker fetch push requires `UseDispatcher = true` — individual-worker mode has a thundering-herd problem and is left on polling. See §2.9 and the DB Push section in `README.md`.
+**Optional DB push**: `opt.UseDatabasePush()` on the builder replaces polling wake-up with push notifications (Postgres LISTEN/NOTIFY, SQL Server Service Broker) for the dispatcher, `MessageRoutingTask`, and `OrchestrationTask`. Worker fetch push requires `UseDispatcher = true` — individual-worker mode has a thundering-herd problem and is left on polling. See §2.9 and the DB Push section in `README.md`.
 
-Ships as NuGet packages (Jobly.Core, Jobly.UI, Jobly.Worker). Supports PostgreSQL and SQL Server.
+Ships as NuGet packages: `Jobly.Core` (provider-agnostic), `Jobly.PostgreSql` (PG-specific), `Jobly.SqlServer` (SQL Server-specific), `Jobly.Worker` (worker runtime), `Jobly.UI` (dashboard). Users install the provider package that matches their database and call `opt.UsePostgreSql()` or `opt.UseSqlServer()` inside the `AddJobly` / `AddJoblyWorker` lambda.
 
 ## Build & Test Commands
 
@@ -329,13 +329,15 @@ public class MyIntegrationTests_SqlServer : MyIntegrationTestsBase
 
 ### Registration
 
-`AddJobly<TContext>()` / `AddJoblyWorker<TContext>()` automatically configures the user's DbContext:
+`AddJobly<TContext>(opt => ...)` / `AddJoblyWorker<TContext>(opt => ...)` take a single `Action<JoblyBuilder<TContext>>` / `Action<JoblyWorkerBuilder<TContext>>` lambda and automatically configure the user's DbContext:
 - Wraps the existing `DbContextOptions<TContext>` service descriptor to add row-lock interceptors
 - Replaces `IModelCustomizer` with `JoblyModelCustomizer` to auto-apply entity configurations
 - Registers `TimeProvider.System` via `TryAddSingleton` (overridable for testing)
-- Registers `IJoblyLockProvider` (wraps `IDistributedLockProvider` — Medallion.Threading is internal)
+- Registers `IJoblyLockProvider` (wraps `IDistributedLockProvider` — Medallion.Threading is internal; the concrete `IDistributedLockProvider` is registered by the provider package)
 - Users just register their DbContext normally — no manual configuration needed
-- Opt-in addons: `AddJoblyRetry()` for retry behavior, `AddJoblyMutex()` for mutex/concurrency control
+- The builder inherits from `JoblyConfiguration` / `JoblyWorkerConfiguration`, so config fields (`WorkerCount`, `PollingInterval`, `DefaultQueue`, etc.) are set directly on `opt`
+- Opt-in addons on the builder: `opt.AddRetry()`, `opt.AddMutex()`, `opt.AddCircuitBreaker()`, `opt.AddNoRestart()`, `opt.UseDatabasePush()`
+- Provider selection via `opt.UsePostgreSql()` / `opt.UseSqlServer()` (from `Jobly.PostgreSql` / `Jobly.SqlServer`) — mandatory for real use; registers `IJoblySqlQueries`, `IDatabaseExceptionClassifier`, `IJoblyNotificationTransportFactory`, and the provider-specific `IDistributedLockProvider`
 
 ### Worker Groups
 
@@ -369,7 +371,7 @@ Workers can be split into groups with independent queues and polling intervals. 
 - **§2.6** In-memory requests (`IRequest<TResponse>`) go through `IMediator.Send()` — same `IPipelineBehavior` pipeline as jobs/messages, but no database persistence.
 - **§2.7** In-memory streams (`IStreamRequest<TResponse>`) go through `IMediator.CreateStream()` — `IPipelineBehavior` applies at request level, `IStreamPipelineBehavior` wraps enumeration, returns `IAsyncEnumerable<TResponse>`, no database persistence.
 - **§2.8** Future-dated jobs land in `State.Scheduled`; `ScheduledJobActivationTask` flips them to `Enqueued` when `ScheduleTime <= now`. Activation cadence is controlled by `JoblyWorkerConfiguration.ScheduledActivationInterval` (default 5s) — this is the worst-case latency between `ScheduleTime` and pickup eligibility. The task is time-driven and does not participate in DB-push wake-up; push only accelerates what happens *after* activation. Worker fetch queries always check `CurrentState == Enqueued` with a defensive `ScheduleTime <= now` predicate for pre-upgrade legacy rows. Adding new query sites that filter by `Enqueued` without the time predicate is a latent bug on upgraded deployments.
-- **§2.9** DB push is an opt-in addon. `AddJoblyDatabasePush<TContext>()` replaces the default `NullNotificationTransport` with a provider-specific one (Postgres LISTEN/NOTIFY or SQL Server Service Broker) and registers `NotificationListenerTask`. Worker-fetch push only fires when `UseDispatcher = true`. Transports must not throw from `PublishAsync` — they log + increment `JoblyTelemetry.NotificationPublishFailures` instead. Missed notifications are caught by drain-on-reconnect in the listener.
+- **§2.9** DB push is an opt-in addon. `opt.UseDatabasePush()` on the builder replaces the default `NullNotificationTransport` with a provider-specific one (Postgres LISTEN/NOTIFY or SQL Server Service Broker) and registers `NotificationListenerTask`. The provider-specific transport is resolved via `IJoblyNotificationTransportFactory`, which the provider package (`Jobly.PostgreSql` / `Jobly.SqlServer`) registers when you call `opt.UsePostgreSql()` / `opt.UseSqlServer()` — call the provider first, push second. Worker-fetch push only fires when `UseDispatcher = true`. Transports must not throw from `PublishAsync` — they log + increment `JoblyTelemetry.NotificationPublishFailures` instead. Missed notifications are caught by drain-on-reconnect in the listener.
 
 ### §3 — Coding Style
 
@@ -426,7 +428,7 @@ var activeJobs = await _context.Set<Job>()
 
 ### §5 — Data Layer
 
-- **§5.1** No raw SQL. All queries use EF Core LINQ. This ensures dual-database compatibility. **Exception**: provider-native APIs with no EF Core abstraction are allowed inside `src/core/Jobly.Core/Notifications/` (Postgres LISTEN/NOTIFY via `NpgsqlConnection`, SQL Server Service Broker via `SqlConnection`) and in the row-lock `DbCommandInterceptor`s. No other app-code escape hatches.
+- **§5.1** No raw SQL. All queries use EF Core LINQ. This ensures dual-database compatibility. **Exception**: provider-native APIs with no EF Core abstraction are allowed inside the provider packages (`src/core/Jobly.PostgreSql/` — LISTEN/NOTIFY via `NpgsqlConnection`, row-lock SQL; `src/core/Jobly.SqlServer/` — Service Broker via `SqlConnection`, row-lock SQL). `Jobly.Core` itself must stay provider-agnostic — no `Npgsql` or `Microsoft.Data.SqlClient` references.
 - **§5.2** No `_context.Set<>()` subqueries inside `.Select()` projections. Use navigation properties or two-step fetch.
 - **§5.3** `AsNoTracking()` on read-only queries. `Select()` projections over `Include()` for reads.
 - **§5.4** EF Core entity configurations applied via `JoblyModelCustomizer` (auto-registered by `AddJobly`). Fluent API in `OnModelCreating` overrides.
@@ -458,6 +460,6 @@ var activeJobs = await _context.Set<Job>()
 - **§8.3** `ContinuationOptions` is generalized to all job kinds — any job with children can control child activation on failure.
 - **§8.4** `RequeueJob` resets `ScheduleTime` to now. Requeued jobs always execute immediately.
 - **§8.5** Cancellation uses `CancellationMode` enum, not immediate state change. Worker monitors and cancels handler token.
-- **§8.6** Mutex is an opt-in addon (`AddJoblyMutex()`). `MutexPipelineBehavior` uses distributed lock via `IJoblyLockProvider`. Set key via `.WithMutex("key")` or `[Mutex("key")]` attribute. Concurrency key stored in metadata.
+- **§8.6** Mutex is an opt-in addon (`opt.AddMutex()` on the builder). `MutexPipelineBehavior` uses distributed lock via `IJoblyLockProvider`. Set key via `.WithMutex("key")` or `[Mutex("key")]` attribute. Concurrency key stored in metadata.
 - **§8.7** `RecurringJobSchedulerTask` creates jobs, `AddOrUpdateRecurringJob` only registers/updates definitions.
 - **§8.8** Source generator (`Jobly.SourceGenerator`) for zero-allocation mediator and worker dispatch.
