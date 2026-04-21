@@ -1,18 +1,13 @@
-using Jobly.Core.Data.Entities;
 using Jobly.Core.Interceptors;
-using Jobly.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Respawn;
-using Testcontainers.PostgreSql;
 
 namespace Jobly.Tests.Fixtures;
 
 public class PostgreSqlIntegrationFixture : IAsyncLifetime, IDatabaseFixture
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
-        .WithImage("postgres:latest")
-        .Build();
+    private const string DatabaseName = "jobly_integration";
 
     private Respawner _respawner = null!;
     private string _connectionString = null!;
@@ -21,8 +16,9 @@ public class PostgreSqlIntegrationFixture : IAsyncLifetime, IDatabaseFixture
 
     public async ValueTask InitializeAsync()
     {
-        await _container.StartAsync(Xunit.TestContext.Current.CancellationToken);
-        _connectionString = _container.GetConnectionString();
+        _connectionString = await SharedPostgreSqlContainer.CreateDatabaseAsync(
+            DatabaseName,
+            Xunit.TestContext.Current.CancellationToken);
 
         await using var context = CreateContext();
         await context.Database.EnsureCreatedAsync(Xunit.TestContext.Current.CancellationToken);
@@ -57,7 +53,6 @@ public class PostgreSqlIntegrationFixture : IAsyncLifetime, IDatabaseFixture
     public async ValueTask DisposeAsync()
     {
         await TestServer.DisposeAsync();
-        await _container.DisposeAsync();
     }
 }
 

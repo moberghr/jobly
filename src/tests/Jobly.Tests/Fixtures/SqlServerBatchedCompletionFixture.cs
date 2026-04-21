@@ -1,17 +1,13 @@
 using Jobly.Core.Interceptors;
-using Jobly.Tests.Fixtures;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Respawn;
-using Testcontainers.MsSql;
 
 namespace Jobly.Tests.Fixtures;
 
 public class SqlServerBatchedCompletionFixture : IAsyncLifetime, IDatabaseFixture
 {
-    private readonly MsSqlContainer _container = new MsSqlBuilder()
-        .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
-        .Build();
+    private const string DatabaseName = "jobly_batched";
 
     private Respawner _respawner = null!;
     private string _connectionString = null!;
@@ -20,8 +16,10 @@ public class SqlServerBatchedCompletionFixture : IAsyncLifetime, IDatabaseFixtur
 
     public async ValueTask InitializeAsync()
     {
-        await _container.StartAsync(Xunit.TestContext.Current.CancellationToken);
-        _connectionString = _container.GetConnectionString() + ";Encrypt=False;";
+        _connectionString = await SharedSqlServerContainer.CreateDatabaseAsync(
+            DatabaseName,
+            enableServiceBroker: false,
+            Xunit.TestContext.Current.CancellationToken);
 
         await using var context = CreateContext();
         await context.Database.EnsureCreatedAsync(Xunit.TestContext.Current.CancellationToken);
@@ -61,7 +59,6 @@ public class SqlServerBatchedCompletionFixture : IAsyncLifetime, IDatabaseFixtur
     public async ValueTask DisposeAsync()
     {
         await TestServer.DisposeAsync();
-        await _container.DisposeAsync();
     }
 }
 

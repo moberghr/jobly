@@ -1,17 +1,13 @@
 using Jobly.Core.Interceptors;
-using Jobly.Tests.Fixtures;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Respawn;
-using Testcontainers.MsSql;
 
 namespace Jobly.Tests.Fixtures;
 
 public class SqlServerIntegrationFixture : IAsyncLifetime, IDatabaseFixture
 {
-    private readonly MsSqlContainer _container = new MsSqlBuilder()
-        .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
-        .Build();
+    private const string DatabaseName = "jobly_integration";
 
     private Respawner _respawner = null!;
     private string _connectionString = null!;
@@ -20,24 +16,10 @@ public class SqlServerIntegrationFixture : IAsyncLifetime, IDatabaseFixture
 
     public async ValueTask InitializeAsync()
     {
-        await _container.StartAsync(Xunit.TestContext.Current.CancellationToken);
-        var masterConnString = _container.GetConnectionString() + ";Encrypt=False;";
-
-        // Use a dedicated database (not master) so Service Broker can be enabled — system
-        // databases can't be altered by name/CURRENT. Mirrors SqlServerFixture setup so
-        // SqlServerNotificationTransport integration tests have broker available.
-        await using (var bootstrapConn = new SqlConnection(masterConnString))
-        {
-            await bootstrapConn.OpenAsync(Xunit.TestContext.Current.CancellationToken);
-            await using var bootstrapCmd = new SqlCommand(
-                @"IF DB_ID('jobly_tests') IS NULL CREATE DATABASE [jobly_tests];
-                  ALTER DATABASE [jobly_tests] SET ENABLE_BROKER WITH ROLLBACK IMMEDIATE;",
-                bootstrapConn);
-            await bootstrapCmd.ExecuteNonQueryAsync(Xunit.TestContext.Current.CancellationToken);
-        }
-
-        var builder = new SqlConnectionStringBuilder(masterConnString) { InitialCatalog = "jobly_tests" };
-        _connectionString = builder.ConnectionString;
+        _connectionString = await SharedSqlServerContainer.CreateDatabaseAsync(
+            DatabaseName,
+            enableServiceBroker: true,
+            Xunit.TestContext.Current.CancellationToken);
 
         await using var context = CreateContext();
         await context.Database.EnsureCreatedAsync(Xunit.TestContext.Current.CancellationToken);
@@ -71,7 +53,6 @@ public class SqlServerIntegrationFixture : IAsyncLifetime, IDatabaseFixture
     public async ValueTask DisposeAsync()
     {
         await TestServer.DisposeAsync();
-        await _container.DisposeAsync();
     }
 }
 
