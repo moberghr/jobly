@@ -87,7 +87,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -115,7 +115,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -143,7 +143,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();

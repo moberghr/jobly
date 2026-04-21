@@ -319,7 +319,7 @@ public abstract class RetentionTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        var cleaned = await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        var cleaned = await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None);
 
         // Assert
         cleaned.ShouldBeGreaterThanOrEqualTo(1);

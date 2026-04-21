@@ -157,7 +157,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None);
 
         // Assert — job is deleted, but statistics survive
         var readCtx = _fixture.CreateContext();

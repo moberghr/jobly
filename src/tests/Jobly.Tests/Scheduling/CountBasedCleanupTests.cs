@@ -42,7 +42,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        var deleted = await ExpirationCleanupTask<TestContext>.RunCountBasedCleanup(cleanCtx, maxCount: 20, batchSize: 1000);
+        var deleted = await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCountBasedCleanupAsync(maxCount: 20, batchSize: 1000, CancellationToken.None);
 
         // Assert
         deleted.ShouldBe(5);
@@ -75,7 +75,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        var deleted = await ExpirationCleanupTask<TestContext>.RunCountBasedCleanup(cleanCtx, maxCount: 20, batchSize: 1000);
+        var deleted = await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCountBasedCleanupAsync(maxCount: 20, batchSize: 1000, CancellationToken.None);
 
         // Assert
         deleted.ShouldBe(0);
@@ -108,7 +108,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        var deleted = await ExpirationCleanupTask<TestContext>.RunCountBasedCleanup(cleanCtx, maxCount: 20, batchSize: 3);
+        var deleted = await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCountBasedCleanupAsync(maxCount: 20, batchSize: 3, CancellationToken.None);
 
         // Assert
         deleted.ShouldBe(10);
@@ -166,7 +166,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        var deleted = await ExpirationCleanupTask<TestContext>.RunCountBasedCleanup(cleanCtx, maxCount: 20, batchSize: 1000);
+        var deleted = await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCountBasedCleanupAsync(maxCount: 20, batchSize: 1000, CancellationToken.None);
 
         // Assert
         deleted.ShouldBe(5);
@@ -234,7 +234,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        var deleted = await ExpirationCleanupTask<TestContext>.RunCountBasedCleanup(cleanCtx, maxCount: 20, batchSize: 1000);
+        var deleted = await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCountBasedCleanupAsync(maxCount: 20, batchSize: 1000, CancellationToken.None);
 
         // Assert
         deleted.ShouldBe(5);
@@ -276,7 +276,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
 
         // Act — maxCount == actual count
         var cleanCtx = _fixture.CreateContext();
-        var deleted = await ExpirationCleanupTask<TestContext>.RunCountBasedCleanup(cleanCtx, maxCount: 10, batchSize: 1000);
+        var deleted = await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCountBasedCleanupAsync(maxCount: 10, batchSize: 1000, CancellationToken.None);
 
         // Assert
         deleted.ShouldBe(0);
@@ -335,7 +335,7 @@ public abstract class CountBasedCleanupTestsBase : IAsyncLifetime
         // Act: run count-based cleanup with threshold of 3
         var cleanCtx = _fixture.CreateContext();
         await Should.NotThrowAsync(async () =>
-            await ExpirationCleanupTask<TestContext>.RunCountBasedCleanup(cleanCtx, 3, 1000));
+            await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCountBasedCleanupAsync(3, 1000, CancellationToken.None));
 
         // Assert: parent should survive (child not expired), standalone jobs reduced to 3
         var readCtx = _fixture.CreateContext();

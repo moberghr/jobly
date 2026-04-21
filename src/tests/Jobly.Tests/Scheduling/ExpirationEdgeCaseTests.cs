@@ -66,7 +66,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -87,7 +87,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -127,7 +127,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -166,7 +166,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -196,7 +196,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         // Act — use a FakeTimeProvider that returns the same fixedTime
         var tp = new FakeTimeProvider(fixedTime);
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, tp);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, tp).RunCleanupAsync(CancellationToken.None);
 
         // Assert — job should still exist (ExpireAt is NOT < now, it's equal)
         var readCtx = _fixture.CreateContext();
@@ -237,7 +237,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None);
 
         // Assert — parent should still exist
         var readCtx = _fixture.CreateContext();
@@ -264,7 +264,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        var deleted = await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        var deleted = await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None);
 
         // Assert
         deleted.ShouldBe(0);
@@ -291,7 +291,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -330,7 +330,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -360,7 +360,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -406,7 +406,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         // Act: should not throw FK violation
         var cleanCtx = _fixture.CreateContext();
         await Should.NotThrowAsync(async () =>
-            await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System));
+            await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None));
 
         // Assert: both should be deleted
         var readCtx = _fixture.CreateContext();
@@ -454,7 +454,7 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
         // Act: should not throw
         var cleanCtx = _fixture.CreateContext();
         await Should.NotThrowAsync(async () =>
-            await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System));
+            await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None));
 
         // Assert: parent should NOT be deleted (child still references it)
         // OR both deleted together — either way no FK error

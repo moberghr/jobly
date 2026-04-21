@@ -112,6 +112,18 @@ public static class TestTasks
             Options.Create(new JoblyWorkerConfiguration()));
     }
 
+    public static ExpirationCleanup<TContext> CreateExpirationCleanup<TContext>(
+        TContext context,
+        TimeProvider timeProvider,
+        int batchSize = 1000)
+        where TContext : DbContext
+    {
+        return new ExpirationCleanup<TContext>(
+            context,
+            timeProvider,
+            Options.Create(new JoblyWorkerConfiguration { ExpirationBatchSize = batchSize }));
+    }
+
     public static ServerCleanup<TContext> CreateServerCleanup<TContext>(
         TContext context,
         TimeProvider timeProvider,

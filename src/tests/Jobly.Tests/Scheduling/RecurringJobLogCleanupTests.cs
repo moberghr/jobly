@@ -50,7 +50,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.CleanupRecurringJobLogs(cleanCtx);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).CleanupRecurringJobLogsAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -88,7 +88,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.CleanupRecurringJobLogs(cleanCtx);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).CleanupRecurringJobLogsAsync(CancellationToken.None);
 
         // Assert: oldest entry should now be the 11th from the original set
         var readCtx = _fixture.CreateContext();
@@ -126,7 +126,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.CleanupRecurringJobLogs(cleanCtx);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).CleanupRecurringJobLogsAsync(CancellationToken.None);
 
         // Assert — all 100 should remain
         var readCtx = _fixture.CreateContext();
@@ -138,7 +138,7 @@ public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
     public async Task CleanupRecurringJobLogs_NoLogsDoesNothing()
     {
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.CleanupRecurringJobLogs(cleanCtx);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).CleanupRecurringJobLogsAsync(CancellationToken.None);
 
         var readCtx = _fixture.CreateContext();
         var count = await readCtx.Set<RecurringJobLog>().CountAsync(Xunit.TestContext.Current.CancellationToken);
