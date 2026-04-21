@@ -4,6 +4,53 @@ sidebar_position: 6
 
 # Releases
 
+## 0.9.0
+
+*2026-04-21*
+
+### New Features
+
+- **Database Push** — Opt-in push notifications replace polling wake-up for the dispatcher, `MessageRoutingTask`, and `OrchestrationTask`. Uses PostgreSQL `LISTEN`/`NOTIFY` or SQL Server Service Broker natively. Enable via `opt.UseDatabasePush()` inside the `AddJobly` / `AddJoblyWorker` lambda. Dispatcher pickup drops from ~500ms to &lt;50ms; burst-and-idle workloads roughly halve wall-clock time. Idle deployments see ~16% fewer SELECTs (empty `FOR UPDATE SKIP LOCKED` fetches during idle go away). Worker-fetch push only wires when `UseDispatcher = true` — individual-worker mode keeps polling to avoid thundering-herd. Zero overhead if you don't opt in. See [DB Push](/docs/features/db-push).
+- **`State.Scheduled`** — Future-dated jobs (`Schedule(job, at)`) now land in `State.Scheduled` instead of `State.Enqueued` with a future `ScheduleTime`. `ScheduledJobActivationTask` flips them to `Enqueued` when due and fires a `JobEnqueued` push. Cleans up the worker fetch predicate to a pure `CurrentState = Enqueued` check. Pre-upgrade rows still execute correctly thanks to a defensive `ScheduleTime <= now` filter.
+- **Per-database Provider Packages** — Provider-specific code moves out of `Jobly.Core` / `Jobly.Worker` into two new NuGet packages: `Moberg.Jobly.Provider.PostgreSql` and `Moberg.Jobly.Provider.SqlServer`. Install the one that matches your database and opt in via `opt.UsePostgreSql()` / `opt.UseSqlServer()` inside the registration lambda. Core now stays fully provider-agnostic — no `Npgsql` or `Microsoft.Data.SqlClient` references.
+- **Builder-based DI API** — `AddJobly<TContext>(opt => ...)` / `AddJoblyWorker<TContext>(opt => ...)` take a single lambda over `IJoblyBuilder<TContext>`. Config fields live on the builder directly (inherits `JoblyConfiguration`); addons chain as extension methods (`opt.AddRetry()`, `opt.AddMutex()`, `opt.AddCircuitBreaker()`, `opt.AddNoRestart()`, `opt.UseDatabasePush()`).
+
+### Improvements
+
+- **Atomic-claim fetch** — Worker and dispatcher fetch are now `UPDATE ... RETURNING` (PG) / `UPDATE ... OUTPUT INSERTED.*` (SQL Server) via new `IJoblySqlQueries<TContext>` implementations in the provider packages. Closes the SELECT→UPDATE race window that produced rare double-claims under concurrent-worker load. The old regex-based `RowLockInterceptor` is retired.
+- **Shutdown safety** — Three races that could leave jobs as `State=Processing` orphans on shutdown are fixed: `JoblyDispatcher` un-claims rows it fetched but didn't deliver; `JoblyDispatcherWorker` drains its channel fully before exiting; post-handler bookkeeping uses `CancellationToken.None` so a job whose handler already ran can't be abandoned mid-finalize.
+- **Retry / CircuitBreaker respect `State.Scheduled`** — Delayed retries and circuit-breaker reschedules land in `State.Scheduled` when the target time is in the future. New `JobOutcome.RescheduledState(scheduleTime, now)` helper is shared by both pipeline behaviors. No change for immediate retries.
+- **Worker host split** — `JoblyWorkerSetup` is replaced by three DI-registered `IHostedService`s: `JoblyServerRegistration`, `JoblyDispatcherHost`, `JoblySingleWorkerHost`. Each mode no-ops when the other is selected via `UseDispatcher`. State flows via a new `ServerRegistrationState` singleton instead of re-querying.
+- **Source layout** — Libraries under `src/core/`, providers under `src/core/providers/`, tests in `src/tests/`, demo apps in `src/demo/`. `Directory.Build.props` scoped to match.
+
+### Bug Fixes
+
+- **Queue-name encoding collision (SQL Server)** — `JobHelper` now rejects queue names containing the unit-separator (``) that SQL Server's `STRING_SPLIT` uses internally for encoding. Previously a job published to a ``-containing queue could be delivered to the wrong worker group.
+
+### Migration
+
+Breaking release because of the provider package split and the DI lambda API.
+
+- **Install a provider NuGet**: add `Moberg.Jobly.Provider.PostgreSql` or `Moberg.Jobly.Provider.SqlServer` alongside `Moberg.Jobly.Core`. The provider package registers the row-lock / atomic-claim queries, the exception classifier, and the notification-transport factory — all of which used to live in Core.
+- **Wrap registration in a lambda + call the provider**:
+  ```csharp
+  // before
+  services.AddJobly<MyContext>();
+  services.AddJoblyDatabasePush<MyContext>();   // if using push
+
+  // after
+  services.AddJobly<MyContext>(opt =>
+  {
+      opt.UsePostgreSql();                      // or UseSqlServer()
+      opt.UseDatabasePush();                    // if using push, now chains on the builder
+  });
+  ```
+- **`AddJoblyDatabasePush<TContext>()` removed** — call `opt.UseDatabasePush()` on the builder instead. Must be after `UsePostgreSql` / `UseSqlServer`.
+- **`State.Scheduled` is new** — Future-dated jobs existing from a previous version still execute correctly (worker fetch has a defensive `ScheduleTime <= now` predicate) but won't show in the dashboard's Scheduled list until their time arrives.
+- **Retry / CircuitBreaker reschedules land in `State.Scheduled` when delayed** — dashboard filters and any external tooling that queried `Enqueued + future ScheduleTime` should now also look at `Scheduled`.
+
+---
+
 ## 0.8.0
 
 *2026-04-19*
