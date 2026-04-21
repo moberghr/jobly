@@ -6,7 +6,7 @@ sidebar_position: 3
 
 View pub/sub messages with their type, queue, state, job count, and creation time. Click to see the message detail with all spawned jobs.
 
-The messages list shows a **live job count** for each message. This is the `totalJobs` value computed from the current child job records, not a stale `jobCount` snapshot. The count updates as handlers are discovered and child jobs are created by the `MessageRoutingTask`.
+The messages list shows a **live job count** for each message. This is the `totalJobs` value computed from the current child job records, not a stale `jobCount` snapshot. The count updates as handlers are discovered and child jobs are created by the `MessageRouter`.
 
 ## Message Detail
 

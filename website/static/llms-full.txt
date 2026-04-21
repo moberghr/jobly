@@ -169,7 +169,7 @@ await context.SaveChangesAsync(); // Committed atomically with business data
 ### How message routing works
 
 1. `Publish()` creates a `Job` entity with `Kind = Message` in the database
-2. `MessageRoutingTask` (background task, polls every 1s) discovers all registered `IMessageHandler<T>` implementations
+2. `MessageRouter` (background task, polls every 1s) discovers all registered `IMessageHandler<T>` implementations
 3. For each handler, a child `Job` is created with `Kind = Job` and the handler pre-assigned
 4. Workers pick up each child job independently
 5. When all children complete, the parent message transitions to `Completed` or `Failed`
@@ -299,7 +299,7 @@ If a worker picks up a job whose mutex is already held by another processing job
 
 ### NoRestart (stale-recovery opt-out)
 
-Opt-in addon: `services.AddJoblyNoRestart()`. Lets specific job types stay `Failed` on worker crash instead of being auto-requeued by `StaleJobRecoveryTask`.
+Opt-in addon: `services.AddJoblyNoRestart()`. Lets specific job types stay `Failed` on worker crash instead of being auto-requeued by `StaleJobRecovery`.
 
 ```csharp
 [NoRestart]
@@ -506,7 +506,7 @@ await recurringPublisher.AddOrUpdateRecurringJob(
     cron: "0 * * * *");  // Every hour
 ```
 
-`AddOrUpdateRecurringJob` only registers the definition — it does NOT create a job. The `RecurringJobSchedulerTask` background task creates jobs when the cron time arrives.
+`AddOrUpdateRecurringJob` only registers the definition — it does NOT create a job. The `RecurringJobScheduler` background task creates jobs when the cron time arrives.
 
 ### Cron expressions
 
@@ -710,7 +710,7 @@ POST /api/groups/{groupId}/resume
 ### How it works
 
 1. Pause request sets `PausedAt` timestamp on the server or worker group
-2. `HeartbeatTask` (every ~3s) reads pause state from database into `PauseStateHolder`
+2. `Heartbeat` task (every ~3s) reads pause state from database into `PauseStateHolder`
 3. Workers check `PauseStateHolder` before each poll — if paused, skip
 4. Resume clears `PausedAt`, next heartbeat propagates the change
 

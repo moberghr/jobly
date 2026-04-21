@@ -10,11 +10,6 @@
 
 ## Behavior Fixes
 
-### Tasks re-running immediately when work found
-`ServerTaskBase` re-runs immediately if `RunServerTask` returns non-null. This causes tight loops for:
-- `CounterAggregatorTask` — always finds counters, runs continuously instead of every 5s
-- Check all other tasks — some should always wait for interval regardless
-
 ### Batch detail page doesn't show continuations
 Batch detail page only shows the batch's children. Should also show the continuation batch (if any) linked via `ParentJobId`.
 

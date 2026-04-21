@@ -4,7 +4,7 @@ sidebar_position: 8
 
 # NoRestart (Stale-Recovery Opt-Out)
 
-When a worker crashes mid-job, Jobly's `StaleJobRecoveryTask` normally requeues the job so another worker can pick it up. That's the right default for idempotent work — but some jobs must never run twice (charge a card, send an email, call a non-idempotent API). The NoRestart feature lets those jobs opt out: on worker crash they are marked `Failed` instead of requeued.
+When a worker crashes mid-job, Jobly's `StaleJobRecovery` normally requeues the job so another worker can pick it up. That's the right default for idempotent work — but some jobs must never run twice (charge a card, send an email, call a non-idempotent API). The NoRestart feature lets those jobs opt out: on worker crash they are marked `Failed` instead of requeued.
 
 ## Setup
 
@@ -72,7 +72,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(config =>
 
 ## Override Chain
 
-When `StaleJobRecoveryTask` evaluates a stale job, it resolves `CanBeRestarted` in this order (first non-null wins):
+When `StaleJobRecovery` evaluates a stale job, it resolves `CanBeRestarted` in this order (first non-null wins):
 
 1. Per-publish metadata set via `.WithRestart()`
 2. `[NoRestart]` / `[Restart]` attribute on the job class (written at publish time by `NoRestartPublishBehavior`)
@@ -83,7 +83,7 @@ When `StaleJobRecoveryTask` evaluates a stale job, it resolves `CanBeRestarted` 
 NoRestart has two moving parts:
 
 - **`NoRestartPublishBehavior<T>`** runs at publish time. If metadata doesn't already carry a `CanBeRestarted` value, it inspects the job type for `[NoRestart]` / `[Restart]` and writes `CanBeRestarted = false` / `true` into the job's metadata. Attribute lookups are cached per closed generic type.
-- **`StaleJobRecoveryTask`** runs on each server (default every 30s). It finds jobs in `Processing` with `LastKeepAlive` older than `InvisibilityTimeout`, then for each:
+- **`StaleJobRecovery`** runs on each server (default every 30s). It finds jobs in `Processing` with `LastKeepAlive` older than `InvisibilityTimeout`, then for each:
   - If `CancellationMode != None` → `Deleted` (user intent wins).
   - Else read `CanBeRestarted` from metadata, fall back to `RestartStaleJobsByDefault`.
     - `true` → `Enqueued` with an `EventType = "Requeued"` warning log.

@@ -29,7 +29,7 @@ POST /api/groups/{groupId}/resume
 ## How It Works
 
 1. **Pause request** sets `PausedAt` timestamp on the server or worker group
-2. **HeartbeatTask** (runs every ~3s) reads pause state from the database and updates an in-memory `PauseStateHolder`
+2. **Heartbeat** task (runs every ~3s) reads pause state from the database and updates an in-memory `PauseStateHolder`
 3. **Workers** check the `PauseStateHolder` before each job poll — if paused, they skip the poll
 4. **Resume** clears `PausedAt`, next heartbeat propagates the change, workers resume polling
 
