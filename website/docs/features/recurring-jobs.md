@@ -15,7 +15,7 @@ await recurringPublisher.AddOrUpdateRecurringJob(
     cron: "0 * * * *");  // Every hour
 ```
 
-`AddOrUpdateRecurringJob` only registers (or updates) the definition — it does **not** create a job. The `RecurringJobSchedulerTask` background task creates jobs when the cron time arrives.
+`AddOrUpdateRecurringJob` only registers (or updates) the definition — it does **not** create a job. The `RecurringJobScheduler` background task creates jobs when the cron time arrives.
 
 :::info Saves immediately
 `AddOrUpdateRecurringJob` acquires a distributed lock on the job name and calls `SaveChanges` internally. You do **not** need to call `SaveChanges` after this method. The lock prevents race conditions when multiple app instances register the same recurring job concurrently.
@@ -24,7 +24,7 @@ await recurringPublisher.AddOrUpdateRecurringJob(
 ## How It Works
 
 1. **Registration**: `AddOrUpdateRecurringJob` stores the cron expression, message payload, and type. Sets `NextExecution` to the next cron occurrence.
-2. **Scheduling**: `RecurringJobSchedulerTask` polls every 15 seconds. When `NextExecution <= now`, it creates a job with `ScheduleTime = now` (ready for immediate execution) and updates `NextExecution` to the next cron occurrence.
+2. **Scheduling**: `RecurringJobScheduler` polls every 15 seconds. When `NextExecution <= now`, it creates a job with `ScheduleTime = now` (ready for immediate execution) and updates `NextExecution` to the next cron occurrence.
 3. **Deduplication**: Before creating a new job, the scheduler checks the most recent `RecurringJobLog` entry. If that job is still `Enqueued` or `Processing`, it skips — no duplicate jobs.
 4. **Execution**: The created job is a regular job. Workers pick it up, execute the handler, and it follows the normal lifecycle.
 

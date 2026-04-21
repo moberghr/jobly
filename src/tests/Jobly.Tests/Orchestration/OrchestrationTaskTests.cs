@@ -54,7 +54,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -104,7 +104,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -155,7 +155,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -206,7 +206,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -249,7 +249,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -326,9 +326,9 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act — run orchestration multiple times to finalize parent and then activate continuation
         var orchCtx1 = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx1, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx1, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
         var orchCtx2 = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx2, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx2, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -387,10 +387,10 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act — finalize parent, then run again
         var orchCtx1 = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx1, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx1, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         var orchCtx2 = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx2, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx2, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         // Assert: continuation stays Awaiting (condition not met, but parent could be requeued)
         var readCtx = _fixture.CreateContext();
@@ -429,7 +429,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        var workDone = await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        var workDone = await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         // Assert
         workDone.ShouldBeTrue();
@@ -466,7 +466,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        var workDone = await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        var workDone = await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         // Assert
         workDone.ShouldBeTrue();
@@ -523,7 +523,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -579,9 +579,9 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act — finalize parent (Failed but OnAnyFinished → Completed), then activate continuation
         var orchCtx1 = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx1, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx1, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
         var orchCtx2 = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx2, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx2, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -621,7 +621,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -666,7 +666,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Act
         var orchCtx = _fixture.CreateContext();
-        var workDone = await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        var workDone = await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         // Assert
         workDone.ShouldBeFalse();
@@ -707,7 +707,7 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Run orchestration
         var orchCtx = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         var readCtx = _fixture.CreateContext();
         var child = await readCtx.Set<Job>().FindAsync([childId], Xunit.TestContext.Current.CancellationToken);
@@ -774,9 +774,9 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
 
         // Run orchestration twice (first finalizes parent, second should clean up continuations)
         var orchCtx1 = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx1, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx1, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
         var orchCtx2 = _fixture.CreateContext();
-        await OrchestrationTask<TestContext>.RunOrchestration(orchCtx2, TimeProvider.System, TimeSpan.FromDays(1), CancellationToken.None);
+        await Jobly.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx2, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
 
         var readCtx = _fixture.CreateContext();
 

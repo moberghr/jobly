@@ -49,11 +49,11 @@ jobs:
 
       - name: Restore
         working-directory: src
-        run: dotnet restore Jobly.slnx
+        run: dotnet restore tests/Jobly.Tests/Jobly.Tests.csproj
 
       - name: Build
         working-directory: src
-        run: dotnet build Jobly.slnx --no-restore --configuration Debug
+        run: dotnet build tests/Jobly.Tests/Jobly.Tests.csproj --no-restore --configuration Debug
 
       - name: Test (${{ matrix.database }})
         working-directory: src

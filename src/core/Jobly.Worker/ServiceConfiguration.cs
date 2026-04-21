@@ -68,18 +68,21 @@ public static class ServiceConfiguration
         // If the user never calls one, IJoblyLockProvider resolution fails fast the first time
         // a lock is requested.
         services.AddSingleton<ServerRegistrationState>();
+        services.AddSingleton<ServerTaskSignals<TContext>>();
+        services.AddSingleton<ProcessCpuTracker>();
+        services.AddScoped<IServerTask, Heartbeat<TContext>>();
+        services.AddScoped<IServerTask, ServerCleanup<TContext>>();
+        services.AddScoped<IServerTask, StaleJobRecovery<TContext>>();
+        services.AddScoped<IServerTask, CounterAggregator<TContext>>();
+        services.AddScoped<IServerTask, ExpirationCleanup<TContext>>();
+        services.AddScoped<IServerTask, RecurringJobScheduler<TContext>>();
+        services.AddScoped<IServerTask, ScheduledJobActivation<TContext>>();
+        services.AddScoped<IServerTask, Orchestrator<TContext>>();
+        services.AddScoped<IServerTask, MessageRouter<TContext>>();
         services.AddHostedService<JoblyServerRegistration<TContext>>();
         services.AddHostedService<JoblyDispatcherHost<TContext>>();
         services.AddHostedService<JoblySingleWorkerHost<TContext>>();
-        services.AddHostedService<HeartbeatTask<TContext>>();
-        services.AddHostedService<CounterAggregatorTask<TContext>>();
-        services.AddHostedService<ServerCleanupTask<TContext>>();
-        services.AddHostedService<StaleJobRecoveryTask<TContext>>();
-        services.AddHostedService<ExpirationCleanupTask<TContext>>();
-        services.AddHostedService<RecurringJobSchedulerTask<TContext>>();
-        services.AddHostedService<ScheduledJobActivationTask<TContext>>();
-        services.AddHostedService<MessageRoutingTask<TContext>>();
-        services.AddHostedService<OrchestrationTask<TContext>>();
+        services.AddHostedService<ServerTaskHost<TContext>>();
 
         return services;
     }

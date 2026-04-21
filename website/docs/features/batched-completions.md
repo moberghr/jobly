@@ -34,9 +34,9 @@ Each `JoblyDispatcherWorker` owns its own in-memory batch. When a handler finish
 
 ## Poison Entry Isolation
 
-If a batch commit fails with `DbUpdateException` (e.g. one of the 50 rows was deleted by another server between processing and flush), `FlushRangeAsync` recursively splits the batch in half and retries each half. Single-entry failures are logged and dropped — `StaleJobRecoveryTask` will later observe the orphaned `Processing` row and decide whether to requeue or fail it based on the `CanBeRestarted` metadata.
+If a batch commit fails with `DbUpdateException` (e.g. one of the 50 rows was deleted by another server between processing and flush), `FlushRangeAsync` recursively splits the batch in half and retries each half. Single-entry failures are logged and dropped — `StaleJobRecovery` will later observe the orphaned `Processing` row and decide whether to requeue or fail it based on the `CanBeRestarted` metadata.
 
-Non-`DbUpdateException` failures (connection drops, timeouts) propagate up and the drained entries are lost for this flush cycle. `StaleJobRecoveryTask` handles those too.
+Non-`DbUpdateException` failures (connection drops, timeouts) propagate up and the drained entries are lost for this flush cycle. `StaleJobRecovery` handles those too.
 
 ## Trade-offs
 

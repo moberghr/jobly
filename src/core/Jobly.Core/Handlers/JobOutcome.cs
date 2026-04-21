@@ -14,7 +14,7 @@ public class JobOutcome
 
     /// <summary>
     /// Picks the correct queued state for a reschedule: <see cref="State.Scheduled"/> when the
-    /// target time is in the future (so <c>ScheduledJobActivationTask</c> owns the flip back),
+    /// target time is in the future (so <c>ScheduledJobActivation</c> owns the flip back),
     /// otherwise <see cref="State.Enqueued"/>. Every pipeline behaviour that reschedules a job
     /// (retry, circuit breaker, future mutex/rate-limit) must route through this so no new
     /// behaviour silently writes <c>Enqueued</c> + future <c>ScheduleTime</c> — which the worker

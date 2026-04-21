@@ -8,7 +8,7 @@ Cron-based scheduled jobs with name, cron expression, type, next/last execution 
 
 ## How Recurring Jobs Work
 
-`AddOrUpdateRecurringJob` only registers (or updates) the recurring job definition — it does **not** create any job instances. The `RecurringJobSchedulerTask` background task monitors all definitions and creates a new job each time the cron expression fires.
+`AddOrUpdateRecurringJob` only registers (or updates) the recurring job definition — it does **not** create any job instances. The `RecurringJobScheduler` background task monitors all definitions and creates a new job each time the cron expression fires.
 
 ## Execution History
 

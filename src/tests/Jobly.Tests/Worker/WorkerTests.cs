@@ -90,7 +90,8 @@ public abstract class WorkerTestsBase : IAsyncLifetime
             groupConfig,
             TimeProvider.System,
             Jobly.Tests.Helpers.TestTasks.QueriesFromScope<TestContext>(scopeFactory),
-            Jobly.Tests.Helpers.TestTasks.NullTransport);
+            Jobly.Tests.Helpers.TestTasks.NullTransport,
+            Jobly.Tests.Helpers.TestTasks.NullSignals);
 
         return (worker, scopeFactory);
     }

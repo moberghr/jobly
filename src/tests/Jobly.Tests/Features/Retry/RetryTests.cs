@@ -113,7 +113,8 @@ public abstract class RetryTestsBase : IAsyncLifetime
             groupConfig,
             TimeProvider.System,
             Jobly.Tests.Helpers.TestTasks.QueriesFromScope<TestContext>(scopeFactory),
-            Jobly.Tests.Helpers.TestTasks.NullTransport);
+            Jobly.Tests.Helpers.TestTasks.NullTransport,
+            Jobly.Tests.Helpers.TestTasks.NullSignals);
     }
 
     [TimedFact]
@@ -205,7 +206,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
         // Act — process once (should be requeued, not failed)
         await worker.GetAndProcessJob(CancellationToken.None);
 
-        await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
+        await Jobly.Tests.Helpers.TestTasks.CreateCounterAggregator(_fixture.CreateContext()).AggregateCountersAsync(CancellationToken.None);
 
         // Assert — stats:failed should NOT be incremented during retry
         var failedStat = await _fixture.CreateContext().Set<Statistic>()

@@ -8,7 +8,7 @@ namespace Jobly.Worker.Services;
 
 /// <summary>
 /// Hosted service that consumes <see cref="IJoblyNotificationTransport.ListenAsync"/> and
-/// signals the in-process background tasks (dispatcher, MessageRoutingTask, OrchestrationTask)
+/// signals the in-process background tasks (dispatcher, MessageRouter, Orchestrator)
 /// on each notification. Only registered when the user opts in via
 /// <c>opt.UseDatabasePush() (inside the AddJobly/AddJoblyWorker lambda)</c>.
 /// </summary>
@@ -18,17 +18,20 @@ public class NotificationListenerTask<TContext> : BackgroundService
     private readonly IJoblyNotificationTransport _transport;
     private readonly JoblyDatabasePushConfiguration _options;
     private readonly JoblyWorkerConfiguration _workerConfiguration;
+    private readonly ServerTaskSignals<TContext> _signals;
     private readonly ILogger<NotificationListenerTask<TContext>> _logger;
 
     public NotificationListenerTask(
         IJoblyNotificationTransport transport,
         JoblyDatabasePushConfiguration options,
         IOptions<JoblyWorkerConfiguration> workerConfiguration,
+        ServerTaskSignals<TContext> signals,
         ILogger<NotificationListenerTask<TContext>> logger)
     {
         _transport = transport;
         _options = options;
         _workerConfiguration = workerConfiguration.Value;
+        _signals = signals;
         _logger = logger;
     }
 
@@ -96,14 +99,14 @@ public class NotificationListenerTask<TContext> : BackgroundService
         }
     }
 
-    private static void DrainSignals()
+    private void DrainSignals()
     {
         JoblyDispatcher<TContext>.SignalAll();
-        MessageRoutingTask<TContext>.SignalRouting();
-        OrchestrationTask<TContext>.SignalOrchestrator();
+        _signals.SignalMessageEnqueued();
+        _signals.SignalJobFinalized();
     }
 
-    private static void Dispatch(Notification notification)
+    private void Dispatch(Notification notification)
     {
         switch (notification.Kind)
         {
@@ -111,10 +114,10 @@ public class NotificationListenerTask<TContext> : BackgroundService
                 JoblyDispatcher<TContext>.SignalAll();
                 break;
             case NotificationKind.MessageEnqueued:
-                MessageRoutingTask<TContext>.SignalRouting();
+                _signals.SignalMessageEnqueued();
                 break;
             case NotificationKind.JobFinalized:
-                OrchestrationTask<TContext>.SignalOrchestrator();
+                _signals.SignalJobFinalized();
                 break;
             default:
                 break;

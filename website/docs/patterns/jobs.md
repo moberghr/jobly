@@ -136,7 +136,7 @@ await recurringPublisher.AddOrUpdateRecurringJob(
     new CleanupSessions(), name: "session-cleanup", cron: "0 * * * *");
 ```
 
-This only registers the definition. The `RecurringJobSchedulerTask` creates jobs when the cron time arrives. See [Recurring Jobs](/docs/features/recurring-jobs) for full details.
+This only registers the definition. The `RecurringJobScheduler` task creates jobs when the cron time arrives. See [Recurring Jobs](/docs/features/recurring-jobs) for full details.
 
 ## Cancellation
 

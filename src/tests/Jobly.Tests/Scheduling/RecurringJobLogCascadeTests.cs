@@ -49,7 +49,7 @@ public abstract class RecurringJobLogCascadeTestsBase : IAsyncLifetime
 
         // Act: delete the job via expiration cleanup (simulates real cleanup)
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None);
 
         // Assert: log entry survives with JobId set to null
         var readCtx = _fixture.CreateContext();

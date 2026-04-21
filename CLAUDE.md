@@ -11,7 +11,7 @@ Jobly is a distributed job processing and message queue library for .NET 10. Fou
 - **Requests** (`IRequest<TResponse>`) — In-memory request/response. Single handler, no database persistence, returns typed response immediately via `IMediator.Send()`.
 - **Streams** (`IStreamRequest<TResponse>`) — In-memory streaming. Single handler, no database persistence, returns `IAsyncEnumerable<TResponse>` via `IMediator.CreateStream()`.
 
-**Optional DB push**: `opt.UseDatabasePush()` on the builder replaces polling wake-up with push notifications (Postgres LISTEN/NOTIFY, SQL Server Service Broker) for the dispatcher, `MessageRoutingTask`, and `OrchestrationTask`. Worker fetch push requires `UseDispatcher = true` — individual-worker mode has a thundering-herd problem and is left on polling. See §2.9 and the DB Push section in `README.md`.
+**Optional DB push**: `opt.UseDatabasePush()` on the builder replaces polling wake-up with push notifications (Postgres LISTEN/NOTIFY, SQL Server Service Broker) for the dispatcher, `MessageRouter`, and `Orchestrator`. Worker fetch push requires `UseDispatcher = true` — individual-worker mode has a thundering-herd problem and is left on polling. See §2.9 and the DB Push section in `README.md`.
 
 Ships as NuGet packages: `Jobly.Core` (provider-agnostic), `Jobly.Provider.PostgreSql` (PG-specific), `Jobly.Provider.SqlServer` (SQL Server-specific), `Jobly.Worker` (worker runtime), `Jobly.UI` (dashboard). Users install the provider package that matches their database and call `opt.UsePostgreSql()` or `opt.UseSqlServer()` inside the `AddJobly` / `AddJoblyWorker` lambda.
 
@@ -131,22 +131,24 @@ Single table with `Kind` enum. Key fields:
 
 ### Worker Architecture
 
-Workers are **pure executors** — they only fetch and execute `Kind=Job` jobs. All orchestration is handled by dedicated background tasks (all extend `ServerTaskBase`):
+Workers are **pure executors** — they only fetch and execute `Kind=Job` jobs. All orchestration is handled by scoped `IServerTask` services driven by a single `ServerTaskHost<TContext>` (see §2.2 / §2.3):
 
 ```
 Worker (pure executor):
   1. Fetch Job (Kind=Job, Enqueued, ScheduleTime < now)
   2. Execute handler (pipeline behaviors run first — mutex, retry, etc.)
   3. Update state, counters, logs
-  4. Signal orchestrator
+  4. ServerTaskSignals.SignalJobFinalized() — wakes Orchestrator
 
-MessageRoutingTask (polls every 1s):
+MessageRouter (polls every 1s, signalled on MessageEnqueued):
   - Routes Kind=Message jobs → discovers handlers, creates N child jobs
 
-OrchestrationTask (signal + 10s sweep):
+Orchestrator (polls every 10s, signalled on JobFinalized):
   - Finalizes parents when all children reach terminal state
   - Activates continuations (Awaiting children of completed parents)
 ```
+
+Every task implements `IServerTask` (`Name`, `LockKey`, `DefaultInterval`, `ExecuteAsync`, optional `RerunImmediately` / `LogOnSuccess` defaults). Tasks are registered as scoped services; the host resolves one per iteration, takes the distributed lock if `LockKey != null`, runs `ExecuteAsync`, and writes `ServerTask` / `ServerLog` rows. Nullable `DefaultInterval` lets an operator disable a task entirely.
 
 ### Job Cancellation
 
@@ -164,10 +166,10 @@ Opt-in addon via `services.AddJoblyMutex()`. Only one job per concurrency key ca
 ### Recurring Jobs
 
 - `AddOrUpdateRecurringJob` only registers/updates the definition (cron, message, type). **Does not create jobs.** Acquires a distributed lock on the recurring job name, saves immediately (exception to §5.7 — lock must be held during save to prevent race conditions).
-- `RecurringJobSchedulerTask` creates jobs with `ScheduleTime = now` (ready for immediate execution) and sets `NextExecution` to the next cron occurrence.
+- `RecurringJobScheduler` creates jobs with `ScheduleTime = now` (ready for immediate execution) and sets `NextExecution` to the next cron occurrence.
 - **RecurringJobLog** — Immutable audit trail linking recurring jobs to their created jobs. Fields: `Id, RecurringJobId, JobId (nullable), CreatedAt`. `JobId` has FK with `SET NULL` cascade — when the job is cleaned up, `JobId` becomes null but the log entry survives. Navigation property `Job` for clean LINQ queries.
 - Scheduler uses RecurringJobLog for dedup: checks if the most recent log entry's job is still Enqueued/Processing via nav property.
-- ExpirationCleanupTask retains last 100 logs per recurring job (uses `HAVING COUNT > 100` to skip most).
+- ExpirationCleanup retains last 100 logs per recurring job (uses `HAVING COUNT > 100` to skip most).
 
 ### Dashboard Authorization
 
@@ -185,22 +187,22 @@ Default: no auth (open access).
 - **TimeProvider** — all production code uses injectable `TimeProvider` instead of `DateTime.UtcNow`. Registered as `TryAddSingleton(TimeProvider.System)` in `AddJobly`. Test code can use `DateTime.UtcNow` directly.
 - **DbContext must be registered as Scoped** (not Transient). The outbox pattern requires the publisher and application code to share the same DbContext instance within a scope.
 - Everything is a Job. `ParentJobId` replaces both the old MessageId and BatchId foreign keys.
-- Workers never touch parent/child orchestration — that's the OrchestrationTask's job.
+- Workers never touch parent/child orchestration — that's the `Orchestrator`'s job.
 - `ContinuationOptions` is generalized: any job with children can control whether children activate on failure.
 - Failed jobs never auto-deleted.
-- Statistics use Counter rows (write-optimized) aggregated into Statistic rows by CounterAggregatorTask.
-- All background tasks extend `ServerTaskBase` with signal support (semaphore-based wake-up, capped at 1).
+- Statistics use Counter rows (write-optimized) aggregated into Statistic rows by `CounterAggregator`.
+- Every background task implements `IServerTask` and is driven by the single `ServerTaskHost<TContext>`. Signal-driven wake-up (`ServerTaskSignals<TContext>`) wakes `Orchestrator` on `JobFinalized` and `MessageRouter` on `MessageEnqueued`; the other tasks are time-driven.
 - `RequeueJob` resets `ScheduleTime` to now — requeued jobs always execute immediately.
 - Count-based cleanup: `MaxExpirableJobCount` (default null/disabled) — deletes oldest by `ExpireAt` when threshold exceeded. Failed jobs excluded (null `ExpireAt`).
 - `JobExpirationTimeout` configurable on base `JoblyConfiguration` (default 1 day). Used by worker, command service, and orchestration task.
 - Job metadata: `JobParameters.Metadata` (key-value dictionary), stored as JSON on the Job entity. `IJobContext` gives handlers access to metadata, job ID, and trace ID. `IPublishPipelineBehavior<T>` intercepts publish for cross-cutting metadata. Metadata inherited by child jobs via ambient context.
-- Pause/Resume: Server and worker group level. `PausedAt` timestamp on Server and WorkerGroup entities. `PauseStateHolder` (in-memory snapshot) updated by `HeartbeatTask`, checked by workers before each poll. API endpoints: `POST /api/servers/{id}/pause|resume`, `POST /api/groups/{id}/pause|resume`.
+- Pause/Resume: Server and worker group level. `PausedAt` timestamp on Server and WorkerGroup entities. `PauseStateHolder` (in-memory snapshot) updated by `Heartbeat`, checked by workers before each poll. API endpoints: `POST /api/servers/{id}/pause|resume`, `POST /api/groups/{id}/pause|resume`.
 - Real-time log flushing: `RunJobMonitor` drains `JobLogCollector` every ~1s during handler execution and persists logs to the database. Logs visible in dashboard while the job is still processing.
 
 ### Backend (.NET 10)
 
 - **Jobly.Core** — Entities (Job, RecurringJob, RecurringJobLog, JobLog, Server, Worker, ServerTask, ServerLog), handlers, JobDispatcher (cached reflection), Publisher, BatchPublisher, logging (JobLogContext/JobLoggerProvider). Services: `JobQueryService`, `JobCommandService`, `JobGroupQueryService`, `RecurringJobService`, `DashboardStatsService`.
-- **Jobly.Worker** — JoblyWorkerService (pure executor), JoblyDispatcher/JoblyDispatcherWorker (batch-fetch mode), worker groups. Background tasks (all extend ServerTaskBase): HeartbeatTask, CounterAggregatorTask, ServerCleanupTask, StaleJobRecoveryTask, ExpirationCleanupTask, RecurringJobSchedulerTask, MessageRoutingTask, OrchestrationTask.
+- **Jobly.Worker** — JoblyWorkerService (pure executor), JoblyDispatcher/JoblyDispatcherWorker (batch-fetch mode), worker groups. Server-task services driven by `ServerTaskHost<TContext>` (all implement `IServerTask`): `Heartbeat`, `CounterAggregator`, `ServerCleanup`, `StaleJobRecovery`, `ExpirationCleanup`, `RecurringJobScheduler`, `ScheduledJobActivation`, `MessageRouter`, `Orchestrator`. Push → wake plumbing: `ServerTaskSignals<TContext>`.
 - **Jobly.UI** — Minimal API endpoints + embedded SPA served at `/jobly`. Auth middleware (`IJoblyAuthorizationFilter`, `IJoblyCredentialValidator`, built-in cookie login). Typed `config.ts` for window globals.
 - **Static analyzers** — StyleCop, Roslynator, SonarAnalyzer, Meziantou.
 
@@ -364,13 +366,13 @@ Workers can be split into groups with independent queues and polling intervals. 
 ### §2 — Architecture Patterns
 
 - **§2.1** Everything is a Job. No separate entity tables for messages or batches. Use `Kind` discriminator and `ParentJobId` chain.
-- **§2.2** Workers are pure executors. Never add orchestration, routing, or parent/child logic to worker code. That belongs in `ServerTaskBase` subclasses.
-- **§2.3** All background tasks extend `ServerTaskBase` with signal support. Use `Signal()` to wake tasks instead of reducing poll intervals.
+- **§2.2** Workers are pure executors. Never add orchestration, routing, or parent/child logic to worker code. That belongs in an `IServerTask` implementation driven by `ServerTaskHost<TContext>`.
+- **§2.3** Every background task implements `IServerTask` and is registered as `Scoped`. Wake-up is push-driven via `ServerTaskSignals<TContext>` (`SignalJobFinalized` / `SignalMessageEnqueued`) rather than reducing poll intervals; tasks that don't need push (heartbeat, cleanups) just poll at `DefaultInterval`.
 - **§2.4** Services expose interfaces (`IJobCommandService`, `IJobQueryService`, etc.). Generic implementations take `TContext : DbContext`.
 - **§2.5** `AddJobly<TContext>()` / `AddJoblyWorker<TContext>()` auto-configure the user's DbContext. Users register their DbContext normally — no manual Jobly configuration needed.
 - **§2.6** In-memory requests (`IRequest<TResponse>`) go through `IMediator.Send()` — same `IPipelineBehavior` pipeline as jobs/messages, but no database persistence.
 - **§2.7** In-memory streams (`IStreamRequest<TResponse>`) go through `IMediator.CreateStream()` — `IPipelineBehavior` applies at request level, `IStreamPipelineBehavior` wraps enumeration, returns `IAsyncEnumerable<TResponse>`, no database persistence.
-- **§2.8** Future-dated jobs land in `State.Scheduled`; `ScheduledJobActivationTask` flips them to `Enqueued` when `ScheduleTime <= now`. Activation cadence is controlled by `JoblyWorkerConfiguration.ScheduledActivationInterval` (default 5s) — this is the worst-case latency between `ScheduleTime` and pickup eligibility. The task is time-driven and does not participate in DB-push wake-up; push only accelerates what happens *after* activation. Worker fetch queries always check `CurrentState == Enqueued` with a defensive `ScheduleTime <= now` predicate for pre-upgrade legacy rows. Adding new query sites that filter by `Enqueued` without the time predicate is a latent bug on upgraded deployments.
+- **§2.8** Future-dated jobs land in `State.Scheduled`; `ScheduledJobActivation` flips them to `Enqueued` when `ScheduleTime <= now`. Activation cadence is controlled by `JoblyWorkerConfiguration.ScheduledActivationInterval` (default 5s) — this is the worst-case latency between `ScheduleTime` and pickup eligibility. The task is time-driven and does not participate in DB-push wake-up; push only accelerates what happens *after* activation. Worker fetch queries always check `CurrentState == Enqueued` with a defensive `ScheduleTime <= now` predicate for pre-upgrade legacy rows. Adding new query sites that filter by `Enqueued` without the time predicate is a latent bug on upgraded deployments.
 - **§2.9** DB push is an opt-in addon. `opt.UseDatabasePush()` on the builder replaces the default `NullNotificationTransport` with a provider-specific one (Postgres LISTEN/NOTIFY or SQL Server Service Broker) and registers `NotificationListenerTask`. The provider-specific transport is resolved via `IJoblyNotificationTransportFactory`, which the provider package (`Jobly.Provider.PostgreSql` / `Jobly.Provider.SqlServer`) registers when you call `opt.UsePostgreSql()` / `opt.UseSqlServer()` — call the provider first, push second. Worker-fetch push only fires when `UseDispatcher = true`. Transports must not throw from `PublishAsync` — they log + increment `JoblyTelemetry.NotificationPublishFailures` instead. Missed notifications are caught by drain-on-reconnect in the listener.
 
 ### §3 — Coding Style
@@ -441,7 +443,7 @@ var activeJobs = await _context.Set<Job>()
 ### §6 — Performance
 
 - **§6.1** Worker hot path is sacred. No additional logic in fetch/execute cycle.
-- **§6.2** Statistics use Counter rows (write-optimized) aggregated by `CounterAggregatorTask`. Never update Statistic rows directly.
+- **§6.2** Statistics use Counter rows (write-optimized) aggregated by `CounterAggregator`. Never update Statistic rows directly.
 - **§6.3** Signal-driven wakeup for background tasks. Avoid reducing poll intervals as a performance hack.
 - **§6.4** Select only needed columns from database — never load full entities for read-only display.
 - **§6.5** Avoid initializing collections inside loops.
@@ -461,5 +463,5 @@ var activeJobs = await _context.Set<Job>()
 - **§8.4** `RequeueJob` resets `ScheduleTime` to now. Requeued jobs always execute immediately.
 - **§8.5** Cancellation uses `CancellationMode` enum, not immediate state change. Worker monitors and cancels handler token.
 - **§8.6** Mutex is an opt-in addon (`opt.AddMutex()` on the builder). `MutexPipelineBehavior` uses distributed lock via `IJoblyLockProvider`. Set key via `.WithMutex("key")` or `[Mutex("key")]` attribute. Concurrency key stored in metadata.
-- **§8.7** `RecurringJobSchedulerTask` creates jobs, `AddOrUpdateRecurringJob` only registers/updates definitions.
+- **§8.7** `RecurringJobScheduler` creates jobs, `AddOrUpdateRecurringJob` only registers/updates definitions.
 - **§8.8** Source generator (`Jobly.SourceGenerator`) for zero-allocation mediator and worker dispatch.

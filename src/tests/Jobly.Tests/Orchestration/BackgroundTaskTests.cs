@@ -34,7 +34,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var aggCtx = _fixture.CreateContext();
-        await CounterAggregatorTask<TestContext>.AggregateCounters(aggCtx);
+        await TestTasks.CreateCounterAggregator(aggCtx).AggregateCountersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -58,7 +58,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var aggCtx = _fixture.CreateContext();
-        await CounterAggregatorTask<TestContext>.AggregateCounters(aggCtx);
+        await TestTasks.CreateCounterAggregator(aggCtx).AggregateCountersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -87,7 +87,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -115,7 +115,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -143,7 +143,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -173,8 +173,8 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         // Act
         var recoveryCtx = _fixture.CreateContext();
         var result = await TestTasks
-            .CreateStaleJobRecoveryTask(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
-            .RecoverStaleJobsAsync(recoveryCtx, Xunit.TestContext.Current.CancellationToken);
+            .CreateStaleJobRecovery(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
+            .RecoverStaleJobsAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         result.Requeued.ShouldBe(1);
@@ -205,8 +205,8 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         // Act
         var recoveryCtx = _fixture.CreateContext();
         var result = await TestTasks
-            .CreateStaleJobRecoveryTask(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
-            .RecoverStaleJobsAsync(recoveryCtx, Xunit.TestContext.Current.CancellationToken);
+            .CreateStaleJobRecovery(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
+            .RecoverStaleJobsAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         result.Total.ShouldBe(0);
@@ -235,8 +235,8 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         // Act
         var cleanCtx = _fixture.CreateContext();
         var count = await TestTasks
-            .CreateServerCleanupTask(cleanCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
-            .CleanUpServersAsync(cleanCtx, Xunit.TestContext.Current.CancellationToken);
+            .CreateServerCleanup(cleanCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
+            .CleanUpServersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         count.ShouldBe(1);
@@ -283,8 +283,8 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         // Act
         var cleanCtx = _fixture.CreateContext();
         await TestTasks
-            .CreateServerCleanupTask(cleanCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
-            .CleanUpServersAsync(cleanCtx, Xunit.TestContext.Current.CancellationToken);
+            .CreateServerCleanup(cleanCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
+            .CleanUpServersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert — worker groups and workers both gone
         var readCtx = _fixture.CreateContext();
@@ -306,7 +306,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         var aggCtx = _fixture.CreateContext();
 
         // Act
-        var count = await CounterAggregatorTask<TestContext>.AggregateCounters(aggCtx);
+        var count = await TestTasks.CreateCounterAggregator(aggCtx).AggregateCountersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         count.ShouldBe(0);
@@ -323,7 +323,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var aggCtx = _fixture.CreateContext();
-        await CounterAggregatorTask<TestContext>.AggregateCounters(aggCtx);
+        await TestTasks.CreateCounterAggregator(aggCtx).AggregateCountersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert — should increment existing stat, not create a new one
         var readCtx = _fixture.CreateContext();
@@ -345,7 +345,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var aggCtx = _fixture.CreateContext();
-        await CounterAggregatorTask<TestContext>.AggregateCounters(aggCtx);
+        await TestTasks.CreateCounterAggregator(aggCtx).AggregateCountersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert — should create new stat with correct value
         var readCtx = _fixture.CreateContext();

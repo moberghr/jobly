@@ -48,7 +48,8 @@ public class WorkerMemoryBenchmark
             new WorkerGroupConfiguration { Queues = ["default"], WorkerCount = 1 },
             services.GetRequiredService<TimeProvider>(),
             services.GetRequiredService<IJoblySqlQueries<TestContext>>(),
-            services.GetRequiredService<IJoblyNotificationTransport>());
+            services.GetRequiredService<IJoblyNotificationTransport>(),
+            services.GetRequiredService<Jobly.Worker.Services.ServerTaskSignals<TestContext>>());
 
         // Register a server + worker in the DB (required for job processing)
         await using var scope = services.CreateAsyncScope();

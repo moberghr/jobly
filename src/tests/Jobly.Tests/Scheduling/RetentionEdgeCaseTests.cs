@@ -97,7 +97,8 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
             groupConfig,
             TimeProvider.System,
             Jobly.Tests.Helpers.TestTasks.QueriesFromScope<TestContext>(scopeFactory),
-            Jobly.Tests.Helpers.TestTasks.NullTransport);
+            Jobly.Tests.Helpers.TestTasks.NullTransport,
+            Jobly.Tests.Helpers.TestTasks.NullSignals);
     }
 
     [TimedFact]
@@ -125,7 +126,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         // Act — process once (should be requeued, not yet failed)
         await worker.GetAndProcessJob(CancellationToken.None);
 
-        await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
+        await Jobly.Tests.Helpers.TestTasks.CreateCounterAggregator(_fixture.CreateContext()).AggregateCountersAsync(CancellationToken.None);
 
         // Assert — stats:failed should be 0 during retry phase
         var failedStat = await _fixture.CreateContext().Set<Statistic>()
@@ -157,7 +158,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var cleanCtx = _fixture.CreateContext();
-        await ExpirationCleanupTask<TestContext>.RunCleanup(cleanCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateExpirationCleanup(cleanCtx, TimeProvider.System).RunCleanupAsync(CancellationToken.None);
 
         // Assert — job is deleted, but statistics survive
         var readCtx = _fixture.CreateContext();
@@ -181,7 +182,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         var worker = CreateWorker();
         await worker.GetAndProcessJob(CancellationToken.None);
 
-        await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
+        await Jobly.Tests.Helpers.TestTasks.CreateCounterAggregator(_fixture.CreateContext()).AggregateCountersAsync(CancellationToken.None);
 
         var succeededBefore = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:succeeded")
@@ -197,7 +198,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         await svc.DeleteJob(jobId);
 
-        await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
+        await Jobly.Tests.Helpers.TestTasks.CreateCounterAggregator(_fixture.CreateContext()).AggregateCountersAsync(CancellationToken.None);
 
         // Assert
         var succeededAfter = await _fixture.CreateContext().Set<Statistic>()
@@ -237,7 +238,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         var worker = CreateWorker();
         await worker.GetAndProcessJob(CancellationToken.None);
 
-        await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
+        await Jobly.Tests.Helpers.TestTasks.CreateCounterAggregator(_fixture.CreateContext()).AggregateCountersAsync(CancellationToken.None);
 
         var failedBefore = await _fixture.CreateContext().Set<Statistic>()
             .Where(x => x.Key == "stats:failed")
@@ -248,7 +249,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
         var svc = Jobly.Tests.Helpers.TestTasks.CreateJobCommandService(_fixture.CreateContext());
         await svc.RequeueJob(jobId);
 
-        await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
+        await Jobly.Tests.Helpers.TestTasks.CreateCounterAggregator(_fixture.CreateContext()).AggregateCountersAsync(CancellationToken.None);
 
         // Assert
         var failedAfter = await _fixture.CreateContext().Set<Statistic>()

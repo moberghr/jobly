@@ -4,6 +4,7 @@ using Jobly.Core.Notifications;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.Helpers;
 using Jobly.Worker;
+using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -48,13 +49,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
         await AssertNoServerSideEffectsAsync();
     }
 
-    // Flaky on SQL Server under CI load — boots a real polling worker for a smoke check,
-    // and StopAsync can't tear down within the 30s test budget when the shared SQL Server
-    // container is under concurrent pressure from parallel fixture collections. The positive
-    // lifecycle is already covered end-to-end by integration tests; the IsSilentNoOp variants
-    // in this file carry the real value (mode-branching contract). Re-enable after the
-    // server-task decoupling refactor lets us verify Start/Stop without spawning workers.
-    [TimedFact(Skip = "CI flake — see follow-up refactor/server-task-decoupling")]
+    [TimedFact]
     public async Task DispatcherHost_UseDispatcherTrue_CompletesLifecycleWithoutThrowing()
     {
         // Arrange
@@ -86,7 +81,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
         await AssertNoServerSideEffectsAsync();
     }
 
-    [TimedFact(Skip = "CI flake — see follow-up refactor/server-task-decoupling")]
+    [TimedFact]
     public async Task SingleWorkerHost_UseDispatcherFalse_CompletesLifecycleWithoutThrowing()
     {
         // Arrange
@@ -131,6 +126,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
             new PauseStateHolder(),
             new NullNotificationTransport(),
             state,
+            TestTasks.NullSignals,
             NullLoggerFactory.Instance);
     }
 
@@ -150,6 +146,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
             new NullNotificationTransport(),
             TestTasks.QueriesFromScope<TestContext>(scopeFactory),
             state,
+            TestTasks.NullSignals,
             NullLoggerFactory.Instance);
     }
 

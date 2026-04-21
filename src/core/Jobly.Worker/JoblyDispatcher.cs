@@ -176,7 +176,7 @@ public class JoblyDispatcher<TContext> : BackgroundService
         // them to the channel is a separate, interruptible phase: the JobLog SaveChangesAsync and
         // each WriteAsync are await points where a shutdown-triggered cancellation can fire. If
         // we don't recover, claimed-but-undelivered rows stay as Processing orphans until
-        // StaleJobRecoveryTask finds them. The try/catch here restores undelivered rows back to
+        // StaleJobRecovery finds them. The try/catch here restores undelivered rows back to
         // Enqueued so shutdown leaves the DB in a clean state.
         var delivered = 0;
         try
@@ -237,10 +237,10 @@ public class JoblyDispatcher<TContext> : BackgroundService
         }
         catch (Exception ex)
         {
-            // Cleanup failure is not fatal — StaleJobRecoveryTask will still recover the orphaned
+            // Cleanup failure is not fatal — StaleJobRecovery will still recover the orphaned
             // Processing rows on its normal cadence. Log loudly because it means the DB was in
             // a bad state (connection lost, timeout) exactly when we needed it.
-            _logger.LogError(ex, "Failed to un-claim {Count} undelivered jobs; StaleJobRecoveryTask will recover", jobs.Count - delivered);
+            _logger.LogError(ex, "Failed to un-claim {Count} undelivered jobs; StaleJobRecovery will recover", jobs.Count - delivered);
         }
     }
 

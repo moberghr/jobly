@@ -11,7 +11,7 @@ public interface IRecurringJobPublisher
 {
     /// <summary>
     /// Registers or updates a recurring job definition. Does not create job instances — that is
-    /// handled by <c>RecurringJobSchedulerTask</c>. Acquires a distributed lock on the job name
+    /// handled by <c>RecurringJobScheduler</c>. Acquires a distributed lock on the job name
     /// and saves changes immediately (callers should NOT call SaveChanges after this method).
     /// </summary>
     Task AddOrUpdateRecurringJob<T>(T message, string name, string cron)

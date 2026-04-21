@@ -67,8 +67,8 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        var task = TestTasks.CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System);
-        var routed = await task.RunMessageRoutingAsync(routeCtx, CancellationToken.None);
+        var task = TestTasks.CreateMessageRouter(routeCtx, scopeFactory, TimeProvider.System);
+        var routed = await task.RunMessageRoutingAsync(CancellationToken.None);
 
         // Assert
         routed.ShouldBeGreaterThan(0);
@@ -102,8 +102,8 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        var task = TestTasks.CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System);
-        await task.RunMessageRoutingAsync(routeCtx, CancellationToken.None);
+        var task = TestTasks.CreateMessageRouter(routeCtx, scopeFactory, TimeProvider.System);
+        await task.RunMessageRoutingAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -135,8 +135,8 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        var task = TestTasks.CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System);
-        await task.RunMessageRoutingAsync(routeCtx, CancellationToken.None);
+        var task = TestTasks.CreateMessageRouter(routeCtx, scopeFactory, TimeProvider.System);
+        await task.RunMessageRoutingAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -154,8 +154,8 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
 
         // Act
         var ctx = _fixture.CreateContext();
-        var task = TestTasks.CreateMessageRoutingTask(ctx, scopeFactory, TimeProvider.System);
-        var routed = await task.RunMessageRoutingAsync(ctx, CancellationToken.None);
+        var task = TestTasks.CreateMessageRouter(ctx, scopeFactory, TimeProvider.System);
+        var routed = await task.RunMessageRoutingAsync(CancellationToken.None);
 
         // Assert
         routed.ShouldBe(0);
@@ -190,8 +190,8 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        var task = TestTasks.CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System);
-        var routed = await task.RunMessageRoutingAsync(routeCtx, CancellationToken.None);
+        var task = TestTasks.CreateMessageRouter(routeCtx, scopeFactory, TimeProvider.System);
+        var routed = await task.RunMessageRoutingAsync(CancellationToken.None);
 
         // Assert
         routed.ShouldBe(3);
@@ -230,8 +230,8 @@ public abstract class MessageRoutingTaskTestsBase : IAsyncLifetime
         // Act: run message routing
         var routeCtx = _fixture.CreateContext();
         var scopeFactory = CreateScopeFactory();
-        var task = TestTasks.CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System);
-        await task.RunMessageRoutingAsync(routeCtx, CancellationToken.None);
+        var task = TestTasks.CreateMessageRouter(routeCtx, scopeFactory, TimeProvider.System);
+        await task.RunMessageRoutingAsync(CancellationToken.None);
 
         // Assert: message should be Failed with a log entry explaining why
         var readCtx = _fixture.CreateContext();

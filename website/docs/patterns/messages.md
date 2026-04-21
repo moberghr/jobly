@@ -45,7 +45,7 @@ await context.SaveChangesAsync(); // Persisted atomically with your data
 ## How it works
 
 1. `Publish()` creates a `Job` entity with `Kind = Message` in the database
-2. `MessageRoutingTask` discovers all registered `IMessageHandler<T>` implementations
+2. `MessageRouter` discovers all registered `IMessageHandler<T>` implementations
 3. For each handler, a child `Job` is created with `Kind = Job` and the handler pre-assigned
 4. Workers pick up each child job and execute it independently
 5. When all children complete, the parent message transitions to `Completed` or `Failed`
