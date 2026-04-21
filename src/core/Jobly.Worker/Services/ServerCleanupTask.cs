@@ -48,12 +48,20 @@ public class ServerCleanupTask<TContext> : ServerTaskBase<TContext>
         {
             if (now - server.LastHeartbeatTime > Configuration.HealthCheckTimeout)
             {
-                context.Set<Server>().Remove(server);
-
                 var workers = await context.Set<Jobly.Core.Data.Entities.Worker>()
-                    .Where(w => w.ServerId == server.Id)
+                    .Where(x => x.ServerId == server.Id)
                     .ToListAsync(ct);
                 context.Set<Jobly.Core.Data.Entities.Worker>().RemoveRange(workers);
+
+                // WorkerGroup rows are FK-linked to Server without OnDelete(Cascade) — this is
+                // the crash-recovery path, so we must clean them up here. JoblyServerRegistration.
+                // StopAsync handles the graceful-shutdown case; this handles the ungraceful one.
+                var workerGroups = await context.Set<Jobly.Core.Data.Entities.WorkerGroup>()
+                    .Where(x => x.ServerId == server.Id)
+                    .ToListAsync(ct);
+                context.Set<Jobly.Core.Data.Entities.WorkerGroup>().RemoveRange(workerGroups);
+
+                context.Set<Server>().Remove(server);
 
                 removedCount++;
             }

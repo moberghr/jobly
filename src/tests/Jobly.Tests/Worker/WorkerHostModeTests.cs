@@ -176,11 +176,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
     private static ServerRegistrationState PopulateState(Guid groupEntityId, int workerCount)
     {
         var state = new ServerRegistrationState();
-        var workerIds = new List<Guid>();
-        for (var i = 0; i < workerCount; i++)
-        {
-            workerIds.Add(Guid.NewGuid());
-        }
+        var workerIds = Enumerable.Range(0, workerCount).Select(_ => Guid.NewGuid()).ToList();
 
         state.Set(
         [

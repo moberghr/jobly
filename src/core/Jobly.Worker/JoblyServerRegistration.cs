@@ -113,10 +113,9 @@ public class JoblyServerRegistration<TContext> : IHostedService
             .ToListAsync(cancellationToken);
         context.Set<Jobly.Core.Data.Entities.Worker>().RemoveRange(workers);
 
-        // WorkerGroup rows are FK-linked to Server without OnDelete(Cascade); we must remove
-        // them ourselves or they accumulate on every restart. StaleJobRecoveryTask/ServerCleanup
-        // likewise need to know about this coupling — both currently clean Worker + Server rows
-        // only, relying on this path for correctness.
+        // WorkerGroup rows are FK-linked to Server without OnDelete(Cascade) — we must remove
+        // them ourselves on graceful shutdown. The crash-recovery path is covered by
+        // ServerCleanupTask, which cleans up WorkerGroup rows for timed-out servers.
         var workerGroups = await context.Set<Jobly.Core.Data.Entities.WorkerGroup>()
             .Where(x => x.ServerId == server.Id)
             .ToListAsync(cancellationToken);

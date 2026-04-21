@@ -245,6 +245,60 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         server.ShouldBeNull();
     }
 
+    // Pins the crash-recovery contract: WorkerGroup rows are FK-linked to Server without
+    // OnDelete(Cascade), so ServerCleanupTask must delete them explicitly. Without this,
+    // WorkerGroup rows from crashed servers would accumulate indefinitely.
+    [TimedFact]
+    public async Task ServerCleanup_DeadServer_RemovesWorkerGroupsAndWorkers()
+    {
+        // Arrange — stale server with a worker group and worker row
+        var ctx = _fixture.CreateContext();
+        var serverId = Guid.NewGuid();
+        ctx.Set<Server>().Add(new Server
+        {
+            Id = serverId,
+            StartedTime = DateTime.UtcNow.AddHours(-2),
+            LastHeartbeatTime = DateTime.UtcNow.AddMinutes(-10),
+            ServiceCount = 1,
+        });
+        var groupId = Guid.NewGuid();
+        ctx.Set<Jobly.Core.Data.Entities.WorkerGroup>().Add(new Jobly.Core.Data.Entities.WorkerGroup
+        {
+            Id = groupId,
+            ServerId = serverId,
+            WorkerCount = 1,
+            Queues = "default",
+            PollingIntervalMs = 1000,
+        });
+        ctx.Set<Jobly.Core.Data.Entities.Worker>().Add(new Jobly.Core.Data.Entities.Worker
+        {
+            Id = Guid.NewGuid(),
+            ServerId = serverId,
+            StartedTime = DateTime.UtcNow.AddHours(-2),
+            LastHeartbeatTime = DateTime.UtcNow.AddMinutes(-10),
+            WorkerGroupId = groupId,
+        });
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        // Act
+        var cleanCtx = _fixture.CreateContext();
+        await TestTasks
+            .CreateServerCleanupTask(cleanCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
+            .CleanUpServersAsync(cleanCtx, Xunit.TestContext.Current.CancellationToken);
+
+        // Assert — worker groups and workers both gone
+        var readCtx = _fixture.CreateContext();
+        var groups = await readCtx.Set<Jobly.Core.Data.Entities.WorkerGroup>()
+            .Where(x => x.ServerId == serverId)
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
+        groups.ShouldBe(0);
+
+        var workers = await readCtx.Set<Jobly.Core.Data.Entities.Worker>()
+            .Where(x => x.ServerId == serverId)
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
+        workers.ShouldBe(0);
+    }
+
     [TimedFact]
     public async Task AggregateCounters_NoCounters_ReturnsZero()
     {
