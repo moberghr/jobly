@@ -2,8 +2,6 @@ using Jobly.Core;
 using Jobly.Core.Data;
 using Jobly.Core.Data.Queries;
 using Jobly.Core.Notifications;
-using Medallion.Threading;
-using Medallion.Threading.Postgres;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,8 +30,8 @@ public static class PostgreSqlServiceConfiguration
         builder.Services.TryAddSingleton<IDatabaseExceptionClassifier, PostgresExceptionClassifier>();
         builder.Services.TryAddSingleton<IJoblyNotificationTransportFactory, PostgresNotificationTransportFactory>();
 
-        builder.Services.TryAddSingleton<IDistributedLockProvider>(sp =>
-            new PostgresDistributedSynchronizationProvider(ResolveConnectionString<TContext>(sp)));
+        builder.Services.TryAddSingleton<IJoblyLockProvider>(sp =>
+            new PostgresLockProvider(ResolveConnectionString<TContext>(sp)));
 
         return builder;
     }

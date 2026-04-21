@@ -1,9 +1,7 @@
+using Jobly.Core;
 using Jobly.Provider.PostgreSql;
 using Jobly.Provider.SqlServer;
 using Jobly.Worker;
-using Medallion.Threading;
-using Medallion.Threading.Postgres;
-using Medallion.Threading.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,43 +9,47 @@ using Shouldly;
 
 namespace Jobly.Tests.Reliability;
 
+// Medallion (IDistributedLockProvider) is now an implementation detail of each provider
+// package — only IJoblyLockProvider crosses the package boundary. These tests assert the
+// contract: after UsePostgreSql() / UseSqlServer(), an IJoblyLockProvider resolves and is
+// of the provider-specific adapter type. No Medallion types appear in test code.
 [Trait("Category", "NoDb")]
 public class DistributedLockRegistrationTests
 {
     [TimedFact]
-    public void AddJoblyWorker_PostgreSql_ResolvesPostgresLockProvider()
+    public void AddJoblyWorker_PostgreSql_RegistersPostgresLockProvider()
     {
         var services = new ServiceCollection();
         services.AddDbContext<TestContext>(o => o.UseNpgsql("Host=localhost;Database=test;Username=user;Password=secret"));
         services.AddJoblyWorker<TestContext>(opt => opt.UsePostgreSql());
 
         using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
-        var provider = sp.GetRequiredService<IDistributedLockProvider>();
+        var provider = sp.GetRequiredService<IJoblyLockProvider>();
 
-        provider.ShouldBeOfType<PostgresDistributedSynchronizationProvider>();
+        provider.GetType().Name.ShouldBe("PostgresLockProvider");
     }
 
     [TimedFact]
-    public void AddJoblyWorker_SqlServer_ResolvesSqlServerLockProvider()
+    public void AddJoblyWorker_SqlServer_RegistersSqlServerLockProvider()
     {
         var services = new ServiceCollection();
         services.AddDbContext<TestContext>(o => o.UseSqlServer("Server=localhost;Database=test;User Id=sa;Password=secret;TrustServerCertificate=True"));
         services.AddJoblyWorker<TestContext>(opt => opt.UseSqlServer());
 
         using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
-        var provider = sp.GetRequiredService<IDistributedLockProvider>();
+        var provider = sp.GetRequiredService<IJoblyLockProvider>();
 
-        provider.ShouldBeOfType<SqlDistributedSynchronizationProvider>();
+        provider.GetType().Name.ShouldBe("SqlServerLockProvider");
     }
 
     /// <summary>
-    /// Verifies the fix reads the connection string from DbContextOptions extensions
+    /// Verifies the provider reads the connection string from DbContextOptions extensions
     /// instead of resolving a DbContext. The old code created a scope and resolved the
     /// context — which, after Npgsql opens a pooled connection, can strip the password
     /// via PersistSecurityInfo=false.
     ///
     /// Poison the TestContext registration so any attempt to resolve it throws.
-    /// The fix must succeed without ever resolving a DbContext.
+    /// The provider factory must succeed without ever resolving a DbContext.
     /// </summary>
     [TimedFact]
     public void AddJoblyWorker_PostgreSql_ResolvesFromOptionsExtension_NotFromContext()
@@ -60,9 +62,9 @@ public class DistributedLockRegistrationTests
         services.AddScoped<TestContext>(_ => throw new InvalidOperationException("DbContext should not be resolved for connection string"));
 
         using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
-        var provider = sp.GetRequiredService<IDistributedLockProvider>();
+        var provider = sp.GetRequiredService<IJoblyLockProvider>();
 
-        provider.ShouldBeOfType<PostgresDistributedSynchronizationProvider>();
+        provider.GetType().Name.ShouldBe("PostgresLockProvider");
     }
 
     /// <summary>
@@ -79,9 +81,9 @@ public class DistributedLockRegistrationTests
         services.AddScoped<TestContext>(_ => throw new InvalidOperationException("DbContext should not be resolved for connection string"));
 
         using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
-        var provider = sp.GetRequiredService<IDistributedLockProvider>();
+        var provider = sp.GetRequiredService<IJoblyLockProvider>();
 
-        provider.ShouldBeOfType<SqlDistributedSynchronizationProvider>();
+        provider.GetType().Name.ShouldBe("SqlServerLockProvider");
     }
 
     [TimedFact]
@@ -99,20 +101,5 @@ public class DistributedLockRegistrationTests
 
         extension.ShouldNotBeNull();
         extension.ConnectionString.ShouldBe(connectionString);
-    }
-
-    [TimedFact]
-    public void AddJoblyWorker_PostgreSql_LockProviderCreatesLock()
-    {
-        var services = new ServiceCollection();
-        services.AddDbContext<TestContext>(o => o.UseNpgsql("Host=localhost;Database=test;Username=user;Password=secret"));
-        services.AddJoblyWorker<TestContext>(opt => opt.UsePostgreSql());
-
-        using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
-        var provider = sp.GetRequiredService<IDistributedLockProvider>();
-        var distributedLock = provider.CreateLock("test-lock");
-
-        distributedLock.ShouldNotBeNull();
-        distributedLock.Name.ShouldBe("test-lock");
     }
 }

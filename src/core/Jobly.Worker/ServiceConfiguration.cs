@@ -63,12 +63,10 @@ public static class ServiceConfiguration
             });
         });
 
-        // IDistributedLockProvider is registered by the provider package (Jobly.PostgreSql /
-        // Jobly.SqlServer) via their UsePostgreSql / UseSqlServer builder extensions. If the
-        // user never calls one, IJoblyLockProvider resolution fails fast with a clear message
-        // the first time a lock is requested.
-        services.AddSingleton<IJoblyLockProvider, JoblyLockProvider>();
-
+        // IJoblyLockProvider is registered by the provider package (Jobly.Provider.PostgreSql /
+        // Jobly.Provider.SqlServer) via their UsePostgreSql / UseSqlServer builder extensions.
+        // If the user never calls one, IJoblyLockProvider resolution fails fast the first time
+        // a lock is requested.
         services.AddSingleton<ServerRegistrationState>();
         services.AddHostedService<JoblyServerRegistration<TContext>>();
         services.AddHostedService<JoblyDispatcherHost<TContext>>();

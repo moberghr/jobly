@@ -2,8 +2,6 @@ using Jobly.Core;
 using Jobly.Core.Data;
 using Jobly.Core.Data.Queries;
 using Jobly.Core.Notifications;
-using Medallion.Threading;
-using Medallion.Threading.SqlServer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,8 +30,8 @@ public static class SqlServerServiceConfiguration
         builder.Services.TryAddSingleton<IDatabaseExceptionClassifier, SqlServerExceptionClassifier>();
         builder.Services.TryAddSingleton<IJoblyNotificationTransportFactory, SqlServerNotificationTransportFactory>();
 
-        builder.Services.TryAddSingleton<IDistributedLockProvider>(sp =>
-            new SqlDistributedSynchronizationProvider(ResolveConnectionString<TContext>(sp)));
+        builder.Services.TryAddSingleton<IJoblyLockProvider>(sp =>
+            new SqlServerLockProvider(ResolveConnectionString<TContext>(sp)));
 
         return builder;
     }

@@ -1,15 +1,16 @@
 using Jobly.Core;
 using Medallion.Threading;
+using Medallion.Threading.SqlServer;
 
-namespace Jobly.Worker;
+namespace Jobly.Provider.SqlServer;
 
-internal class JoblyLockProvider : IJoblyLockProvider
+internal sealed class SqlServerLockProvider : IJoblyLockProvider
 {
     private readonly IDistributedLockProvider _inner;
 
-    public JoblyLockProvider(IDistributedLockProvider inner)
+    public SqlServerLockProvider(string connectionString)
     {
-        _inner = inner;
+        _inner = new SqlDistributedSynchronizationProvider(connectionString);
     }
 
     public async Task<IAsyncDisposable?> TryAcquireAsync(string name, TimeSpan timeout, CancellationToken ct)
