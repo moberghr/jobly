@@ -57,8 +57,8 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
         var jobId = await InsertStaleJob(_fixture, metadata: null);
 
         var result = await TestTasks
-            .CreateStaleJobRecoveryTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: true)
-            .RecoverStaleJobsAsync(_fixture.CreateContext(), CancellationToken.None);
+            .CreateStaleJobRecovery(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: true)
+            .RecoverStaleJobsAsync(CancellationToken.None);
 
         result.Requeued.ShouldBe(1);
         result.Failed.ShouldBe(0);
@@ -73,8 +73,8 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
         var jobId = await InsertStaleJob(_fixture, metadata: null);
 
         var result = await TestTasks
-            .CreateStaleJobRecoveryTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: false)
-            .RecoverStaleJobsAsync(_fixture.CreateContext(), CancellationToken.None);
+            .CreateStaleJobRecovery(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: false)
+            .RecoverStaleJobsAsync(CancellationToken.None);
 
         result.Failed.ShouldBe(1);
         result.Requeued.ShouldBe(0);
@@ -102,8 +102,8 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
         var jobId = await InsertStaleJob(_fixture, metadata: SerializeCanBeRestarted(true));
 
         await TestTasks
-            .CreateStaleJobRecoveryTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: false)
-            .RecoverStaleJobsAsync(_fixture.CreateContext(), CancellationToken.None);
+            .CreateStaleJobRecovery(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: false)
+            .RecoverStaleJobsAsync(CancellationToken.None);
 
         var job = await _fixture.CreateContext().Set<Job>().FirstAsync(x => x.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Enqueued);
@@ -115,8 +115,8 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
         var jobId = await InsertStaleJob(_fixture, metadata: SerializeCanBeRestarted(false));
 
         await TestTasks
-            .CreateStaleJobRecoveryTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: true)
-            .RecoverStaleJobsAsync(_fixture.CreateContext(), CancellationToken.None);
+            .CreateStaleJobRecovery(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: true)
+            .RecoverStaleJobsAsync(CancellationToken.None);
 
         var readCtx = _fixture.CreateContext();
         var job = await readCtx.Set<Job>().FirstAsync(x => x.Id == jobId, Xunit.TestContext.Current.CancellationToken);
@@ -148,8 +148,8 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await TestTasks
-            .CreateStaleJobRecoveryTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: true)
-            .RecoverStaleJobsAsync(_fixture.CreateContext(), CancellationToken.None);
+            .CreateStaleJobRecovery(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: true)
+            .RecoverStaleJobsAsync(CancellationToken.None);
 
         var readCtx = _fixture.CreateContext();
         var job = await readCtx.Set<Job>().FirstAsync(x => x.Id == jobId, Xunit.TestContext.Current.CancellationToken);
@@ -201,8 +201,8 @@ public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var result = await TestTasks
-            .CreateStaleJobRecoveryTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: true)
-            .RecoverStaleJobsAsync(_fixture.CreateContext(), CancellationToken.None);
+            .CreateStaleJobRecovery(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5), restartByDefault: true)
+            .RecoverStaleJobsAsync(CancellationToken.None);
 
         result.Total.ShouldBe(3);
         result.Requeued.ShouldBe(2);

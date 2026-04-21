@@ -173,8 +173,8 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         // Act
         var recoveryCtx = _fixture.CreateContext();
         var result = await TestTasks
-            .CreateStaleJobRecoveryTask(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
-            .RecoverStaleJobsAsync(recoveryCtx, Xunit.TestContext.Current.CancellationToken);
+            .CreateStaleJobRecovery(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
+            .RecoverStaleJobsAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         result.Requeued.ShouldBe(1);
@@ -205,8 +205,8 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         // Act
         var recoveryCtx = _fixture.CreateContext();
         var result = await TestTasks
-            .CreateStaleJobRecoveryTask(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
-            .RecoverStaleJobsAsync(recoveryCtx, Xunit.TestContext.Current.CancellationToken);
+            .CreateStaleJobRecovery(recoveryCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
+            .RecoverStaleJobsAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         result.Total.ShouldBe(0);

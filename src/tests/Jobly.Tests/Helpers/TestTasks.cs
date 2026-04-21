@@ -86,24 +86,22 @@ public static class TestTasks
             Jobly.Tests.Helpers.TestTasks.QueriesFor(context));
     }
 
-    public static StaleJobRecoveryTask<TContext> CreateStaleJobRecoveryTask<TContext>(
+    public static StaleJobRecovery<TContext> CreateStaleJobRecovery<TContext>(
         TContext context,
         TimeProvider timeProvider,
         TimeSpan invisibilityTimeout,
         bool restartByDefault = true)
         where TContext : DbContext
     {
-        return new StaleJobRecoveryTask<TContext>(
-            EmptyScopeFactory,
-            NullLogger<StaleJobRecoveryTask<TContext>>.Instance,
+        return new StaleJobRecovery<TContext>(
+            context,
+            timeProvider,
+            Jobly.Tests.Helpers.TestTasks.QueriesFor(context),
             Options.Create(new JoblyWorkerConfiguration
             {
                 InvisibilityTimeout = invisibilityTimeout,
                 RestartStaleJobsByDefault = restartByDefault,
-            }),
-            NoOpLockProvider.Instance,
-            timeProvider,
-            Jobly.Tests.Helpers.TestTasks.QueriesFor(context));
+            }));
     }
 
     public static ServerCleanup<TContext> CreateServerCleanup<TContext>(

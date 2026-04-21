@@ -1,4 +1,3 @@
-using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Data.Queries;
 using Jobly.Core.Entities;
@@ -6,38 +5,46 @@ using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
 using Jobly.Core.NoRestart;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Jobly.Worker.Services;
 
-public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
+/// <summary>
+/// Finds jobs in <see cref="State.Processing"/> whose worker stopped refreshing
+/// <c>LastKeepAlive</c> past <see cref="JoblyWorkerConfiguration.InvisibilityTimeout"/>
+/// and either requeues them, fails them, or honors a pending cancellation.
+/// </summary>
+public sealed class StaleJobRecovery<TContext> : IServerTask
     where TContext : DbContext
 {
+    private readonly TContext _context;
+    private readonly TimeProvider _time;
     private readonly IJoblySqlQueries<TContext> _sqlQueries;
+    private readonly JoblyWorkerConfiguration _configuration;
 
-    public StaleJobRecoveryTask(
-        IServiceScopeFactory scopeFactory,
-        ILogger<StaleJobRecoveryTask<TContext>> logger,
-        IOptions<JoblyWorkerConfiguration> configuration,
-        IJoblyLockProvider lockProvider,
-        TimeProvider timeProvider,
-        IJoblySqlQueries<TContext> sqlQueries)
-        : base(scopeFactory, logger, configuration, timeProvider, "jobly:stale-job-recovery", lockProvider)
+    public StaleJobRecovery(
+        TContext context,
+        TimeProvider time,
+        IJoblySqlQueries<TContext> sqlQueries,
+        IOptions<JoblyWorkerConfiguration> configuration)
     {
+        _context = context;
+        _time = time;
         _sqlQueries = sqlQueries;
+        _configuration = configuration.Value;
     }
 
-    protected override string TaskName => "StaleJobRecovery";
+    public string Name => "StaleJobRecovery";
 
-    protected override bool RerunImmediately => false;
+    public string? LockKey => "jobly:stale-job-recovery";
 
-    protected override TimeSpan DefaultInterval => Configuration.StaleJobRecoveryInterval;
+    public TimeSpan? DefaultInterval => _configuration.StaleJobRecoveryInterval;
 
-    protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
+    public bool RerunImmediately => false;
+
+    public async Task<string?> ExecuteAsync(CancellationToken ct)
     {
-        var result = await RecoverStaleJobsAsync(context, ct);
+        var result = await RecoverStaleJobsAsync(ct);
         if (result.Total == 0)
         {
             return null;
@@ -46,14 +53,14 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
         return $"Recovered {result.Total} stale jobs ({result.Requeued} requeued, {result.Failed} failed, {result.Deleted} deleted)";
     }
 
-    public async Task<StaleJobRecoveryResult> RecoverStaleJobsAsync(TContext context, CancellationToken ct)
+    internal async Task<StaleJobRecoveryResult> RecoverStaleJobsAsync(CancellationToken ct)
     {
-        var now = TimeProvider.GetUtcNow().UtcDateTime;
-        var cutoff = now - Configuration.InvisibilityTimeout;
-        var restartByDefault = Configuration.RestartStaleJobsByDefault;
+        var now = _time.GetUtcNow().UtcDateTime;
+        var cutoff = now - _configuration.InvisibilityTimeout;
+        var restartByDefault = _configuration.RestartStaleJobsByDefault;
 
-        await using var transaction = await context.Database.BeginTransactionAsync(ct);
-        var staleJobs = await _sqlQueries.LockStaleProcessingJobsAsync(context, cutoff, ct);
+        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+        var staleJobs = await _sqlQueries.LockStaleProcessingJobsAsync(_context, cutoff, ct);
 
         var requeued = 0;
         var failed = 0;
@@ -66,12 +73,11 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
 
             if (job.CancellationMode != CancellationMode.None)
             {
-                // User intended to cancel this job — honor the intent
                 job.CurrentState = State.Deleted;
                 job.CancellationMode = CancellationMode.None;
                 job.ExpireAt = now.AddDays(1);
-                context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
-                context.Set<JobLog>().Add(new JobLog
+                _context.Set<Counter>().Add(new Counter { Key = "stats:deleted", Value = 1 });
+                _context.Set<JobLog>().Add(new JobLog
                 {
                     JobId = job.Id,
                     EventType = "Deleted",
@@ -89,7 +95,7 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
             if (canRestart)
             {
                 job.CurrentState = State.Enqueued;
-                context.Set<JobLog>().Add(new JobLog
+                _context.Set<JobLog>().Add(new JobLog
                 {
                     JobId = job.Id,
                     EventType = "Requeued",
@@ -103,8 +109,8 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
             {
                 job.CurrentState = State.Failed;
                 job.ExpireAt = null;
-                context.Set<Counter>().Add(new Counter { Key = "stats:failed", Value = 1 });
-                context.Set<JobLog>().Add(new JobLog
+                _context.Set<Counter>().Add(new Counter { Key = "stats:failed", Value = 1 });
+                _context.Set<JobLog>().Add(new JobLog
                 {
                     JobId = job.Id,
                     EventType = "Failed",
@@ -116,7 +122,7 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
             }
         }
 
-        await context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
 
         return new StaleJobRecoveryResult(requeued, failed, deleted);
