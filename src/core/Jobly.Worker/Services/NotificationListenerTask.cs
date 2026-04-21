@@ -18,17 +18,23 @@ public class NotificationListenerTask<TContext> : BackgroundService
     private readonly IJoblyNotificationTransport _transport;
     private readonly JoblyDatabasePushConfiguration _options;
     private readonly JoblyWorkerConfiguration _workerConfiguration;
+    private readonly OrchestrationSignalRegistry<TContext> _orchestrationRegistry;
+    private readonly MessageRoutingSignalRegistry<TContext> _routingRegistry;
     private readonly ILogger<NotificationListenerTask<TContext>> _logger;
 
     public NotificationListenerTask(
         IJoblyNotificationTransport transport,
         JoblyDatabasePushConfiguration options,
         IOptions<JoblyWorkerConfiguration> workerConfiguration,
+        OrchestrationSignalRegistry<TContext> orchestrationRegistry,
+        MessageRoutingSignalRegistry<TContext> routingRegistry,
         ILogger<NotificationListenerTask<TContext>> logger)
     {
         _transport = transport;
         _options = options;
         _workerConfiguration = workerConfiguration.Value;
+        _orchestrationRegistry = orchestrationRegistry;
+        _routingRegistry = routingRegistry;
         _logger = logger;
     }
 
@@ -96,14 +102,16 @@ public class NotificationListenerTask<TContext> : BackgroundService
         }
     }
 
-    private static void DrainSignals()
+    private void DrainSignals()
     {
         JoblyDispatcher<TContext>.SignalAll();
         MessageRoutingTask<TContext>.SignalRouting();
         OrchestrationTask<TContext>.SignalOrchestrator();
+        _routingRegistry.Signal();
+        _orchestrationRegistry.Signal();
     }
 
-    private static void Dispatch(Notification notification)
+    private void Dispatch(Notification notification)
     {
         switch (notification.Kind)
         {
@@ -112,9 +120,11 @@ public class NotificationListenerTask<TContext> : BackgroundService
                 break;
             case NotificationKind.MessageEnqueued:
                 MessageRoutingTask<TContext>.SignalRouting();
+                _routingRegistry.Signal();
                 break;
             case NotificationKind.JobFinalized:
                 OrchestrationTask<TContext>.SignalOrchestrator();
+                _orchestrationRegistry.Signal();
                 break;
             default:
                 break;

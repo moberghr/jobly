@@ -68,6 +68,8 @@ public static class ServiceConfiguration
         // If the user never calls one, IJoblyLockProvider resolution fails fast the first time
         // a lock is requested.
         services.AddSingleton<ServerRegistrationState>();
+        services.AddSingleton<OrchestrationSignalRegistry<TContext>>();
+        services.AddSingleton<MessageRoutingSignalRegistry<TContext>>();
         services.AddHostedService<JoblyServerRegistration<TContext>>();
         services.AddHostedService<JoblyDispatcherHost<TContext>>();
         services.AddHostedService<JoblySingleWorkerHost<TContext>>();
