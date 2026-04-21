@@ -87,7 +87,7 @@ public class JoblySingleWorkerHost<TContext> : IHostedService
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        var tasks = _workers.Select(worker => worker.StopAsync(cancellationToken));
+        var tasks = _workers.Select(x => x.StopAsync(cancellationToken));
         await Task.WhenAll(tasks);
     }
 }

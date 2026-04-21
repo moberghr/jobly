@@ -70,7 +70,7 @@ public static class ServiceConfiguration
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
 
-        // Default no-op transport. AddJoblyDatabasePush<TContext>() replaces this with a
+        // Default no-op transport. opt.UseDatabasePush() (inside the AddJobly/AddJoblyWorker lambda) replaces this with a
         // provider-specific implementation (Postgres LISTEN/NOTIFY or SQL Server Service Broker).
         services.TryAddSingleton<IJoblyNotificationTransport, NullNotificationTransport>();
 

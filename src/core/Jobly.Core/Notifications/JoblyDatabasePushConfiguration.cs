@@ -1,7 +1,7 @@
 namespace Jobly.Core.Notifications;
 
 /// <summary>
-/// Options for <c>AddJoblyDatabasePush()</c>. Defaults are sensible; override only if you
+/// Options for <c>opt.UseDatabasePush() (inside the AddJobly/AddJoblyWorker lambda)</c>. Defaults are sensible; override only if you
 /// need to share a channel name with an external system or tune reconnect behavior.
 /// </summary>
 public class JoblyDatabasePushConfiguration

@@ -1,3 +1,4 @@
+using Jobly.Core.Data.Entities;
 using Jobly.Core.Data.Queries;
 using Jobly.Core.Notifications;
 using Jobly.Tests.Fixtures;
@@ -31,45 +32,44 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [TimedFact]
-    public async Task DispatcherHost_UseDispatcherFalse_DoesNotMutateState()
+    public async Task DispatcherHost_UseDispatcherFalse_IsSilentNoOp()
     {
         // Arrange — state pre-populated as though registration ran
-        var groupId = Guid.NewGuid();
-        var state = PopulateState(groupEntityId: groupId, workerCount: 1);
+        var state = PopulateState(groupEntityId: Guid.NewGuid(), workerCount: 1);
         var host = CreateDispatcherHost(useDispatcher: false, state);
 
         // Act
         await host.StartAsync(Xunit.TestContext.Current.CancellationToken);
         await host.StopAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Assert — state is read-only from the host's perspective; verify it wasn't touched
-        state.Groups.Count.ShouldBe(1);
-        state.Groups[0].GroupEntityId.ShouldBe(groupId);
+        // Assert — the wrong-mode host must not write any side-effect rows. JoblyServerRegistration
+        // owns Server/Worker/WorkerGroup insertion; a host that accidentally duplicates that work
+        // would show up here.
+        await AssertNoServerSideEffectsAsync();
     }
 
     [TimedFact]
-    public async Task DispatcherHost_UseDispatcherTrue_StartsAndStopsCleanly()
+    public async Task DispatcherHost_UseDispatcherTrue_CompletesLifecycleWithoutThrowing()
     {
         // Arrange
-        var groupId = Guid.NewGuid();
-        var state = PopulateState(groupEntityId: groupId, workerCount: 1);
+        var state = PopulateState(groupEntityId: Guid.NewGuid(), workerCount: 1);
         var host = CreateDispatcherHost(useDispatcher: true, state);
 
-        // Act
+        // Act — the dispatcher and its workers actually start (scope factory points at the real
+        // test DB), poll briefly, then stop. The full job-processing loop is covered by integration
+        // tests; here we just pin the DI wiring + StartAsync/StopAsync round-trip.
         await host.StartAsync(Xunit.TestContext.Current.CancellationToken);
         await host.StopAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Assert — state remains intact after the dispatcher mode runs its lifecycle
-        state.Groups.Count.ShouldBe(1);
-        state.Groups[0].GroupEntityId.ShouldBe(groupId);
+        // Assert — host consumes state, doesn't produce it; no Server/Worker/WorkerGroup rows.
+        await AssertNoServerSideEffectsAsync();
     }
 
     [TimedFact]
-    public async Task SingleWorkerHost_UseDispatcherTrue_DoesNotMutateState()
+    public async Task SingleWorkerHost_UseDispatcherTrue_IsSilentNoOp()
     {
         // Arrange
-        var groupId = Guid.NewGuid();
-        var state = PopulateState(groupEntityId: groupId, workerCount: 1);
+        var state = PopulateState(groupEntityId: Guid.NewGuid(), workerCount: 1);
         var host = CreateSingleWorkerHost(useDispatcher: true, state);
 
         // Act
@@ -77,16 +77,14 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
         await host.StopAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
-        state.Groups.Count.ShouldBe(1);
-        state.Groups[0].GroupEntityId.ShouldBe(groupId);
+        await AssertNoServerSideEffectsAsync();
     }
 
     [TimedFact]
-    public async Task SingleWorkerHost_UseDispatcherFalse_StartsAndStopsCleanly()
+    public async Task SingleWorkerHost_UseDispatcherFalse_CompletesLifecycleWithoutThrowing()
     {
         // Arrange
-        var groupId = Guid.NewGuid();
-        var state = PopulateState(groupEntityId: groupId, workerCount: 1);
+        var state = PopulateState(groupEntityId: Guid.NewGuid(), workerCount: 1);
         var host = CreateSingleWorkerHost(useDispatcher: false, state);
 
         // Act
@@ -94,8 +92,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
         await host.StopAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
-        state.Groups.Count.ShouldBe(1);
-        state.Groups[0].GroupEntityId.ShouldBe(groupId);
+        await AssertNoServerSideEffectsAsync();
     }
 
     [TimedFact]
@@ -148,6 +145,19 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
             TestTasks.QueriesFromScope<TestContext>(scopeFactory),
             state,
             NullLoggerFactory.Instance);
+    }
+
+    private async Task AssertNoServerSideEffectsAsync()
+    {
+        var ctx = _fixture.CreateContext();
+        var servers = await ctx.Set<Server>().CountAsync(Xunit.TestContext.Current.CancellationToken);
+        servers.ShouldBe(0, "Worker hosts must consume ServerRegistrationState — not duplicate JoblyServerRegistration's DB inserts.");
+
+        var workerGroups = await ctx.Set<Jobly.Core.Data.Entities.WorkerGroup>().CountAsync(Xunit.TestContext.Current.CancellationToken);
+        workerGroups.ShouldBe(0);
+
+        var workers = await ctx.Set<Jobly.Core.Data.Entities.Worker>().CountAsync(Xunit.TestContext.Current.CancellationToken);
+        workers.ShouldBe(0);
     }
 
     private IServiceScopeFactory BuildScopeFactory()

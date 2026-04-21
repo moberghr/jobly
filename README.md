@@ -100,6 +100,16 @@ builder.Services.AddJobly<AppDbContext>(opt =>
 });
 ```
 
+To bind configuration from `appsettings.json`, use `BindConfiguration` inside the lambda — provider opt-in must still be an explicit call since it's a DI registration, not a config field:
+
+```csharp
+builder.Services.AddJoblyWorker<AppDbContext>(opt =>
+{
+    opt.BindConfiguration(builder.Configuration.GetSection("Jobly"));
+    opt.UsePostgreSql();
+});
+```
+
 For fine-grained control, use worker groups to assign different queues and polling intervals:
 
 ```csharp

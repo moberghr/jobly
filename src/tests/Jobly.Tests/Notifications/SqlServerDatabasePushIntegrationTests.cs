@@ -11,7 +11,7 @@ using Shouldly;
 namespace Jobly.Tests.Notifications;
 
 /// <summary>
-/// End-to-end integration tests for AddJoblyDatabasePush on SQL Server (Service Broker).
+/// End-to-end integration tests for UseDatabasePush on SQL Server (Service Broker).
 /// Mirrors PostgresDatabasePushIntegrationTests — each test starts a fresh JoblyTestServer
 /// with UseDispatcher=true, long PollingInterval, and DB push enabled, then asserts that
 /// jobs are picked up quickly via push (not via the long poll).

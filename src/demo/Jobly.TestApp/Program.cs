@@ -6,6 +6,7 @@ using Jobly.Core.Handlers;
 using Jobly.Core.Helper;
 using Jobly.Core.Mutex;
 using Jobly.Core.Retry;
+using Jobly.Provider.PostgreSql;
 using Jobly.Test.Shared;
 using Jobly.UI;
 using Jobly.UI.Extensions;
@@ -35,6 +36,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddSingleton<IJoblyUIExtension, RetryUIExtension>();
 builder.Services.AddJoblyWorker<TestContext>(options =>
 {
+    options.UsePostgreSql();
+
     options.WorkerCount = 10;
     options.ServerName = "jobly-demo-server";
     options.DefaultQueue = "default";

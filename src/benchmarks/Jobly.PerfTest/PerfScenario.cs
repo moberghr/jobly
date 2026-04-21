@@ -4,6 +4,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Provider.PostgreSql;
 using Jobly.Worker;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -67,6 +68,7 @@ public sealed class PerfScenario : IAsyncDisposable
 
                 services.AddJoblyWorker<TestContext>(config =>
                 {
+                    config.UsePostgreSql();
                     config.WorkerCount = 5;
                     config.Queues = ["default"];
 

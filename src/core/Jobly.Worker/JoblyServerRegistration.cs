@@ -109,9 +109,19 @@ public class JoblyServerRegistration<TContext> : IHostedService
         }
 
         var workers = await context.Set<Jobly.Core.Data.Entities.Worker>()
-            .Where(w => w.ServerId == server.Id)
+            .Where(x => x.ServerId == server.Id)
             .ToListAsync(cancellationToken);
         context.Set<Jobly.Core.Data.Entities.Worker>().RemoveRange(workers);
+
+        // WorkerGroup rows are FK-linked to Server without OnDelete(Cascade); we must remove
+        // them ourselves or they accumulate on every restart. StaleJobRecoveryTask/ServerCleanup
+        // likewise need to know about this coupling — both currently clean Worker + Server rows
+        // only, relying on this path for correctness.
+        var workerGroups = await context.Set<Jobly.Core.Data.Entities.WorkerGroup>()
+            .Where(x => x.ServerId == server.Id)
+            .ToListAsync(cancellationToken);
+        context.Set<Jobly.Core.Data.Entities.WorkerGroup>().RemoveRange(workerGroups);
+
         context.Set<Server>().Remove(server);
         await context.SaveChangesAsync(cancellationToken);
     }

@@ -77,7 +77,7 @@ public abstract class JoblyServerRegistrationTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
-    public async Task StopAsync_RemovesServerAndWorkerRows()
+    public async Task StopAsync_RemovesServerAndWorkerAndWorkerGroupRows()
     {
         // Arrange
         var serverId = Guid.NewGuid();
@@ -96,6 +96,13 @@ public abstract class JoblyServerRegistrationTestsBase : IAsyncLifetime
             .Where(x => x.ServerId == serverId)
             .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         workers.Count.ShouldBe(0);
+
+        // WorkerGroup rows must not be orphaned — Server→WorkerGroup FK has no DB-level
+        // cascade, so StopAsync is the only thing that cleans them up on graceful shutdown.
+        var workerGroups = await readCtx.Set<Jobly.Core.Data.Entities.WorkerGroup>()
+            .Where(x => x.ServerId == serverId)
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
+        workerGroups.Count.ShouldBe(0);
     }
 
     [TimedFact]

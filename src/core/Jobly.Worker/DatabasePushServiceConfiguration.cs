@@ -24,6 +24,17 @@ public static class DatabasePushServiceConfiguration
         Action<JoblyDatabasePushConfiguration>? configure = null)
         where TContext : DbContext
     {
+        // Fail fast at setup time if no provider has been opted into yet. Without this check
+        // the error surfaces only when the IJoblyNotificationTransport singleton is first
+        // resolved (typically inside a hosted service at app startup), which is much harder
+        // to diagnose. The ordering contract — UsePostgreSql()/UseSqlServer() must come
+        // before UseDatabasePush() — is enforced here, in the lambda, in the same call order.
+        if (!builder.Services.Any(x => x.ServiceType == typeof(IJoblyNotificationTransportFactory)))
+        {
+            throw new InvalidOperationException(
+                "UseDatabasePush requires a provider package. Call opt.UsePostgreSql() or opt.UseSqlServer() inside the AddJobly/AddJoblyWorker lambda BEFORE opt.UseDatabasePush().");
+        }
+
         var options = new JoblyDatabasePushConfiguration();
         configure?.Invoke(options);
         builder.Services.AddSingleton(options);
