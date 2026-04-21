@@ -20,16 +20,16 @@ Ships as NuGet packages: `Jobly.Core` (provider-agnostic), `Jobly.Provider.Postg
 ```bash
 # Backend (from src/)
 dotnet build Jobly.slnx
-dotnet test --project core/Jobly.Tests/Jobly.Tests.csproj                                          # Full suite (947 tests, ~2m 40s)
+dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj                                          # Full suite (947 tests, ~2m 40s)
 
 # By database requirement (CI uses this matrix)
-dotnet test --project core/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=NoDb"        # Pure-unit, no container (~6s)
-dotnet test --project core/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=PostgreSql"  # PG-backed (~1m)
-dotnet test --project core/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=SqlServer"   # SQL Server-backed (~1m 40s)
+dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=NoDb"        # Pure-unit, no container (~6s)
+dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=PostgreSql"  # PG-backed (~1m)
+dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=SqlServer"   # SQL Server-backed (~1m 40s)
 
 # Run specific test suites
-dotnet test --project core/Jobly.Tests/Jobly.Tests.csproj -- --filter-namespace "Jobly.Tests.Unit"         # Unit tests only
-dotnet test --project core/Jobly.Tests/Jobly.Tests.csproj -- --filter-namespace "Jobly.Tests.Integration"  # Integration tests only
+dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-namespace "Jobly.Tests.Unit"         # Unit tests only
+dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-namespace "Jobly.Tests.Integration"  # Integration tests only
 
 # Frontend (from src/ui/)
 npm install

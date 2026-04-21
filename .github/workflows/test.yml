@@ -58,7 +58,7 @@ jobs:
       - name: Test (${{ matrix.database }})
         working-directory: src
         run: |
-          dotnet test --project core/Jobly.Tests/Jobly.Tests.csproj --no-build --configuration Debug -- \
+          dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj --no-build --configuration Debug -- \
             ${{ matrix.filter }} \
             --report-trx --report-trx-filename test-results.trx \
             --results-directory "$GITHUB_WORKSPACE/test-results"

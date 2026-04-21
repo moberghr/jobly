@@ -7,7 +7,7 @@ Mutation testing for Jobly using a dedicated SQLite-only test project (`Jobly.Te
 ## How to run
 
 ```bash
-cd src/core/Jobly.Tests.Mutation
+cd src/tests/Jobly.Tests.Mutation
 
 # Full Core run (~30 min)
 dotnet stryker --test-runner mtp
