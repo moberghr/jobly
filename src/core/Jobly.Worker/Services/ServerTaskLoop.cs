@@ -76,8 +76,10 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
     }
 
     /// <summary>
-    /// Main auto-run loop. Registers the ServerTask row, then repeatedly: reads interval,
-    /// runs the task under its lock, writes bookkeeping, waits for the next tick.
+    /// Scheduling loop. Registers the ServerTask row once, then alternates between running
+    /// one iteration (see <see cref="RunOneIterationAsync"/>) and waiting for the next tick
+    /// or wake signal. All bookkeeping + exception handling lives in the inner method; this
+    /// one is pure control flow.
     /// </summary>
     internal async Task RunAsync(CancellationToken ct)
     {
@@ -100,34 +102,10 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
                 continue;
             }
 
-            var sw = Stopwatch.StartNew();
-            var didWork = false;
-            try
-            {
-                var message = await ExecuteInLockedScopeAsync(ct);
-                if (message == null)
-                {
-                    await TryUpdateServerTaskAsync("Skipped", null, sw.Elapsed.TotalMilliseconds);
-                }
-                else
-                {
-                    didWork = true;
-                    await TryUpdateServerTaskAsync("Completed", message, sw.Elapsed.TotalMilliseconds);
-                    if (_logOnSuccess)
-                    {
-                        await TryWriteServerLogAsync("Completed", message, sw.Elapsed.TotalMilliseconds);
-                    }
-                }
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            var didWork = await RunOneIterationAsync(ct);
+            if (ct.IsCancellationRequested)
             {
                 break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Server task {Name} failed", _name);
-                await TryUpdateServerTaskAsync("Failed", ex.Message, sw.Elapsed.TotalMilliseconds);
-                await TryWriteServerLogAsync("Failed", ex.Message, sw.Elapsed.TotalMilliseconds);
             }
 
             if (didWork && _rerunImmediately)
@@ -136,6 +114,49 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
             }
 
             await WaitForNextRunAsync(interval.Value, ct);
+        }
+    }
+
+    /// <summary>
+    /// Runs the task once under its lock, writes the ServerTask / ServerLog bookkeeping, and
+    /// swallows exceptions after logging them. Returns <c>true</c> when work was done (so the
+    /// outer loop can re-run immediately if <see cref="IServerTask.RerunImmediately"/> is set),
+    /// <c>false</c> otherwise.
+    /// </summary>
+    private async Task<bool> RunOneIterationAsync(CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var message = await ExecuteInLockedScopeAsync(ct);
+            var elapsed = sw.Elapsed.TotalMilliseconds;
+
+            if (message == null)
+            {
+                await TryUpdateServerTaskAsync("Skipped", null, elapsed);
+                return false;
+            }
+
+            await TryUpdateServerTaskAsync("Completed", message, elapsed);
+            if (_logOnSuccess)
+            {
+                await TryWriteServerLogAsync("Completed", message, elapsed);
+            }
+
+            return true;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Server task {Name} failed", _name);
+            var elapsed = sw.Elapsed.TotalMilliseconds;
+            await TryUpdateServerTaskAsync("Failed", ex.Message, elapsed);
+            await TryWriteServerLogAsync("Failed", ex.Message, elapsed);
+
+            return false;
         }
     }
 
