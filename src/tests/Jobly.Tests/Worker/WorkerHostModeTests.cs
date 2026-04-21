@@ -1,5 +1,6 @@
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Data.Queries;
+using Jobly.Core.Entities;
 using Jobly.Core.Notifications;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.Helpers;
@@ -167,13 +168,42 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
     {
         var services = new ServiceCollection();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
-        services.AddSingleton<IJoblySqlQueries<TestContext>>(sp =>
-        {
-            using var scope = sp.CreateScope();
-            var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
-            return Jobly.Tests.Helpers.TestTasks.QueriesFor(ctx);
-        });
+
+        // Lifecycle smoke test — the dispatcher and single-worker both poll in their
+        // ExecuteAsync loops. Using real hand-SQL queries means each poll fires an
+        // UPDATE ... OUTPUT INSERTED.* against SQL Server, and cancelling that in-flight
+        // command on shutdown forces a round-trip for the server to acknowledge the abort
+        // (Error 3980). On a loaded CI container that can take seconds, pushing the test
+        // past its 30s TimedFact budget. A no-op fake returns empty instantly, so shutdown
+        // only has to unwind WaitAsync / Task.Delay — millisecond timescale.
+        services.AddSingleton<IJoblySqlQueries<TestContext>>(new NoopSqlQueries());
         return services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
+    }
+
+    /// <summary>
+    /// No-op implementation used only by the lifecycle smoke tests in this file. Any method
+    /// called by a code path actually under test throws — the fetch-methods return empty so
+    /// the polling loops observe "no work" without ever hitting the database.
+    /// </summary>
+    private sealed class NoopSqlQueries : IJoblySqlQueries<TestContext>
+    {
+        public Task<List<Job>> ClaimEnqueuedJobsAsync(TestContext context, string[] queues, Guid workerId, DateTime now, int limit, CancellationToken ct) =>
+            Task.FromResult(new List<Job>());
+
+        public Task<Job?> LockNextEnqueuedMessageAsync(TestContext context, CancellationToken ct) =>
+            Task.FromResult<Job?>(null);
+
+        public Task<List<Job>> LockStaleProcessingJobsAsync(TestContext context, DateTime cutoff, CancellationToken ct) =>
+            Task.FromResult(new List<Job>());
+
+        public Task<Job?> LockJobByIdAsync(TestContext context, Guid jobId, CancellationToken ct) =>
+            throw new NotSupportedException();
+
+        public Task<Job?> LockJobByIdWaitAsync(TestContext context, Guid jobId, CancellationToken ct) =>
+            throw new NotSupportedException();
+
+        public Task<List<Server>> LockAllServersAsync(TestContext context, CancellationToken ct) =>
+            Task.FromResult(new List<Server>());
     }
 
     private static ServerRegistrationState PopulateState(Guid groupEntityId, int workerCount)
