@@ -106,19 +106,17 @@ public static class TestTasks
             Jobly.Tests.Helpers.TestTasks.QueriesFor(context));
     }
 
-    public static ServerCleanupTask<TContext> CreateServerCleanupTask<TContext>(
+    public static ServerCleanup<TContext> CreateServerCleanup<TContext>(
         TContext context,
         TimeProvider timeProvider,
         TimeSpan healthCheckTimeout)
         where TContext : DbContext
     {
-        return new ServerCleanupTask<TContext>(
-            EmptyScopeFactory,
-            NullLogger<ServerCleanupTask<TContext>>.Instance,
-            Options.Create(new JoblyWorkerConfiguration { HealthCheckTimeout = healthCheckTimeout }),
-            NoOpLockProvider.Instance,
+        return new ServerCleanup<TContext>(
+            context,
             timeProvider,
-            Jobly.Tests.Helpers.TestTasks.QueriesFor(context));
+            Jobly.Tests.Helpers.TestTasks.QueriesFor(context),
+            Options.Create(new JoblyWorkerConfiguration { HealthCheckTimeout = healthCheckTimeout }));
     }
 
     // Tests call the instance methods (CleanUpServersAsync, etc.) directly — they never hit

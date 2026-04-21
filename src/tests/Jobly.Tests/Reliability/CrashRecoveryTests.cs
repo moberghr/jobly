@@ -228,8 +228,8 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 
         // Act — cleanup only removes server/workers, not jobs
         await TestTasks
-            .CreateServerCleanupTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5))
-            .CleanUpServersAsync(_fixture.CreateContext(), CancellationToken.None);
+            .CreateServerCleanup(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5))
+            .CleanUpServersAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -279,8 +279,8 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
             .CreateStaleJobRecoveryTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5))
             .RecoverStaleJobsAsync(_fixture.CreateContext(), CancellationToken.None);
         var removed = await TestTasks
-            .CreateServerCleanupTask(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5))
-            .CleanUpServersAsync(_fixture.CreateContext(), CancellationToken.None);
+            .CreateServerCleanup(_fixture.CreateContext(), TimeProvider.System, TimeSpan.FromMinutes(5))
+            .CleanUpServersAsync(CancellationToken.None);
 
         // Assert
         recovery.Requeued.ShouldBe(1);
@@ -356,8 +356,8 @@ public abstract class CrashRecoveryTestsBase : IAsyncLifetime
         // Act
         var tp = new FakeTimeProvider(now);
         await TestTasks
-            .CreateServerCleanupTask(_fixture.CreateContext(), tp, timeout)
-            .CleanUpServersAsync(_fixture.CreateContext(), CancellationToken.None);
+            .CreateServerCleanup(_fixture.CreateContext(), tp, timeout)
+            .CleanUpServersAsync(CancellationToken.None);
 
         // Assert — server should still exist
         var readCtx = _fixture.CreateContext();

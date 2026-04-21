@@ -235,8 +235,8 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         // Act
         var cleanCtx = _fixture.CreateContext();
         var count = await TestTasks
-            .CreateServerCleanupTask(cleanCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
-            .CleanUpServersAsync(cleanCtx, Xunit.TestContext.Current.CancellationToken);
+            .CreateServerCleanup(cleanCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
+            .CleanUpServersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         count.ShouldBe(1);
@@ -283,8 +283,8 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         // Act
         var cleanCtx = _fixture.CreateContext();
         await TestTasks
-            .CreateServerCleanupTask(cleanCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
-            .CleanUpServersAsync(cleanCtx, Xunit.TestContext.Current.CancellationToken);
+            .CreateServerCleanup(cleanCtx, TimeProvider.System, TimeSpan.FromMinutes(5))
+            .CleanUpServersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert — worker groups and workers both gone
         var readCtx = _fixture.CreateContext();
