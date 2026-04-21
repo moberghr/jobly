@@ -116,7 +116,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         // Act
         await worker.GetAndProcessJob(CancellationToken.None);
 
-        await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
+        await Jobly.Tests.Helpers.TestTasks.CreateCounterAggregator(_fixture.CreateContext()).AggregateCountersAsync(CancellationToken.None);
 
         // Assert
         var hourKey = $"stats:succeeded:{DateTime.UtcNow:yyyy-MM-dd-HH}";
@@ -151,7 +151,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         // Act
         await worker.GetAndProcessJob(CancellationToken.None);
 
-        await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
+        await Jobly.Tests.Helpers.TestTasks.CreateCounterAggregator(_fixture.CreateContext()).AggregateCountersAsync(CancellationToken.None);
 
         // Assert
         var hourKey = $"stats:failed:{DateTime.UtcNow:yyyy-MM-dd-HH}";
@@ -191,7 +191,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         await worker.GetAndProcessJob(CancellationToken.None);
         await worker.GetAndProcessJob(CancellationToken.None);
 
-        await CounterAggregatorTask<TestContext>.AggregateCounters(_fixture.CreateContext());
+        await Jobly.Tests.Helpers.TestTasks.CreateCounterAggregator(_fixture.CreateContext()).AggregateCountersAsync(CancellationToken.None);
 
         // Assert
         var hourKey = $"stats:succeeded:{DateTime.UtcNow:yyyy-MM-dd-HH}";

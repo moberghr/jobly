@@ -34,7 +34,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var aggCtx = _fixture.CreateContext();
-        await CounterAggregatorTask<TestContext>.AggregateCounters(aggCtx);
+        await TestTasks.CreateCounterAggregator(aggCtx).AggregateCountersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -58,7 +58,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var aggCtx = _fixture.CreateContext();
-        await CounterAggregatorTask<TestContext>.AggregateCounters(aggCtx);
+        await TestTasks.CreateCounterAggregator(aggCtx).AggregateCountersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -306,7 +306,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
         var aggCtx = _fixture.CreateContext();
 
         // Act
-        var count = await CounterAggregatorTask<TestContext>.AggregateCounters(aggCtx);
+        var count = await TestTasks.CreateCounterAggregator(aggCtx).AggregateCountersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert
         count.ShouldBe(0);
@@ -323,7 +323,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var aggCtx = _fixture.CreateContext();
-        await CounterAggregatorTask<TestContext>.AggregateCounters(aggCtx);
+        await TestTasks.CreateCounterAggregator(aggCtx).AggregateCountersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert — should increment existing stat, not create a new one
         var readCtx = _fixture.CreateContext();
@@ -345,7 +345,7 @@ public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 
         // Act
         var aggCtx = _fixture.CreateContext();
-        await CounterAggregatorTask<TestContext>.AggregateCounters(aggCtx);
+        await TestTasks.CreateCounterAggregator(aggCtx).AggregateCountersAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Assert — should create new stat with correct value
         var readCtx = _fixture.CreateContext();

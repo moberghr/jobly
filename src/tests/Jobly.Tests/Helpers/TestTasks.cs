@@ -104,6 +104,14 @@ public static class TestTasks
             }));
     }
 
+    public static CounterAggregator<TContext> CreateCounterAggregator<TContext>(TContext context)
+        where TContext : DbContext
+    {
+        return new CounterAggregator<TContext>(
+            context,
+            Options.Create(new JoblyWorkerConfiguration()));
+    }
+
     public static ServerCleanup<TContext> CreateServerCleanup<TContext>(
         TContext context,
         TimeProvider timeProvider,
