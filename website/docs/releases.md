@@ -4,6 +4,21 @@ sidebar_position: 6
 
 # Releases
 
+## 0.9.1
+
+*2026-04-21*
+
+### Bug Fixes
+
+- **Docs site build** — `website/docs/features/db-push.md` was referenced from the 0.9.0 release notes but never added, breaking the Docusaurus production build with `onBrokenLinks: 'throw'`. The page is now present and mirrors the DB Push section of the README.
+
+### Maintenance
+
+- **Dashboard UI dependencies** — `npm audit fix` in `src/ui` patches `vite`, `axios`, `hono`, `@hono/node-server`, and `follow-redirects` (5 advisories, 1 high + 4 moderate). No API-surface changes; dashboard bundle hashes change because Vite re-bundles with updated transitive deps.
+- **Docs site dependencies** — Docusaurus 3.9.2 → 3.10.0, added `@docusaurus/faster` (required by 3.10 with `future.v4`), and pinned `serialize-javascript ^7.0.5` via `overrides` to close [GHSA-qj8w-gfj5-8c6v](https://github.com/advisories/GHSA-qj8w-gfj5-8c6v) — the build-chain DoS that Docusaurus's bundler transitively pulled in. `npm audit` now reports 0 vulnerabilities on both frontends.
+
+---
+
 ## 0.9.0
 
 *2026-04-21*
