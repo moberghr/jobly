@@ -42,13 +42,13 @@ A distributed job processing, message queue, and in-memory mediator library for 
 
 Jobly ships as a small set of NuGet packages — pick the provider package that matches your database:
 
-| Package                    | Purpose                                               |
-|----------------------------|-------------------------------------------------------|
-| `Moberg.Jobly.Core`        | Core types (always required)                          |
-| `Moberg.Jobly.Worker`      | Worker + background tasks (required for processing)   |
-| `Moberg.Jobly.PostgreSql`  | PostgreSQL provider (row-lock SQL, LISTEN/NOTIFY, locks) |
-| `Moberg.Jobly.SqlServer`   | SQL Server provider (row-lock SQL, Service Broker, locks) |
-| `Moberg.Jobly.UI`          | Dashboard UI (optional)                               |
+| Package                            | Purpose                                                   |
+|------------------------------------|-----------------------------------------------------------|
+| `Moberg.Jobly.Core`                | Core types (always required)                              |
+| `Moberg.Jobly.Worker`              | Worker + background tasks (required for processing)       |
+| `Moberg.Jobly.Provider.PostgreSql` | PostgreSQL provider (row-lock SQL, LISTEN/NOTIFY, locks)  |
+| `Moberg.Jobly.Provider.SqlServer`  | SQL Server provider (row-lock SQL, Service Broker, locks) |
+| `Moberg.Jobly.UI`                  | Dashboard UI (optional)                                   |
 
 You only add the provider package for your database; Jobly.Core no longer has a hard dependency on either EF provider.
 
@@ -64,7 +64,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
 // Register Jobly worker (includes AddJobly internally).
-// opt.UsePostgreSql() comes from Moberg.Jobly.PostgreSql and registers the row-lock SQL,
+// opt.UsePostgreSql() comes from Moberg.Jobly.Provider.PostgreSql and registers the row-lock SQL,
 // distributed lock provider, exception classifier, and the push notification factory.
 builder.Services.AddJoblyWorker<AppDbContext>(opt =>
 {

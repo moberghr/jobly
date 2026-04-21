@@ -13,7 +13,7 @@ Jobly is a distributed job processing and message queue library for .NET 10. Fou
 
 **Optional DB push**: `opt.UseDatabasePush()` on the builder replaces polling wake-up with push notifications (Postgres LISTEN/NOTIFY, SQL Server Service Broker) for the dispatcher, `MessageRoutingTask`, and `OrchestrationTask`. Worker fetch push requires `UseDispatcher = true` — individual-worker mode has a thundering-herd problem and is left on polling. See §2.9 and the DB Push section in `README.md`.
 
-Ships as NuGet packages: `Jobly.Core` (provider-agnostic), `Jobly.PostgreSql` (PG-specific), `Jobly.SqlServer` (SQL Server-specific), `Jobly.Worker` (worker runtime), `Jobly.UI` (dashboard). Users install the provider package that matches their database and call `opt.UsePostgreSql()` or `opt.UseSqlServer()` inside the `AddJobly` / `AddJoblyWorker` lambda.
+Ships as NuGet packages: `Jobly.Core` (provider-agnostic), `Jobly.Provider.PostgreSql` (PG-specific), `Jobly.Provider.SqlServer` (SQL Server-specific), `Jobly.Worker` (worker runtime), `Jobly.UI` (dashboard). Users install the provider package that matches their database and call `opt.UsePostgreSql()` or `opt.UseSqlServer()` inside the `AddJobly` / `AddJoblyWorker` lambda.
 
 ## Build & Test Commands
 
@@ -337,7 +337,7 @@ public class MyIntegrationTests_SqlServer : MyIntegrationTestsBase
 - Users just register their DbContext normally — no manual configuration needed
 - The builder inherits from `JoblyConfiguration` / `JoblyWorkerConfiguration`, so config fields (`WorkerCount`, `PollingInterval`, `DefaultQueue`, etc.) are set directly on `opt`
 - Opt-in addons on the builder: `opt.AddRetry()`, `opt.AddMutex()`, `opt.AddCircuitBreaker()`, `opt.AddNoRestart()`, `opt.UseDatabasePush()`
-- Provider selection via `opt.UsePostgreSql()` / `opt.UseSqlServer()` (from `Jobly.PostgreSql` / `Jobly.SqlServer`) — mandatory for real use; registers `IJoblySqlQueries`, `IDatabaseExceptionClassifier`, `IJoblyNotificationTransportFactory`, and the provider-specific `IDistributedLockProvider`
+- Provider selection via `opt.UsePostgreSql()` / `opt.UseSqlServer()` (from `Jobly.Provider.PostgreSql` / `Jobly.Provider.SqlServer`) — mandatory for real use; registers `IJoblySqlQueries`, `IDatabaseExceptionClassifier`, `IJoblyNotificationTransportFactory`, and the provider-specific `IDistributedLockProvider`
 
 ### Worker Groups
 
@@ -371,7 +371,7 @@ Workers can be split into groups with independent queues and polling intervals. 
 - **§2.6** In-memory requests (`IRequest<TResponse>`) go through `IMediator.Send()` — same `IPipelineBehavior` pipeline as jobs/messages, but no database persistence.
 - **§2.7** In-memory streams (`IStreamRequest<TResponse>`) go through `IMediator.CreateStream()` — `IPipelineBehavior` applies at request level, `IStreamPipelineBehavior` wraps enumeration, returns `IAsyncEnumerable<TResponse>`, no database persistence.
 - **§2.8** Future-dated jobs land in `State.Scheduled`; `ScheduledJobActivationTask` flips them to `Enqueued` when `ScheduleTime <= now`. Activation cadence is controlled by `JoblyWorkerConfiguration.ScheduledActivationInterval` (default 5s) — this is the worst-case latency between `ScheduleTime` and pickup eligibility. The task is time-driven and does not participate in DB-push wake-up; push only accelerates what happens *after* activation. Worker fetch queries always check `CurrentState == Enqueued` with a defensive `ScheduleTime <= now` predicate for pre-upgrade legacy rows. Adding new query sites that filter by `Enqueued` without the time predicate is a latent bug on upgraded deployments.
-- **§2.9** DB push is an opt-in addon. `opt.UseDatabasePush()` on the builder replaces the default `NullNotificationTransport` with a provider-specific one (Postgres LISTEN/NOTIFY or SQL Server Service Broker) and registers `NotificationListenerTask`. The provider-specific transport is resolved via `IJoblyNotificationTransportFactory`, which the provider package (`Jobly.PostgreSql` / `Jobly.SqlServer`) registers when you call `opt.UsePostgreSql()` / `opt.UseSqlServer()` — call the provider first, push second. Worker-fetch push only fires when `UseDispatcher = true`. Transports must not throw from `PublishAsync` — they log + increment `JoblyTelemetry.NotificationPublishFailures` instead. Missed notifications are caught by drain-on-reconnect in the listener.
+- **§2.9** DB push is an opt-in addon. `opt.UseDatabasePush()` on the builder replaces the default `NullNotificationTransport` with a provider-specific one (Postgres LISTEN/NOTIFY or SQL Server Service Broker) and registers `NotificationListenerTask`. The provider-specific transport is resolved via `IJoblyNotificationTransportFactory`, which the provider package (`Jobly.Provider.PostgreSql` / `Jobly.Provider.SqlServer`) registers when you call `opt.UsePostgreSql()` / `opt.UseSqlServer()` — call the provider first, push second. Worker-fetch push only fires when `UseDispatcher = true`. Transports must not throw from `PublishAsync` — they log + increment `JoblyTelemetry.NotificationPublishFailures` instead. Missed notifications are caught by drain-on-reconnect in the listener.
 
 ### §3 — Coding Style
 
@@ -428,7 +428,7 @@ var activeJobs = await _context.Set<Job>()
 
 ### §5 — Data Layer
 
-- **§5.1** No raw SQL. All queries use EF Core LINQ. This ensures dual-database compatibility. **Exception**: provider-native APIs with no EF Core abstraction are allowed inside the provider packages (`src/core/Jobly.PostgreSql/` — LISTEN/NOTIFY via `NpgsqlConnection`, row-lock SQL; `src/core/Jobly.SqlServer/` — Service Broker via `SqlConnection`, row-lock SQL). `Jobly.Core` itself must stay provider-agnostic — no `Npgsql` or `Microsoft.Data.SqlClient` references.
+- **§5.1** No raw SQL. All queries use EF Core LINQ. This ensures dual-database compatibility. **Exception**: provider-native APIs with no EF Core abstraction are allowed inside the provider packages (`src/core/providers/Jobly.Provider.PostgreSql/` — LISTEN/NOTIFY via `NpgsqlConnection`, row-lock SQL; `src/core/providers/Jobly.Provider.SqlServer/` — Service Broker via `SqlConnection`, row-lock SQL). `Jobly.Core` itself must stay provider-agnostic — no `Npgsql` or `Microsoft.Data.SqlClient` references.
 - **§5.2** No `_context.Set<>()` subqueries inside `.Select()` projections. Use navigation properties or two-step fetch.
 - **§5.3** `AsNoTracking()` on read-only queries. `Select()` projections over `Include()` for reads.
 - **§5.4** EF Core entity configurations applied via `JoblyModelCustomizer` (auto-registered by `AddJobly`). Fluent API in `OnModelCreating` overrides.
