@@ -70,11 +70,12 @@ public static class ServiceConfiguration
         services.AddSingleton<ServerRegistrationState>();
         services.AddSingleton<OrchestrationSignalRegistry<TContext>>();
         services.AddSingleton<MessageRoutingSignalRegistry<TContext>>();
+        services.AddSingleton<ProcessCpuTracker>();
+        services.AddScoped<IServerTask, Heartbeat<TContext>>();
         services.AddHostedService<JoblyServerRegistration<TContext>>();
         services.AddHostedService<JoblyDispatcherHost<TContext>>();
         services.AddHostedService<JoblySingleWorkerHost<TContext>>();
         services.AddHostedService<ServerTaskHost<TContext>>();
-        services.AddHostedService<HeartbeatTask<TContext>>();
         services.AddHostedService<CounterAggregatorTask<TContext>>();
         services.AddHostedService<ServerCleanupTask<TContext>>();
         services.AddHostedService<StaleJobRecoveryTask<TContext>>();
