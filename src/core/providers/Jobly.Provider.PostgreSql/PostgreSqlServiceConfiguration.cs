@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace Jobly.PostgreSql;
+namespace Jobly.Provider.PostgreSql;
 
 /// <summary>
 /// Registers the PostgreSQL-specific provider services (row-lock SQL, exception classifier)

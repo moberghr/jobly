@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace Jobly.SqlServer;
+namespace Jobly.Provider.SqlServer;
 
 /// <summary>
 /// Registers the SQL Server-specific provider services (row-lock SQL, exception classifier)

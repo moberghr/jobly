@@ -4,8 +4,8 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<PackageId>Moberg.Jobly.PostgreSql</PackageId>
-		<Description>PostgreSQL provider for Moberg.Jobly — notification transport (LISTEN/NOTIFY), row-lock SQL, and exception classification.</Description>
+		<PackageId>Moberg.Jobly.Provider.PostgreSql</PackageId>
+		<Description>PostgreSQL provider for Moberg.Jobly — notification transport (LISTEN/NOTIFY), row-lock SQL, distributed lock, and exception classification.</Description>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -18,8 +18,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Jobly.Core\Jobly.Core.csproj" />
-		<ProjectReference Include="..\Jobly.Worker\Jobly.Worker.csproj" />
+		<ProjectReference Include="..\..\Jobly.Core\Jobly.Core.csproj" />
+		<ProjectReference Include="..\..\Jobly.Worker\Jobly.Worker.csproj" />
 	</ItemGroup>
 
 </Project>

@@ -10,18 +10,23 @@
     <Project Path="benchmarks/Jobly.ServerBenchmarks/Jobly.ServerBenchmarks.csproj" />
   </Folder>
   <Folder Name="/core/">
+    <Project Path="core/Jobly.Core/Jobly.Core.csproj" />
     <Project Path="core/Jobly.SourceGenerator/Jobly.SourceGenerator.csproj" />
+    <Project Path="core/Jobly.UI/Jobly.UI.csproj" />
+    <Project Path="core/Jobly.Worker/Jobly.Worker.csproj" />
   </Folder>
-  <Folder Name="/TestProjects/">
-    <Project Path="tests/Jobly.Test.Shared/Jobly.Test.Shared.csproj" />
-    <Project Path="tests/Jobly.TestApp/Jobly.Test.App.csproj" />
-    <Project Path="tests/Jobly.TestWorker/Jobly.Test.Worker.csproj" />
+  <Folder Name="/core/providers/">
+    <Project Path="core/providers/Jobly.Provider.PostgreSql/Jobly.Provider.PostgreSql.csproj" />
+    <Project Path="core/providers/Jobly.Provider.SqlServer/Jobly.Provider.SqlServer.csproj" />
   </Folder>
-  <Project Path="core/Jobly.Core/Jobly.Core.csproj" />
-  <Project Path="core/Jobly.PostgreSql/Jobly.PostgreSql.csproj" />
-  <Project Path="core/Jobly.SqlServer/Jobly.SqlServer.csproj" />
-  <Project Path="core/Jobly.Tests/Jobly.Tests.csproj" />
-  <Project Path="core/Jobly.Tests.Mutation/Jobly.Tests.Mutation.csproj" />
-  <Project Path="core/Jobly.UI/Jobly.UI.csproj" />
-  <Project Path="core/Jobly.Worker/Jobly.Worker.csproj" />
+  <Folder Name="/tests/">
+    <Project Path="tests/Jobly.Tests/Jobly.Tests.csproj" />
+    <Project Path="tests/Jobly.Tests.Mutation/Jobly.Tests.Mutation.csproj" />
+    <Project Path="tests/Jobly.Tests.SourceGenerator/Jobly.Tests.SourceGenerator.csproj" />
+  </Folder>
+  <Folder Name="/demo/">
+    <Project Path="demo/Jobly.Test.Shared/Jobly.Test.Shared.csproj" />
+    <Project Path="demo/Jobly.TestApp/Jobly.Test.App.csproj" />
+    <Project Path="demo/Jobly.TestWorker/Jobly.Test.Worker.csproj" />
+  </Folder>
 </Solution>

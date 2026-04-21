@@ -1,5 +1,5 @@
-using Jobly.PostgreSql;
-using Jobly.SqlServer;
+using Jobly.Provider.PostgreSql;
+using Jobly.Provider.SqlServer;
 using Jobly.Worker;
 using Medallion.Threading;
 using Medallion.Threading.Postgres;

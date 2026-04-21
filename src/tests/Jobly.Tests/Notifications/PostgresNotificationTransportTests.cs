@@ -1,37 +1,37 @@
 using Jobly.Core.Notifications;
-using Jobly.SqlServer;
+using Jobly.Provider.PostgreSql;
 using Jobly.Tests.Fixtures;
 using Shouldly;
 
 namespace Jobly.Tests.Notifications;
 
-[Collection<SqlServerCollection>]
-[Trait("Category", "SqlServer")]
-public class SqlServerNotificationTransportTests : IAsyncLifetime
+[Collection<PostgreSqlCollection>]
+[Trait("Category", "PostgreSql")]
+public class PostgresNotificationTransportTests : IAsyncLifetime
 {
-    private readonly SqlServerFixture _fixture;
+    private readonly PostgreSqlFixture _fixture;
 
-    public SqlServerNotificationTransportTests(SqlServerFixture fixture) => _fixture = fixture;
+    public PostgresNotificationTransportTests(PostgreSqlFixture fixture) => _fixture = fixture;
 
     public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    private SqlServerNotificationTransport CreateTransport(string channelName) =>
-        new(_fixture.ConnectionString, new JoblyDatabasePushConfiguration { ChannelName = channelName });
-
     [TimedFact]
     public async Task PublishListen_RoundTrip_DeliversNotification()
     {
-        var transport = CreateTransport("jobly_notify_rt");
+        var transport = new PostgresNotificationTransport(
+            _fixture.ConnectionString,
+            new JoblyDatabasePushConfiguration { ChannelName = "jobly_notify_test" });
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         var enumerator = transport.ListenAsync(cts.Token).GetAsyncEnumerator(cts.Token);
         try
         {
+            // Kick off MoveNextAsync first so the iterator runs OpenAsync+LISTEN before we publish.
             var moveTask = enumerator.MoveNextAsync();
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cts.Token);
+            await Task.Delay(TimeSpan.FromMilliseconds(300), cts.Token);
 
             await transport.PublishAsync(NotificationKind.JobEnqueued, "default", cts.Token);
 
@@ -56,15 +56,17 @@ public class SqlServerNotificationTransportTests : IAsyncLifetime
     [TimedFact]
     public async Task PublishListen_MultipleKinds_DeliversAll()
     {
-        var transport = CreateTransport("jobly_notify_multi");
+        var transport = new PostgresNotificationTransport(
+            _fixture.ConnectionString,
+            new JoblyDatabasePushConfiguration { ChannelName = "jobly_notify_test2" });
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         var enumerator = transport.ListenAsync(cts.Token).GetAsyncEnumerator(cts.Token);
         try
         {
             var firstMoveTask = enumerator.MoveNextAsync();
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cts.Token);
+            await Task.Delay(TimeSpan.FromMilliseconds(300), cts.Token);
 
             await transport.PublishAsync(NotificationKind.MessageEnqueued, null, cts.Token);
             await transport.PublishAsync(NotificationKind.JobFinalized, null, cts.Token);
@@ -75,7 +77,7 @@ public class SqlServerNotificationTransportTests : IAsyncLifetime
             hasNext.ShouldBeTrue();
             received.Add(enumerator.Current);
 
-            while (received.Count < 3)
+            for (var i = 0; i < 2; i++)
             {
                 hasNext = await enumerator.MoveNextAsync();
                 hasNext.ShouldBeTrue();
@@ -100,33 +102,38 @@ public class SqlServerNotificationTransportTests : IAsyncLifetime
     }
 
     [Fact]
-    public void Constructor_UnsafeChannelName_Throws()
-    {
-        var unsafe1 = () => new SqlServerNotificationTransport(
-            _fixture.ConnectionString,
-            new JoblyDatabasePushConfiguration { ChannelName = "bad; drop table foo;" });
-        unsafe1.ShouldThrow<ArgumentException>();
-
-        var unsafe2 = () => new SqlServerNotificationTransport(
-            _fixture.ConnectionString,
-            new JoblyDatabasePushConfiguration { ChannelName = "1starts_with_digit" });
-        unsafe2.ShouldThrow<ArgumentException>();
-    }
-
-    [Fact]
     public void Encode_Decode_RoundTripsJobEnqueuedWithQueue()
     {
-        var payload = SqlServerNotificationTransport.Encode(NotificationKind.JobEnqueued, "critical");
-        SqlServerNotificationTransport.TryDecode(payload, out var parsed).ShouldBeTrue();
+        var payload = PostgresNotificationTransport.Encode(NotificationKind.JobEnqueued, "critical");
+        PostgresNotificationTransport.TryDecode(payload, out var parsed).ShouldBeTrue();
         parsed.Kind.ShouldBe(NotificationKind.JobEnqueued);
         parsed.Queue.ShouldBe("critical");
     }
 
     [Fact]
+    public void Encode_Decode_RoundTripsMessageEnqueued()
+    {
+        var payload = PostgresNotificationTransport.Encode(NotificationKind.MessageEnqueued, null);
+        PostgresNotificationTransport.TryDecode(payload, out var parsed).ShouldBeTrue();
+        parsed.Kind.ShouldBe(NotificationKind.MessageEnqueued);
+        parsed.Queue.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Encode_Decode_RoundTripsJobFinalized()
+    {
+        var payload = PostgresNotificationTransport.Encode(NotificationKind.JobFinalized, null);
+        PostgresNotificationTransport.TryDecode(payload, out var parsed).ShouldBeTrue();
+        parsed.Kind.ShouldBe(NotificationKind.JobFinalized);
+        parsed.Queue.ShouldBeNull();
+    }
+
+    [Fact]
     public void Decode_Garbage_ReturnsFalse()
     {
-        SqlServerNotificationTransport.TryDecode("Xxx", out _).ShouldBeFalse();
-        SqlServerNotificationTransport.TryDecode(null, out _).ShouldBeFalse();
-        SqlServerNotificationTransport.TryDecode(string.Empty, out _).ShouldBeFalse();
+        PostgresNotificationTransport.TryDecode("Xxx", out _).ShouldBeFalse();
+        PostgresNotificationTransport.TryDecode(null, out _).ShouldBeFalse();
+        PostgresNotificationTransport.TryDecode(string.Empty, out _).ShouldBeFalse();
+        PostgresNotificationTransport.TryDecode("J", out _).ShouldBeFalse();
     }
 }

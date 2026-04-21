@@ -1,7 +1,7 @@
 using Jobly.Core.Notifications;
 using Microsoft.Extensions.Logging;
 
-namespace Jobly.SqlServer;
+namespace Jobly.Provider.SqlServer;
 
 internal sealed class SqlServerNotificationTransportFactory : IJoblyNotificationTransportFactory
 {

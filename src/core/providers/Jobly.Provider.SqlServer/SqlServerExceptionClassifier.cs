@@ -2,7 +2,7 @@ using Jobly.Core.Data;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
-namespace Jobly.SqlServer;
+namespace Jobly.Provider.SqlServer;
 
 internal sealed class SqlServerExceptionClassifier : IDatabaseExceptionClassifier
 {

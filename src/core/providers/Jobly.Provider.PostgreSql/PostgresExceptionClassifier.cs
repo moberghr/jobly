@@ -2,7 +2,7 @@ using Jobly.Core.Data;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
-namespace Jobly.PostgreSql;
+namespace Jobly.Provider.PostgreSql;
 
 internal sealed class PostgresExceptionClassifier : IDatabaseExceptionClassifier
 {

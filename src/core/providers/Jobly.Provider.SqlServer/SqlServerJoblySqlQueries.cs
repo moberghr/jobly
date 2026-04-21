@@ -4,7 +4,7 @@ using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
-namespace Jobly.SqlServer;
+namespace Jobly.Provider.SqlServer;
 
 /// <summary>
 /// SQL Server-specific SQL queries using <c>WITH (ROWLOCK, UPDLOCK, READPAST)</c> directly in

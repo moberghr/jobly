@@ -1,7 +1,7 @@
 using Jobly.Core.Notifications;
 using Microsoft.Extensions.Logging;
 
-namespace Jobly.PostgreSql;
+namespace Jobly.Provider.PostgreSql;
 
 internal sealed class PostgresNotificationTransportFactory : IJoblyNotificationTransportFactory
 {

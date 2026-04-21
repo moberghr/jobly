@@ -12,7 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="../../core/Jobly.Core/Jobly.Core.csproj" />
     <ProjectReference Include="../../core/Jobly.Worker/Jobly.Worker.csproj" />
-    <ProjectReference Include="../../tests/Jobly.Test.Shared/Jobly.Test.Shared.csproj" />
+    <ProjectReference Include="../../demo/Jobly.Test.Shared/Jobly.Test.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -46,12 +46,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Jobly.Core\Jobly.Core.csproj" />
-		<ProjectReference Include="..\Jobly.PostgreSql\Jobly.PostgreSql.csproj" />
-		<ProjectReference Include="..\Jobly.SqlServer\Jobly.SqlServer.csproj" />
-		<ProjectReference Include="..\Jobly.Worker\Jobly.Worker.csproj" />
-		<ProjectReference Include="..\Jobly.UI\Jobly.UI.csproj" />
-		<ProjectReference Include="..\Jobly.SourceGenerator\Jobly.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+		<ProjectReference Include="..\..\core\Jobly.Core\Jobly.Core.csproj" />
+		<ProjectReference Include="..\..\core\providers\Jobly.Provider.PostgreSql\Jobly.Provider.PostgreSql.csproj" />
+		<ProjectReference Include="..\..\core\providers\Jobly.Provider.SqlServer\Jobly.Provider.SqlServer.csproj" />
+		<ProjectReference Include="..\..\core\Jobly.Worker\Jobly.Worker.csproj" />
+		<ProjectReference Include="..\..\core\Jobly.UI\Jobly.UI.csproj" />
+		<ProjectReference Include="..\..\core\Jobly.SourceGenerator\Jobly.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 		<ProjectReference Include="..\Jobly.Tests.SourceGenerator\Jobly.Tests.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 	</ItemGroup>
 
