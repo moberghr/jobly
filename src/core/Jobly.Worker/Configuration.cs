@@ -175,7 +175,7 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
     /// <para>
     /// Trade-off: batching widens the at-least-once duplicate-execution window. If a worker
     /// crashes with buffered completions that have not yet been flushed, those jobs stay in
-    /// <c>Processing</c> and <c>StaleJobRecoveryTask</c> will requeue them per the
+    /// <c>Processing</c> and <c>StaleJobRecovery</c> will requeue them per the
     /// <c>[NoRestart]</c> setting. Handlers with side effects should be idempotent or marked
     /// <c>[NoRestart]</c>.
     /// </para>

@@ -22,7 +22,7 @@ internal readonly record struct PendingCompletion(
 /// <para>
 /// On <see cref="DbUpdateException"/> (concurrency mismatch, phantom row, etc.) the flush
 /// recursively splits the batch in half to isolate the failing entries. A single-entry partition
-/// that still fails is logged and dropped — <c>StaleJobRecoveryTask</c> will recover the underlying
+/// that still fails is logged and dropped — <c>StaleJobRecovery</c> will recover the underlying
 /// <c>Processing</c> row. Non-<see cref="DbUpdateException"/> failures propagate to the caller.
 /// </para>
 /// </summary>
@@ -74,7 +74,7 @@ internal sealed class CompletionBatch<TContext>
     /// Persists the buffered completions. On success (including poison-drops isolated via split)
     /// the buffer is cleared. On transient failure (non-<see cref="DbUpdateException"/>) the buffer
     /// is already drained — the exception propagates and the orphaned <c>Processing</c> rows are
-    /// recovered by <c>StaleJobRecoveryTask</c>.
+    /// recovered by <c>StaleJobRecovery</c>.
     /// <para>
     /// No cancellation parameter on purpose: once the buffer is drained, cancelling an in-flight
     /// flush would orphan the drained entries (the split-on-failure recursion makes re-queuing
@@ -135,7 +135,7 @@ internal sealed class CompletionBatch<TContext>
             {
                 _logger.LogError(
                     ex,
-                    "Dropping poison completion for job {jobId}; StaleJobRecoveryTask will recover the underlying Processing row",
+                    "Dropping poison completion for job {jobId}; StaleJobRecovery will recover the underlying Processing row",
                     entries[start].Job.Id);
                 return;
             }

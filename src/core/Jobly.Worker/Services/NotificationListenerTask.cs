@@ -8,7 +8,7 @@ namespace Jobly.Worker.Services;
 
 /// <summary>
 /// Hosted service that consumes <see cref="IJoblyNotificationTransport.ListenAsync"/> and
-/// signals the in-process background tasks (dispatcher, MessageRoutingTask, OrchestrationTask)
+/// signals the in-process background tasks (dispatcher, MessageRouter, Orchestrator)
 /// on each notification. Only registered when the user opts in via
 /// <c>opt.UseDatabasePush() (inside the AddJobly/AddJoblyWorker lambda)</c>.
 /// </summary>

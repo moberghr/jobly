@@ -9,10 +9,10 @@ public enum NotificationKind : byte
     // Kind=Job, CurrentState=Enqueued, ScheduleTime<=now → wake dispatcher on that queue.
     JobEnqueued = 1,
 
-    // Kind=Message, CurrentState=Enqueued → wake MessageRoutingTask.
+    // Kind=Message, CurrentState=Enqueued → wake MessageRouter.
     MessageEnqueued = 2,
 
-    // Child reached terminal state → wake OrchestrationTask (cross-server).
+    // Child reached terminal state → wake Orchestrator (cross-server).
     JobFinalized = 3,
 }
 

@@ -20,7 +20,7 @@ namespace Jobly.Worker;
 
 /// <summary>
 /// Worker that receives pre-fetched jobs from a dispatcher channel.
-/// Pure executor — handles execution and completion only. Orchestration handled by OrchestrationTask.
+/// Pure executor — handles execution and completion only. Orchestration handled by Orchestrator.
 /// Completions are buffered in a per-worker <see cref="CompletionBatch{TContext}"/> and flushed
 /// as a single multi-row transaction when any of: size threshold, time threshold, idle, or shutdown fires.
 /// </summary>

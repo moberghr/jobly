@@ -9,7 +9,7 @@
 Single `Job` entity with `Kind` discriminator (`Job=1, Message=2, Batch=3`). No separate tables for messages or batches. `ParentJobId` chain handles all parent-child relationships. This simplifies the data model, queries, and cleanup.
 
 ### 2. Workers Are Pure Executors
-Workers only fetch and execute `Kind=Job` jobs. All orchestration (message routing, batch finalization, continuation activation) is handled by dedicated `ServerTaskBase` background tasks. This separation prevents coupling between execution and coordination logic.
+Workers only fetch and execute `Kind=Job` jobs. All orchestration (message routing, batch finalization, continuation activation) is handled by scoped `IServerTask` services driven by a single `ServerTaskHost<TContext>`. This separation prevents coupling between execution and coordination logic.
 
 ### 3. No Raw SQL
 All queries use EF Core LINQ. No `FromSqlRaw`, `ExecuteSqlRaw`, or `SqlQuery`. This ensures both PostgreSQL and SQL Server compatibility from a single codebase.
@@ -24,7 +24,7 @@ All production code uses injectable `TimeProvider` instead of `DateTime.UtcNow`.
 DbContext must be registered as `Scoped` (not Transient). The outbox pattern requires the publisher and application code to share the same DbContext instance within a scope.
 
 ### 7. Signal-Driven Background Tasks
-All background tasks extend `ServerTaskBase` with semaphore-based signal support (capped at 1). Workers signal the orchestrator after job completion rather than relying solely on polling intervals. This reduces latency without busy-waiting.
+Every background task implements `IServerTask` and is driven by `ServerTaskHost<TContext>`, which takes the distributed lock (when `LockKey != null`), creates a fresh DI scope per iteration, and writes ServerTask / ServerLog rows. Push-to-wake runs through `ServerTaskSignals<TContext>` (`SignalJobFinalized` / `SignalMessageEnqueued`) — workers signal the orchestrator after job completion rather than relying on polling intervals. The semaphore-per-task wake primitive is an implementation detail of `ServerTaskLoop`.
 
 ### 8. Dual-Database Support
 Every query, entity configuration, and test runs on both PostgreSQL and SQL Server. Abstract test base classes with concrete subclasses per database. No database-specific code paths in business logic.
@@ -35,7 +35,7 @@ Every query, entity configuration, and test runs on both PostgreSQL and SQL Serv
 Prefer `Select()` projections over `Include()` for read queries. Only load full entities when updating. `AsNoTracking()` on read-only paths.
 
 ### 10. Write-Optimized Statistics
-Statistics use Counter rows (write-optimized) aggregated into Statistic rows by `CounterAggregatorTask`. Avoids contention on a single row during high-throughput writes.
+Statistics use Counter rows (write-optimized) aggregated into Statistic rows by `CounterAggregator`. Avoids contention on a single row during high-throughput writes.
 
 ### 11. Row-Level Locking via Interceptors
 EF Core interceptors add `FOR UPDATE` (PostgreSQL) / `WITH (UPDLOCK, ROWLOCK)` (SQL Server) hints via `TagWith()` markers. This is transparent to business logic.

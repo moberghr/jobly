@@ -2,7 +2,7 @@ namespace Jobly.Worker;
 
 /// <summary>
 /// Thread-safe singleton that holds the current pause state for this server.
-/// Updated by HeartbeatTask every 3s, read by workers on each poll iteration.
+/// Updated by Heartbeat every 3s, read by workers on each poll iteration.
 /// Uses an immutable snapshot swapped atomically to avoid torn reads.
 /// </summary>
 public class PauseStateHolder

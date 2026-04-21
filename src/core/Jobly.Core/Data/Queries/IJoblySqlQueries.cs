@@ -67,7 +67,7 @@ public interface IJoblySqlQueries<TContext>
     /// <summary>
     /// Locks every <see cref="Server"/> row with a blocking lock (WAIT — no SKIP LOCKED).
     /// Used by server cleanup to freeze the set while it decides which servers are stale.
-    /// The blocking lock serializes against <c>HeartbeatTask</c>'s per-row update so we can't
+    /// The blocking lock serializes against <c>Heartbeat</c>'s per-row update so we can't
     /// delete a server that just sent a fresh heartbeat.
     /// </summary>
     Task<List<Server>> LockAllServersAsync(TContext context, CancellationToken ct);

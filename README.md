@@ -305,7 +305,7 @@ await recurringPublisher.AddOrUpdateRecurringJob(
     new CleanupSessions(), name: "session-cleanup", cron: "0 * * * *");
 ```
 
-`AddOrUpdateRecurringJob` registers the definition. The `RecurringJobSchedulerTask` creates jobs when the cron time arrives. Execution history is tracked in `RecurringJobLog` and survives job cleanup.
+`AddOrUpdateRecurringJob` registers the definition. The `RecurringJobScheduler` task creates jobs when the cron time arrives. Execution history is tracked in `RecurringJobLog` and survives job cleanup.
 
 ### 10. Dashboard Authorization
 
@@ -370,7 +370,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 
 ### 11. DB Push (optional)
 
-Replaces polling wake-up with push notifications — PostgreSQL `LISTEN`/`NOTIFY` or SQL Server Service Broker. The dispatcher, `MessageRoutingTask`, and `OrchestrationTask` wake instantly on relevant events instead of waiting for their next poll. Opt-in; default behavior (polling) is unchanged if you don't call `opt.UseDatabasePush()`.
+Replaces polling wake-up with push notifications — PostgreSQL `LISTEN`/`NOTIFY` or SQL Server Service Broker. The dispatcher, `MessageRouter`, and `Orchestrator` wake instantly on relevant events instead of waiting for their next poll. Opt-in; default behavior (polling) is unchanged if you don't call `opt.UseDatabasePush()`.
 
 ```csharp
 builder.Services.AddJoblyWorker<AppDbContext>(opt =>
@@ -387,7 +387,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(opt =>
 
 The provider-specific transport is wired by whichever `UsePostgreSql()` / `UseSqlServer()` you called. Transports are resilient to connection drops — the listener reconnects with exponential backoff and fires a drain signal on every reconnect so jobs enqueued during the gap are picked up.
 
-**Scheduled jobs**: push accelerates *immediate* enqueues. Jobs published via `Schedule(job, at)` sit in `State.Scheduled` until `ScheduledJobActivationTask` flips them to `Enqueued` — only then does the `JobEnqueued` notification fire. Dispatcher pickup after activation is <50ms via push, but the activation itself is time-driven and bounded by `ScheduledActivationInterval` (default 5s, see §10). If you need sub-second precision on scheduled jobs, lower that interval — polling is the only mechanism, since there's no event for "wall-clock time has advanced."
+**Scheduled jobs**: push accelerates *immediate* enqueues. Jobs published via `Schedule(job, at)` sit in `State.Scheduled` until `ScheduledJobActivation` flips them to `Enqueued` — only then does the `JobEnqueued` notification fire. Dispatcher pickup after activation is <50ms via push, but the activation itself is time-driven and bounded by `ScheduledActivationInterval` (default 5s, see §10). If you need sub-second precision on scheduled jobs, lower that interval — polling is the only mechanism, since there's no event for "wall-clock time has advanced."
 
 **SQL Server setup requirements**: Service Broker must be enabled on the target database. Jobly creates the message type / contract / queue / service idempotently on first publish, but it cannot run `ALTER DATABASE ... SET ENABLE_BROKER` for you (that requires exclusive DB access). If broker isn't enabled, the transport logs an actionable error and degrades silently to polling:
 
@@ -411,7 +411,7 @@ WHERE  current_state = 1  -- State.Enqueued
 ### Message Flow
 ```
 Publish(OrderCreated) → Message (Enqueued)
-  ↓ MessageRoutingTask routes
+  ↓ MessageRouter routes
   → Job 1 (SendEmail)       → Completed → stats:succeeded +1
   → Job 2 (UpdateInventory) → Completed → stats:succeeded +1
   → Message Completed → ExpireAt set

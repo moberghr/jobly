@@ -7,7 +7,7 @@ namespace Jobly.Core.Data.Queries;
 
 /// <summary>
 /// Snapshot of the resolved table/column names for <see cref="Job"/> (and <see cref="Server"/>
-/// for <c>ServerCleanupTask</c>) as seen through the user's configured EF Core naming
+/// for <c>ServerCleanup</c>) as seen through the user's configured EF Core naming
 /// conventions (e.g. <c>UseSnakeCaseNamingConvention</c>) and schema override. Read once at
 /// DI setup and interpolated into the cached SQL strings so per-fetch calls pay zero
 /// string-formatting cost.

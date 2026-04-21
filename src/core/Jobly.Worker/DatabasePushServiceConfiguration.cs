@@ -12,7 +12,7 @@ namespace Jobly.Worker;
 /// Opt-in DB-push extension on the Jobly builder. Call <c>opt.UseDatabasePush()</c> inside the
 /// <c>AddJobly</c> or <c>AddJoblyWorker</c> lambda (after <c>UsePostgreSql()</c> or
 /// <c>UseSqlServer()</c>) to replace the default polling wake-up on the dispatcher,
-/// <c>MessageRoutingTask</c>, and <c>OrchestrationTask</c> with push notifications delivered via
+/// <c>MessageRouter</c>, and <c>Orchestrator</c> with push notifications delivered via
 /// the provider's native mechanism (Postgres LISTEN/NOTIFY, SQL Server Service Broker). Provider
 /// selection is transparent: the transport is constructed from whichever
 /// <see cref="IJoblyNotificationTransportFactory"/> the provider package registered.
