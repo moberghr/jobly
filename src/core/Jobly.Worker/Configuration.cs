@@ -67,19 +67,37 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
 
     public TimeSpan HealthCheckTimeout { get; set; } = TimeSpan.FromMinutes(5);
 
-    public TimeSpan CounterAggregationInterval { get; set; } = TimeSpan.FromSeconds(5);
-
-    public TimeSpan ServerCleanupInterval { get; set; } = TimeSpan.FromSeconds(30);
-
-    public TimeSpan StaleJobRecoveryInterval { get; set; } = TimeSpan.FromSeconds(30);
-
-    public TimeSpan ExpirationCleanupInterval { get; set; } = TimeSpan.FromSeconds(60);
+    /// <summary>
+    /// How often <see cref="Services.CounterAggregator{TContext}"/> folds pending Counter rows
+    /// into the Statistic table. Set to <c>null</c> to disable the auto-run loop — the task
+    /// stays DI-resolvable but no server runs it on a schedule.
+    /// </summary>
+    public TimeSpan? CounterAggregationInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// How often RecurringJobScheduler checks for recurring jobs whose NextExecution has elapsed
-    /// and creates the next occurrence.
+    /// How often <see cref="Services.ServerCleanup{TContext}"/> removes Server rows whose
+    /// heartbeat is past <see cref="HealthCheckTimeout"/>. Set to <c>null</c> to disable.
     /// </summary>
-    public TimeSpan RecurringJobSchedulerInterval { get; set; } = TimeSpan.FromSeconds(15);
+    public TimeSpan? ServerCleanupInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// How often <see cref="Services.StaleJobRecovery{TContext}"/> requeues or fails jobs
+    /// whose worker stopped refreshing keep-alive. Set to <c>null</c> to disable.
+    /// </summary>
+    public TimeSpan? StaleJobRecoveryInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// How often <see cref="Services.ExpirationCleanup{TContext}"/> deletes expired jobs and
+    /// their log rows. Set to <c>null</c> to disable.
+    /// </summary>
+    public TimeSpan? ExpirationCleanupInterval { get; set; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// How often <see cref="Services.RecurringJobScheduler{TContext}"/> checks for recurring
+    /// jobs whose NextExecution has elapsed and creates the next occurrence. Set to
+    /// <c>null</c> to disable.
+    /// </summary>
+    public TimeSpan? RecurringJobSchedulerInterval { get; set; } = TimeSpan.FromSeconds(15);
 
     public TimeSpan OrchestrationInterval { get; set; } = TimeSpan.FromSeconds(10);
 
