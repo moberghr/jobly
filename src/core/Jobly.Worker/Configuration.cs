@@ -75,6 +75,12 @@ public class JoblyWorkerConfiguration : JoblyConfiguration
 
     public TimeSpan ExpirationCleanupInterval { get; set; } = TimeSpan.FromSeconds(60);
 
+    /// <summary>
+    /// How often RecurringJobScheduler checks for recurring jobs whose NextExecution has elapsed
+    /// and creates the next occurrence.
+    /// </summary>
+    public TimeSpan RecurringJobSchedulerInterval { get; set; } = TimeSpan.FromSeconds(15);
+
     public TimeSpan OrchestrationInterval { get; set; } = TimeSpan.FromSeconds(10);
 
     public TimeSpan MessageRoutingInterval { get; set; } = TimeSpan.FromSeconds(1);

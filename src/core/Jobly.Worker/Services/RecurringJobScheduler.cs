@@ -1,64 +1,67 @@
 using Cronos;
-using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Helper;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Jobly.Worker.Services;
 
 /// <summary>
-/// Polls recurring jobs and creates the next occurrence when due.
-/// Decouples scheduling from execution — recurring jobs fire regardless of whether
-/// the previous execution succeeded or failed.
+/// Polls recurring jobs and creates the next occurrence when due. Decouples scheduling
+/// from execution — recurring jobs fire regardless of whether the previous execution
+/// succeeded or failed. The dedup check uses the latest RecurringJobLog entry rather
+/// than the oldest to catch the correct outstanding job.
 /// </summary>
-public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
+public sealed class RecurringJobScheduler<TContext> : IServerTask
     where TContext : DbContext
 {
-    public RecurringJobSchedulerTask(
-        IServiceScopeFactory scopeFactory,
-        ILogger<RecurringJobSchedulerTask<TContext>> logger,
-        IOptions<JoblyWorkerConfiguration> configuration,
-        IJoblyLockProvider lockProvider,
-        TimeProvider timeProvider)
-        : base(scopeFactory, logger, configuration, timeProvider, "jobly:recurring-scheduler", lockProvider)
+    private readonly TContext _context;
+    private readonly TimeProvider _time;
+    private readonly JoblyWorkerConfiguration _configuration;
+
+    public RecurringJobScheduler(
+        TContext context,
+        TimeProvider time,
+        IOptions<JoblyWorkerConfiguration> configuration)
     {
+        _context = context;
+        _time = time;
+        _configuration = configuration.Value;
     }
 
-    protected override string TaskName => "RecurringJobScheduler";
+    public string Name => "RecurringJobScheduler";
 
-    protected override bool RerunImmediately => false;
+    public string? LockKey => "jobly:recurring-scheduler";
 
-    protected override TimeSpan DefaultInterval => TimeSpan.FromSeconds(15);
+    public TimeSpan? DefaultInterval => _configuration.RecurringJobSchedulerInterval;
 
-    protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
+    public bool RerunImmediately => false;
+
+    public async Task<string?> ExecuteAsync(CancellationToken ct)
     {
-        var count = await ScheduleRecurringJobs(context, TimeProvider);
+        var count = await ScheduleRecurringJobsAsync(ct);
+
         return count > 0 ? $"Scheduled {count} recurring jobs" : null;
     }
 
-    public static async Task<int> ScheduleRecurringJobs<TCtx>(TCtx context, TimeProvider timeProvider)
-        where TCtx : DbContext
+    internal async Task<int> ScheduleRecurringJobsAsync(CancellationToken ct)
     {
-        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var now = _time.GetUtcNow().UtcDateTime;
         var count = 0;
 
-        var recurringJobs = await context.Set<RecurringJob>()
+        var recurringJobs = await _context.Set<RecurringJob>()
             .Where(x => x.NextExecution != null && x.NextExecution <= now)
-            .ToListAsync();
+            .ToListAsync(ct);
 
         foreach (var recurringJob in recurringJobs)
         {
-            // Check if the most recent job for this recurring definition is still active
-            var latestLog = await context.Set<RecurringJobLog>()
+            var latestLog = await _context.Set<RecurringJobLog>()
                 .Where(l => l.RecurringJobId == recurringJob.Id)
                 .OrderByDescending(l => l.CreatedAt)
                 .Select(l => new { l.JobId, JobState = l.Job != null ? l.Job.CurrentState : (State?)null })
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(ct);
 
             if (latestLog?.JobState is State.Enqueued or State.Processing)
             {
@@ -70,7 +73,7 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
 
             if (recurringJob.DisabledAt != null)
             {
-                context.Set<RecurringJobLog>().Add(new RecurringJobLog
+                _context.Set<RecurringJobLog>().Add(new RecurringJobLog
                 {
                     RecurringJobId = recurringJob.Id,
                     Skipped = true,
@@ -93,8 +96,8 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
                 state: State.Enqueued,
                 now: now);
 
-            context.Set<Job>().Add(newJob);
-            context.Set<JobLog>().Add(new JobLog
+            _context.Set<Job>().Add(newJob);
+            _context.Set<JobLog>().Add(new JobLog
             {
                 JobId = newJob.Id,
                 EventType = "Created",
@@ -102,7 +105,7 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
                 Level = "Information",
                 Message = $"Job {newJob.Id} created for recurring job {recurringJob.Id}",
             });
-            context.Set<RecurringJobLog>().Add(new RecurringJobLog
+            _context.Set<RecurringJobLog>().Add(new RecurringJobLog
             {
                 RecurringJobId = recurringJob.Id,
                 JobId = newJob.Id,
@@ -117,7 +120,7 @@ public class RecurringJobSchedulerTask<TContext> : ServerTaskBase<TContext>
 
         if (count > 0)
         {
-            await context.SaveChangesAsync();
+            await _context.SaveChangesAsync(ct);
         }
 
         return count;

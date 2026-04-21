@@ -76,11 +76,11 @@ public static class ServiceConfiguration
         services.AddScoped<IServerTask, StaleJobRecovery<TContext>>();
         services.AddScoped<IServerTask, CounterAggregator<TContext>>();
         services.AddScoped<IServerTask, ExpirationCleanup<TContext>>();
+        services.AddScoped<IServerTask, RecurringJobScheduler<TContext>>();
         services.AddHostedService<JoblyServerRegistration<TContext>>();
         services.AddHostedService<JoblyDispatcherHost<TContext>>();
         services.AddHostedService<JoblySingleWorkerHost<TContext>>();
         services.AddHostedService<ServerTaskHost<TContext>>();
-        services.AddHostedService<RecurringJobSchedulerTask<TContext>>();
         services.AddHostedService<ScheduledJobActivationTask<TContext>>();
         services.AddHostedService<MessageRoutingTask<TContext>>();
         services.AddHostedService<OrchestrationTask<TContext>>();

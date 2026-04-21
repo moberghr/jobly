@@ -57,7 +57,7 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert: the created job should have ScheduleTime <= now (ready for execution)
         var readCtx = _fixture.CreateContext();

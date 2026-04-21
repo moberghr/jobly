@@ -112,6 +112,17 @@ public static class TestTasks
             Options.Create(new JoblyWorkerConfiguration()));
     }
 
+    public static RecurringJobScheduler<TContext> CreateRecurringJobScheduler<TContext>(
+        TContext context,
+        TimeProvider timeProvider)
+        where TContext : DbContext
+    {
+        return new RecurringJobScheduler<TContext>(
+            context,
+            timeProvider,
+            Options.Create(new JoblyWorkerConfiguration()));
+    }
+
     public static ExpirationCleanup<TContext> CreateExpirationCleanup<TContext>(
         TContext context,
         TimeProvider timeProvider,

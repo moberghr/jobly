@@ -64,7 +64,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+        var count = await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert — should skip because the pending job still exists
         count.ShouldBe(0);
@@ -118,7 +118,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+        var count = await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert
         count.ShouldBe(3);
@@ -165,7 +165,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert — NextExecution should be updated to a future time
         var readCtx = _fixture.CreateContext();
@@ -215,7 +215,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert — LastExecution should be set (was the previous NextExecution)
         var readCtx = _fixture.CreateContext();
@@ -245,7 +245,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+        var count = await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert
         count.ShouldBe(1);
@@ -281,7 +281,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert
         var jobCountAfter = await _fixture.CreateContext().Set<Job>().CountAsync(Xunit.TestContext.Current.CancellationToken);
@@ -308,7 +308,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -337,7 +337,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+        await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -390,7 +390,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+        var count = await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert — should create a real job
         count.ShouldBe(1);
@@ -428,7 +428,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
         // Act
         var tp = new FakeTimeProvider(now);
         var schedCtx = _fixture.CreateContext();
-        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, tp);
+        var count = await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, tp).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert — should schedule (NextExecution <= now)
         count.ShouldBe(1);
@@ -455,7 +455,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+        var count = await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert
         count.ShouldBe(0);
@@ -525,7 +525,7 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs(schedCtx, TimeProvider.System);
+        var count = await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert — should skip because latest log's job is Enqueued
         count.ShouldBe(0);

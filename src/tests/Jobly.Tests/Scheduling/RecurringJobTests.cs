@@ -326,7 +326,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
-        var count = await RecurringJobSchedulerTask<TestContext>.ScheduleRecurringJobs<TestContext>(schedCtx, TimeProvider.System);
+        var count = await Jobly.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert
         count.ShouldBeGreaterThanOrEqualTo(1);
