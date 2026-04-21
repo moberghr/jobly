@@ -1,3 +1,4 @@
+using Jobly.Core.Data;
 using Jobly.Core.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,11 +10,13 @@ public class CircuitBreakerStore<TContext> : ICircuitBreakerStore
 {
     private readonly TContext _context;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IDatabaseExceptionClassifier _exceptionClassifier;
 
-    public CircuitBreakerStore(TContext context, IServiceScopeFactory scopeFactory)
+    public CircuitBreakerStore(TContext context, IServiceScopeFactory scopeFactory, IDatabaseExceptionClassifier exceptionClassifier)
     {
         _context = context;
         _scopeFactory = scopeFactory;
+        _exceptionClassifier = exceptionClassifier;
     }
 
     public Task<CircuitBreakerState?> GetAsync(string groupKey, CancellationToken cancellationToken)
@@ -71,7 +74,7 @@ public class CircuitBreakerStore<TContext> : ICircuitBreakerStore
                 });
             await insertContext.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException ex) when (CircuitBreakerExceptions.IsUniqueConstraintViolation(ex))
+        catch (DbUpdateException ex) when (_exceptionClassifier.IsUniqueConstraintViolation(ex))
         {
             // Concurrent worker inserted the row first — fall back to ExecuteUpdate.
             // Non-unique DbUpdateException (CHECK, FK, column-length) skips this catch

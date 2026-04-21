@@ -31,9 +31,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     private readonly WorkerGroupConfiguration _groupConfiguration;
     private readonly TimeProvider _timeProvider;
     private readonly IJoblyNotificationTransport _notificationTransport;
-    private IJoblySqlQueries<TContext>? _sqlQueries;
+    private readonly IJoblySqlQueries<TContext> _sqlQueries;
 
-    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration, TimeProvider timeProvider, IJoblySqlQueries<TContext>? sqlQueries = null, IJoblyNotificationTransport? notificationTransport = null)
+    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration, TimeProvider timeProvider, IJoblySqlQueries<TContext> sqlQueries, IJoblyNotificationTransport notificationTransport)
     {
         _workerId = workerId;
         _serviceScopeFactory = serviceScopeFactory;
@@ -42,31 +42,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         _groupConfiguration = groupConfiguration;
         _timeProvider = timeProvider;
         _sqlQueries = sqlQueries;
-        _notificationTransport = notificationTransport ?? new NullNotificationTransport();
-    }
-
-    // Lazy resolution so tests that build a partial DI container without IJoblySqlQueries
-    // still work: first call tries the scope's registered instance, falls back to constructing
-    // one from the context's model. Subsequent calls reuse the cached instance.
-    private IJoblySqlQueries<TContext> GetOrResolveSqlQueries(IServiceScope scope, TContext context)
-    {
-        if (_sqlQueries != null)
-        {
-            return _sqlQueries;
-        }
-
-        var resolved = scope.ServiceProvider.GetService<IJoblySqlQueries<TContext>>();
-        if (resolved == null)
-        {
-            var names = JoblyJobTableNames.FromModel(context.Model);
-            var isPostgres = context.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
-            resolved = isPostgres
-                ? new PostgresJoblySqlQueries<TContext>(names)
-                : new SqlServerJoblySqlQueries<TContext>(names);
-        }
-
-        _sqlQueries = resolved;
-        return resolved;
+        _notificationTransport = notificationTransport;
     }
 
     public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
@@ -84,8 +60,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         // window, no dependency on a regex-rewriting interceptor. Concurrent workers across
         // servers get distinct rows or nothing at all — never the same row.
         PerfTrace.Mark(PerfTrace.FetchJob);
-        var sqlQueries = GetOrResolveSqlQueries(workerScope, workerContext);
-        var claimed = await sqlQueries.ClaimEnqueuedJobsAsync(
+        var claimed = await _sqlQueries.ClaimEnqueuedJobsAsync(
             workerContext,
             _groupConfiguration.Queues,
             _workerId,

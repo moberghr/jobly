@@ -16,8 +16,9 @@ public class JoblyConfiguration
 
     /// <summary>
     /// Model builder callbacks contributed by opt-in addons (e.g. CircuitBreaker).
-    /// Invoked by JoblyModelCustomizer after the core entities are registered.
-    /// Addons append via services.Configure&lt;JoblyConfiguration&gt;.
+    /// Invoked by JoblyModelCustomizer after the core entities are registered. Addons
+    /// append via the builder inside the <c>AddJobly</c>/<c>AddJoblyWorker</c> lambda;
+    /// exposed publicly so external addons (e.g. provider packages) can contribute too.
     /// </summary>
-    internal List<Action<ModelBuilder, string?>> EntityConfigurators { get; } = [];
+    public List<Action<ModelBuilder, string?>> EntityConfigurators { get; } = [];
 }

@@ -37,7 +37,7 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
-        var result = await RecoverStaleJobs(context, TimeProvider, Configuration.InvisibilityTimeout, Configuration.RestartStaleJobsByDefault, _sqlQueries, ct);
+        var result = await RecoverStaleJobsAsync(context, ct);
         if (result.Total == 0)
         {
             return null;
@@ -46,28 +46,14 @@ public class StaleJobRecoveryTask<TContext> : ServerTaskBase<TContext>
         return $"Recovered {result.Total} stale jobs ({result.Requeued} requeued, {result.Failed} failed, {result.Deleted} deleted)";
     }
 
-    /// <summary>
-    /// Finds jobs stuck in Processing with stale LastKeepAlive and recovers them —
-    /// requeueing, failing (per <see cref="ICanBeRestartedMetadata.CanBeRestarted"/>),
-    /// or deleting (when cancellation was pending). Public static so tests can call it directly;
-    /// pass <paramref name="sqlQueries"/> to reuse a cached instance, otherwise one is built from
-    /// the context on every invocation.
-    /// </summary>
-    public static async Task<StaleJobRecoveryResult> RecoverStaleJobs<TCtx>(
-        TCtx context,
-        TimeProvider timeProvider,
-        TimeSpan invisibilityTimeout,
-        bool restartByDefault = true,
-        IJoblySqlQueries<TCtx>? sqlQueries = null,
-        CancellationToken ct = default)
-        where TCtx : DbContext
+    public async Task<StaleJobRecoveryResult> RecoverStaleJobsAsync(TContext context, CancellationToken ct)
     {
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        var cutoff = now - invisibilityTimeout;
-        var queries = sqlQueries ?? JoblySqlQueriesFactory.Create(context);
+        var now = TimeProvider.GetUtcNow().UtcDateTime;
+        var cutoff = now - Configuration.InvisibilityTimeout;
+        var restartByDefault = Configuration.RestartStaleJobsByDefault;
 
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
-        var staleJobs = await queries.LockStaleProcessingJobsAsync(context, cutoff, ct);
+        var staleJobs = await _sqlQueries.LockStaleProcessingJobsAsync(context, cutoff, ct);
 
         var requeued = 0;
         var failed = 0;

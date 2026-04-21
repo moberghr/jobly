@@ -4,9 +4,11 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using Jobly.Core;
 using Jobly.Core.Data.Entities;
+using Jobly.Core.Data.Queries;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Notifications;
 using Jobly.ServerBenchmarks.Infrastructure;
 using Jobly.Worker;
 using Microsoft.EntityFrameworkCore;
@@ -44,7 +46,9 @@ public class WorkerMemoryBenchmark
             services.GetRequiredService<ILogger<JoblyWorkerService<TestContext>>>(),
             services.GetRequiredService<IOptions<JoblyWorkerConfiguration>>(),
             new WorkerGroupConfiguration { Queues = ["default"], WorkerCount = 1 },
-            services.GetRequiredService<TimeProvider>());
+            services.GetRequiredService<TimeProvider>(),
+            services.GetRequiredService<IJoblySqlQueries<TestContext>>(),
+            services.GetRequiredService<IJoblyNotificationTransport>());
 
         // Register a server + worker in the DB (required for job processing)
         await using var scope = services.CreateAsyncScope();

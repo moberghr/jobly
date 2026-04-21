@@ -34,13 +34,27 @@ A distributed job processing, message queue, and in-memory mediator library for 
 - **Configurable Handler Logging** — `EnableHandlerLogging` option (default true) to suppress handler ILogger output from the JobLog table when not needed.
 - **Dashboard** — React-based web UI with realtime graph, historical graph, dark mode, clickable metric cards, bulk actions, batch progress bars, worker detail page.
 - **TimeProvider** — All production code uses injectable `TimeProvider` for testability.
-- **DB Push (optional)** — Opt-in `AddJoblyDatabasePush<TContext>()` replaces polling wake-up with PostgreSQL `LISTEN`/`NOTIFY` or SQL Server Service Broker, cutting dispatcher pickup latency from ~500ms to <50ms without tight polling.
+- **DB Push (optional)** — Opt-in `opt.UseDatabasePush()` replaces polling wake-up with PostgreSQL `LISTEN`/`NOTIFY` or SQL Server Service Broker, cutting dispatcher pickup latency from ~500ms to <50ms without tight polling.
 
 ## Integration Guide
 
-### 1. Register Services
+### 1. Install packages
 
-Register your DbContext as usual — Jobly hooks into it automatically when you call `AddJobly` or `AddJoblyWorker`:
+Jobly ships as a small set of NuGet packages — pick the provider package that matches your database:
+
+| Package                            | Purpose                                                   |
+|------------------------------------|-----------------------------------------------------------|
+| `Moberg.Jobly.Core`                | Core types (always required)                              |
+| `Moberg.Jobly.Worker`              | Worker + background tasks (required for processing)       |
+| `Moberg.Jobly.Provider.PostgreSql` | PostgreSQL provider (row-lock SQL, LISTEN/NOTIFY, locks)  |
+| `Moberg.Jobly.Provider.SqlServer`  | SQL Server provider (row-lock SQL, Service Broker, locks) |
+| `Moberg.Jobly.UI`                  | Dashboard UI (optional)                                   |
+
+You only add the provider package for your database; Jobly.Core no longer has a hard dependency on either EF provider.
+
+### 2. Register Services
+
+Register your DbContext as usual — Jobly hooks into it automatically when you call `AddJobly` or `AddJoblyWorker`. Opt into a provider from the lambda:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
@@ -49,13 +63,21 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
-// Register Jobly worker (includes AddJobly internally)
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+// Register Jobly worker (includes AddJobly internally).
+// opt.UsePostgreSql() comes from Moberg.Jobly.Provider.PostgreSql and registers the row-lock SQL,
+// distributed lock provider, exception classifier, and the push notification factory.
+builder.Services.AddJoblyWorker<AppDbContext>(opt =>
 {
-    options.WorkerCount = 5;
-    options.PollingInterval = TimeSpan.FromSeconds(1);
-    options.Queues = ["critical", "default", "low"];
-    options.JobExpirationTimeout = TimeSpan.FromDays(7);
+    opt.UsePostgreSql();
+
+    opt.WorkerCount = 5;
+    opt.PollingInterval = TimeSpan.FromSeconds(1);
+    opt.Queues = ["critical", "default", "low"];
+    opt.JobExpirationTimeout = TimeSpan.FromDays(7);
+
+    // Core addons live on the same builder
+    opt.AddRetry(r => r.MaxRetries = 3);
+    opt.AddMutex();
 });
 
 // Scan assembly for IJobHandler<T> and IMessageHandler<T> implementations
@@ -72,19 +94,34 @@ app.Run();
 If you only need to publish jobs (no worker), use `AddJobly` instead:
 
 ```csharp
-builder.Services.AddJobly<AppDbContext>();
+builder.Services.AddJobly<AppDbContext>(opt =>
+{
+    opt.UsePostgreSql();  // or opt.UseSqlServer()
+});
+```
+
+To bind configuration from `appsettings.json`, use `BindConfiguration` inside the lambda — provider opt-in must still be an explicit call since it's a DI registration, not a config field:
+
+```csharp
+builder.Services.AddJoblyWorker<AppDbContext>(opt =>
+{
+    opt.BindConfiguration(builder.Configuration.GetSection("Jobly"));
+    opt.UsePostgreSql();
+});
 ```
 
 For fine-grained control, use worker groups to assign different queues and polling intervals:
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+builder.Services.AddJoblyWorker<AppDbContext>(opt =>
 {
-    options.WorkerCount = 5;
-    options.Queues = ["critical"];
-    options.PollingInterval = TimeSpan.FromMilliseconds(100);
+    opt.UseSqlServer();
 
-    options.AddWorkerGroup(group =>
+    opt.WorkerCount = 5;
+    opt.Queues = ["critical"];
+    opt.PollingInterval = TimeSpan.FromMilliseconds(100);
+
+    opt.AddWorkerGroup(group =>
     {
         group.WorkerCount = 2;
         group.Queues = ["reports", "default"];
@@ -93,7 +130,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 });
 ```
 
-### 2. Define Messages (Pub/Sub)
+### 3. Define Messages (Pub/Sub)
 
 ```csharp
 public class OrderCreated : IMessage
@@ -141,7 +178,7 @@ public async Task<IActionResult> CreateOrder(CreateOrderRequest request)
 }
 ```
 
-### 3. Define Jobs (Orchestration)
+### 4. Define Jobs (Orchestration)
 
 ```csharp
 public class GenerateReport : IJob
@@ -170,7 +207,7 @@ await publisher.Enqueue(new GenerateReport { Month = 3 }, queue: "reports");
 await publisher.Enqueue(new FollowUp(), parentJobId: prepareId); // continuation
 ```
 
-### 4. Define Requests (In-Memory)
+### 5. Define Requests (In-Memory)
 
 ```csharp
 public class GetUser : IRequest<UserDto>
@@ -195,7 +232,7 @@ var user = await mediator.Send(new GetUser { UserId = 1 });
 
 Requests execute immediately in-process — no database, no worker, no retries. Errors bubble up to the caller.
 
-### 5. Define Streams (In-Memory)
+### 6. Define Streams (In-Memory)
 
 ```csharp
 public class GetUsers : IStreamRequest<UserDto>
@@ -226,7 +263,7 @@ await foreach (var user in mediator.CreateStream(new GetUsers { Role = "Admin" }
 
 Streams execute lazily in-process — items are yielded one at a time. No database persistence, no worker, no retries.
 
-### 6. Pipeline Behaviors
+### 7. Pipeline Behaviors
 
 The unified pipeline wraps all four patterns — jobs, messages, requests, and streams:
 
@@ -251,7 +288,7 @@ builder.Services.AddPipelineBehaviors(typeof(Program).Assembly);
 
 For jobs and messages, `TResponse` is `Unit`. For requests, it's your custom response type. For streams, it's `IAsyncEnumerable<T>`.
 
-### 7. Named Queues
+### 8. Named Queues
 
 ```csharp
 options.Queues = ["a-critical", "b-default", "c-low"];
@@ -261,7 +298,7 @@ await publisher.Enqueue(new UrgentTask(), queue: "a-critical");
 await publisher.Publish(new LowPriorityEvent(), queue: "c-low");
 ```
 
-### 8. Recurring Jobs
+### 9. Recurring Jobs
 
 ```csharp
 await recurringPublisher.AddOrUpdateRecurringJob(
@@ -270,7 +307,7 @@ await recurringPublisher.AddOrUpdateRecurringJob(
 
 `AddOrUpdateRecurringJob` registers the definition. The `RecurringJobSchedulerTask` creates jobs when the cron time arrives. Execution history is tracked in `RecurringJobLog` and survives job cleanup.
 
-### 9. Dashboard Authorization
+### 10. Dashboard Authorization
 
 ```csharp
 app.UseJoblyUI(options =>
@@ -333,20 +370,22 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 
 ### 11. DB Push (optional)
 
-Replaces polling wake-up with push notifications — PostgreSQL `LISTEN`/`NOTIFY` or SQL Server Service Broker. The dispatcher, `MessageRoutingTask`, and `OrchestrationTask` wake instantly on relevant events instead of waiting for their next poll. Opt-in; default behavior (polling) is unchanged if you don't call `AddJoblyDatabasePush`.
+Replaces polling wake-up with push notifications — PostgreSQL `LISTEN`/`NOTIFY` or SQL Server Service Broker. The dispatcher, `MessageRoutingTask`, and `OrchestrationTask` wake instantly on relevant events instead of waiting for their next poll. Opt-in; default behavior (polling) is unchanged if you don't call `opt.UseDatabasePush()`.
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+builder.Services.AddJoblyWorker<AppDbContext>(opt =>
 {
-    // Push benefits the dispatcher's batch-fetch path; individual workers still poll.
-    options.UseDispatcher = true;
-    options.PollingInterval = TimeSpan.FromSeconds(5); // loose polling is fine when push is on
-});
+    opt.UsePostgreSql();         // or opt.UseSqlServer()
 
-builder.Services.AddJoblyDatabasePush<AppDbContext>();
+    // Push benefits the dispatcher's batch-fetch path; individual workers still poll.
+    opt.UseDispatcher = true;
+    opt.PollingInterval = TimeSpan.FromSeconds(5); // loose polling is fine when push is on
+
+    opt.UseDatabasePush();
+});
 ```
 
-Provider is auto-detected from the `DbContextOptions`. Transports are resilient to connection drops — the listener reconnects with exponential backoff and fires a drain signal on every reconnect so jobs enqueued during the gap are picked up.
+The provider-specific transport is wired by whichever `UsePostgreSql()` / `UseSqlServer()` you called. Transports are resilient to connection drops — the listener reconnects with exponential backoff and fires a drain signal on every reconnect so jobs enqueued during the gap are picked up.
 
 **Scheduled jobs**: push accelerates *immediate* enqueues. Jobs published via `Schedule(job, at)` sit in `State.Scheduled` until `ScheduledJobActivationTask` flips them to `Enqueued` — only then does the `JobEnqueued` notification fire. Dispatcher pickup after activation is <50ms via push, but the activation itself is time-driven and bounded by `ScheduledActivationInterval` (default 5s, see §10). If you need sub-second precision on scheduled jobs, lower that interval — polling is the only mechanism, since there's no event for "wall-clock time has advanced."
 

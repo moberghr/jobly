@@ -9,67 +9,64 @@ using Microsoft.Extensions.Logging;
 namespace Jobly.Worker;
 
 /// <summary>
-/// Opt-in DB-push extension. Call <c>AddJoblyDatabasePush&lt;TContext&gt;()</c> after
-/// <c>AddJoblyWorker&lt;TContext&gt;()</c> to replace the default polling wake-up on the
-/// dispatcher / MessageRoutingTask / OrchestrationTask with push notifications delivered
-/// via PostgreSQL LISTEN/NOTIFY or SQL Server Service Broker.
+/// Opt-in DB-push extension on the Jobly builder. Call <c>opt.UseDatabasePush()</c> inside the
+/// <c>AddJobly</c> or <c>AddJoblyWorker</c> lambda (after <c>UsePostgreSql()</c> or
+/// <c>UseSqlServer()</c>) to replace the default polling wake-up on the dispatcher,
+/// <c>MessageRoutingTask</c>, and <c>OrchestrationTask</c> with push notifications delivered via
+/// the provider's native mechanism (Postgres LISTEN/NOTIFY, SQL Server Service Broker). Provider
+/// selection is transparent: the transport is constructed from whichever
+/// <see cref="IJoblyNotificationTransportFactory"/> the provider package registered.
 /// </summary>
 public static class DatabasePushServiceConfiguration
 {
-    public static IServiceCollection AddJoblyDatabasePush<TContext>(this IServiceCollection services)
+    public static Jobly.Core.IJoblyBuilder<TContext> UseDatabasePush<TContext>(
+        this Jobly.Core.IJoblyBuilder<TContext> builder,
+        Action<JoblyDatabasePushConfiguration>? configure = null)
         where TContext : DbContext
     {
-        return AddJoblyDatabasePush<TContext>(services, _ => { });
-    }
-
-    public static IServiceCollection AddJoblyDatabasePush<TContext>(
-        this IServiceCollection services,
-        Action<JoblyDatabasePushConfiguration> configure)
-        where TContext : DbContext
-    {
-        var options = new JoblyDatabasePushConfiguration();
-        configure(options);
-        services.AddSingleton(options);
-
-        // Replace the default NullNotificationTransport with a provider-specific one.
-        // RemoveAll is required because the null transport was added via TryAddSingleton in AddJobly.
-        services.RemoveAll<IJoblyNotificationTransport>();
-        services.AddSingleton<IJoblyNotificationTransport>(sp =>
+        // Fail fast at setup time if no provider has been opted into yet. Without this check
+        // the error surfaces only when the IJoblyNotificationTransport singleton is first
+        // resolved (typically inside a hosted service at app startup), which is much harder
+        // to diagnose. The ordering contract — UsePostgreSql()/UseSqlServer() must come
+        // before UseDatabasePush() — is enforced here, in the lambda, in the same call order.
+        if (!builder.Services.Any(x => x.ServiceType == typeof(IJoblyNotificationTransportFactory)))
         {
+            throw new InvalidOperationException(
+                "UseDatabasePush requires a provider package. Call opt.UsePostgreSql() or opt.UseSqlServer() inside the AddJobly/AddJoblyWorker lambda BEFORE opt.UseDatabasePush().");
+        }
+
+        var options = new JoblyDatabasePushConfiguration();
+        configure?.Invoke(options);
+        builder.Services.AddSingleton(options);
+
+        // Replace the default NullNotificationTransport with the provider-specific one.
+        // RemoveAll is required because the null transport was added via TryAddSingleton in AddJobly.
+        builder.Services.RemoveAll<IJoblyNotificationTransport>();
+        builder.Services.AddSingleton<IJoblyNotificationTransport>(sp =>
+        {
+            var factory = sp.GetService<IJoblyNotificationTransportFactory>()
+                ?? throw new InvalidOperationException(
+                    "UseDatabasePush requires a provider package. Call opt.UsePostgreSql() or opt.UseSqlServer() inside the AddJobly/AddJoblyWorker lambda before opt.UseDatabasePush().");
+
             var dbOptions = sp.GetRequiredService<DbContextOptions<TContext>>();
             var relationalExtension = dbOptions.Extensions.OfType<RelationalOptionsExtension>().FirstOrDefault();
             var connectionString = relationalExtension?.ConnectionString;
 
-            // Provider detection: prefer RelationalOptionsExtension type name (cheap, no scope
-            // needed). For factory-configured DbContexts (UseNpgsql(sp => ...)) the extension is
-            // present but its ConnectionString is null, so we resolve via a scoped context AND
-            // re-check the provider via Database.ProviderName to avoid silently defaulting to
-            // SQL Server for a Postgres user.
-            var providerName = relationalExtension?.GetType().FullName;
-            if (string.IsNullOrEmpty(connectionString) || string.IsNullOrEmpty(providerName))
+            // Factory-configured DbContexts (UseNpgsql(sp => ...)) have the extension present but
+            // with a null connection string — resolve via a scoped context.
+            if (string.IsNullOrEmpty(connectionString))
             {
                 using var scope = sp.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<TContext>();
-                connectionString ??= context.Database.GetConnectionString()
+                connectionString = context.Database.GetConnectionString()
                     ?? throw new InvalidOperationException("Cannot resolve connection string for Jobly DB push.");
-                providerName ??= context.Database.ProviderName;
             }
 
-            var isPostgres = providerName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
-
-            return isPostgres
-                ? new PostgresNotificationTransport(
-                    connectionString,
-                    options,
-                    sp.GetService<ILogger<PostgresNotificationTransport>>())
-                : new SqlServerNotificationTransport(
-                    connectionString,
-                    options,
-                    sp.GetService<ILogger<SqlServerNotificationTransport>>());
+            return factory.Create(connectionString, options, sp.GetRequiredService<ILoggerFactory>());
         });
 
-        services.AddHostedService<NotificationListenerTask<TContext>>();
+        builder.Services.AddHostedService<NotificationListenerTask<TContext>>();
 
-        return services;
+        return builder;
     }
 }

@@ -15,7 +15,7 @@ We evaluated migrating from xUnit v3 to TUnit v1.33.0. After a full side-by-side
 
 ## What We Did Instead
 
-Added `TimedFactAttribute` / `TimedTheoryAttribute` with a default 10-second timeout — the one TUnit feature we wanted. See `src/core/Jobly.Tests/TestData/TimedFactAttribute.cs`.
+Added `TimedFactAttribute` / `TimedTheoryAttribute` with a default 10-second timeout — the one TUnit feature we wanted. See `src/tests/Jobly.Tests/TestData/TimedFactAttribute.cs`.
 
 ## Benchmark Results
 

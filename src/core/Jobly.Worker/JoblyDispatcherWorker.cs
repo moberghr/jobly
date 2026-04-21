@@ -43,7 +43,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         ILogger<JoblyDispatcherWorker<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
         TimeProvider timeProvider,
-        IJoblyNotificationTransport? notificationTransport = null)
+        IJoblyNotificationTransport notificationTransport)
     {
         _workerId = workerId;
         _jobReader = jobReader;
@@ -51,7 +51,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         _logger = logger;
         _configuration = configuration.Value;
         _timeProvider = timeProvider;
-        _notificationTransport = notificationTransport ?? new NullNotificationTransport();
+        _notificationTransport = notificationTransport;
         _batch = new CompletionBatch<TContext>(
             scopeFactory,
             timeProvider,

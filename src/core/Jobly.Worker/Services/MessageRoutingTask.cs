@@ -70,29 +70,17 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
-        var routed = await RunMessageRouting(context, _scopeFactory, TimeProvider, ct, _sqlQueries);
+        var routed = await RunMessageRoutingAsync(context, ct);
         return routed > 0 ? $"Routed {routed} messages" : null;
     }
 
-    /// <summary>
-    /// Routes all pending messages. Creates child jobs for each handler. Public static so tests
-    /// can call it directly; pass <paramref name="sqlQueries"/> to reuse a cached instance,
-    /// otherwise one is built from the context on every invocation.
-    /// </summary>
-    public static async Task<int> RunMessageRouting<TCtx>(
-        TCtx context,
-        IServiceScopeFactory scopeFactory,
-        TimeProvider timeProvider,
-        CancellationToken ct,
-        IJoblySqlQueries<TCtx>? sqlQueries = null)
-        where TCtx : DbContext
+    public async Task<int> RunMessageRoutingAsync(TContext context, CancellationToken ct)
     {
         var totalRouted = 0;
-        var queries = sqlQueries ?? JoblySqlQueriesFactory.Create(context);
 
         while (true)
         {
-            var message = await queries.LockNextEnqueuedMessageAsync(context, ct);
+            var message = await _sqlQueries.LockNextEnqueuedMessageAsync(context, ct);
 
             if (message == null)
             {
@@ -107,7 +95,7 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
                 {
                     JobId = message.Id,
                     EventType = "Failed",
-                    Timestamp = timeProvider.GetUtcNow().UtcDateTime,
+                    Timestamp = TimeProvider.GetUtcNow().UtcDateTime,
                     Level = "Error",
                     Message = $"Unknown message type: {message.Type}",
                 });
@@ -115,7 +103,7 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
                 continue;
             }
 
-            using var handlerScope = scopeFactory.CreateScope();
+            using var handlerScope = _scopeFactory.CreateScope();
             var handlerTypes = JobDispatcher.DiscoverMessageHandlers(messageType, handlerScope.ServiceProvider);
 
             if (handlerTypes.Count == 0)
@@ -125,7 +113,7 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
                 {
                     JobId = message.Id,
                     EventType = "Failed",
-                    Timestamp = timeProvider.GetUtcNow().UtcDateTime,
+                    Timestamp = TimeProvider.GetUtcNow().UtcDateTime,
                     Level = "Error",
                     Message = $"No handlers registered for message type {messageType.Name}",
                 });
@@ -133,7 +121,7 @@ public class MessageRoutingTask<TContext> : ServerTaskBase<TContext>
                 continue;
             }
 
-            var now = timeProvider.GetUtcNow().UtcDateTime;
+            var now = TimeProvider.GetUtcNow().UtcDateTime;
             foreach (var handlerType in handlerTypes)
             {
                 var job = JobHelper.CreateJob(

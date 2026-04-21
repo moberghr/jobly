@@ -33,39 +33,35 @@ public class ServerCleanupTask<TContext> : ServerTaskBase<TContext>
 
     protected override async Task<string?> RunServerTask(TContext context, CancellationToken ct)
     {
-        var count = await CleanUpServers(context, TimeProvider, Configuration.HealthCheckTimeout, _sqlQueries, ct);
+        var count = await CleanUpServersAsync(context, ct);
         return count > 0 ? $"Removed {count} stale servers" : null;
     }
 
-    /// <summary>
-    /// Removes servers that have not sent a heartbeat within the timeout. Public static so tests
-    /// can call it directly; pass <paramref name="sqlQueries"/> to reuse a cached instance,
-    /// otherwise one is built from the context on every invocation.
-    /// </summary>
-    public static async Task<int> CleanUpServers<TCtx>(
-        TCtx context,
-        TimeProvider timeProvider,
-        TimeSpan healthCheckTimeout,
-        IJoblySqlQueries<TCtx>? sqlQueries = null,
-        CancellationToken ct = default)
-        where TCtx : DbContext
+    public async Task<int> CleanUpServersAsync(TContext context, CancellationToken ct)
     {
-        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var now = TimeProvider.GetUtcNow().UtcDateTime;
         var removedCount = 0;
-        var queries = sqlQueries ?? JoblySqlQueriesFactory.Create(context);
 
         await using var transaction = await context.Database.BeginTransactionAsync(ct);
-        var servers = await queries.LockAllServersAsync(context, ct);
+        var servers = await _sqlQueries.LockAllServersAsync(context, ct);
         foreach (var server in servers)
         {
-            if (now - server.LastHeartbeatTime > healthCheckTimeout)
+            if (now - server.LastHeartbeatTime > Configuration.HealthCheckTimeout)
             {
-                context.Set<Server>().Remove(server);
-
                 var workers = await context.Set<Jobly.Core.Data.Entities.Worker>()
-                    .Where(w => w.ServerId == server.Id)
+                    .Where(x => x.ServerId == server.Id)
                     .ToListAsync(ct);
                 context.Set<Jobly.Core.Data.Entities.Worker>().RemoveRange(workers);
+
+                // WorkerGroup rows are FK-linked to Server without OnDelete(Cascade) — this is
+                // the crash-recovery path, so we must clean them up here. JoblyServerRegistration.
+                // StopAsync handles the graceful-shutdown case; this handles the ungraceful one.
+                var workerGroups = await context.Set<Jobly.Core.Data.Entities.WorkerGroup>()
+                    .Where(x => x.ServerId == server.Id)
+                    .ToListAsync(ct);
+                context.Set<Jobly.Core.Data.Entities.WorkerGroup>().RemoveRange(workerGroups);
+
+                context.Set<Server>().Remove(server);
 
                 removedCount++;
             }

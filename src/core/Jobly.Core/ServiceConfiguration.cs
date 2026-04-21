@@ -19,31 +19,21 @@ public static class ServiceConfiguration
 {
     private static readonly SaveChangesConcurrencyTokenInterceptor _saveChangesInterceptor = new();
 
-    public static IServiceCollection AddJobly<TContext>(this IServiceCollection services)
-        where TContext : DbContext
-    {
-        services.AddOptions<JoblyConfiguration>();
-        return CreateJoblyServices<TContext>(services);
-    }
-
     public static IServiceCollection AddJobly<TContext>(
         this IServiceCollection services,
-        Action<JoblyConfiguration> options)
+        Action<JoblyBuilder<TContext>>? configure = null)
         where TContext : DbContext
     {
-        services.AddOptions<JoblyConfiguration>()
-            .Configure(options);
+        var builder = new JoblyBuilder<TContext>(services);
+        configure?.Invoke(builder);
 
-        return CreateJoblyServices<TContext>(services);
-    }
+        // The builder IS the configuration. Register it as the IOptions<JoblyConfiguration>
+        // value so downstream consumers (JobCommandService, JoblyModelCustomizer, etc.) see
+        // exactly what the caller set, and so addon-contributed EntityConfigurators survive.
+        // TryAdd: if the caller has already registered IOptions<JoblyConfiguration> (e.g. via
+        // AddJoblyWorker, which inherits JoblyConfiguration), keep theirs.
+        services.TryAddSingleton<IOptions<JoblyConfiguration>>(Options.Create<JoblyConfiguration>(builder));
 
-    public static IServiceCollection AddJobly<TContext>(
-        this IServiceCollection services,
-        IConfiguration namedConfigurationSection)
-        where TContext : DbContext
-    {
-        services.AddOptions<JoblyConfiguration>()
-            .Bind(namedConfigurationSection);
         return CreateJoblyServices<TContext>(services);
     }
 
@@ -80,21 +70,12 @@ public static class ServiceConfiguration
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
 
-        // Default no-op transport. AddJoblyDatabasePush<TContext>() replaces this with a
+        // Default no-op transport. opt.UseDatabasePush() (inside the AddJobly/AddJoblyWorker lambda) replaces this with a
         // provider-specific implementation (Postgres LISTEN/NOTIFY or SQL Server Service Broker).
         services.TryAddSingleton<IJoblyNotificationTransport, NullNotificationTransport>();
 
-        // Provider-specific hand-written SQL for row-locking Job queries. Replaces the legacy
-        // regex-rewriting RowLockInterceptor. Singleton — caches SQL strings read from the
-        // EF model at first resolution.
-        services.TryAddSingleton<IJoblySqlQueries<TContext>>(sp =>
-        {
-            using var scope = sp.CreateScope();
-            var ctx = scope.ServiceProvider.GetRequiredService<TContext>();
-
-            return JoblySqlQueriesFactory.Create(ctx);
-        });
-
+        // IJoblySqlQueries<TContext> is registered by the provider package (Jobly.PostgreSql /
+        // Jobly.SqlServer) via their UsePostgreSql / UseSqlServer builder extensions.
         return services;
     }
 
@@ -125,8 +106,6 @@ public static class ServiceConfiguration
     public static DbContextOptionsBuilder AddJoblyInterceptors(this DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.AddInterceptors(_saveChangesInterceptor);
-
-        optionsBuilder.ConfigureWarnings(w => w.Ignore(SqlServerEventId.SavepointsDisabledBecauseOfMARS));
 
         return optionsBuilder;
     }
