@@ -44,6 +44,8 @@ public sealed class MessageRouter<TContext> : IServerTask
 
     public TimeSpan? DefaultInterval => _configuration.MessageRoutingInterval;
 
+    public IEnumerable<ServerTaskSignal> Signals => [ServerTaskSignal.MessageEnqueued];
+
     public async Task<string?> ExecuteAsync(CancellationToken ct)
     {
         var routed = await RunMessageRoutingAsync(ct);

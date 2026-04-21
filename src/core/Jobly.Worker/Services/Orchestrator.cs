@@ -36,6 +36,8 @@ public sealed class Orchestrator<TContext> : IServerTask
 
     public TimeSpan? DefaultInterval => _configuration.OrchestrationInterval;
 
+    public IEnumerable<ServerTaskSignal> Signals => [ServerTaskSignal.JobFinalized];
+
     public async Task<string?> ExecuteAsync(CancellationToken ct)
     {
         var workDone = await RunOrchestrationCoreAsync(ct);

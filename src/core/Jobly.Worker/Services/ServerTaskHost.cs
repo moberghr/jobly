@@ -62,14 +62,12 @@ public sealed class ServerTaskHost<TContext> : BackgroundService
                 loopLogger);
         }
 
-        if (_loops.TryGetValue(typeof(Orchestrator<TContext>), out var orchLoop))
+        foreach (var loop in _loops.Values)
         {
-            _signalSubscriptions.Add(signals.SubscribeJobFinalized(orchLoop.Signal));
-        }
-
-        if (_loops.TryGetValue(typeof(MessageRouter<TContext>), out var routingLoop))
-        {
-            _signalSubscriptions.Add(signals.SubscribeMessageEnqueued(routingLoop.Signal));
+            foreach (var channel in loop.Signals)
+            {
+                _signalSubscriptions.Add(signals.Subscribe(channel, loop.Signal));
+            }
         }
     }
 

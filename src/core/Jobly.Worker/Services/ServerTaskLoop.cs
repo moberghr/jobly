@@ -21,6 +21,7 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
     private readonly TimeSpan _defaultInterval;
     private readonly bool _rerunImmediately;
     private readonly bool _logOnSuccess;
+    private readonly ServerTaskSignal[] _signals;
 
     private readonly IServiceScopeFactory _scopes;
     private readonly IJoblyLockProvider _lockProvider;
@@ -48,6 +49,7 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
                 nameof(template));
         _rerunImmediately = template.RerunImmediately;
         _logOnSuccess = template.LogOnSuccess;
+        _signals = [.. template.Signals];
         _scopes = scopes;
         _lockProvider = lockProvider;
         _time = time;
@@ -58,6 +60,8 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
     public string Name => _name;
 
     public Type TaskType => _taskType;
+
+    public IReadOnlyList<ServerTaskSignal> Signals => _signals;
 
     /// <summary>
     /// Wake the loop's <see cref="WaitForNextRunAsync"/> — next iteration starts immediately.

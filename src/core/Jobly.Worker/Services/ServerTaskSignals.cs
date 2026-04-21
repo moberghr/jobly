@@ -34,11 +34,16 @@ public sealed class ServerTaskSignals<TContext>
     /// </summary>
     public void SignalMessageEnqueued() => Fire(_messageEnqueuedWakers);
 
-    internal Subscription SubscribeJobFinalized(Action wake) =>
-        Subscribe(_jobFinalizedWakers, wake);
-
-    internal Subscription SubscribeMessageEnqueued(Action wake) =>
-        Subscribe(_messageEnqueuedWakers, wake);
+    /// <summary>
+    /// Subscribe <paramref name="wake"/> to the given channel. Dispose the returned handle to
+    /// unregister — leaking it would leak a closure across the host's lifetime.
+    /// </summary>
+    internal Subscription Subscribe(ServerTaskSignal channel, Action wake) => channel switch
+    {
+        ServerTaskSignal.JobFinalized => Subscribe(_jobFinalizedWakers, wake),
+        ServerTaskSignal.MessageEnqueued => Subscribe(_messageEnqueuedWakers, wake),
+        _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, "Unknown server-task signal channel."),
+    };
 
     private Subscription Subscribe(List<Action> list, Action wake)
     {
