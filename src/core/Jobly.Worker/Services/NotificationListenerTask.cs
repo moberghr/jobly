@@ -18,23 +18,20 @@ public class NotificationListenerTask<TContext> : BackgroundService
     private readonly IJoblyNotificationTransport _transport;
     private readonly JoblyDatabasePushConfiguration _options;
     private readonly JoblyWorkerConfiguration _workerConfiguration;
-    private readonly OrchestrationSignalRegistry<TContext> _orchestrationRegistry;
-    private readonly MessageRoutingSignalRegistry<TContext> _routingRegistry;
+    private readonly ServerTaskSignals<TContext> _signals;
     private readonly ILogger<NotificationListenerTask<TContext>> _logger;
 
     public NotificationListenerTask(
         IJoblyNotificationTransport transport,
         JoblyDatabasePushConfiguration options,
         IOptions<JoblyWorkerConfiguration> workerConfiguration,
-        OrchestrationSignalRegistry<TContext> orchestrationRegistry,
-        MessageRoutingSignalRegistry<TContext> routingRegistry,
+        ServerTaskSignals<TContext> signals,
         ILogger<NotificationListenerTask<TContext>> logger)
     {
         _transport = transport;
         _options = options;
         _workerConfiguration = workerConfiguration.Value;
-        _orchestrationRegistry = orchestrationRegistry;
-        _routingRegistry = routingRegistry;
+        _signals = signals;
         _logger = logger;
     }
 
@@ -105,10 +102,8 @@ public class NotificationListenerTask<TContext> : BackgroundService
     private void DrainSignals()
     {
         JoblyDispatcher<TContext>.SignalAll();
-        MessageRoutingTask<TContext>.SignalRouting();
-        OrchestrationTask<TContext>.SignalOrchestrator();
-        _routingRegistry.Signal();
-        _orchestrationRegistry.Signal();
+        _signals.SignalMessageEnqueued();
+        _signals.SignalJobFinalized();
     }
 
     private void Dispatch(Notification notification)
@@ -119,12 +114,10 @@ public class NotificationListenerTask<TContext> : BackgroundService
                 JoblyDispatcher<TContext>.SignalAll();
                 break;
             case NotificationKind.MessageEnqueued:
-                MessageRoutingTask<TContext>.SignalRouting();
-                _routingRegistry.Signal();
+                _signals.SignalMessageEnqueued();
                 break;
             case NotificationKind.JobFinalized:
-                OrchestrationTask<TContext>.SignalOrchestrator();
-                _orchestrationRegistry.Signal();
+                _signals.SignalJobFinalized();
                 break;
             default:
                 break;

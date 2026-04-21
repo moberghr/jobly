@@ -198,8 +198,8 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
         // Act
         var routeCtx = _fixture.CreateContext();
         await TestTasks
-            .CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System)
-            .RunMessageRoutingAsync(routeCtx, CancellationToken.None);
+            .CreateMessageRouter(routeCtx, scopeFactory, TimeProvider.System)
+            .RunMessageRoutingAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -241,8 +241,8 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
         // Act
         var routeCtx = _fixture.CreateContext();
         await TestTasks
-            .CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System)
-            .RunMessageRoutingAsync(routeCtx, CancellationToken.None);
+            .CreateMessageRouter(routeCtx, scopeFactory, TimeProvider.System)
+            .RunMessageRoutingAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();

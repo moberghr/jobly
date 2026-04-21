@@ -1,5 +1,6 @@
 using Jobly.Core.Data.Queries;
 using Jobly.Core.Notifications;
+using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -27,6 +28,7 @@ public class JoblySingleWorkerHost<TContext> : IHostedService
     private readonly IJoblyNotificationTransport _notificationTransport;
     private readonly IJoblySqlQueries<TContext> _sqlQueries;
     private readonly ServerRegistrationState _state;
+    private readonly ServerTaskSignals<TContext> _signals;
     private readonly ILoggerFactory _loggerFactory;
     private readonly List<BackgroundService> _workers = [];
 
@@ -38,6 +40,7 @@ public class JoblySingleWorkerHost<TContext> : IHostedService
         IJoblyNotificationTransport notificationTransport,
         IJoblySqlQueries<TContext> sqlQueries,
         ServerRegistrationState state,
+        ServerTaskSignals<TContext> signals,
         ILoggerFactory loggerFactory)
     {
         _configuration = configuration.Value;
@@ -48,6 +51,7 @@ public class JoblySingleWorkerHost<TContext> : IHostedService
         _notificationTransport = notificationTransport;
         _sqlQueries = sqlQueries;
         _state = state;
+        _signals = signals;
         _loggerFactory = loggerFactory;
     }
 
@@ -70,7 +74,8 @@ public class JoblySingleWorkerHost<TContext> : IHostedService
                     registration.Config,
                     _timeProvider,
                     _sqlQueries,
-                    _notificationTransport);
+                    _notificationTransport,
+                    _signals);
 
                 var worker = new JoblyWorker<TContext>(
                     workerService,

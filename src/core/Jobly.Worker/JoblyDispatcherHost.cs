@@ -1,4 +1,5 @@
 using Jobly.Core.Notifications;
+using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -24,6 +25,7 @@ public class JoblyDispatcherHost<TContext> : IHostedService
     private readonly PauseStateHolder _pauseStateHolder;
     private readonly IJoblyNotificationTransport _notificationTransport;
     private readonly ServerRegistrationState _state;
+    private readonly ServerTaskSignals<TContext> _signals;
     private readonly ILoggerFactory _loggerFactory;
     private readonly List<BackgroundService> _workers = [];
 
@@ -34,6 +36,7 @@ public class JoblyDispatcherHost<TContext> : IHostedService
         PauseStateHolder pauseStateHolder,
         IJoblyNotificationTransport notificationTransport,
         ServerRegistrationState state,
+        ServerTaskSignals<TContext> signals,
         ILoggerFactory loggerFactory)
     {
         _configuration = configuration.Value;
@@ -43,6 +46,7 @@ public class JoblyDispatcherHost<TContext> : IHostedService
         _pauseStateHolder = pauseStateHolder;
         _notificationTransport = notificationTransport;
         _state = state;
+        _signals = signals;
         _loggerFactory = loggerFactory;
     }
 
@@ -76,7 +80,8 @@ public class JoblyDispatcherHost<TContext> : IHostedService
                     _loggerFactory.CreateLogger<JoblyDispatcherWorker<TContext>>(),
                     _configurationOptions,
                     _timeProvider,
-                    _notificationTransport);
+                    _notificationTransport,
+                    _signals);
 
                 await worker.StartAsync(cancellationToken);
                 _workers.Add(worker);

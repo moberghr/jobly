@@ -101,7 +101,8 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
             groupConfig,
             TimeProvider.System,
             Jobly.Tests.Helpers.TestTasks.QueriesFromScope<TestContext>(scopeFactory),
-            Jobly.Tests.Helpers.TestTasks.NullTransport);
+            Jobly.Tests.Helpers.TestTasks.NullTransport,
+            new Jobly.Worker.Services.ServerTaskSignals<TestContext>());
     }
 
     private static bool HasTag(ReadOnlySpan<KeyValuePair<string, object?>> tags, string key, string value)

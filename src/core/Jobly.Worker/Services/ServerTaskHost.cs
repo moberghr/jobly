@@ -23,15 +23,18 @@ public sealed class ServerTaskHost<TContext> : BackgroundService
     where TContext : DbContext
 {
     private readonly Dictionary<Type, ServerTaskLoop<TContext>> _loops = [];
+    private readonly List<ServerTaskSignals<TContext>.Subscription> _signalSubscriptions = [];
 
     public ServerTaskHost(
         IServiceScopeFactory scopes,
         IJoblyLockProvider lockProvider,
         TimeProvider time,
         ILoggerFactory loggerFactory,
-        ILogger<ServerTaskHost<TContext>> logger,
-        IOptions<JoblyWorkerConfiguration> configuration)
+        IOptions<JoblyWorkerConfiguration> configuration,
+        ServerTaskSignals<TContext> signals)
     {
+        var hostLogger = loggerFactory.CreateLogger<ServerTaskHost<TContext>>();
+
         using var metadataScope = scopes.CreateScope();
         foreach (var task in metadataScope.ServiceProvider.GetServices<IServerTask>())
         {
@@ -43,7 +46,7 @@ public sealed class ServerTaskHost<TContext> : BackgroundService
 
             if (task.DefaultInterval == null)
             {
-                logger.LogInformation(
+                hostLogger.LogInformation(
                     "Server task {Name} has null DefaultInterval — auto-run loop disabled.",
                     task.Name);
                 continue;
@@ -57,6 +60,16 @@ public sealed class ServerTaskHost<TContext> : BackgroundService
                 time,
                 configuration.Value.ServerId,
                 loopLogger);
+        }
+
+        if (_loops.TryGetValue(typeof(Orchestrator<TContext>), out var orchLoop))
+        {
+            _signalSubscriptions.Add(signals.SubscribeJobFinalized(orchLoop.Signal));
+        }
+
+        if (_loops.TryGetValue(typeof(MessageRouter<TContext>), out var routingLoop))
+        {
+            _signalSubscriptions.Add(signals.SubscribeMessageEnqueued(routingLoop.Signal));
         }
     }
 
@@ -75,19 +88,6 @@ public sealed class ServerTaskHost<TContext> : BackgroundService
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             // Normal shutdown.
-        }
-    }
-
-    /// <summary>
-    /// Wake the loop for <typeparamref name="TTask"/> — next iteration starts immediately.
-    /// No-op if the task isn't registered (e.g. DefaultInterval is null).
-    /// </summary>
-    public void Signal<TTask>()
-        where TTask : IServerTask
-    {
-        if (_loops.TryGetValue(typeof(TTask), out var loop))
-        {
-            loop.Signal();
         }
     }
 
@@ -111,6 +111,11 @@ public sealed class ServerTaskHost<TContext> : BackgroundService
     public override void Dispose()
     {
         base.Dispose();
+        foreach (var subscription in _signalSubscriptions)
+        {
+            subscription.Dispose();
+        }
+
         foreach (var loop in _loops.Values)
         {
             loop.Dispose();

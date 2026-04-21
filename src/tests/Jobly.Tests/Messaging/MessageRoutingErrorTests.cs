@@ -62,8 +62,8 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        var task = TestTasks.CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System);
-        await task.RunMessageRoutingAsync(routeCtx, CancellationToken.None);
+        var task = TestTasks.CreateMessageRouter(routeCtx, scopeFactory, TimeProvider.System);
+        await task.RunMessageRoutingAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -96,8 +96,8 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        var task = TestTasks.CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System);
-        await task.RunMessageRoutingAsync(routeCtx, CancellationToken.None);
+        var task = TestTasks.CreateMessageRouter(routeCtx, scopeFactory, TimeProvider.System);
+        await task.RunMessageRoutingAsync(CancellationToken.None);
 
         // Assert
         var readCtx = _fixture.CreateContext();
@@ -129,8 +129,8 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        var task = TestTasks.CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System);
-        await task.RunMessageRoutingAsync(routeCtx, CancellationToken.None);
+        var task = TestTasks.CreateMessageRouter(routeCtx, scopeFactory, TimeProvider.System);
+        await task.RunMessageRoutingAsync(CancellationToken.None);
 
         // Assert — MultiRequest has MultiHandlerA and MultiHandlerB => 2 child jobs
         var readCtx = _fixture.CreateContext();
@@ -163,8 +163,8 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 
         // Act
         var routeCtx = _fixture.CreateContext();
-        var task = TestTasks.CreateMessageRoutingTask(routeCtx, scopeFactory, TimeProvider.System);
-        await task.RunMessageRoutingAsync(routeCtx, CancellationToken.None);
+        var task = TestTasks.CreateMessageRouter(routeCtx, scopeFactory, TimeProvider.System);
+        await task.RunMessageRoutingAsync(CancellationToken.None);
 
         // Assert — each child should have a distinct HandlerType
         var readCtx = _fixture.CreateContext();

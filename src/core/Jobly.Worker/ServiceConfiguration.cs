@@ -68,8 +68,7 @@ public static class ServiceConfiguration
         // If the user never calls one, IJoblyLockProvider resolution fails fast the first time
         // a lock is requested.
         services.AddSingleton<ServerRegistrationState>();
-        services.AddSingleton<OrchestrationSignalRegistry<TContext>>();
-        services.AddSingleton<MessageRoutingSignalRegistry<TContext>>();
+        services.AddSingleton<ServerTaskSignals<TContext>>();
         services.AddSingleton<ProcessCpuTracker>();
         services.AddScoped<IServerTask, Heartbeat<TContext>>();
         services.AddScoped<IServerTask, ServerCleanup<TContext>>();
@@ -77,13 +76,13 @@ public static class ServiceConfiguration
         services.AddScoped<IServerTask, CounterAggregator<TContext>>();
         services.AddScoped<IServerTask, ExpirationCleanup<TContext>>();
         services.AddScoped<IServerTask, RecurringJobScheduler<TContext>>();
+        services.AddScoped<IServerTask, ScheduledJobActivation<TContext>>();
+        services.AddScoped<IServerTask, Orchestrator<TContext>>();
+        services.AddScoped<IServerTask, MessageRouter<TContext>>();
         services.AddHostedService<JoblyServerRegistration<TContext>>();
         services.AddHostedService<JoblyDispatcherHost<TContext>>();
         services.AddHostedService<JoblySingleWorkerHost<TContext>>();
         services.AddHostedService<ServerTaskHost<TContext>>();
-        services.AddHostedService<ScheduledJobActivationTask<TContext>>();
-        services.AddHostedService<MessageRoutingTask<TContext>>();
-        services.AddHostedService<OrchestrationTask<TContext>>();
 
         return services;
     }

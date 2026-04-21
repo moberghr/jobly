@@ -35,6 +35,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
     private readonly TimeProvider _timeProvider;
     private readonly CompletionBatch<TContext> _batch;
     private readonly IJoblyNotificationTransport _notificationTransport;
+    private readonly ServerTaskSignals<TContext> _signals;
 
     public JoblyDispatcherWorker(
         Guid workerId,
@@ -43,7 +44,8 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         ILogger<JoblyDispatcherWorker<TContext>> logger,
         IOptions<JoblyWorkerConfiguration> configuration,
         TimeProvider timeProvider,
-        IJoblyNotificationTransport notificationTransport)
+        IJoblyNotificationTransport notificationTransport,
+        ServerTaskSignals<TContext> signals)
     {
         _workerId = workerId;
         _jobReader = jobReader;
@@ -52,6 +54,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         _configuration = configuration.Value;
         _timeProvider = timeProvider;
         _notificationTransport = notificationTransport;
+        _signals = signals;
         _batch = new CompletionBatch<TContext>(
             scopeFactory,
             timeProvider,
@@ -112,7 +115,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         try
         {
             await _batch.FlushAsync();
-            OrchestrationTask<TContext>.SignalOrchestrator();
+            _signals.SignalJobFinalized();
             await NotificationDispatch.FireAsync(
                 _notificationTransport,
                 [new Notification(NotificationKind.JobFinalized, null)],
@@ -134,7 +137,7 @@ public class JoblyDispatcherWorker<TContext> : BackgroundService
         try
         {
             await _batch.FlushAsync();
-            OrchestrationTask<TContext>.SignalOrchestrator();
+            _signals.SignalJobFinalized();
             await NotificationDispatch.FireAsync(
                 _notificationTransport,
                 [new Notification(NotificationKind.JobFinalized, null)]);

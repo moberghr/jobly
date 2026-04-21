@@ -39,7 +39,7 @@ public abstract class ScheduledJobActivationTaskTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var actCtx = _fixture.CreateContext();
-        var activated = await ScheduledJobActivationTask<TestContext>.Activate(actCtx, TimeProvider.System, CancellationToken.None);
+        var activated = (await Jobly.Tests.Helpers.TestTasks.CreateScheduledJobActivation(actCtx, TimeProvider.System).ActivateWithNotifyAsync(CancellationToken.None)).Activated;
 
         activated.ShouldBe(1);
         var readCtx = _fixture.CreateContext();
@@ -68,7 +68,7 @@ public abstract class ScheduledJobActivationTaskTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var actCtx = _fixture.CreateContext();
-        var activated = await ScheduledJobActivationTask<TestContext>.Activate(actCtx, TimeProvider.System, CancellationToken.None);
+        var activated = (await Jobly.Tests.Helpers.TestTasks.CreateScheduledJobActivation(actCtx, TimeProvider.System).ActivateWithNotifyAsync(CancellationToken.None)).Activated;
 
         activated.ShouldBe(0);
         var readCtx = _fixture.CreateContext();
@@ -97,7 +97,7 @@ public abstract class ScheduledJobActivationTaskTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var actCtx = _fixture.CreateContext();
-        var activated = await ScheduledJobActivationTask<TestContext>.Activate(actCtx, TimeProvider.System, CancellationToken.None);
+        var activated = (await Jobly.Tests.Helpers.TestTasks.CreateScheduledJobActivation(actCtx, TimeProvider.System).ActivateWithNotifyAsync(CancellationToken.None)).Activated;
 
         activated.ShouldBe(0);
     }
@@ -125,7 +125,7 @@ public abstract class ScheduledJobActivationTaskTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var actCtx = _fixture.CreateContext();
-        var activated = await ScheduledJobActivationTask<TestContext>.Activate(actCtx, TimeProvider.System, CancellationToken.None);
+        var activated = (await Jobly.Tests.Helpers.TestTasks.CreateScheduledJobActivation(actCtx, TimeProvider.System).ActivateWithNotifyAsync(CancellationToken.None)).Activated;
 
         activated.ShouldBe(5);
         var readCtx = _fixture.CreateContext();
@@ -158,7 +158,7 @@ public abstract class ScheduledJobActivationTaskTestsBase : IAsyncLifetime
 
         var transport = new RecordingTransport();
         var actCtx = _fixture.CreateContext();
-        var result = await ScheduledJobActivationTask<TestContext>.ActivateWithNotify(actCtx, TimeProvider.System, transport, CancellationToken.None);
+        var result = await Jobly.Tests.Helpers.TestTasks.CreateScheduledJobActivation(actCtx, TimeProvider.System, transport).ActivateWithNotifyAsync(CancellationToken.None);
 
         result.Activated.ShouldBe(3);
         transport.Published.Count.ShouldBe(2);

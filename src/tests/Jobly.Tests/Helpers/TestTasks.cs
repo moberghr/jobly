@@ -71,19 +71,18 @@ public static class TestTasks
             Jobly.Tests.Helpers.TestTasks.QueriesFor(context));
     }
 
-    public static MessageRoutingTask<TContext> CreateMessageRoutingTask<TContext>(
+    public static MessageRouter<TContext> CreateMessageRouter<TContext>(
         TContext context,
         IServiceScopeFactory scopeFactory,
         TimeProvider timeProvider)
         where TContext : DbContext
     {
-        return new MessageRoutingTask<TContext>(
-            scopeFactory,
-            NullLogger<MessageRoutingTask<TContext>>.Instance,
-            Options.Create(new JoblyWorkerConfiguration()),
-            NoOpLockProvider.Instance,
+        return new MessageRouter<TContext>(
+            context,
             timeProvider,
-            Jobly.Tests.Helpers.TestTasks.QueriesFor(context));
+            scopeFactory,
+            Jobly.Tests.Helpers.TestTasks.QueriesFor(context),
+            Options.Create(new JoblyWorkerConfiguration()));
     }
 
     public static StaleJobRecovery<TContext> CreateStaleJobRecovery<TContext>(
@@ -110,6 +109,31 @@ public static class TestTasks
         return new CounterAggregator<TContext>(
             context,
             Options.Create(new JoblyWorkerConfiguration()));
+    }
+
+    public static ScheduledJobActivation<TContext> CreateScheduledJobActivation<TContext>(
+        TContext context,
+        TimeProvider timeProvider,
+        IJoblyNotificationTransport? transport = null)
+        where TContext : DbContext
+    {
+        return new ScheduledJobActivation<TContext>(
+            context,
+            timeProvider,
+            transport ?? NullTransport,
+            Options.Create(new JoblyWorkerConfiguration()));
+    }
+
+    public static Orchestrator<TContext> CreateOrchestrator<TContext>(
+        TContext context,
+        TimeProvider timeProvider,
+        TimeSpan jobExpirationTimeout)
+        where TContext : DbContext
+    {
+        return new Orchestrator<TContext>(
+            context,
+            timeProvider,
+            Options.Create(new JoblyWorkerConfiguration { JobExpirationTimeout = jobExpirationTimeout }));
     }
 
     public static RecurringJobScheduler<TContext> CreateRecurringJobScheduler<TContext>(
@@ -146,18 +170,5 @@ public static class TestTasks
             timeProvider,
             Jobly.Tests.Helpers.TestTasks.QueriesFor(context),
             Options.Create(new JoblyWorkerConfiguration { HealthCheckTimeout = healthCheckTimeout }));
-    }
-
-    // Tests call the instance methods (CleanUpServersAsync, etc.) directly — they never hit
-    // ServerTaskBase's lock-acquisition path. This no-op lets them satisfy the ctor contract
-    // without requiring a real distributed-lock backend.
-    private sealed class NoOpLockProvider : IJoblyLockProvider
-    {
-        public static readonly NoOpLockProvider Instance = new();
-
-        public Task<IAsyncDisposable?> TryAcquireAsync(string name, TimeSpan timeout, CancellationToken ct)
-        {
-            return Task.FromResult<IAsyncDisposable?>(null);
-        }
     }
 }

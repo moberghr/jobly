@@ -4,6 +4,7 @@ using Jobly.Core.Notifications;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.Helpers;
 using Jobly.Worker;
+using Jobly.Worker.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -125,6 +126,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
             new PauseStateHolder(),
             new NullNotificationTransport(),
             state,
+            new ServerTaskSignals<TestContext>(),
             NullLoggerFactory.Instance);
     }
 
@@ -144,6 +146,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
             new NullNotificationTransport(),
             TestTasks.QueriesFromScope<TestContext>(scopeFactory),
             state,
+            new ServerTaskSignals<TestContext>(),
             NullLoggerFactory.Instance);
     }
 

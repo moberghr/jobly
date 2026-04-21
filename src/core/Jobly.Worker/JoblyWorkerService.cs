@@ -32,8 +32,9 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
     private readonly TimeProvider _timeProvider;
     private readonly IJoblyNotificationTransport _notificationTransport;
     private readonly IJoblySqlQueries<TContext> _sqlQueries;
+    private readonly ServerTaskSignals<TContext> _signals;
 
-    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration, TimeProvider timeProvider, IJoblySqlQueries<TContext> sqlQueries, IJoblyNotificationTransport notificationTransport)
+    public JoblyWorkerService(Guid workerId, IServiceScopeFactory serviceScopeFactory, ILogger<JoblyWorkerService<TContext>> logger, IOptions<JoblyWorkerConfiguration> configuration, WorkerGroupConfiguration groupConfiguration, TimeProvider timeProvider, IJoblySqlQueries<TContext> sqlQueries, IJoblyNotificationTransport notificationTransport, ServerTaskSignals<TContext> signals)
     {
         _workerId = workerId;
         _serviceScopeFactory = serviceScopeFactory;
@@ -43,6 +44,7 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
         _timeProvider = timeProvider;
         _sqlQueries = sqlQueries;
         _notificationTransport = notificationTransport;
+        _signals = signals;
     }
 
     public async Task<bool> GetAndProcessJob(CancellationToken cancellationToken)
@@ -343,8 +345,8 @@ public class JoblyWorkerService<TContext> : IJoblyWorkerService
 
         // Signal orchestrator — this job may have a parent that needs finalization,
         // or children that need activation. Local signal wakes the in-process task; the
-        // push notification fans out to other servers' OrchestrationTask via the listener.
-        OrchestrationTask<TContext>.SignalOrchestrator();
+        // push notification fans out to other servers' orchestrator via the listener.
+        _signals.SignalJobFinalized();
         await NotificationDispatch.FireAsync(
             _notificationTransport,
             [new Notification(NotificationKind.JobFinalized, null)],
