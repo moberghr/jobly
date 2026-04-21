@@ -126,7 +126,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
             new PauseStateHolder(),
             new NullNotificationTransport(),
             state,
-            new ServerTaskSignals<TestContext>(),
+            TestTasks.NullSignals,
             NullLoggerFactory.Instance);
     }
 
@@ -146,7 +146,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
             new NullNotificationTransport(),
             TestTasks.QueriesFromScope<TestContext>(scopeFactory),
             state,
-            new ServerTaskSignals<TestContext>(),
+            TestTasks.NullSignals,
             NullLoggerFactory.Instance);
     }
 

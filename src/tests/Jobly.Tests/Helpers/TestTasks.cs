@@ -29,6 +29,12 @@ public static class TestTasks
 
     public static readonly IJoblyNotificationTransport NullTransport = new NullNotificationTransport();
 
+    /// <summary>
+    /// A no-op <see cref="ServerTaskSignals{TestContext}"/> for worker constructors in tests
+    /// that don't exercise the orchestrator wake path. Cheap to share — no per-test state.
+    /// </summary>
+    public static readonly ServerTaskSignals<TestContext> NullSignals = new();
+
     public static IJoblySqlQueries<TContext> QueriesFor<TContext>(TContext context)
         where TContext : DbContext
     {
