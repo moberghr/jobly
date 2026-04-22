@@ -11,6 +11,7 @@ sidebar_position: 6
 ### Bug Fixes
 
 - **SQL Server push setup stall is now cancellable** — `SqlServerNotificationTransport.PublishAsync` and `ListenAsync` now await the cached `_setup.Value` via `Task.WaitAsync(ct)` instead of a raw `await`. A stalled broker setup (e.g., schema lock contention on a busy SQL Server) no longer blocks every caller indefinitely — each caller's `CancellationToken` bails out of the wait without invalidating the cached setup task. The next caller with a live token re-awaits and proceeds. This closes the class of intermittent `"Test execution timed out after 30000 milliseconds"` failures in `SqlServerDatabasePushIntegrationTests` under heavy CI contention.
+- **Race in `ServerTaskLoop.Signal` fixed** — `Signal()` had a check-then-act TOCTOU on its `SemaphoreSlim(0, 1)`: two threads could both pass `CurrentCount == 0` and both call `Release()`, second throwing `SemaphoreFullException`. Surfaced under dispatcher-mode contention (many workers calling `SignalJobFinalized` concurrently as batches flush) as `"Adding the specified count to the semaphore would cause it to exceed its maximum count"` and cascading downstream failures in the affected task loop. Fixed by dropping the check and catching `SemaphoreFullException` — a Release that would exceed max is exactly the "signal already pending" case we want. Regression test runs 32 threads × 500 calls concurrently and asserts no exception.
 
 ### Test Suite Improvements
 
