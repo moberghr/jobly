@@ -18,7 +18,10 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    [TimedFact]
+    // Large integration workload (100+ jobs with retries, batches, messages, continuations) —
+    // real runtime is ~15–30s under CI contention, so an explicit 90s cap keeps a legitimate
+    // hang detectable without masking it behind "push + orchestration just took a while."
+    [TimedFact(90_000)]
     public async Task GivenComplexWorkload_WhenProcessedByRealWorkers_ThenAllJobsReachTerminalState()
     {
         var publisher = Server.CreatePublisher();

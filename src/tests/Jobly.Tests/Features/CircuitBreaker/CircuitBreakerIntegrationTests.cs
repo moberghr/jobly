@@ -41,7 +41,7 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
             new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 0));
         await failingPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(failingJobId, State.Failed, timeout: TimeSpan.FromSeconds(30));
+        await Server.WaitForJobState(failingJobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
         // Verify circuit is open
         var stateCtx = Server.CreateContext();
@@ -99,7 +99,7 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Completed, timeout: TimeSpan.FromSeconds(30));
+        await Server.WaitForJobState(jobId, State.Completed, timeout: TimeSpan.FromSeconds(8));
 
         var readCtx = Server.CreateContext();
         var state = await readCtx.Set<CircuitBreakerState>()

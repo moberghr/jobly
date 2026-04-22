@@ -20,12 +20,12 @@ Ships as NuGet packages: `Jobly.Core` (provider-agnostic), `Jobly.Provider.Postg
 ```bash
 # Backend (from src/)
 dotnet build Jobly.slnx
-dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj                                          # Full suite (947 tests, ~2m 40s)
+dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj                                          # Full suite (1,024 tests, ~1m 30s)
 
 # By database requirement (CI uses this matrix)
-dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=NoDb"        # Pure-unit, no container (~6s)
-dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=PostgreSql"  # PG-backed (~1m)
-dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=SqlServer"   # SQL Server-backed (~1m 40s)
+dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=NoDb"        # Pure-unit, no container (~3s)
+dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=PostgreSql"  # PG-backed (~1m 10s)
+dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=SqlServer"   # SQL Server-backed (~1m 20s)
 
 # Run specific test suites
 dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-namespace "Jobly.Tests.Unit"         # Unit tests only
@@ -212,45 +212,38 @@ Default: no auth (open access).
 
 ## Testing
 
-632 tests (316 PostgreSQL + 316 SQL Server) using xUnit, Shouldly, Testcontainers + Respawn (~30s).
+1,024 tests (135 NoDb + 445 PostgreSQL + 444 SQL Server) in `src/tests/Jobly.Tests/`, using xUnit v3, Shouldly, Testcontainers + Respawn. Full suite ~1m 30s locally; per-category ~3s / ~1m 10s / ~1m 20s.
 
-### Test Structure
+Tests are organized by **feature folder** (`Admin/`, `Core/`, `Features/Retry/`, `Worker/`, `Notifications/`, etc.), not by unit-vs-integration split. The `[GenerateDatabaseTests(FixtureKind.X)]` source generator (`src/tests/Jobly.Tests.SourceGenerator/`) emits `_PostgreSql` and `_SqlServer` concrete subclasses from a single abstract base, so each behavior is asserted on both backends.
 
-Three categories:
+### Test Categories (xUnit traits)
 
-**Unit tests** (`src/core/Jobly.Tests/Unit/`) — ~500 tests, ~15s:
-- Each test calls exactly ONE public method on ONE class
-- State set up via direct DB inserts, not via other services
-- Fresh `CreateContext()` for setup, act, and assert (no shared tracking)
-- Use `[Collection("PostgreSql")]` / `[Collection("SqlServer")]` fixtures (no server running)
+**NoDb** — ~135 tests, ~3s. Pure unit tests: no container, no DB, no fixture. Things like `PollingBackoffTests`, `CompletionBatchTests`, `MetadataSerializerTests`, `DashboardAuthTests` (uses `Microsoft.AspNetCore.TestHost`).
 
-**Integration tests** (`src/core/Jobly.Tests/Integration/`) — ~72 tests, ~35s:
-- Use `JoblyTestServer` — boots full worker + all background tasks against a real database
-- Tests publish jobs, wait for results via `Server.WaitForCompletion()` / `Server.WaitForJobState()`
-- Use `[Collection("PostgreSql-Integration")]` / `[Collection("SqlServer-Integration")]` fixtures (server running)
-- Server shared per collection fixture (boots once, Respawn between tests with retry on lock contention)
+**PostgreSql** / **SqlServer** — ~445 / ~444 tests each. Any test that needs a real database. Two sub-styles:
 
-**Multi-server integration tests** (`src/core/Jobly.Tests/Integration/MultiServerTests.cs`) — 16 tests, ~5s:
-- Use 2 `JoblyTestServer` instances (3 workers each) sharing one database container
-- Verify distributed coordination: row locks, distributed advisory locks, orchestration, message routing, mutex
-- Use `[Collection("PostgreSql-MultiServer")]` / `[Collection("SqlServer-MultiServer")]` fixtures
-- `IMultiServerDatabaseFixture` provides `Server1` and `Server2`
+1. **Unit-style against a real DB** (most tests): each test calls exactly ONE public method on ONE class. State set up via direct DB inserts. Fresh `CreateContext()` for arrange / act / assert — no shared change tracking. Uses `[GenerateDatabaseTests(FixtureKind.Default)]` → `PostgreSqlFixture` / `SqlServerFixture` with Respawn between tests.
 
-**Dashboard auth tests** (`DashboardAuthTests`) — 7 tests, ~400ms:
-- Uses `WebApplication` with `TestServer` — no database, no Jobly services
-- Tests auth middleware in isolation: login, logout, cookie flow, filter, redirect
+2. **Integration via `JoblyTestServer`**: boots full worker + all background tasks against a real database. Tests publish jobs and wait for completion via `Server.WaitForCompletion()` / `Server.WaitForJobState()`. Uses `[GenerateDatabaseTests(FixtureKind.Integration)]` → `PostgreSqlIntegrationFixture` / `SqlServerIntegrationFixture` (server boots once per fixture). Variants: `FixtureKind.BatchedCompletion` for dispatcher-mode batching; `FixtureKind.MultiServer` for 2-server distributed-coordination tests.
+
+### TimedFact default
+
+Every test-affecting attribute defaults to **10s** (`[TimedFact]`, `[TimedTheory]`). Tests exercising genuinely slow behavior (retry chains with real delays, end-to-end workload tests) opt in explicitly with `[TimedFact(N_000)]`. A short default surfaces deadlocks and hangs immediately instead of hiding them behind a half-minute wait. See `src/tests/Jobly.Tests/TestData/TimedFactAttribute.cs`.
 
 ### Writing Unit Tests
 
+Only the abstract base is hand-written. The source generator emits `_PostgreSql` and `_SqlServer` subclasses with the right fixture, collection, and `Category` trait.
+
 ```csharp
+[GenerateDatabaseTests(FixtureKind.Default)]
 public abstract class MyTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;
     protected MyTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
-    public async Task InitializeAsync() => await _fixture.ResetAsync();
-    public Task DisposeAsync() => Task.CompletedTask;
+    public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact]
+    [TimedFact]
     public async Task MethodName_Scenario_ExpectedResult()
     {
         // Arrange: insert state directly into DB
@@ -269,35 +262,22 @@ public abstract class MyTestsBase : IAsyncLifetime
         job.CurrentState.ShouldBe(State.Deleted);
     }
 }
-
-// Concrete subclasses for dual-database
-[Collection("PostgreSql")]
-public class MyTests_PostgreSql : MyTestsBase
-{
-    public MyTests_PostgreSql(PostgreSqlFixture fixture) : base(fixture) { }
-}
-
-[Collection("SqlServer")]
-[Trait("Category", "SqlServer")]
-public class MyTests_SqlServer : MyTestsBase
-{
-    public MyTests_SqlServer(SqlServerFixture fixture) : base(fixture) { }
-}
 ```
 
 ### Writing Integration Tests
 
 ```csharp
+[GenerateDatabaseTests(FixtureKind.Integration)]
 public abstract class MyIntegrationTestsBase : IntegrationTestBase
 {
     protected MyIntegrationTestsBase(IDatabaseFixture fixture) : base(fixture) { }
 
-    [Fact]
+    [TimedFact]
     public async Task GivenWorkload_WhenProcessed_ThenExpectedResult()
     {
         var publisher = Server.CreatePublisher();
-        await publisher.Enqueue(new MyRequest());
-        await publisher.SaveChangesAsync();
+        var jobId = await publisher.Enqueue(new MyRequest());
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await Server.WaitForCompletion();
 
@@ -305,20 +285,9 @@ public abstract class MyIntegrationTestsBase : IntegrationTestBase
         job.CurrentState.ShouldBe(State.Completed);
     }
 }
-
-[Collection("PostgreSql-Integration")]
-public class MyIntegrationTests_PostgreSql : MyIntegrationTestsBase
-{
-    public MyIntegrationTests_PostgreSql(PostgreSqlIntegrationFixture fixture) : base(fixture) { }
-}
-
-[Collection("SqlServer-Integration")]
-[Trait("Category", "SqlServer")]
-public class MyIntegrationTests_SqlServer : MyIntegrationTestsBase
-{
-    public MyIntegrationTests_SqlServer(SqlServerIntegrationFixture fixture) : base(fixture) { }
-}
 ```
+
+Use `FixtureKind.BatchedCompletion` for dispatcher-mode completion-batch tests, `FixtureKind.MultiServer` for two-server distributed-coordination tests. A test that needs a one-off custom worker config can call `JoblyTestServer.StartAsync(_fixture, configure: cfg => ...)` inline, as the durability and batched-completion tests do.
 
 ### Test Principles
 

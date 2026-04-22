@@ -45,7 +45,7 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait for parent to fail
-        await Server.WaitForJobState(parentId, State.Failed, timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobState(parentId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
         // Give orchestration a few ticks (100ms interval in the test server) to confirm the
         // child is not activated. 500ms covers ~5 passes without stalling the test for 2s.

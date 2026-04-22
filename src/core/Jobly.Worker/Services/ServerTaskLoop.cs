@@ -30,6 +30,7 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
     private readonly ILogger _logger;
 
     private readonly SemaphoreSlim _signal = new(0, 1);
+    private readonly Lock _signalLock = new();
     private int? _serverTaskId;
 
     public ServerTaskLoop(
@@ -65,13 +66,19 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
 
     /// <summary>
     /// Wake the loop's <see cref="WaitForNextRunAsync"/> — next iteration starts immediately.
-    /// No-op if the semaphore already has a pending signal.
+    /// No-op if the semaphore already has a pending signal. The lock serializes concurrent
+    /// callers so that two threads can't both observe <c>CurrentCount == 0</c> and both call
+    /// <c>Release()</c> — which would exceed the max count of 1 and throw.
+    /// (Same pattern as <c>JoblyDispatcher.SignalAll</c>.)
     /// </summary>
     public void Signal()
     {
-        if (_signal.CurrentCount == 0)
+        lock (_signalLock)
         {
-            _signal.Release();
+            if (_signal.CurrentCount == 0)
+            {
+                _signal.Release();
+            }
         }
     }
 

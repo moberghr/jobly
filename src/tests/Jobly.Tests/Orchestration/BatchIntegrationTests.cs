@@ -164,7 +164,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait for batch to fail
-        await Server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
         // Give orchestration a few ticks (100ms interval in the test server) to confirm the
         // continuation is not activated. 500ms covers ~5 passes — more than enough to catch
@@ -198,7 +198,7 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         var batchId = await batchPublisher.StartNew(failingJobs);
         await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
         var ctx = Server.CreateContext();
 

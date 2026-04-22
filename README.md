@@ -490,24 +490,34 @@ DeleteJob(processingJobId)
 ```
 src/
 ├── core/
-│   ├── Jobly.Core/          # Entities, handlers, publisher, services, logging
-│   ├── Jobly.Worker/        # Worker service, background tasks, dispatcher
-│   ├── Jobly.UI/            # Dashboard API endpoints + embedded SPA
-│   └── Jobly.Tests/         # 632 tests (xUnit + Shouldly + Testcontainers + Respawn)
+│   ├── Jobly.Core/                      # Entities, handlers, publisher, services, logging
+│   ├── Jobly.Worker/                    # Worker service, background tasks, dispatcher
+│   ├── Jobly.UI/                        # Dashboard API endpoints + embedded SPA
+│   ├── Jobly.SourceGenerator/           # Mediator & worker-dispatch source generator
+│   └── providers/
+│       ├── Jobly.Provider.PostgreSql/   # PG provider (LISTEN/NOTIFY, row-lock SQL, locks)
+│       └── Jobly.Provider.SqlServer/    # SS provider (Service Broker, row-lock SQL, locks)
 ├── tests/
-│   ├── Jobly.Test.Shared/   # Shared test handlers
-│   ├── Jobly.TestApp/       # Test web application with login page
-│   └── Jobly.TestWorker/    # Test worker service
-└── ui/                      # Vite + React + TypeScript + Tailwind + shadcn/ui
+│   ├── Jobly.Tests/                     # 1,024 tests (xUnit v3 + Shouldly + Testcontainers + Respawn)
+│   ├── Jobly.Tests.Mutation/            # Stryker mutation-testing config
+│   └── Jobly.Tests.SourceGenerator/     # Test source generator (emits PG/SS concrete subclasses)
+├── demo/
+│   ├── Jobly.Test.Shared/               # Shared demo handlers
+│   ├── Jobly.TestApp/                   # Demo web application with login page
+│   └── Jobly.TestWorker/                # Demo worker service
+├── benchmarks/                          # BenchmarkDotNet throughput suite
+└── ui/                                  # Vite + React + TypeScript + Tailwind + shadcn/ui
 ```
 
 ## Development
 
 ```bash
 dotnet build Jobly.slnx
-dotnet test Jobly.slnx --filter "Category!=SqlServer"  # PostgreSQL only (~45s)
-dotnet test Jobly.slnx                                   # Both databases (~80s)
-cd src/ui && npm run dev                                # Dashboard on :5173
+dotnet test Jobly.slnx -- --filter-trait "Category=NoDb"        # No container (~3s)
+dotnet test Jobly.slnx -- --filter-trait "Category=PostgreSql"  # PG-backed (~1m 10s)
+dotnet test Jobly.slnx -- --filter-trait "Category=SqlServer"   # SS-backed (~1m 20s)
+dotnet test Jobly.slnx                                           # Full suite (~1m 30s)
+cd src/ui && npm run dev                                         # Dashboard on :5173
 ```
 
 Requires Docker for tests (Testcontainers + Respawn).

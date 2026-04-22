@@ -72,7 +72,7 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
         });
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(30));
+        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
         var ctx = Server.CreateContext();
         var leaked = await ctx.Set<Counter>()
