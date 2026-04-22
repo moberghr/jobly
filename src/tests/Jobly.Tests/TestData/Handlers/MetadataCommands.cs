@@ -18,7 +18,9 @@ public class MetadataCapture
     public Dictionary<string, object>? CapturedMetadata { get; set; }
 }
 
-public class TestMetadataPublishBehavior<T> : IPublishPipelineBehavior<T>
+// Internal so the Jobly source generator's auto-registration skips it — tests that want
+// this behavior enabled register it explicitly via JoblyTestServer.
+internal class TestMetadataPublishBehavior<T> : IPublishPipelineBehavior<T>
 {
     public Task PublishAsync(PublishContext<T> context, PublishDelegate next, CancellationToken ct)
     {

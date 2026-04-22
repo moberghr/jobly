@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -19,6 +20,8 @@ public sealed class JoblyMediatorGenerator : IIncrementalGenerator
     private const string IStreamRequestMetadataName = "Jobly.Core.Handlers.IStreamRequest`1";
     private const string IStreamRequestHandlerMetadataName = "Jobly.Core.Handlers.IStreamRequestHandler`2";
     private const string IPublishPipelineBehaviorMetadataName = "Jobly.Core.Handlers.IPublishPipelineBehavior`1";
+    private const string IPipelineBehaviorMetadataName = "Jobly.Core.Handlers.IPipelineBehavior`2";
+    private const string IStreamPipelineBehaviorMetadataName = "Jobly.Core.Handlers.IStreamPipelineBehavior`2";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -38,6 +41,15 @@ public sealed class JoblyMediatorGenerator : IIncrementalGenerator
         Compilation compilation,
         ImmutableArray<INamedTypeSymbol?> candidates)
     {
+        // Jobly.Core itself has no user-level handlers. Its own open-generic pipeline/publish
+        // behaviors (MutexPipelineBehavior, RetryPublishBehavior, ...) are registered by opt-in
+        // addon methods (AddMutex, AddRetry, ...) — auto-registering them here would short-circuit
+        // that opt-in. Skip source-generation for Core entirely.
+        if (string.Equals(compilation.AssemblyName, "Jobly.Core", StringComparison.Ordinal))
+        {
+            return;
+        }
+
         var iRequestSymbol = compilation.GetTypeByMetadataName(IRequestMetadataName);
         var iJobSymbol = compilation.GetTypeByMetadataName(IJobMetadataName);
         var iMessageSymbol = compilation.GetTypeByMetadataName(IMessageMetadataName);
@@ -61,7 +73,7 @@ public sealed class JoblyMediatorGenerator : IIncrementalGenerator
             ? BuildSingleTypeHandlerMap(compilation, iJobHandlerSymbol)
             : [];
         var messageHandlerMap = iMessageHandlerSymbol is not null
-            ? BuildSingleTypeHandlerMap(compilation, iMessageHandlerSymbol)
+            ? BuildSingleTypeMultiHandlerMap(compilation, iMessageHandlerSymbol)
             : [];
 
         var iPublishBehaviorSymbol = compilation.GetTypeByMetadataName(IPublishPipelineBehaviorMetadataName);
@@ -104,15 +116,29 @@ public sealed class JoblyMediatorGenerator : IIncrementalGenerator
 
                 if (isJob || isMessage)
                 {
-                    var handlerLookup = isJob ? jobHandlerMap : messageHandlerMap;
-                    if (handlerLookup.TryGetValue(candidateFullName, out var handlerSymbol))
+                    if (isJob && jobHandlerMap.TryGetValue(candidateFullName, out var jobHandlerSymbol))
                     {
                         var methodName = "Execute_" + candidate.Name;
                         jobTypes.Add(new JobTypeInfo(
                             candidateFullName,
-                            GetFullyQualifiedName(handlerSymbol),
+                            [GetFullyQualifiedName(jobHandlerSymbol)],
                             methodName,
-                            isMessage));
+                            isMessage: false));
+                    }
+                    else if (isMessage && messageHandlerMap.TryGetValue(candidateFullName, out var messageHandlers))
+                    {
+                        var methodName = "Execute_" + candidate.Name;
+                        var handlerNames = new List<string>(messageHandlers.Count);
+                        foreach (var h in messageHandlers)
+                        {
+                            handlerNames.Add(GetFullyQualifiedName(h));
+                        }
+
+                        jobTypes.Add(new JobTypeInfo(
+                            candidateFullName,
+                            handlerNames,
+                            methodName,
+                            isMessage: true));
                     }
 
                     continue;
@@ -179,40 +205,127 @@ public sealed class JoblyMediatorGenerator : IIncrementalGenerator
             }
         }
 
-        // Collect publish behavior registrations — multiple behaviors per type are allowed (pipeline chain)
+        // Collect pipeline behavior registrations — multiple behaviors per type are allowed (pipeline chain).
+        // Scan only types declared in the *current* compilation (not referenced assemblies) so each
+        // consumer's generator registers its own behaviors. Core's opt-in addons (Mutex, Retry, ...)
+        // register their behaviors explicitly — this scan deliberately won't duplicate them for
+        // consumers that reference Core.
+        var iPipelineBehaviorSymbol = compilation.GetTypeByMetadataName(IPipelineBehaviorMetadataName);
+        var iStreamPipelineBehaviorSymbol = compilation.GetTypeByMetadataName(IStreamPipelineBehaviorMetadataName);
+
         var publishBehaviorRegistrations = new List<(string BehaviorFullName, string InterfaceFullName)>();
-        if (iPublishBehaviorSymbol is not null)
+        var pipelineBehaviorRegistrations = new List<(string BehaviorFullName, string InterfaceFullName)>();
+        var streamPipelineBehaviorRegistrations = new List<(string BehaviorFullName, string InterfaceFullName)>();
+
+        foreach (var candidateType in candidates)
         {
-            foreach (var type in GetAllTypes(compilation))
+            if (candidateType is null || candidateType.IsAbstract || candidateType.TypeKind == TypeKind.Interface
+                || candidateType.ContainingType is not null || candidateType.DeclaredAccessibility != Accessibility.Public)
             {
-                if (type.IsAbstract || type.TypeKind == TypeKind.Interface || type.IsGenericType
-                    || type.ContainingType is not null || type.DeclaredAccessibility != Accessibility.Public)
+                continue;
+            }
+
+            var isOpenGeneric = candidateType.IsGenericType;
+
+            foreach (var iface in candidateType.AllInterfaces)
+            {
+                if (iPublishBehaviorSymbol is not null
+                    && iface.OriginalDefinition.Equals(iPublishBehaviorSymbol, SymbolEqualityComparer.Default))
                 {
+                    AddBehaviorRegistration(
+                        publishBehaviorRegistrations,
+                        candidateType,
+                        iface,
+                        isOpenGeneric,
+                        "global::Jobly.Core.Handlers.IPublishPipelineBehavior");
                     continue;
                 }
 
-                foreach (var iface in type.AllInterfaces)
+                if (iPipelineBehaviorSymbol is not null
+                    && iface.OriginalDefinition.Equals(iPipelineBehaviorSymbol, SymbolEqualityComparer.Default))
                 {
-                    if (!iface.OriginalDefinition.Equals(iPublishBehaviorSymbol, SymbolEqualityComparer.Default))
-                    {
-                        continue;
-                    }
+                    AddBehaviorRegistration(
+                        pipelineBehaviorRegistrations,
+                        candidateType,
+                        iface,
+                        isOpenGeneric,
+                        "global::Jobly.Core.Handlers.IPipelineBehavior");
+                    continue;
+                }
 
-                    var behaviorFullName = GetFullyQualifiedName(type);
-                    var messageTypeFullName = GetFullyQualifiedName(iface.TypeArguments[0]);
-                    var interfaceFullName = $"global::Jobly.Core.Handlers.IPublishPipelineBehavior<{messageTypeFullName}>";
-                    publishBehaviorRegistrations.Add((behaviorFullName, interfaceFullName));
+                if (iStreamPipelineBehaviorSymbol is not null
+                    && iface.OriginalDefinition.Equals(iStreamPipelineBehaviorSymbol, SymbolEqualityComparer.Default))
+                {
+                    AddBehaviorRegistration(
+                        streamPipelineBehaviorRegistrations,
+                        candidateType,
+                        iface,
+                        isOpenGeneric,
+                        "global::Jobly.Core.Handlers.IStreamPipelineBehavior");
+                    continue;
                 }
             }
         }
 
-        if (requestTypes.Count == 0 && streamRequestTypes.Count == 0 && jobTypes.Count == 0 && publishBehaviorRegistrations.Count == 0)
+        if (requestTypes.Count == 0 && streamRequestTypes.Count == 0 && jobTypes.Count == 0
+            && publishBehaviorRegistrations.Count == 0 && pipelineBehaviorRegistrations.Count == 0
+            && streamPipelineBehaviorRegistrations.Count == 0)
         {
             return;
         }
 
-        var source = GenerateSource(requestTypes, streamRequestTypes, jobTypes, publishBehaviorRegistrations);
+        var source = GenerateSource(
+            requestTypes,
+            streamRequestTypes,
+            jobTypes,
+            publishBehaviorRegistrations,
+            pipelineBehaviorRegistrations,
+            streamPipelineBehaviorRegistrations);
         context.AddSource("JoblyMediator.g.cs", source);
+    }
+
+    /// <summary>
+    /// Emits one behavior registration. Open-generic implementations (e.g. <c>Foo&lt;T&gt;</c>
+    /// implementing <c>IPublishPipelineBehavior&lt;T&gt;</c>) are registered as open generics so
+    /// the DI container closes them at resolve time — the same behavior the reflection-based
+    /// <c>AddPipelineBehaviors(assembly)</c> provided.
+    /// </summary>
+    private static void AddBehaviorRegistration(
+        List<(string BehaviorFullName, string InterfaceFullName)> registrations,
+        INamedTypeSymbol behaviorType,
+        INamedTypeSymbol iface,
+        bool isOpenGeneric,
+        string interfaceNamePrefix)
+    {
+        if (isOpenGeneric)
+        {
+            var behaviorCommas = new string(',', behaviorType.TypeParameters.Length - 1);
+            var ifaceCommas = new string(',', iface.TypeArguments.Length - 1);
+            var behaviorTypeOf = $"typeof({GetOpenGenericContainingName(behaviorType)}<{behaviorCommas}>)";
+            var ifaceTypeOf = $"typeof({interfaceNamePrefix}<{ifaceCommas}>)";
+            registrations.Add((behaviorTypeOf, ifaceTypeOf));
+            return;
+        }
+
+        var behaviorFullName = GetFullyQualifiedName(behaviorType);
+        var typeArgs = string.Join(", ", iface.TypeArguments.Select(GetFullyQualifiedName));
+        var interfaceFullName = $"{interfaceNamePrefix}<{typeArgs}>";
+        registrations.Add((behaviorFullName, interfaceFullName));
+    }
+
+    /// <summary>
+    /// Returns the fully-qualified name of <paramref name="type"/> without the generic
+    /// arity suffix — e.g. <c>global::Foo.Bar</c> for <c>Bar&lt;T&gt;</c>.
+    /// </summary>
+    private static string GetOpenGenericContainingName(INamedTypeSymbol type)
+    {
+        var display = type.ToDisplayString(
+            new SymbolDisplayFormat(
+                globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Included,
+                typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+                genericsOptions: SymbolDisplayGenericsOptions.None));
+
+        return display;
     }
 
     private static Dictionary<string, INamedTypeSymbol> BuildHandlerMap(
@@ -246,7 +359,9 @@ public sealed class JoblyMediatorGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// Build handler map for single-type-param interfaces (IJobHandler&lt;T&gt;, IMessageHandler&lt;T&gt;).
+    /// Build handler map for single-type-param interfaces where only one handler per type is
+    /// allowed (IJobHandler&lt;T&gt;). If multiple implementers exist the last one wins — but
+    /// that's a user error, not our problem.
     /// </summary>
     private static Dictionary<string, INamedTypeSymbol> BuildSingleTypeHandlerMap(
         Compilation compilation,
@@ -271,6 +386,46 @@ public sealed class JoblyMediatorGenerator : IIncrementalGenerator
                 var messageType = iface.TypeArguments[0];
                 var key = GetFullyQualifiedName(messageType);
                 map[key] = type;
+            }
+        }
+
+        return map;
+    }
+
+    /// <summary>
+    /// Build handler map for single-type-param interfaces that allow multiple handlers per type
+    /// (IMessageHandler&lt;T&gt; — pub/sub semantics). Preserves declaration order across the
+    /// compilation + reference assemblies.
+    /// </summary>
+    private static Dictionary<string, List<INamedTypeSymbol>> BuildSingleTypeMultiHandlerMap(
+        Compilation compilation,
+        INamedTypeSymbol handlerInterfaceSymbol)
+    {
+        var map = new Dictionary<string, List<INamedTypeSymbol>>();
+
+        foreach (var type in GetAllTypes(compilation))
+        {
+            if (type.IsAbstract || type.TypeKind == TypeKind.Interface)
+            {
+                continue;
+            }
+
+            foreach (var iface in type.AllInterfaces)
+            {
+                if (!iface.OriginalDefinition.Equals(handlerInterfaceSymbol, SymbolEqualityComparer.Default))
+                {
+                    continue;
+                }
+
+                var messageType = iface.TypeArguments[0];
+                var key = GetFullyQualifiedName(messageType);
+                if (!map.TryGetValue(key, out var list))
+                {
+                    list = [];
+                    map[key] = list;
+                }
+
+                list.Add(type);
             }
         }
 
@@ -320,7 +475,13 @@ public sealed class JoblyMediatorGenerator : IIncrementalGenerator
         return symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
     }
 
-    private static string GenerateSource(List<RequestTypeInfo> requestTypes, List<StreamRequestTypeInfo> streamRequestTypes, List<JobTypeInfo> jobTypes, List<(string BehaviorFullName, string InterfaceFullName)> publishBehaviorRegistrations)
+    private static string GenerateSource(
+        List<RequestTypeInfo> requestTypes,
+        List<StreamRequestTypeInfo> streamRequestTypes,
+        List<JobTypeInfo> jobTypes,
+        List<(string BehaviorFullName, string InterfaceFullName)> publishBehaviorRegistrations,
+        List<(string BehaviorFullName, string InterfaceFullName)> pipelineBehaviorRegistrations,
+        List<(string BehaviorFullName, string InterfaceFullName)> streamPipelineBehaviorRegistrations)
     {
         var sb = new StringBuilder();
         sb.AppendLine("// <auto-generated />");
@@ -347,7 +508,9 @@ public sealed class JoblyMediatorGenerator : IIncrementalGenerator
             GenerateJobDispatcherCode(sb, jobTypes);
         }
 
-        GenerateDIRegistration(sb, requestTypes, streamRequestTypes, jobTypes, publishBehaviorRegistrations);
+        GenerateDIRegistration(sb, requestTypes, streamRequestTypes, jobTypes, publishBehaviorRegistrations, pipelineBehaviorRegistrations, streamPipelineBehaviorRegistrations);
+
+        GenerateModuleInitializer(sb);
 
         sb.AppendLine("}");
 
@@ -594,46 +757,102 @@ public sealed class JoblyMediatorGenerator : IIncrementalGenerator
         sb.AppendLine();
     }
 
-    private static void GenerateDIRegistration(StringBuilder sb, List<RequestTypeInfo> requestTypes, List<StreamRequestTypeInfo> streamRequestTypes, List<JobTypeInfo> jobTypes, List<(string BehaviorFullName, string InterfaceFullName)> publishBehaviorRegistrations)
+    private static void GenerateDIRegistration(
+        StringBuilder sb,
+        List<RequestTypeInfo> requestTypes,
+        List<StreamRequestTypeInfo> streamRequestTypes,
+        List<JobTypeInfo> jobTypes,
+        List<(string BehaviorFullName, string InterfaceFullName)> publishBehaviorRegistrations,
+        List<(string BehaviorFullName, string InterfaceFullName)> pipelineBehaviorRegistrations,
+        List<(string BehaviorFullName, string InterfaceFullName)> streamPipelineBehaviorRegistrations)
     {
         sb.AppendLine("    public static class JoblyMediatorServiceExtensions");
         sb.AppendLine("    {");
         sb.AppendLine("        public static global::Microsoft.Extensions.DependencyInjection.IServiceCollection AddJoblyMediator(this global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)");
         sb.AppendLine("        {");
 
+        EmitRegistrations(sb, "            ", requestTypes, streamRequestTypes, jobTypes, publishBehaviorRegistrations, pipelineBehaviorRegistrations, streamPipelineBehaviorRegistrations);
+
+        sb.AppendLine("            return services;");
+        sb.AppendLine("        }");
+        sb.AppendLine("    }");
+    }
+
+    private static void EmitRegistrations(
+        StringBuilder sb,
+        string indent,
+        List<RequestTypeInfo> requestTypes,
+        List<StreamRequestTypeInfo> streamRequestTypes,
+        List<JobTypeInfo> jobTypes,
+        List<(string BehaviorFullName, string InterfaceFullName)> publishBehaviorRegistrations,
+        List<(string BehaviorFullName, string InterfaceFullName)> pipelineBehaviorRegistrations,
+        List<(string BehaviorFullName, string InterfaceFullName)> streamPipelineBehaviorRegistrations)
+    {
         foreach (var req in requestTypes)
         {
-            sb.AppendLine($"            services.AddTransient<global::Jobly.Core.Handlers.IRequestHandler<{req.RequestFullName}, {req.ResponseFullName}>, {req.HandlerFullName}>();");
+            sb.AppendLine($"{indent}services.AddTransient<global::Jobly.Core.Handlers.IRequestHandler<{req.RequestFullName}, {req.ResponseFullName}>, {req.HandlerFullName}>();");
         }
 
         foreach (var stream in streamRequestTypes)
         {
-            sb.AppendLine($"            services.AddTransient<global::Jobly.Core.Handlers.IStreamRequestHandler<{stream.RequestFullName}, {stream.ResponseFullName}>, {stream.HandlerFullName}>();");
+            sb.AppendLine($"{indent}services.AddTransient<global::Jobly.Core.Handlers.IStreamRequestHandler<{stream.RequestFullName}, {stream.ResponseFullName}>, {stream.HandlerFullName}>();");
         }
 
         foreach (var job in jobTypes)
         {
             if (job.IsMessage)
             {
-                sb.AppendLine($"            services.AddTransient<global::Jobly.Core.Handlers.IMessageHandler<{job.JobFullName}>, {job.HandlerFullName}>();");
+                foreach (var handlerFullName in job.HandlerFullNames)
+                {
+                    sb.AppendLine($"{indent}services.AddTransient<global::Jobly.Core.Handlers.IMessageHandler<{job.JobFullName}>, {handlerFullName}>();");
+                }
             }
             else
             {
-                sb.AppendLine($"            services.AddTransient<global::Jobly.Core.Handlers.IJobHandler<{job.JobFullName}>, {job.HandlerFullName}>();");
+                sb.AppendLine($"{indent}services.AddTransient<global::Jobly.Core.Handlers.IJobHandler<{job.JobFullName}>, {job.HandlerFullNames[0]}>();");
             }
         }
 
-        foreach (var (behaviorFullName, interfaceFullName) in publishBehaviorRegistrations)
-        {
-            sb.AppendLine($"            services.AddTransient<{interfaceFullName}, {behaviorFullName}>();");
-        }
+        EmitBehaviorRegistrations(sb, indent, publishBehaviorRegistrations);
+        EmitBehaviorRegistrations(sb, indent, pipelineBehaviorRegistrations);
+        EmitBehaviorRegistrations(sb, indent, streamPipelineBehaviorRegistrations);
 
         if (requestTypes.Count > 0 || streamRequestTypes.Count > 0)
         {
-            sb.AppendLine("            services.AddScoped<global::Jobly.Core.Handlers.IMediator, GeneratedMediator>();");
+            sb.AppendLine($"{indent}services.AddScoped<global::Jobly.Core.Handlers.IMediator, GeneratedMediator>();");
         }
+    }
 
-        sb.AppendLine("            return services;");
+    private static void EmitBehaviorRegistrations(
+        StringBuilder sb,
+        string indent,
+        List<(string BehaviorFullName, string InterfaceFullName)> registrations)
+    {
+        foreach (var (behaviorFullName, interfaceFullName) in registrations)
+        {
+            if (behaviorFullName.StartsWith("typeof(", StringComparison.Ordinal))
+            {
+                sb.AppendLine($"{indent}services.AddTransient({interfaceFullName}, {behaviorFullName});");
+            }
+            else
+            {
+                sb.AppendLine($"{indent}services.AddTransient<{interfaceFullName}, {behaviorFullName}>();");
+            }
+        }
+    }
+
+    private static void GenerateModuleInitializer(StringBuilder sb)
+    {
+        sb.AppendLine();
+        sb.AppendLine("    internal static class JoblyGeneratedRegistrationModuleInit");
+        sb.AppendLine("    {");
+        sb.AppendLine("        [global::System.Runtime.CompilerServices.ModuleInitializer]");
+        sb.AppendLine("        internal static void Register()");
+        sb.AppendLine("        {");
+        sb.AppendLine("            global::Jobly.Core.Handlers.JoblyGeneratedHandlerRegistry.Add(static services =>");
+        sb.AppendLine("            {");
+        sb.AppendLine("                JoblyMediatorServiceExtensions.AddJoblyMediator(services);");
+        sb.AppendLine("            });");
         sb.AppendLine("        }");
         sb.AppendLine("    }");
     }

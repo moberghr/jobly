@@ -21,8 +21,6 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddServices(builder.Configuration);
-builder.Services.AddHandlers(typeof(Program).Assembly);
-builder.Services.AddHandlers(typeof(Jobly.Test.Shared.ServiceConfiguration).Assembly);
 
 builder.Services.AddDataProtection();
 builder.Services.AddScoped<IJoblyCredentialValidator, DemoCredentialValidator>();

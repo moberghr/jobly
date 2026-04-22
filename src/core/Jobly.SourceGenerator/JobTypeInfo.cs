@@ -1,22 +1,28 @@
+using System.Collections.Generic;
+
 namespace Jobly.SourceGenerator;
 
 internal sealed class JobTypeInfo
 {
     public JobTypeInfo(
         string jobFullName,
-        string handlerFullName,
+        IReadOnlyList<string> handlerFullNames,
         string methodName,
         bool isMessage)
     {
         JobFullName = jobFullName;
-        HandlerFullName = handlerFullName;
+        HandlerFullNames = handlerFullNames;
         MethodName = methodName;
         IsMessage = isMessage;
     }
 
     public string JobFullName { get; }
 
-    public string HandlerFullName { get; }
+    /// <summary>
+    /// All handlers for this type. Always one for <see cref="IsMessage"/> = false (IJob),
+    /// one or more for <see cref="IsMessage"/> = true (IMessage pub/sub).
+    /// </summary>
+    public IReadOnlyList<string> HandlerFullNames { get; }
 
     public string MethodName { get; }
 

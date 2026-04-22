@@ -44,6 +44,8 @@ public static class ServiceConfiguration
 
         services.TryAddSingleton(TimeProvider.System);
 
+        JoblyGeneratedHandlerRegistry.ApplyAll(services);
+
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(
             x.GetRequiredService<TContext>(),
             x.GetRequiredService<TimeProvider>(),

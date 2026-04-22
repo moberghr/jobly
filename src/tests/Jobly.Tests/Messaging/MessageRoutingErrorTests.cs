@@ -2,6 +2,7 @@ using Jobly.Core.Data.Queries;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Handlers.Generated;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.Helpers;
 using Jobly.Tests.TestData.Handlers;
@@ -26,7 +27,7 @@ public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
     private static IServiceScopeFactory BuildScopeFactoryWithHandlers()
     {
         var services = new ServiceCollection();
-        services.AddHandlers(typeof(MessageRoutingErrorTestsBase).Assembly);
+        services.AddJoblyMediator();
         services.AddSingleton<MultiHandlerCounter>();
         var provider = services.BuildServiceProvider();
         return provider.GetRequiredService<IServiceScopeFactory>();

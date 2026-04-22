@@ -136,8 +136,7 @@ public class JoblyTestServer : IAsyncDisposable
                     }
                 });
 
-                services.AddHandlers(typeof(JoblyTestServer).Assembly);
-                services.AddPipelineBehaviors(typeof(JoblyTestServer).Assembly);
+                services.AddTransient(typeof(IPublishPipelineBehavior<>), typeof(TestData.Handlers.TestMetadataPublishBehavior<>));
                 services.AddSingleton<TestData.Handlers.CounterService>();
                 services.AddSingleton<TestData.Handlers.MultiHandlerCounter>();
                 services.AddSingleton<TestData.Handlers.MetadataCapture>();

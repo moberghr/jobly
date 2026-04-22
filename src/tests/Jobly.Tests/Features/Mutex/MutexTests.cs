@@ -4,6 +4,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Handlers.Generated;
 using Jobly.Core.Helper;
 using Jobly.Core.Mutex;
 using Jobly.Tests.Fixtures;
@@ -259,7 +260,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
     {
         // Arrange: MutexAttributeRequest has [Mutex("static-key")] on the job class
         var services = new ServiceCollection();
-        services.AddHandlers(typeof(MutexTestsBase).Assembly);
+        services.AddJoblyMediator();
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddScoped<JobContext>();
@@ -295,7 +296,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddHandlers(typeof(MutexTestsBase).Assembly);
+        services.AddJoblyMediator();
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddScoped<JobContext>();
@@ -330,7 +331,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
     {
         lockProvider ??= new FakeLockProvider();
         var services = new ServiceCollection();
-        services.AddHandlers(typeof(MutexTestsBase).Assembly);
+        services.AddJoblyMediator();
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddScoped<JobContext>();
