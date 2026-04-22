@@ -50,7 +50,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
         await AssertNoServerSideEffectsAsync();
     }
 
-    [TimedFact]
+    [TimedFact(60_000)] // real DB Start/Stop roundtrip + 3 assertion queries; CI contention on SS can push this past 30s.
     public async Task DispatcherHost_UseDispatcherTrue_CompletesLifecycleWithoutThrowing()
     {
         // Arrange
@@ -82,7 +82,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
         await AssertNoServerSideEffectsAsync();
     }
 
-    [TimedFact]
+    [TimedFact(60_000)] // real DB Start/Stop roundtrip + 3 assertion queries; CI contention on SS can push this past 30s.
     public async Task SingleWorkerHost_UseDispatcherFalse_CompletesLifecycleWithoutThrowing()
     {
         // Arrange
