@@ -76,39 +76,65 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
 
         await Server.WaitForJobState(jobId, State.Completed);
 
-        // Act — requeue from 2 threads concurrently
-        var successCount = 0;
-        var tasks = new List<Task>();
-        for (var i = 0; i < 2; i++)
+        // Pause the server before the concurrent requeue. Without this, the fixture's worker
+        // re-claims the just-requeued job at its next poll tick (~100ms) and flips the row to
+        // Processing before we can assert State.Enqueued — a race with the workers, not the
+        // property we're testing. Pause is how PauseIntegrationTests isolates similar races.
+        var groupId = await GetFirstGroupId();
+        var serverSvc = Server.CreateServerCommandService();
+        await serverSvc.PauseServer(Server.ServerId);
+        await Server.WaitForPauseState(groupId, expectedPaused: true);
+
+        try
         {
-            tasks.Add(Task.Run(
-                async () =>
-                {
-                    try
+            // Act — requeue from 2 threads concurrently
+            var successCount = 0;
+            var tasks = new List<Task>();
+            for (var i = 0; i < 2; i++)
+            {
+                tasks.Add(Task.Run(
+                    async () =>
                     {
-                        var svc = Server.CreateCommandService();
-                        await svc.RequeueJob(jobId);
-                        Interlocked.Increment(ref successCount);
-                    }
-                    catch (ArgumentException)
-                    {
-                        // Expected — SKIP LOCKED causes second call to not find the row
-                    }
-                },
-                Xunit.TestContext.Current.CancellationToken));
+                        try
+                        {
+                            var svc = Server.CreateCommandService();
+                            await svc.RequeueJob(jobId);
+                            Interlocked.Increment(ref successCount);
+                        }
+                        catch (ArgumentException)
+                        {
+                            // Expected — SKIP LOCKED causes second call to not find the row
+                        }
+                    },
+                    Xunit.TestContext.Current.CancellationToken));
+            }
+
+            await Task.WhenAll(tasks);
+
+            // Assert — state should be consistent (Enqueued), exactly 1 successful requeue
+            var ctx = Server.CreateContext();
+            var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
+            job.CurrentState.ShouldBe(State.Enqueued);
+
+            var requeuedLogs = await ctx.Set<JobLog>()
+                .CountAsync(l => l.JobId == jobId && l.EventType == "Requeued", Xunit.TestContext.Current.CancellationToken);
+            requeuedLogs.ShouldBe(1);
+
+            successCount.ShouldBe(1);
         }
+        finally
+        {
+            await serverSvc.ResumeServer(Server.ServerId);
+            await Server.WaitForPauseState(groupId, expectedPaused: false);
+        }
+    }
 
-        await Task.WhenAll(tasks);
-
-        // Assert — state should be consistent (Enqueued), exactly 1 successful requeue
+    private async Task<Guid> GetFirstGroupId()
+    {
         var ctx = Server.CreateContext();
-        var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
-        job.CurrentState.ShouldBe(State.Enqueued);
-
-        var requeuedLogs = await ctx.Set<JobLog>()
-            .CountAsync(l => l.JobId == jobId && l.EventType == "Requeued", Xunit.TestContext.Current.CancellationToken);
-        requeuedLogs.ShouldBe(1);
-
-        successCount.ShouldBe(1);
+        var group = await ctx.Set<WorkerGroup>()
+            .Where(g => g.ServerId == Server.ServerId)
+            .FirstAsync(Xunit.TestContext.Current.CancellationToken);
+        return group.Id;
     }
 }
