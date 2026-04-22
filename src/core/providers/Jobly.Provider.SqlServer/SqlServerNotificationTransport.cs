@@ -56,7 +56,9 @@ public sealed class SqlServerNotificationTransport : IJoblyNotificationTransport
     {
         try
         {
-            await _setup.Value;
+            // WaitAsync so a caller can give up on a slow/stalled broker setup without
+            // losing the cached task — the next caller re-waits with their own token.
+            await _setup.Value.WaitAsync(ct);
 
             var payload = Encoding.UTF8.GetBytes(Encode(kind, queue));
             var sql = $@"
@@ -97,7 +99,7 @@ public sealed class SqlServerNotificationTransport : IJoblyNotificationTransport
 
     public async IAsyncEnumerable<Notification> ListenAsync([EnumeratorCancellation] CancellationToken ct)
     {
-        await _setup.Value;
+        await _setup.Value.WaitAsync(ct);
 
         await using var conn = new SqlConnection(_connectionString);
         await conn.OpenAsync(ct);

@@ -4,6 +4,25 @@ sidebar_position: 6
 
 # Releases
 
+## 0.9.2
+
+*2026-04-22*
+
+### Bug Fixes
+
+- **SQL Server push setup stall is now cancellable** — `SqlServerNotificationTransport.PublishAsync` and `ListenAsync` now await the cached `_setup.Value` via `Task.WaitAsync(ct)` instead of a raw `await`. A stalled broker setup (e.g., schema lock contention on a busy SQL Server) no longer blocks every caller indefinitely — each caller's `CancellationToken` bails out of the wait without invalidating the cached setup task. The next caller with a live token re-awaits and proceeds. This closes the class of intermittent `"Test execution timed out after 30000 milliseconds"` failures in `SqlServerDatabasePushIntegrationTests` under heavy CI contention.
+
+### Test Suite Improvements
+
+- **`TimedFact` default 30s → 10s** — Individual tests should finish in seconds; the 30s default was a band-aid for overly generous inner waits and could hide real hangs. Tests exercising deliberately slow behaviour (retry chains, multi-job integration workloads, two-server orchestration) opt in explicitly with `[TimedFact(N_000)]`. Twenty-three inner-wait timeouts (retry / cancellation / batch / continuation tests) were tightened from 15–30s to 5–10s to match actual runtime, with comfortable headroom for CI jitter.
+- **Durability tests for "no job left unprocessed"** — Added three integration tests covering the core recovery guarantees that had no prior coverage:
+  - `DispatcherShutdownIntegrationTests.GivenWorkInProgress_WhenServerReplaced_ThenAllJobsEventuallyComplete` — pod-rolling-restart scenario. Server A is disposed mid-flight, server B takes over the same queue; every enqueued job must reach `Completed` via whichever recovery path fires (`UnclaimUndelivered`, channel drain, or `StaleJobRecovery`).
+  - `PushFailurePollingBackstopTests.GivenPushEnabledButTransportBroken_WhenJobEnqueued_ThenPollingStillPicksItUp` — proves that when the notification transport is completely broken (both `PublishAsync` and `ListenAsync` throw), polling still delivers the job within a small multiple of `PollingInterval`. Protects the "polling is the correctness backstop for push" invariant.
+  - `ListenerReconnectDrainTests.GivenListenerAlwaysFails_WhenJobEnqueued_ThenReconnectDrainStillDelivers` — proves that `NotificationListenerTask.DrainSignals` fires on every reconnect iteration, waking the dispatcher even while the listener connection is permanently down. Jobs enqueued during the listener's offline window are not stranded.
+- **Full suite runtime** — now **~1m 30s** for 1,024 tests (was ~2m 40s for 947 in 0.8.0), down primarily from the inner-wait tightenings and the shorter `TimedFact` default.
+
+---
+
 ## 0.9.1
 
 *2026-04-21*

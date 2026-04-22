@@ -46,7 +46,7 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
         // Cancel to release the handler
         var cmd = Server.CreateCommandService();
         await cmd.DeleteJob(jobId);
-        await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(5));
     }
 
     [TimedFact]
@@ -71,7 +71,7 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
 
         var cmd = Server.CreateCommandService();
         await cmd.DeleteJob(jobId);
-        await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(5));
     }
 
     [TimedFact]
@@ -91,7 +91,7 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
         var cmd = Server.CreateCommandService();
         await cmd.DeleteJob(jobId);
 
-        await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(5));
 
         // Verify handler logs survived the cancellation
         var ctx = Server.CreateContext();

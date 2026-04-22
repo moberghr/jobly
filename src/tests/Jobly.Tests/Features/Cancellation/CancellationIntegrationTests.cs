@@ -31,7 +31,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
 
         // Worker should detect state change, cancel handler, and log "Cancelled"
         // Wait for the cancellation log (not just the state change, which happens immediately from DeleteJob)
-        await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(5));
 
         var job = await Server.GetJob(jobId);
         job.CurrentState.ShouldBe(State.Deleted);
@@ -73,7 +73,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
         var cmd = Server.CreateCommandService();
         await cmd.DeleteJob(jobId);
 
-        await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(5));
 
         var logs = await Server.GetJobLogs(jobId);
 
@@ -99,7 +99,7 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
         await cmd.DeleteJob(jobId);
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        await Server.WaitForJobState(jobId, State.Deleted, timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobState(jobId, State.Deleted, timeout: TimeSpan.FromSeconds(5));
         sw.Stop();
 
         // Should complete within a few seconds (CancellationCheckInterval=1s)

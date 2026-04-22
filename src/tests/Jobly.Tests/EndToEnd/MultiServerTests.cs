@@ -138,7 +138,9 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         }
     }
 
-    [TimedFact]
+    // Multi-server batch + continuation (20+3 jobs across 2 servers) — waits on distributed
+    // orchestration with real runtime ~5–10s under CI contention.
+    [TimedFact(45_000)]
     public async Task GivenBatch_WithTwoServers_ThenBatchCompletesCorrectly()
     {
         var batchPublisher = Server1.CreateBatchPublisher();
@@ -256,10 +258,12 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         // Cancel the slow job and wait for it to be deleted so it doesn't leak into subsequent tests
         var cmd = Server1.CreateCommandService();
         await cmd.DeleteJob(job1Id);
-        await Server1.WaitForJobState(job1Id, State.Deleted, timeout: TimeSpan.FromSeconds(15));
+        await Server1.WaitForJobState(job1Id, State.Deleted, timeout: TimeSpan.FromSeconds(5));
     }
 
-    [TimedFact]
+    // Multi-server complex workload (50+ jobs: simple + messages + failing + retries +
+    // batch + continuations on 2 servers) — real runtime ~10–25s under CI contention.
+    [TimedFact(90_000)]
     public async Task GivenComplexWorkload_WithTwoServers_ThenAllReachTerminalState()
     {
         var publisher = Server1.CreatePublisher();

@@ -42,7 +42,7 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
         var jobId = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 3));
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(30));
+        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
         var ctx = Server.CreateContext();
 
@@ -76,7 +76,7 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
         });
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(15));
+        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
         var ctx = Server.CreateContext();
 
@@ -110,7 +110,7 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
         }.Configure<IRetryMetadata>(m => m.MaxRetries = 1));
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(30));
+        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
         var ctx = Server.CreateContext();
         var requeuedLogs = await ctx.Set<JobLog>()
