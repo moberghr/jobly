@@ -60,6 +60,59 @@ public class ServerTaskHostTests
     }
 
     [Fact]
+    public async Task Signal_ConcurrentCallers_DoesNotThrow()
+    {
+        // Regression test: ServerTaskLoop.Signal() previously had a check-then-act race —
+        // two threads both observed CurrentCount == 0 and both called Release() on a
+        // SemaphoreSlim(0, 1), second throwing SemaphoreFullException. Under load in
+        // dispatcher mode (many workers completing jobs in parallel, each calling
+        // SignalJobFinalized), this surfaced as test-suite flakes.
+        // See failure: "Adding the specified count to the semaphore would cause it to exceed its maximum count."
+        var signals = new ServerTaskSignals<StubContext>();
+        using var host = BuildHost(new SignalSubscribingTask(), signals: signals);
+
+        const int threadCount = 32;
+        const int callsPerThread = 500;
+        using var barrier = new Barrier(threadCount);
+        var exceptions = new List<Exception>();
+
+        var threads = Enumerable.Range(0, threadCount)
+            .Select(_ => new Thread(() =>
+            {
+                barrier.SignalAndWait();
+                for (var i = 0; i < callsPerThread; i++)
+                {
+                    try
+                    {
+                        signals.SignalJobFinalized();
+                    }
+                    catch (Exception ex)
+                    {
+                        lock (exceptions)
+                        {
+                            exceptions.Add(ex);
+                        }
+                    }
+                }
+            }))
+            .ToList();
+
+        foreach (var t in threads)
+        {
+            t.Start();
+        }
+
+        foreach (var t in threads)
+        {
+            t.Join();
+        }
+
+        exceptions.ShouldBeEmpty();
+
+        await Task.CompletedTask;
+    }
+
+    [Fact]
     public async Task SignalSubscription_TaskDeclaresChannel_FiringChannelWakesLoop()
     {
         // Doesn't run the loop (that needs DB); just verifies that the host subscribed the

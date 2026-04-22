@@ -65,13 +65,19 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
 
     /// <summary>
     /// Wake the loop's <see cref="WaitForNextRunAsync"/> — next iteration starts immediately.
-    /// No-op if the semaphore already has a pending signal.
+    /// No-op if the semaphore already has a pending signal. Concurrent callers are safe:
+    /// a <see cref="SemaphoreFullException"/> means another caller already left a pending
+    /// signal, which is exactly what we wanted — swallow it.
     /// </summary>
     public void Signal()
     {
-        if (_signal.CurrentCount == 0)
+        try
         {
             _signal.Release();
+        }
+        catch (SemaphoreFullException)
+        {
+            // Signal already pending — the next WaitAsync will observe it. Nothing to do.
         }
     }
 
