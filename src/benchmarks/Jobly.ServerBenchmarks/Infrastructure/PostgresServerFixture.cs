@@ -48,8 +48,6 @@ public class PostgresServerFixture : IAsyncDisposable
                         .UseSnakeCaseNamingConvention();
                 });
 
-                services.AddHandlers(typeof(Jobly.Test.Shared.ServiceConfiguration).Assembly);
-
                 services.AddJoblyWorker<TestContext>(config =>
                 {
                     config.WorkerCount = workerCount;
@@ -91,8 +89,6 @@ public class PostgresServerFixture : IAsyncDisposable
                     options.UseNpgsql(_connectionString)
                         .UseSnakeCaseNamingConvention();
                 });
-
-                services.AddHandlers(typeof(Jobly.Test.Shared.ServiceConfiguration).Assembly);
 
                 services.AddJoblyWorker<TestContext>(config =>
                 {

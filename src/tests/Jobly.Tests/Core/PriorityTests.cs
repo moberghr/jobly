@@ -4,6 +4,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Handlers.Generated;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
 using Jobly.Worker;
@@ -53,8 +54,7 @@ public abstract class PriorityTestsBase : IAsyncLifetime
         var effectiveQueues = queues ?? ["a-critical", "b-default", "default"];
 
         var services = new ServiceCollection();
-        services.AddHandlers(typeof(PriorityTestsBase).Assembly);
-        services.AddPipelineBehaviors(typeof(PriorityTestsBase).Assembly);
+        services.AddJoblyMediator();
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();

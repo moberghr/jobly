@@ -64,8 +64,6 @@ public sealed class PerfScenario : IAsyncDisposable
                     options.AddInterceptors(_interceptor);
                 });
 
-                services.AddHandlers(typeof(Jobly.Test.Shared.ServiceConfiguration).Assembly);
-
                 services.AddJoblyWorker<TestContext>(config =>
                 {
                     config.UsePostgreSql();

@@ -37,7 +37,6 @@
 	<ItemGroup>
 		<ProjectReference Include="..\..\core\Jobly.Core\Jobly.Core.csproj" />
 		<ProjectReference Include="..\Jobly.Tests\Jobly.Tests.csproj" />
-		<ProjectReference Include="..\..\core\Jobly.SourceGenerator\Jobly.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 	</ItemGroup>
 
 </Project>

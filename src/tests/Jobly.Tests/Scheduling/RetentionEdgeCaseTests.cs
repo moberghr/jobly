@@ -4,6 +4,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Handlers.Generated;
 using Jobly.Core.Retry;
 using Jobly.Core.Services;
 using Jobly.Tests.Fixtures;
@@ -56,8 +57,7 @@ public abstract class RetentionEdgeCaseTestsBase : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker()
     {
         var services = new ServiceCollection();
-        services.AddHandlers(typeof(RetentionEdgeCaseTestsBase).Assembly);
-        services.AddPipelineBehaviors(typeof(RetentionEdgeCaseTestsBase).Assembly);
+        services.AddJoblyMediator();
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();

@@ -5,6 +5,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Handlers.Generated;
 using Jobly.Core.Logging;
 using Jobly.Core.Retry;
 using Jobly.Tests.Fixtures;
@@ -57,8 +58,7 @@ public abstract class OTelMetricsTestsBase : IAsyncLifetime
     {
         var queues = new[] { queue };
         var services = new ServiceCollection();
-        services.AddHandlers(typeof(OTelMetricsTestsBase).Assembly);
-        services.AddPipelineBehaviors(typeof(OTelMetricsTestsBase).Assembly);
+        services.AddJoblyMediator();
         services.AddLogging(builder => builder.AddProvider(new JobLoggerProvider()));
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();

@@ -4,6 +4,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Handlers.Generated;
 using Jobly.Core.Logging;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.Helpers;
@@ -40,7 +41,7 @@ public abstract class SpanPropagationTestsBase : IAsyncLifetime
     private static IServiceScopeFactory BuildScopeFactory()
     {
         var services = new ServiceCollection();
-        services.AddHandlers(typeof(SpanPropagationTestsBase).Assembly);
+        services.AddJoblyMediator();
         services.AddSingleton<MultiHandlerCounter>();
         var provider = services.BuildServiceProvider();
 

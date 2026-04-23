@@ -5,6 +5,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Handlers.Generated;
 using Jobly.Core.Mutex;
 using Jobly.Core.Retry;
 using Jobly.Tests.Fixtures;
@@ -640,7 +641,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         FakeLockProvider? lockProvider = null)
     {
         var services = new ServiceCollection();
-        services.AddHandlers(typeof(CircuitBreakerTestsBase).Assembly);
+        services.AddJoblyMediator();
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddScoped<JobContext>();

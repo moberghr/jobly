@@ -2,6 +2,7 @@ using Jobly.Core;
 using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Handlers;
+using Jobly.Core.Handlers.Generated;
 using Jobly.Core.NoRestart;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
@@ -26,7 +27,7 @@ public abstract class NoRestartAddonTestsBase : IAsyncLifetime
     private ServiceProvider BuildProvider(bool registerAddon)
     {
         var services = new ServiceCollection();
-        services.AddHandlers(typeof(NoRestartAddonTestsBase).Assembly);
+        services.AddJoblyMediator();
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddScoped<JobContext>();

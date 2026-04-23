@@ -4,6 +4,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Handlers.Generated;
 using Jobly.Core.Retry;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
@@ -71,8 +72,7 @@ public abstract class RetryTestsBase : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker(int maxRetries = 3, int[]? delays = null, double jitterFactor = 0)
     {
         var services = new ServiceCollection();
-        services.AddHandlers(typeof(RetryTestsBase).Assembly);
-        services.AddPipelineBehaviors(typeof(RetryTestsBase).Assembly);
+        services.AddJoblyMediator();
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();

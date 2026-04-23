@@ -4,6 +4,7 @@ using Jobly.Core.Data.Entities;
 using Jobly.Core.Entities;
 using Jobly.Core.Enums;
 using Jobly.Core.Handlers;
+using Jobly.Core.Handlers.Generated;
 using Jobly.Core.Logging;
 using Jobly.Tests.Fixtures;
 using Jobly.Tests.TestData.Handlers;
@@ -54,8 +55,7 @@ public abstract class HandlerLogTestsBase : IAsyncLifetime
     private JoblyWorkerService<TestContext> CreateWorker(bool enableHandlerLogging = true)
     {
         var services = new ServiceCollection();
-        services.AddHandlers(typeof(HandlerLogTestsBase).Assembly);
-        services.AddPipelineBehaviors(typeof(HandlerLogTestsBase).Assembly);
+        services.AddJoblyMediator();
         services.AddLogging(builder => builder.AddProvider(new JobLoggerProvider()));
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddSingleton<CounterService>();
