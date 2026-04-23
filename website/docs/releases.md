@@ -4,6 +4,54 @@ sidebar_position: 6
 
 # Releases
 
+## 0.10.0
+
+*2026-04-23*
+
+### New Features
+
+- **Auto handler registration** — Handlers and pipeline behaviors register themselves. The `Jobly.SourceGenerator` now emits a `[ModuleInitializer]` per consumer assembly that pushes its handler / pipeline-behavior DI registrations into a process-level `JoblyGeneratedHandlerRegistry` at assembly load. `AddJobly` replays the registry onto the user's `IServiceCollection` — so nothing else is needed.
+
+  ```csharp
+  // before
+  services.AddHandlers(typeof(Program).Assembly);
+  services.AddPipelineBehaviors(typeof(Program).Assembly);
+  services.AddJobly<AppDbContext>(opt => opt.UsePostgreSql());
+
+  // after
+  services.AddJobly<AppDbContext>(opt => opt.UsePostgreSql());
+  ```
+
+  Works across solution boundaries — each assembly with handlers only needs the `Jobly.SourceGenerator` analyzer reference (transitively present via `Moberg.Jobly.Core`).
+
+### Improvements
+
+- **Generator covers all behavior kinds** — `IPipelineBehavior<,>` and `IStreamPipelineBehavior<,>` now flow through the source generator alongside `IPublishPipelineBehavior<>` (previously only publish behaviors did, the rest relied on the reflection scan). Open-generic implementations are emitted through the `services.AddTransient(typeof(IFace<>), typeof(Impl<>))` overload, matching the semantics the reflection path provided.
+- **`IMessageHandler<T>` multi-handler fix** — The generator's per-message-type handler map was a `Dictionary` that silently overwrote earlier handlers when a message had multiple subscribers. Now it collects them all so pub/sub with N handlers registers N `AddTransient` entries and produces N child jobs — the behavior the reflection path already had, now available to the source-generated path.
+- **Scoped behavior scan** — The generator's behavior scan is restricted to the *current* compilation (was walking referenced assemblies via `GetAllTypes`). Core's opt-in addon behaviors (`MutexPipelineBehavior<,>`, `RetryPipelineBehavior<,>`, `CircuitBreakerPipelineBehavior<,>`, `NoRestartPublishBehavior<>`) are still registered only by the explicit `AddMutex` / `AddRetry` / `AddCircuitBreaker` / `AddNoRestart` calls. Core's own compilation short-circuits generation entirely.
+
+### Migration
+
+Breaking release because the reflection-based registration helpers are gone.
+
+- **Drop the reflection calls** — if your `Program.cs` or test setup calls any of these, delete them:
+  ```csharp
+  services.AddHandlers(assembly);
+  services.AddJobHandlers(assembly);
+  services.AddMediatorHandlers(assembly);
+  services.AddPipelineBehaviors(assembly);
+  ```
+  `AddJobly` replaces all of them for consumers that go through the normal DI path.
+- **Test harnesses that build `ServiceCollection` manually** — if you construct an `IServiceCollection` directly (e.g. a unit test that doesn't go through `AddJobly`), call `services.AddJoblyMediator()` from the generated `Jobly.Core.Handlers.Generated` namespace. It stays public as an escape hatch and is idempotent with `AddJobly`.
+- **Shared-handler assemblies need the analyzer** — if handlers live in a library that doesn't already reference `Moberg.Jobly.Core`, add the source generator as an analyzer so its `[ModuleInitializer]` fires on load:
+  ```xml
+  <ProjectReference Include="path/to/Jobly.SourceGenerator.csproj"
+                    OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  ```
+  In practice most consumers already pick this up transitively from `Moberg.Jobly.Core`.
+
+---
+
 ## 0.9.2
 
 *2026-04-22*
