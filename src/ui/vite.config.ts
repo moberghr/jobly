@@ -9,7 +9,7 @@ import fs from 'fs'
  * so Playwright screenshot tests can load them via dynamic import().
  */
 function serveExtensions(): Plugin {
-  const extDir = path.resolve(__dirname, '../core/Jobly.UI/Extensions')
+  const extDir = path.resolve(__dirname, '../core/Warp.UI/Extensions')
   return {
     name: 'serve-extensions',
     // Use enforce: 'pre' so this runs before Vite's transform pipeline
@@ -20,7 +20,7 @@ function serveExtensions(): Plugin {
           // Strip Vite's ?import query parameter
           const rawUrl = req.url ?? ''
           const url = rawUrl.split('?')[0]
-          const prefix = '/jobly/_ext/'
+          const prefix = '/warp/_ext/'
           if (!url.startsWith(prefix)) {
             return next()
           }
@@ -53,14 +53,14 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      outDir: '../core/Jobly.UI/dist',
+      outDir: '../core/Warp.UI/dist',
       emptyOutDir: true,
     },
     server: isDemo
       ? {}
       : {
           proxy: {
-            '/jobly': 'http://localhost:5104',
+            '/warp': 'http://localhost:5104',
           },
         },
   }

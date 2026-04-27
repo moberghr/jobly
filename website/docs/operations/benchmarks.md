@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Benchmarks
 
-Memory and performance benchmarks for the Jobly server. These verify that the server has no memory leaks and provide baseline allocation numbers for capacity planning.
+Memory and performance benchmarks for the Warp server. These verify that the server has no memory leaks and provide baseline allocation numbers for capacity planning.
 
 ## Test Environment
 
@@ -66,17 +66,17 @@ The definitive leak test: **10 workers**, 100,000 jobs processed in 10 rounds. A
 
 ## Running Benchmarks
 
-The benchmark project is at `src/benchmarks/Jobly.ServerBenchmarks/`.
+The benchmark project is at `src/benchmarks/Warp.ServerBenchmarks/`.
 
 ```bash
 # BenchmarkDotNet — per-operation allocation
-dotnet run --project benchmarks/Jobly.ServerBenchmarks -- --filter *ScopeMemory*
-dotnet run --project benchmarks/Jobly.ServerBenchmarks -- --filter *WorkerMemory*
-dotnet run --project benchmarks/Jobly.ServerBenchmarks -- --filter *ServerMemory*
+dotnet run --project benchmarks/Warp.ServerBenchmarks -- --filter *ScopeMemory*
+dotnet run --project benchmarks/Warp.ServerBenchmarks -- --filter *WorkerMemory*
+dotnet run --project benchmarks/Warp.ServerBenchmarks -- --filter *ServerMemory*
 
 # Memory leak stress test (configurable)
-dotnet run --project benchmarks/Jobly.ServerBenchmarks -- stress
-dotnet run --project benchmarks/Jobly.ServerBenchmarks -- stress --workers=10 --jobs=10000 --rounds=10
+dotnet run --project benchmarks/Warp.ServerBenchmarks -- stress
+dotnet run --project benchmarks/Warp.ServerBenchmarks -- stress --workers=10 --jobs=10000 --rounds=10
 ```
 
 The stress test boots a real server with Testcontainers, so Docker must be running. No external database setup needed.

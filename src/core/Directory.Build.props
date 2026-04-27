@@ -5,7 +5,7 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
   <!-- Library-only settings for everything under src/core/ (packaged libraries + the source
-       generator that ships as an analyzer inside Jobly.Core). Test and demo projects don't
+       generator that ships as an analyzer inside Warp.Core). Test and demo projects don't
        live here, so they correctly don't pick these up. -->
   <PropertyGroup>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>

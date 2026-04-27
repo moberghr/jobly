@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import type { ExtensionProps, JoblyExtensionAPI } from './types';
+import type { ExtensionProps, WarpExtensionAPI } from './types';
 
 type MountMode = 'mount' | 'append' | 'insertBefore' | 'insertAfter';
 
@@ -30,7 +30,7 @@ export class ExtensionRuntime {
   private observer: MutationObserver | null = null;
 
   /** Create the extension API that gets passed to install() */
-  createAPI(): JoblyExtensionAPI {
+  createAPI(): WarpExtensionAPI {
     return {
       mount: (selector, component) => this.register(selector, component, 'mount'),
       append: (selector, component) => this.register(selector, component, 'append'),
@@ -100,7 +100,7 @@ export class ExtensionRuntime {
 
   private mountOn(element: HTMLElement, reg: Registration): void {
     // Parse context from data-context attribute
-    const contextStr = element.dataset.joblyContext;
+    const contextStr = element.dataset.warpContext;
     let context: Record<string, unknown> = {};
     if (contextStr) {
       try {

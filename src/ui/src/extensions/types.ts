@@ -11,8 +11,8 @@ export interface ExtensionPage {
   icon?: string;
 }
 
-/** The API exposed to extension install() functions via the jobly parameter */
-export interface JoblyExtensionAPI {
+/** The API exposed to extension install() functions via the warp parameter */
+export interface WarpExtensionAPI {
   /** Replace the contents of elements matching the selector */
   mount(selector: string, component: React.ComponentType<ExtensionProps>): void;
   /** Append a component inside elements matching the selector */
@@ -32,5 +32,5 @@ export interface ExtensionProps {
 
 /** What an extension JS module exports */
 export interface ExtensionModule {
-  install(jobly: JoblyExtensionAPI): void;
+  install(warp: WarpExtensionAPI): void;
 }

@@ -31,7 +31,7 @@ for (const pg of pages) {
     test(`${pg.name}${suffix}`, async ({ page }) => {
       // Set theme before navigation
       await page.addInitScript((t: string) => {
-        localStorage.setItem('jobly:theme', t);
+        localStorage.setItem('warp:theme', t);
       }, theme);
 
       // Build the URL with demo param (and login param for login page)
@@ -43,7 +43,7 @@ for (const pg of pages) {
         });
       }
       const demoParam = isLogin ? '?demo&login' : '?demo';
-      const url = `/jobly${pg.path}${demoParam}`;
+      const url = `/warp${pg.path}${demoParam}`;
 
       await page.goto(url);
 

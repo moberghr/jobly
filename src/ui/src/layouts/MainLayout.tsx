@@ -60,7 +60,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
       {/* Top navbar */}
       <header className="border-b bg-card">
         <div className="flex h-14 items-center px-6">
-          <Link to="/" className="text-lg font-bold mr-8">Jobly</Link>
+          <Link to="/" className="text-lg font-bold mr-8">Warp</Link>
           <nav className="flex gap-1">
             {[
               ...builtInNavItems,
@@ -156,7 +156,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
       {error && (
         <div className="bg-destructive/10 border-b border-destructive/20 px-6 py-2 text-sm text-destructive flex items-center gap-2">
           <span className="font-medium">Connection lost</span>
-          <span className="text-destructive/70">— Unable to connect to Jobly API. Retrying...</span>
+          <span className="text-destructive/70">— Unable to connect to Warp API. Retrying...</span>
         </div>
       )}
 
@@ -172,7 +172,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
 
       {/* Footer */}
       <footer className="border-t bg-card px-6 py-3 text-xs text-muted-foreground flex items-center justify-between">
-        <span>{stats?.databaseConnection ?? 'Jobly Dashboard'}</span>
+        <span>{stats?.databaseConnection ?? 'Warp Dashboard'}</span>
         <div className="flex items-center gap-4">
           {stats && <span>Servers: {stats.servers} · Workers active</span>}
           <span>UTC: {new Date().toISOString().replace('T', ' ').substring(0, 19)}</span>

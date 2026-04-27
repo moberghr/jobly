@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<OutputType>Exe</OutputType>
+
+		<IsPackable>false</IsPackable>
+
+		<UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+
+		<!-- Suppress xUnit v3 CancellationToken advisory warnings (bulk fix is a separate task) -->
+		<NoWarn>$(NoWarn);xUnit1051;CA1816;MA0040</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Compile Remove="StrykerOutput\**" />
+		<EmbeddedResource Remove="StrykerOutput\**" />
+		<None Remove="StrykerOutput\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.5" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.5" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.1.0" />
+		<PackageReference Include="Moq" Version="4.20.72" />
+		<PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
+		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+		<PackageReference Include="Respawn" Version="7.0.0" />
+		<PackageReference Include="Shouldly" Version="4.3.0" />
+		<PackageReference Include="Testcontainers" Version="4.11.0" />
+		<PackageReference Include="Testcontainers.MsSql" Version="4.11.0" />
+		<PackageReference Include="Testcontainers.PostgreSql" Version="4.11.0" />
+		<PackageReference Include="xunit.v3.mtp-v2" Version="3.2.2" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="Xunit" />
+		<Using Include="Warp.Tests.TestData" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\core\Warp.Core\Warp.Core.csproj" />
+		<ProjectReference Include="..\..\core\providers\Warp.Provider.PostgreSql\Warp.Provider.PostgreSql.csproj" />
+		<ProjectReference Include="..\..\core\providers\Warp.Provider.SqlServer\Warp.Provider.SqlServer.csproj" />
+		<ProjectReference Include="..\..\core\Warp.Worker\Warp.Worker.csproj" />
+		<ProjectReference Include="..\..\core\Warp.UI\Warp.UI.csproj" />
+		<ProjectReference Include="..\..\core\Warp.SourceGenerator\Warp.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+		<ProjectReference Include="..\Warp.Tests.SourceGenerator\Warp.Tests.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+	</ItemGroup>
+
+</Project>

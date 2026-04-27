@@ -1,13 +1,13 @@
-# Jobly
+# Warp
 
 > It gets the job done.
 
 A distributed job processing, message queue, and in-memory mediator library for .NET 10. Four patterns, one unified pipeline, a real-time dashboard.
 
-[![NuGet](https://img.shields.io/nuget/v/Moberg.Jobly.Core?label=Jobly.Core)](https://www.nuget.org/packages/Moberg.Jobly.Core)
-[![NuGet](https://img.shields.io/nuget/v/Moberg.Jobly.Worker?label=Jobly.Worker)](https://www.nuget.org/packages/Moberg.Jobly.Worker)
-[![NuGet](https://img.shields.io/nuget/v/Moberg.Jobly.UI?label=Jobly.UI)](https://www.nuget.org/packages/Moberg.Jobly.UI)
-[![Docs](https://img.shields.io/badge/docs-moberghr.github.io%2Fjobly-blue)](https://moberghr.github.io/jobly/)
+[![NuGet](https://img.shields.io/nuget/v/Moberg.Warp.Core?label=Warp.Core)](https://www.nuget.org/packages/Moberg.Warp.Core)
+[![NuGet](https://img.shields.io/nuget/v/Moberg.Warp.Worker?label=Warp.Worker)](https://www.nuget.org/packages/Moberg.Warp.Worker)
+[![NuGet](https://img.shields.io/nuget/v/Moberg.Warp.UI?label=Warp.UI)](https://www.nuget.org/packages/Moberg.Warp.UI)
+[![Docs](https://img.shields.io/badge/docs-moberghr.github.io%2Fwarp-blue)](https://moberghr.github.io/warp/)
 
 ## Features
 
@@ -19,7 +19,7 @@ A distributed job processing, message queue, and in-memory mediator library for 
 - **Named Queues** — Assign jobs to queues. Workers subscribe to specific queues. Alphabetical order = priority.
 - **Execution Logs** — ILogger output automatically captured and flushed to the database every ~1 second during handler execution, viewable in dashboard in real time. Each log entry tracks which worker produced it.
 - **Unified Activity Log** — Single audit trail per job: lifecycle events (Created, Processing, Completed, Failed, Cancelled) + handler logs.
-- **Naming Convention Support** — Entity configurations respect EF Core naming conventions (e.g., `UseSnakeCaseNamingConvention()`). All Jobly tables default to the `jobly` schema (configurable via `JoblyConfiguration.Schema`).
+- **Naming Convention Support** — Entity configurations respect EF Core naming conventions (e.g., `UseSnakeCaseNamingConvention()`). All Warp tables default to the `warp` schema (configurable via `WarpConfiguration.Schema`).
 - **Multi-Database** — PostgreSQL and SQL Server with row-level locking for concurrent worker safety.
 - **Server Monitoring** — Worker registration, heartbeat tracking, orphaned job recovery. Worker detail page shows job activity.
 - **Job Retention** — Configurable `JobExpirationTimeout` (default 1 day). Optional `MaxExpirableJobCount` threshold. Failed jobs persist forever.
@@ -30,7 +30,7 @@ A distributed job processing, message queue, and in-memory mediator library for 
 - **Job Metadata** — Attach key-value metadata to jobs via `JobParameters.Metadata`. Metadata inherited by child jobs, accessible in handlers via `IJobContext`. Publish pipeline behaviors (`IPublishPipelineBehavior<T>`) for cross-cutting metadata.
 - **Real-time Handler Logs** — ILogger output flushed to the database every ~1 second during handler execution, visible in dashboard while the job is still processing.
 - **Failed Job Type Filter** — Group failed jobs by type, filter, and bulk delete/requeue all of a specific type.
-- **Dashboard Auth** — Pluggable `IJoblyAuthorizationFilter` with optional redirect URL. Ships with `LocalRequestsOnlyAuthorizationFilter`.
+- **Dashboard Auth** — Pluggable `IWarpAuthorizationFilter` with optional redirect URL. Ships with `LocalRequestsOnlyAuthorizationFilter`.
 - **Configurable Handler Logging** — `EnableHandlerLogging` option (default true) to suppress handler ILogger output from the JobLog table when not needed.
 - **Dashboard** — React-based web UI with realtime graph, historical graph, dark mode, clickable metric cards, bulk actions, batch progress bars, worker detail page.
 - **TimeProvider** — All production code uses injectable `TimeProvider` for testability.
@@ -40,33 +40,33 @@ A distributed job processing, message queue, and in-memory mediator library for 
 
 ### 1. Install packages
 
-Jobly ships as a small set of NuGet packages — pick the provider package that matches your database:
+Warp ships as a small set of NuGet packages — pick the provider package that matches your database:
 
 | Package                            | Purpose                                                   |
 |------------------------------------|-----------------------------------------------------------|
-| `Moberg.Jobly.Core`                | Core types (always required)                              |
-| `Moberg.Jobly.Worker`              | Worker + background tasks (required for processing)       |
-| `Moberg.Jobly.Provider.PostgreSql` | PostgreSQL provider (row-lock SQL, LISTEN/NOTIFY, locks)  |
-| `Moberg.Jobly.Provider.SqlServer`  | SQL Server provider (row-lock SQL, Service Broker, locks) |
-| `Moberg.Jobly.UI`                  | Dashboard UI (optional)                                   |
+| `Moberg.Warp.Core`                | Core types (always required)                              |
+| `Moberg.Warp.Worker`              | Worker + background tasks (required for processing)       |
+| `Moberg.Warp.Provider.PostgreSql` | PostgreSQL provider (row-lock SQL, LISTEN/NOTIFY, locks)  |
+| `Moberg.Warp.Provider.SqlServer`  | SQL Server provider (row-lock SQL, Service Broker, locks) |
+| `Moberg.Warp.UI`                  | Dashboard UI (optional)                                   |
 
-You only add the provider package for your database; Jobly.Core no longer has a hard dependency on either EF provider.
+You only add the provider package for your database; Warp.Core no longer has a hard dependency on either EF provider.
 
 ### 2. Register Services
 
-Register your DbContext as usual — Jobly hooks into it automatically when you call `AddJobly` or `AddJoblyWorker`. Opt into a provider from the lambda:
+Register your DbContext as usual — Warp hooks into it automatically when you call `AddWarp` or `AddWarpWorker`. Opt into a provider from the lambda:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-// Register your DbContext (Jobly adds interceptors and entity configuration automatically)
+// Register your DbContext (Warp adds interceptors and entity configuration automatically)
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
-// Register Jobly worker (includes AddJobly internally).
-// opt.UsePostgreSql() comes from Moberg.Jobly.Provider.PostgreSql and registers the row-lock SQL,
+// Register Warp worker (includes AddWarp internally).
+// opt.UsePostgreSql() comes from Moberg.Warp.Provider.PostgreSql and registers the row-lock SQL,
 // distributed lock provider, exception classifier, and the push notification factory.
-builder.Services.AddJoblyWorker<AppDbContext>(opt =>
+builder.Services.AddWarpWorker<AppDbContext>(opt =>
 {
     opt.UsePostgreSql();
 
@@ -85,16 +85,16 @@ builder.Services.AddHandlers(typeof(Program).Assembly);
 
 var app = builder.Build();
 
-// Dashboard UI (serves at /jobly)
-app.UseJoblyUI();
+// Dashboard UI (serves at /warp)
+app.UseWarpUI();
 
 app.Run();
 ```
 
-If you only need to publish jobs (no worker), use `AddJobly` instead:
+If you only need to publish jobs (no worker), use `AddWarp` instead:
 
 ```csharp
-builder.Services.AddJobly<AppDbContext>(opt =>
+builder.Services.AddWarp<AppDbContext>(opt =>
 {
     opt.UsePostgreSql();  // or opt.UseSqlServer()
 });
@@ -103,9 +103,9 @@ builder.Services.AddJobly<AppDbContext>(opt =>
 To bind configuration from `appsettings.json`, use `BindConfiguration` inside the lambda — provider opt-in must still be an explicit call since it's a DI registration, not a config field:
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(opt =>
+builder.Services.AddWarpWorker<AppDbContext>(opt =>
 {
-    opt.BindConfiguration(builder.Configuration.GetSection("Jobly"));
+    opt.BindConfiguration(builder.Configuration.GetSection("Warp"));
     opt.UsePostgreSql();
 });
 ```
@@ -113,7 +113,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(opt =>
 For fine-grained control, use worker groups to assign different queues and polling intervals:
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(opt =>
+builder.Services.AddWarpWorker<AppDbContext>(opt =>
 {
     opt.UseSqlServer();
 
@@ -310,13 +310,13 @@ await recurringPublisher.AddOrUpdateRecurringJob(
 ### 10. Dashboard Authorization
 
 ```csharp
-app.UseJoblyUI(options =>
+app.UseWarpUI(options =>
 {
     options.Authorization = new MyAuthFilter();
     options.UnauthorizedRedirectUrl = "/login"; // optional, redirects browser requests
 });
 
-public class MyAuthFilter : IJoblyAuthorizationFilter
+public class MyAuthFilter : IWarpAuthorizationFilter
 {
     public bool Authorize(HttpContext httpContext)
     {
@@ -335,7 +335,7 @@ options.Authorization = new LocalRequestsOnlyAuthorizationFilter();
 ### 10. Configuration
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+builder.Services.AddWarpWorker<AppDbContext>(options =>
 {
     // Worker
     options.WorkerCount = 10;
@@ -373,7 +373,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 Replaces polling wake-up with push notifications — PostgreSQL `LISTEN`/`NOTIFY` or SQL Server Service Broker. The dispatcher, `MessageRouter`, and `Orchestrator` wake instantly on relevant events instead of waiting for their next poll. Opt-in; default behavior (polling) is unchanged if you don't call `opt.UseDatabasePush()`.
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(opt =>
+builder.Services.AddWarpWorker<AppDbContext>(opt =>
 {
     opt.UsePostgreSql();         // or opt.UseSqlServer()
 
@@ -389,18 +389,18 @@ The provider-specific transport is wired by whichever `UsePostgreSql()` / `UseSq
 
 **Scheduled jobs**: push accelerates *immediate* enqueues. Jobs published via `Schedule(job, at)` sit in `State.Scheduled` until `ScheduledJobActivation` flips them to `Enqueued` — only then does the `JobEnqueued` notification fire. Dispatcher pickup after activation is <50ms via push, but the activation itself is time-driven and bounded by `ScheduledActivationInterval` (default 5s, see §10). If you need sub-second precision on scheduled jobs, lower that interval — polling is the only mechanism, since there's no event for "wall-clock time has advanced."
 
-**SQL Server setup requirements**: Service Broker must be enabled on the target database. Jobly creates the message type / contract / queue / service idempotently on first publish, but it cannot run `ALTER DATABASE ... SET ENABLE_BROKER` for you (that requires exclusive DB access). If broker isn't enabled, the transport logs an actionable error and degrades silently to polling:
+**SQL Server setup requirements**: Service Broker must be enabled on the target database. Warp creates the message type / contract / queue / service idempotently on first publish, but it cannot run `ALTER DATABASE ... SET ENABLE_BROKER` for you (that requires exclusive DB access). If broker isn't enabled, the transport logs an actionable error and degrades silently to polling:
 
 ```sql
 ALTER DATABASE [YourDb] SET ENABLE_BROKER WITH ROLLBACK IMMEDIATE;
 ```
 
-**Observability**: transport failures are logged at Warning and incremented on `jobly.notifications.publish_failures` (OpenTelemetry counter). Successful publishes increment `jobly.notifications.published`. Alert on the failure counter if push health matters to your SLOs.
+**Observability**: transport failures are logged at Warning and incremented on `warp.notifications.publish_failures` (OpenTelemetry counter). Successful publishes increment `warp.notifications.published`. Alert on the failure counter if push health matters to your SLOs.
 
 **Upgrading from <0.9**: the `Scheduled` state was introduced alongside DB push. Future-dated jobs published on the old codebase land in `Enqueued` with `ScheduleTime > now` and are correctly gated by a defensive predicate in worker queries — but they won't appear in the dashboard's Scheduled list until their time arrives. To migrate them eagerly, run once after upgrade:
 
 ```sql
-UPDATE jobly.job
+UPDATE warp.job
 SET    current_state = 7  -- State.Scheduled
 WHERE  current_state = 1  -- State.Enqueued
   AND  schedule_time > now();
@@ -490,21 +490,21 @@ DeleteJob(processingJobId)
 ```
 src/
 ├── core/
-│   ├── Jobly.Core/                      # Entities, handlers, publisher, services, logging
-│   ├── Jobly.Worker/                    # Worker service, background tasks, dispatcher
-│   ├── Jobly.UI/                        # Dashboard API endpoints + embedded SPA
-│   ├── Jobly.SourceGenerator/           # Mediator & worker-dispatch source generator
+│   ├── Warp.Core/                      # Entities, handlers, publisher, services, logging
+│   ├── Warp.Worker/                    # Worker service, background tasks, dispatcher
+│   ├── Warp.UI/                        # Dashboard API endpoints + embedded SPA
+│   ├── Warp.SourceGenerator/           # Mediator & worker-dispatch source generator
 │   └── providers/
-│       ├── Jobly.Provider.PostgreSql/   # PG provider (LISTEN/NOTIFY, row-lock SQL, locks)
-│       └── Jobly.Provider.SqlServer/    # SS provider (Service Broker, row-lock SQL, locks)
+│       ├── Warp.Provider.PostgreSql/   # PG provider (LISTEN/NOTIFY, row-lock SQL, locks)
+│       └── Warp.Provider.SqlServer/    # SS provider (Service Broker, row-lock SQL, locks)
 ├── tests/
-│   ├── Jobly.Tests/                     # 1,024 tests (xUnit v3 + Shouldly + Testcontainers + Respawn)
-│   ├── Jobly.Tests.Mutation/            # Stryker mutation-testing config
-│   └── Jobly.Tests.SourceGenerator/     # Test source generator (emits PG/SS concrete subclasses)
+│   ├── Warp.Tests/                     # 1,024 tests (xUnit v3 + Shouldly + Testcontainers + Respawn)
+│   ├── Warp.Tests.Mutation/            # Stryker mutation-testing config
+│   └── Warp.Tests.SourceGenerator/     # Test source generator (emits PG/SS concrete subclasses)
 ├── demo/
-│   ├── Jobly.Test.Shared/               # Shared demo handlers
-│   ├── Jobly.TestApp/                   # Demo web application with login page
-│   └── Jobly.TestWorker/                # Demo worker service
+│   ├── Warp.Test.Shared/               # Shared demo handlers
+│   ├── Warp.TestApp/                   # Demo web application with login page
+│   └── Warp.TestWorker/                # Demo worker service
 ├── benchmarks/                          # BenchmarkDotNet throughput suite
 └── ui/                                  # Vite + React + TypeScript + Tailwind + shadcn/ui
 ```
@@ -512,11 +512,11 @@ src/
 ## Development
 
 ```bash
-dotnet build Jobly.slnx
-dotnet test Jobly.slnx -- --filter-trait "Category=NoDb"        # No container (~3s)
-dotnet test Jobly.slnx -- --filter-trait "Category=PostgreSql"  # PG-backed (~1m 10s)
-dotnet test Jobly.slnx -- --filter-trait "Category=SqlServer"   # SS-backed (~1m 20s)
-dotnet test Jobly.slnx                                           # Full suite (~1m 30s)
+dotnet build Warp.slnx
+dotnet test Warp.slnx -- --filter-trait "Category=NoDb"        # No container (~3s)
+dotnet test Warp.slnx -- --filter-trait "Category=PostgreSql"  # PG-backed (~1m 10s)
+dotnet test Warp.slnx -- --filter-trait "Category=SqlServer"   # SS-backed (~1m 20s)
+dotnet test Warp.slnx                                           # Full suite (~1m 30s)
 cd src/ui && npm run dev                                         # Dashboard on :5173
 ```
 

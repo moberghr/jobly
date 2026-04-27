@@ -1,6 +1,6 @@
 # Memory Profiling Report
 
-Profiled on 2026-04-15. Measures memory allocation, retention, and leak behavior of the Jobly server under sustained load.
+Profiled on 2026-04-15. Measures memory allocation, retention, and leak behavior of the Warp server under sustained load.
 
 ## Test Environment
 
@@ -17,7 +17,7 @@ Profiled on 2026-04-15. Measures memory allocation, retention, and leak behavior
 
 ## Tooling
 
-Benchmarks live in `src/benchmarks/Jobly.ServerBenchmarks/`. Three types of measurements:
+Benchmarks live in `src/benchmarks/Warp.ServerBenchmarks/`. Three types of measurements:
 
 - **BenchmarkDotNet benchmarks** (`[MemoryDiagnoser]`) — per-operation allocation tracking
 - **Custom TotalAllocatedDiagnoser** — tracks `GC.GetTotalAllocatedBytes()` across all threads (workers + background tasks)
@@ -27,12 +27,12 @@ Benchmarks live in `src/benchmarks/Jobly.ServerBenchmarks/`. Three types of meas
 
 ```bash
 # BenchmarkDotNet benchmarks
-dotnet run --project benchmarks/Jobly.ServerBenchmarks -- --filter *ScopeMemory*
-dotnet run --project benchmarks/Jobly.ServerBenchmarks -- --filter *WorkerMemory*
-dotnet run --project benchmarks/Jobly.ServerBenchmarks -- --filter *ServerMemory*
+dotnet run --project benchmarks/Warp.ServerBenchmarks -- --filter *ScopeMemory*
+dotnet run --project benchmarks/Warp.ServerBenchmarks -- --filter *WorkerMemory*
+dotnet run --project benchmarks/Warp.ServerBenchmarks -- --filter *ServerMemory*
 
 # Stress test (configurable workers, jobs per round, rounds)
-dotnet run --project benchmarks/Jobly.ServerBenchmarks -- stress --workers=10 --jobs=10000 --rounds=10
+dotnet run --project benchmarks/Warp.ServerBenchmarks -- stress --workers=10 --jobs=10000 --rounds=10
 ```
 
 ## Results
@@ -116,10 +116,10 @@ Per-job retained: 0.00 KB
 
 ## Conclusion
 
-The Jobly server has no detectable memory leaks under sustained load. Key design decisions that contribute to this:
+The Warp server has no detectable memory leaks under sustained load. Key design decisions that contribute to this:
 
 - **Scoped DI lifetimes**: Worker scopes and handler scopes are created and disposed per job. Background task scopes are created and disposed per iteration.
 - **Separate worker and handler scopes**: The handler's DbContext change tracker is disposed with the handler scope before the worker finalizes job state — preventing cross-scope entity tracking leaks.
-- **AsyncLocal cleanup in finally blocks**: `JobLogContext.Current` and `JobExecutionContext.Current` are cleared in both success, error, cancellation, and finally paths in `JoblyWorkerService.GetAndProcessJob()`.
-- **Activity disposal**: `JoblyTelemetry` activities are stopped and disposed in the finally block.
+- **AsyncLocal cleanup in finally blocks**: `JobLogContext.Current` and `JobExecutionContext.Current` are cleared in both success, error, cancellation, and finally paths in `WarpWorkerService.GetAndProcessJob()`.
+- **Activity disposal**: `WarpTelemetry` activities are stopped and disposed in the finally block.
 - **Mutex lock handles**: Released via `IAsyncDisposable` in the finally block.

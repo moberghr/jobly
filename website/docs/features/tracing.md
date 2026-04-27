@@ -4,7 +4,7 @@ sidebar_position: 7
 
 # Job Tracing
 
-Jobly automatically tracks the flow of jobs across handlers. When a job handler spawns new jobs, they share a `TraceId`, making the full execution chain visible in the dashboard.
+Warp automatically tracks the flow of jobs across handlers. When a job handler spawns new jobs, they share a `TraceId`, making the full execution chain visible in the dashboard.
 
 ## How It Works
 
@@ -59,7 +59,7 @@ await publisher.Publish(new OrderNotification()); // Routes to EmailHandler + Sl
 
 ## OpenTelemetry Integration
 
-Jobly produces OTel-standard distributed traces and metrics using `System.Diagnostics`. Everything is on by default with zero configuration.
+Warp produces OTel-standard distributed traces and metrics using `System.Diagnostics`. Everything is on by default with zero configuration.
 
 ### Distributed Tracing
 
@@ -85,7 +85,7 @@ Trace context is automatically propagated:
 
 ### Log Correlation
 
-`AddJoblyWorker` automatically configures `ActivityTrackingOptions` so TraceId, SpanId, and ParentId appear in your log output:
+`AddWarpWorker` automatically configures `ActivityTrackingOptions` so TraceId, SpanId, and ParentId appear in your log output:
 
 ```
 info: MyApp.Handlers.SendReport[0]
@@ -101,15 +101,15 @@ Each job execution span includes these tags:
 
 | Attribute | Example | Description |
 |-----------|---------|-------------|
-| `messaging.system` | `"jobly"` | OTel semantic convention |
+| `messaging.system` | `"warp"` | OTel semantic convention |
 | `messaging.operation.name` | `"process"` | OTel semantic convention |
 | `messaging.destination.name` | `"default"` | Queue the job belongs to |
 | `messaging.message.id` | `"550e8400-..."` | Job ID |
-| `jobly.job.type` | `"MyApp.SendReport"` | .NET type name |
-| `jobly.job.kind` | `"Job"` | Job, Message, or Batch |
-| `jobly.job.status` | `"succeeded"` | Set after execution: `succeeded`, `failed`, `retried`, `cancelled` |
-| `jobly.job.duration_ms` | `142.5` | Handler execution time (on success) |
-| `jobly.job.retry_count` | `2` | Current retry count (only if retried) |
+| `warp.job.type` | `"MyApp.SendReport"` | .NET type name |
+| `warp.job.kind` | `"Job"` | Job, Message, or Batch |
+| `warp.job.status` | `"succeeded"` | Set after execution: `succeeded`, `failed`, `retried`, `cancelled` |
+| `warp.job.duration_ms` | `142.5` | Handler execution time (on success) |
+| `warp.job.retry_count` | `2` | Current retry count (only if retried) |
 
 On failure, `Activity.SetStatus(Error)` is called with the exception message.
 
@@ -119,33 +119,33 @@ Key lifecycle moments are recorded as events on the span:
 
 | Event | When | Attributes |
 |-------|------|------------|
-| `jobly.job.completed` | Handler succeeds | `duration_ms` |
-| `jobly.job.failed` | Handler throws (no retries left) | `exception.type`, `exception.message` |
-| `jobly.job.retried` | Handler throws (will retry) | `retry_count`, `max_retries` |
-| `jobly.job.cancelled` | Job cancelled while running | — |
+| `warp.job.completed` | Handler succeeds | `duration_ms` |
+| `warp.job.failed` | Handler throws (no retries left) | `exception.type`, `exception.message` |
+| `warp.job.retried` | Handler throws (will retry) | `retry_count`, `max_retries` |
+| `warp.job.cancelled` | Job cancelled while running | — |
 
 ### Metrics
 
-Jobly exposes four metrics through a `System.Diagnostics.Metrics.Meter` named `"Jobly"`:
+Warp exposes four metrics through a `System.Diagnostics.Metrics.Meter` named `"Warp"`:
 
 | Metric | Type | Unit | Tags | Description |
 |--------|------|------|------|-------------|
-| `jobly.job.duration` | Histogram | `ms` | `queue`, `type`, `status` | Handler execution time |
-| `jobly.job.active` | UpDownCounter | `{job}` | `queue` | Currently processing jobs |
-| `jobly.job.completed` | Counter | `{job}` | `queue`, `type`, `status` | Jobs that finished processing |
-| `jobly.job.enqueued` | Counter | `{job}` | `queue`, `kind` | Jobs enqueued |
+| `warp.job.duration` | Histogram | `ms` | `queue`, `type`, `status` | Handler execution time |
+| `warp.job.active` | UpDownCounter | `{job}` | `queue` | Currently processing jobs |
+| `warp.job.completed` | Counter | `{job}` | `queue`, `type`, `status` | Jobs that finished processing |
+| `warp.job.enqueued` | Counter | `{job}` | `queue`, `kind` | Jobs enqueued |
 
 The `status` tag is one of: `succeeded`, `failed`, `retried`, `cancelled`.
 The `kind` tag is one of: `job`, `message`, `batch`.
 
 ### Exporting to OTel Backends
 
-To export traces and metrics to Jaeger, Prometheus, Datadog, etc., subscribe to the `"Jobly"` source and meter:
+To export traces and metrics to Jaeger, Prometheus, Datadog, etc., subscribe to the `"Warp"` source and meter:
 
 ```csharp
 builder.Services.AddOpenTelemetry()
-    .WithTracing(t => t.AddSource("Jobly"))
-    .WithMetrics(m => m.AddMeter("Jobly"));
+    .WithTracing(t => t.AddSource("Warp"))
+    .WithMetrics(m => m.AddMeter("Warp"));
 ```
 
 Without this, traces still appear in logs (via ActivityTrackingOptions) and metric calls are silent no-ops — no overhead.

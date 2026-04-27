@@ -10,19 +10,19 @@ sidebar_position: 6
 
 ### New Features
 
-- **Auto handler registration** — Handlers and pipeline behaviors register themselves. The `Jobly.SourceGenerator` now emits a `[ModuleInitializer]` per consumer assembly that pushes its handler / pipeline-behavior DI registrations into a process-level `JoblyGeneratedHandlerRegistry` at assembly load. `AddJobly` replays the registry onto the user's `IServiceCollection` — so nothing else is needed.
+- **Auto handler registration** — Handlers and pipeline behaviors register themselves. The `Warp.SourceGenerator` now emits a `[ModuleInitializer]` per consumer assembly that pushes its handler / pipeline-behavior DI registrations into a process-level `WarpGeneratedHandlerRegistry` at assembly load. `AddWarp` replays the registry onto the user's `IServiceCollection` — so nothing else is needed.
 
   ```csharp
   // before
   services.AddHandlers(typeof(Program).Assembly);
   services.AddPipelineBehaviors(typeof(Program).Assembly);
-  services.AddJobly<AppDbContext>(opt => opt.UsePostgreSql());
+  services.AddWarp<AppDbContext>(opt => opt.UsePostgreSql());
 
   // after
-  services.AddJobly<AppDbContext>(opt => opt.UsePostgreSql());
+  services.AddWarp<AppDbContext>(opt => opt.UsePostgreSql());
   ```
 
-  Works across solution boundaries — each assembly with handlers only needs the `Jobly.SourceGenerator` analyzer reference (transitively present via `Moberg.Jobly.Core`).
+  Works across solution boundaries — each assembly with handlers only needs the `Warp.SourceGenerator` analyzer reference (transitively present via `Moberg.Warp.Core`).
 
 ### Improvements
 
@@ -41,14 +41,14 @@ Breaking release because the reflection-based registration helpers are gone.
   services.AddMediatorHandlers(assembly);
   services.AddPipelineBehaviors(assembly);
   ```
-  `AddJobly` replaces all of them for consumers that go through the normal DI path.
-- **Test harnesses that build `ServiceCollection` manually** — if you construct an `IServiceCollection` directly (e.g. a unit test that doesn't go through `AddJobly`), call `services.AddJoblyMediator()` from the generated `Jobly.Core.Handlers.Generated` namespace. It stays public as an escape hatch and is idempotent with `AddJobly`.
-- **Shared-handler assemblies need the analyzer** — if handlers live in a library that doesn't already reference `Moberg.Jobly.Core`, add the source generator as an analyzer so its `[ModuleInitializer]` fires on load:
+  `AddWarp` replaces all of them for consumers that go through the normal DI path.
+- **Test harnesses that build `ServiceCollection` manually** — if you construct an `IServiceCollection` directly (e.g. a unit test that doesn't go through `AddWarp`), call `services.AddWarpMediator()` from the generated `Warp.Core.Handlers.Generated` namespace. It stays public as an escape hatch and is idempotent with `AddWarp`.
+- **Shared-handler assemblies need the analyzer** — if handlers live in a library that doesn't already reference `Moberg.Warp.Core`, add the source generator as an analyzer so its `[ModuleInitializer]` fires on load:
   ```xml
-  <ProjectReference Include="path/to/Jobly.SourceGenerator.csproj"
+  <ProjectReference Include="path/to/Warp.SourceGenerator.csproj"
                     OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   ```
-  In practice most consumers already pick this up transitively from `Moberg.Jobly.Core`.
+  In practice most consumers already pick this up transitively from `Moberg.Warp.Core`.
 
 ---
 
@@ -59,7 +59,7 @@ Breaking release because the reflection-based registration helpers are gone.
 ### Bug Fixes
 
 - **SQL Server push setup stall is now cancellable** — `SqlServerNotificationTransport.PublishAsync` and `ListenAsync` now await the cached `_setup.Value` via `Task.WaitAsync(ct)` instead of a raw `await`. A stalled broker setup (e.g., schema lock contention on a busy SQL Server) no longer blocks every caller indefinitely — each caller's `CancellationToken` bails out of the wait without invalidating the cached setup task. The next caller with a live token re-awaits and proceeds. This closes the class of intermittent `"Test execution timed out after 30000 milliseconds"` failures in `SqlServerDatabasePushIntegrationTests` under heavy CI contention.
-- **Race in `ServerTaskLoop.Signal` fixed** — `Signal()` had a check-then-act TOCTOU on its `SemaphoreSlim(0, 1)`: two threads could both pass `CurrentCount == 0` and both call `Release()`, second throwing `SemaphoreFullException`. Surfaced under dispatcher-mode contention (many workers calling `SignalJobFinalized` concurrently as batches flush) as `"Adding the specified count to the semaphore would cause it to exceed its maximum count"` and cascading downstream failures in the affected task loop. Fixed with a lock around the check-and-release — same pattern `JoblyDispatcher.SignalAll` already used. Regression test runs 32 threads × 500 calls concurrently and asserts no exception.
+- **Race in `ServerTaskLoop.Signal` fixed** — `Signal()` had a check-then-act TOCTOU on its `SemaphoreSlim(0, 1)`: two threads could both pass `CurrentCount == 0` and both call `Release()`, second throwing `SemaphoreFullException`. Surfaced under dispatcher-mode contention (many workers calling `SignalJobFinalized` concurrently as batches flush) as `"Adding the specified count to the semaphore would cause it to exceed its maximum count"` and cascading downstream failures in the affected task loop. Fixed with a lock around the check-and-release — same pattern `WarpDispatcher.SignalAll` already used. Regression test runs 32 threads × 500 calls concurrently and asserts no exception.
 
 ### Test Suite Improvements
 
@@ -93,10 +93,10 @@ Breaking release because the reflection-based registration helpers are gone.
 
 ### New Features
 
-- **Database Push** — Opt-in push notifications replace polling wake-up for the dispatcher, `MessageRoutingTask`, and `OrchestrationTask`. Uses PostgreSQL `LISTEN`/`NOTIFY` or SQL Server Service Broker natively. Enable via `opt.UseDatabasePush()` inside the `AddJobly` / `AddJoblyWorker` lambda. Dispatcher pickup drops from ~500ms to &lt;50ms; burst-and-idle workloads roughly halve wall-clock time. Idle deployments see ~16% fewer SELECTs (empty `FOR UPDATE SKIP LOCKED` fetches during idle go away). Worker-fetch push only wires when `UseDispatcher = true` — individual-worker mode keeps polling to avoid thundering-herd. Zero overhead if you don't opt in. See [DB Push](/docs/features/db-push).
+- **Database Push** — Opt-in push notifications replace polling wake-up for the dispatcher, `MessageRoutingTask`, and `OrchestrationTask`. Uses PostgreSQL `LISTEN`/`NOTIFY` or SQL Server Service Broker natively. Enable via `opt.UseDatabasePush()` inside the `AddWarp` / `AddWarpWorker` lambda. Dispatcher pickup drops from ~500ms to &lt;50ms; burst-and-idle workloads roughly halve wall-clock time. Idle deployments see ~16% fewer SELECTs (empty `FOR UPDATE SKIP LOCKED` fetches during idle go away). Worker-fetch push only wires when `UseDispatcher = true` — individual-worker mode keeps polling to avoid thundering-herd. Zero overhead if you don't opt in. See [DB Push](/docs/features/db-push).
 - **`State.Scheduled`** — Future-dated jobs (`Schedule(job, at)`) now land in `State.Scheduled` instead of `State.Enqueued` with a future `ScheduleTime`. `ScheduledJobActivationTask` flips them to `Enqueued` when due and fires a `JobEnqueued` push. Cleans up the worker fetch predicate to a pure `CurrentState = Enqueued` check. Pre-upgrade rows still execute correctly thanks to a defensive `ScheduleTime <= now` filter.
-- **Per-database Provider Packages** — Provider-specific code moves out of `Jobly.Core` / `Jobly.Worker` into two new NuGet packages: `Moberg.Jobly.Provider.PostgreSql` and `Moberg.Jobly.Provider.SqlServer`. Install the one that matches your database and opt in via `opt.UsePostgreSql()` / `opt.UseSqlServer()` inside the registration lambda. Core now stays fully provider-agnostic — no `Npgsql` or `Microsoft.Data.SqlClient` references.
-- **Builder-based DI API** — `AddJobly<TContext>(opt => ...)` / `AddJoblyWorker<TContext>(opt => ...)` take a single lambda over `IJoblyBuilder<TContext>`. Config fields live on the builder directly (inherits `JoblyConfiguration`); addons chain as extension methods (`opt.AddRetry()`, `opt.AddMutex()`, `opt.AddCircuitBreaker()`, `opt.AddNoRestart()`, `opt.UseDatabasePush()`).
+- **Per-database Provider Packages** — Provider-specific code moves out of `Warp.Core` / `Warp.Worker` into two new NuGet packages: `Moberg.Warp.Provider.PostgreSql` and `Moberg.Warp.Provider.SqlServer`. Install the one that matches your database and opt in via `opt.UsePostgreSql()` / `opt.UseSqlServer()` inside the registration lambda. Core now stays fully provider-agnostic — no `Npgsql` or `Microsoft.Data.SqlClient` references.
+- **Builder-based DI API** — `AddWarp<TContext>(opt => ...)` / `AddWarpWorker<TContext>(opt => ...)` take a single lambda over `IWarpBuilder<TContext>`. Config fields live on the builder directly (inherits `WarpConfiguration`); addons chain as extension methods (`opt.AddRetry()`, `opt.AddMutex()`, `opt.AddCircuitBreaker()`, `opt.AddNoRestart()`, `opt.UseDatabasePush()`).
 
 ### Improvements
 
@@ -104,11 +104,11 @@ Breaking release because the reflection-based registration helpers are gone.
 - **Disable cleanup tasks at the config level** — `CounterAggregationInterval`, `ServerCleanupInterval`, `StaleJobRecoveryInterval`, `ExpirationCleanupInterval`, and `RecurringJobSchedulerInterval` are now `TimeSpan?`. Set any to `null` and the host won't auto-run that task's loop. Useful for multi-tenant setups where you want only one server running cleanup.
 - **Signal plumbing consolidated** — `Orchestrator` and `MessageRouter` wake on push events via a single `ServerTaskSignals<TContext>` singleton with named `SignalJobFinalized` / `SignalMessageEnqueued` methods. Tasks declare their subscriptions via `IServerTask.Signals`. Replaces the old static `_instances` lists. No user-visible behaviour change.
 - **Heartbeat no longer writes a `ServerLog` row per run** — under the old `ServerTaskBase` default, every server wrote a heartbeat success row every 3s. Now explicit per task via `LogOnSuccess`; heartbeat opts out. Failed heartbeats still log.
-- **Faster CI builds** — Test workflow builds only `tests/Jobly.Tests/Jobly.Tests.csproj` instead of the full solution. Benchmarks, mutation tests, and demo apps no longer built in the test job; they come in transitively only where tests reference them.
-- **Atomic-claim fetch** — Worker and dispatcher fetch are now `UPDATE ... RETURNING` (PG) / `UPDATE ... OUTPUT INSERTED.*` (SQL Server) via new `IJoblySqlQueries<TContext>` implementations in the provider packages. Closes the SELECT→UPDATE race window that produced rare double-claims under concurrent-worker load. The old regex-based `RowLockInterceptor` is retired.
-- **Shutdown safety** — Three races that could leave jobs as `State=Processing` orphans on shutdown are fixed: `JoblyDispatcher` un-claims rows it fetched but didn't deliver; `JoblyDispatcherWorker` drains its channel fully before exiting; post-handler bookkeeping uses `CancellationToken.None` so a job whose handler already ran can't be abandoned mid-finalize.
+- **Faster CI builds** — Test workflow builds only `tests/Warp.Tests/Warp.Tests.csproj` instead of the full solution. Benchmarks, mutation tests, and demo apps no longer built in the test job; they come in transitively only where tests reference them.
+- **Atomic-claim fetch** — Worker and dispatcher fetch are now `UPDATE ... RETURNING` (PG) / `UPDATE ... OUTPUT INSERTED.*` (SQL Server) via new `IWarpSqlQueries<TContext>` implementations in the provider packages. Closes the SELECT→UPDATE race window that produced rare double-claims under concurrent-worker load. The old regex-based `RowLockInterceptor` is retired.
+- **Shutdown safety** — Three races that could leave jobs as `State=Processing` orphans on shutdown are fixed: `WarpDispatcher` un-claims rows it fetched but didn't deliver; `WarpDispatcherWorker` drains its channel fully before exiting; post-handler bookkeeping uses `CancellationToken.None` so a job whose handler already ran can't be abandoned mid-finalize.
 - **Retry / CircuitBreaker respect `State.Scheduled`** — Delayed retries and circuit-breaker reschedules land in `State.Scheduled` when the target time is in the future. New `JobOutcome.RescheduledState(scheduleTime, now)` helper is shared by both pipeline behaviors. No change for immediate retries.
-- **Worker host split** — `JoblyWorkerSetup` is replaced by three DI-registered `IHostedService`s: `JoblyServerRegistration`, `JoblyDispatcherHost`, `JoblySingleWorkerHost`. Each mode no-ops when the other is selected via `UseDispatcher`. State flows via a new `ServerRegistrationState` singleton instead of re-querying.
+- **Worker host split** — `WarpWorkerSetup` is replaced by three DI-registered `IHostedService`s: `WarpServerRegistration`, `WarpDispatcherHost`, `WarpSingleWorkerHost`. Each mode no-ops when the other is selected via `UseDispatcher`. State flows via a new `ServerRegistrationState` singleton instead of re-querying.
 - **Source layout** — Libraries under `src/core/`, providers under `src/core/providers/`, tests in `src/tests/`, demo apps in `src/demo/`. `Directory.Build.props` scoped to match.
 
 ### Bug Fixes
@@ -119,21 +119,21 @@ Breaking release because the reflection-based registration helpers are gone.
 
 Breaking release because of the provider package split and the DI lambda API.
 
-- **Install a provider NuGet**: add `Moberg.Jobly.Provider.PostgreSql` or `Moberg.Jobly.Provider.SqlServer` alongside `Moberg.Jobly.Core`. The provider package registers the row-lock / atomic-claim queries, the exception classifier, and the notification-transport factory — all of which used to live in Core.
+- **Install a provider NuGet**: add `Moberg.Warp.Provider.PostgreSql` or `Moberg.Warp.Provider.SqlServer` alongside `Moberg.Warp.Core`. The provider package registers the row-lock / atomic-claim queries, the exception classifier, and the notification-transport factory — all of which used to live in Core.
 - **Wrap registration in a lambda + call the provider**:
   ```csharp
   // before
-  services.AddJobly<MyContext>();
-  services.AddJoblyDatabasePush<MyContext>();   // if using push
+  services.AddWarp<MyContext>();
+  services.AddWarpDatabasePush<MyContext>();   // if using push
 
   // after
-  services.AddJobly<MyContext>(opt =>
+  services.AddWarp<MyContext>(opt =>
   {
       opt.UsePostgreSql();                      // or UseSqlServer()
       opt.UseDatabasePush();                    // if using push, now chains on the builder
   });
   ```
-- **`AddJoblyDatabasePush<TContext>()` removed** — call `opt.UseDatabasePush()` on the builder instead. Must be after `UsePostgreSql` / `UseSqlServer`.
+- **`AddWarpDatabasePush<TContext>()` removed** — call `opt.UseDatabasePush()` on the builder instead. Must be after `UsePostgreSql` / `UseSqlServer`.
 - **`State.Scheduled` is new** — Future-dated jobs existing from a previous version still execute correctly (worker fetch has a defensive `ScheduleTime <= now` predicate) but won't show in the dashboard's Scheduled list until their time arrives.
 - **Retry / CircuitBreaker reschedules land in `State.Scheduled` when delayed** — dashboard filters and any external tooling that queried `Enqueued + future ScheduleTime` should now also look at `Scheduled`.
 
@@ -145,16 +145,16 @@ Breaking release because of the provider package split and the DI lambda API.
 
 ### New Features
 
-- **Exponential Polling Backoff** — Workers and the batch-fetch dispatcher now back off geometrically when queues are idle, reducing database load during quiet periods. Configure via `MaxPollingInterval` (default `30s`, ceiling) and `PollingIntervalFactor` (default `2.0`, multiplier). `PollingInterval` becomes the floor. On any processed job, the delay resets to the floor instantly, so throughput under load is unchanged. Paused workers stay at the floor (no compounding while paused). Available on both top-level `JoblyWorkerConfiguration` and per-group `WorkerGroupConfiguration`. Set `PollingIntervalFactor = 1.0` to disable backoff. See [Operations → Configuration → Exponential Polling Backoff](/docs/operations/configuration#exponential-polling-backoff).
+- **Exponential Polling Backoff** — Workers and the batch-fetch dispatcher now back off geometrically when queues are idle, reducing database load during quiet periods. Configure via `MaxPollingInterval` (default `30s`, ceiling) and `PollingIntervalFactor` (default `2.0`, multiplier). `PollingInterval` becomes the floor. On any processed job, the delay resets to the floor instantly, so throughput under load is unchanged. Paused workers stay at the floor (no compounding while paused). Available on both top-level `WarpWorkerConfiguration` and per-group `WorkerGroupConfiguration`. Set `PollingIntervalFactor = 1.0` to disable backoff. See [Operations → Configuration → Exponential Polling Backoff](/docs/operations/configuration#exponential-polling-backoff).
 - **Retry Jitter** — New `JitterFactor` option on `RetryOptions` applies multiplicative random jitter to each computed retry delay: `delay * (1 + JitterFactor * rand(-1, 1))`. Clamped to `[0, 1]`. Global only — no per-job override. Defaults to `0.0` (no jitter) so existing behavior is unchanged. Use to spread retry attempts and avoid thundering herds when many jobs fail at once (e.g. downstream outage). The actual jittered `ScheduleTime` is recorded in the `Requeued` JobLog entry so operators can diagnose from the dashboard.
-- **NoRestart (stale-recovery opt-out)** — New addon `AddJoblyNoRestart()` lets specific job types stay `Failed` on worker crash instead of being auto-requeued. Apply with `[NoRestart]` / `[Restart]` attributes on the job class (inherits through the class hierarchy), `.WithRestart(bool)` per-enqueue, or flip the global default with `RestartStaleJobsByDefault = false`. Override chain: per-publish > attribute > global. For non-idempotent work (payments, emails, webhooks). See [NoRestart](/docs/features/no-restart).
-- **Circuit Breaker** — New addon `AddJoblyCircuitBreaker<TContext>()` stops hammering a failing downstream when failures cross a threshold. Opens after `Threshold` consecutive failures, stays open for `Duration`, then transitions to a **half-open state with an atomic probe gate** — exactly one worker probes while others reschedule, preventing thundering herd on recovery. Customise per-handler via `[CircuitBreaker(Group = "...", Threshold = N)]`. Adds a `CircuitBreakerState` entity to your DbContext (migration required). See [Circuit Breaker](/docs/features/circuit-breaker).
+- **NoRestart (stale-recovery opt-out)** — New addon `AddWarpNoRestart()` lets specific job types stay `Failed` on worker crash instead of being auto-requeued. Apply with `[NoRestart]` / `[Restart]` attributes on the job class (inherits through the class hierarchy), `.WithRestart(bool)` per-enqueue, or flip the global default with `RestartStaleJobsByDefault = false`. Override chain: per-publish > attribute > global. For non-idempotent work (payments, emails, webhooks). See [NoRestart](/docs/features/no-restart).
+- **Circuit Breaker** — New addon `AddWarpCircuitBreaker<TContext>()` stops hammering a failing downstream when failures cross a threshold. Opens after `Threshold` consecutive failures, stays open for `Duration`, then transitions to a **half-open state with an atomic probe gate** — exactly one worker probes while others reschedule, preventing thundering herd on recovery. Customise per-handler via `[CircuitBreaker(Group = "...", Threshold = N)]`. Adds a `CircuitBreakerState` entity to your DbContext (migration required). See [Circuit Breaker](/docs/features/circuit-breaker).
 - **Batched Completions (Dispatcher Mode)** — When `UseDispatcher = true`, each worker now buffers job completions in memory and commits them as a single multi-row transaction, collapsing N per-job commits into one. Tune via `CompletionBatchSize` (default `50`) and `CompletionFlushInterval` (default `100ms`); set `CompletionBatchSize = 1` to opt out. Poison-entry isolation: a single bad row in a batch of 50 is dropped via recursive split; the other 49 still commit. SIGTERM mid-flush is safe — `FlushAsync` commits to completion using `CancellationToken.None` internally. Trade-off is at-least-once semantics; pair with `[NoRestart]` for non-idempotent handlers. See [Batched Completions](/docs/features/batched-completions).
-- **Configurable Log Flush Interval** — New `LogFlushInterval` on `JoblyWorkerConfiguration` (default `1s`) controls how often the job monitor drains handler `ILogger` output into the JobLog table. Lower values surface dashboard logs faster at the cost of more DB writes.
+- **Configurable Log Flush Interval** — New `LogFlushInterval` on `WarpWorkerConfiguration` (default `1s`) controls how often the job monitor drains handler `ILogger` output into the JobLog table. Lower values surface dashboard logs faster at the cost of more DB writes.
 
 ### Improvements
 
-- **Resilient worker/dispatcher exception handling** — `JoblyWorker` now catches transient exceptions in its poll loop (matching the dispatcher), so a single DB hiccup or handler pipeline fault no longer silently terminates the BackgroundService. The exception path uses a fixed floor delay instead of compounding the polling backoff, so jobs resume within `PollingInterval` of recovery instead of sitting at `MaxPollingInterval` for 30s.
+- **Resilient worker/dispatcher exception handling** — `WarpWorker` now catches transient exceptions in its poll loop (matching the dispatcher), so a single DB hiccup or handler pipeline fault no longer silently terminates the BackgroundService. The exception path uses a fixed floor delay instead of compounding the polling backoff, so jobs resume within `PollingInterval` of recovery instead of sitting at `MaxPollingInterval` for 30s.
 - **`[NoRestart]` and `[Restart]` attributes are inherited** — Declare the policy on a base class (e.g. `PaymentJobBase`) and every derived concrete job inherits it. A derived class with its own attribute overrides the base — closest direct declaration wins.
 - **Circuit breaker exception handling narrowed** — The `DbUpdateException` catch in `CircuitBreakerStore.RecordFailureAsync` now only suppresses unique-constraint violations (Npgsql `23505`, SqlClient `2627`/`2601`). CHECK, FK, and column-length violations propagate instead of being silently swallowed.
 - **Test suite 48% faster, flake-free** — Disabled idle-polling backoff inside the test server, tuned `StaleJobRecoveryInterval` for tests only, made `LogFlushInterval` configurable, and bumped the `TimedFact` default from 10s to 30s. Full suite (947 tests) runs in ~2m 39s (was ~5m 05s). Eliminated the latent `TimedFact`/`WaitForJobState` timeout-mismatch class of flakes.
@@ -168,8 +168,8 @@ Breaking release because of the provider package split and the DI lambda API.
 
 ### Migration
 
-- **Circuit Breaker migration** — If you register `AddJoblyCircuitBreaker<TContext>()`, a new `CircuitBreakerState` entity is added to your DbContext. Run an EF Core migration to create the table (`jobly.circuit_breaker_state` under default schema + snake_case naming).
-- **`CompletionBatch.FlushAsync` parameter removal** — If you were calling `CompletionBatch.FlushAsync(CancellationToken)` directly (rare — it's internal to `Jobly.Worker`), the parameter has been removed. The method now always commits to completion.
+- **Circuit Breaker migration** — If you register `AddWarpCircuitBreaker<TContext>()`, a new `CircuitBreakerState` entity is added to your DbContext. Run an EF Core migration to create the table (`warp.circuit_breaker_state` under default schema + snake_case naming).
+- **`CompletionBatch.FlushAsync` parameter removal** — If you were calling `CompletionBatch.FlushAsync(CancellationToken)` directly (rare — it's internal to `Warp.Worker`), the parameter has been removed. The method now always commits to completion.
 - **`[NoRestart]` / `[Restart]` now inherit** — Behaviour change: a base class decorated with `[NoRestart]` now affects every derived concrete job. If you relied on the pre-release `Inherited = false` behaviour, add `[Restart]` on the specific derived types you want to opt back in.
 - **`StaleJobRecoveryTask.RequeueStaleJobs` removed** — Replaced by `RecoverStaleJobs` returning `StaleJobRecoveryResult` (includes `Requeued`, `Failed`, `Deleted` counts). No `[Obsolete]` bridge; callers must migrate to the new signature.
 
@@ -182,38 +182,38 @@ Breaking release because of the provider package split and the DI lambda API.
 ### New Features
 
 - **Stream Requests** — New `IStreamRequest<TResponse>` pattern for lazy, item-by-item streaming via `IAsyncEnumerable<TResponse>`. Extends `IRequest<IAsyncEnumerable<TResponse>>` to preserve the unified type hierarchy — `IPipelineBehavior` applies automatically at the request level. New `IStreamPipelineBehavior<TRequest, TResponse>` wraps the actual enumeration for per-item concerns (timing, transforms). Resolved via `IMediator.CreateStream()`. Source generator provides zero-allocation dispatch.
-- **Addon Architecture** — New `Outcome` on `IJobContext` (formerly `FailureOutcome`) lets pipeline behaviors control what happens on both success and failure. The worker is a generic state machine that applies the pipeline's decision. Combined with typed metadata and publish pipeline behaviors, this enables building composable addons (retry, mutex, dead letter queue, circuit breaker) entirely on top of Jobly's public API. See [Building Addons](https://github.com/moberghr/jobly/blob/main/docs/guides/building-addons.md).
-- **Retry Addon** — Retry logic extracted from the worker into an opt-in module at `Jobly.Core.Retry`. Declare retry policy with `[Retry(3)]` on either the handler or the job class, override per-enqueue with `new JobParameters().WithRetry(maxRetries: 5)`, or set global defaults via `services.AddJoblyRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; })`. Priority: per-enqueue metadata > handler attribute > job attribute > global options.
-- **Mutex Addon** — Mutex extracted from the worker hot path into an opt-in module at `Jobly.Core.Mutex`. Register via `services.AddJoblyMutex()`. Set keys with `new JobParameters().WithMutex("payment:123")` or `[Mutex("payment-processing")]` on the job class. Uses the new `IJoblyLockProvider` abstraction for distributed locking.
+- **Addon Architecture** — New `Outcome` on `IJobContext` (formerly `FailureOutcome`) lets pipeline behaviors control what happens on both success and failure. The worker is a generic state machine that applies the pipeline's decision. Combined with typed metadata and publish pipeline behaviors, this enables building composable addons (retry, mutex, dead letter queue, circuit breaker) entirely on top of Warp's public API. See [Building Addons](https://github.com/moberghr/warp/blob/main/docs/guides/building-addons.md).
+- **Retry Addon** — Retry logic extracted from the worker into an opt-in module at `Warp.Core.Retry`. Declare retry policy with `[Retry(3)]` on either the handler or the job class, override per-enqueue with `new JobParameters().WithRetry(maxRetries: 5)`, or set global defaults via `services.AddWarpRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; })`. Priority: per-enqueue metadata > handler attribute > job attribute > global options.
+- **Mutex Addon** — Mutex extracted from the worker hot path into an opt-in module at `Warp.Core.Mutex`. Register via `services.AddWarpMutex()`. Set keys with `new JobParameters().WithMutex("payment:123")` or `[Mutex("payment-processing")]` on the job class. Uses the new `IWarpLockProvider` abstraction for distributed locking.
 - **Typed Metadata** — Access job metadata through strongly-typed interfaces. Define an interface extending `IJobMetadata`, and read it in handlers via `ctx.GetMetadata<IMyMetadata>()` or configure it at publish time with `new JobParameters().Configure<IMyMetadata>(m => m.CustomerName = "John")`. The source generator produces dictionary-backed implementations. `MetadataSerializer` uses native JSON deserialization for round-trip fidelity (integers stay as `long`, arrays as `List<object>`).
 - **Recurring Job Enable/Disable** — Disable a recurring job to temporarily stop it from creating new jobs. The scheduler still fires on schedule but records a "Skipped" entry in the execution history. Re-enabling resumes from the next natural cron occurrence with no catchup burst. API: `POST /api/recurring/{id}/enable|disable`. Dashboard shows Enabled/Disabled badges and Skipped entries in history.
-- **Worker Scope Isolation** — Worker and handler now use separate DI scopes. The handler's DbContext lives in its own scope — on failure, the scope is disposed and tracked entities are discarded. No partial handler work leaks into the worker's save. On success, handler changes are committed first (outbox pattern), then Jobly state.
-- **Extensible Dashboard UI** — New `IJoblyUIExtension` interface lets external NuGet packages extend the dashboard without forking. Extensions ship an ES-module as an embedded resource, served at `/jobly/_ext/{name}/`. The SPA dynamically imports each module and calls `install(jobly)`. Extensions target `data-jobly-slot` elements with `mount` / `append` / `insertBefore` / `insertAfter` operations, or register whole new pages via `addPage()`. React, ReactDOM, Axios, and shadcn components are exposed on `window.Jobly` so extensions don't bundle them. The built-in `RetryUIExtension` is the reference implementation — renders a retry progress card with attempts/max and next-delay info on the job detail page.
+- **Worker Scope Isolation** — Worker and handler now use separate DI scopes. The handler's DbContext lives in its own scope — on failure, the scope is disposed and tracked entities are discarded. No partial handler work leaks into the worker's save. On success, handler changes are committed first (outbox pattern), then Warp state.
+- **Extensible Dashboard UI** — New `IWarpUIExtension` interface lets external NuGet packages extend the dashboard without forking. Extensions ship an ES-module as an embedded resource, served at `/warp/_ext/{name}/`. The SPA dynamically imports each module and calls `install(warp)`. Extensions target `data-warp-slot` elements with `mount` / `append` / `insertBefore` / `insertAfter` operations, or register whole new pages via `addPage()`. React, ReactDOM, Axios, and shadcn components are exposed on `window.Warp` so extensions don't bundle them. The built-in `RetryUIExtension` is the reference implementation — renders a retry progress card with attempts/max and next-delay info on the job detail page.
 
 ### Improvements
 
 - **Handler Registration Split** — `AddHandlers(assembly)` replaces the old `AddJobHandlers`. New granular methods: `AddJobHandlers` (job + message handlers only), `AddMediatorHandlers` (request + stream handlers only). `AddHandlers` calls both.
 - **Dispatcher Split** — `JobDispatcher` (worker job execution) and `MediatorDispatcher` (in-memory request/stream dispatch) are now separate classes with independent method caches.
 - **xUnit v3 + Microsoft Testing Platform** — Test suite migrated to xUnit v3 with `UseMicrosoftTestingPlatformRunner`. New `[TimedFact]` / `[TimedTheory]` attributes enforce a 10-second default timeout per test, surfacing deadlocks and hangs globally.
-- **Server Memory Benchmarks** — New benchmark project at `src/benchmarks/Jobly.ServerBenchmarks/` with four benchmarks (`ScopeMemoryBenchmark`, `WorkerMemoryBenchmark`, `ServerMemoryBenchmark`, `MemoryStressTest`) and a custom `TotalAllocatedDiagnoser` that tracks allocations across all threads. Baseline: ~50 KB per job regardless of scale; 100K-job stress test shows 0.3 MB retained growth (no leak) at 420–496 jobs/sec steady throughput. Documented in [Operations → Benchmarks](/docs/operations/benchmarks).
-- **Mutation Testing** — New `Jobly.Tests.Mutation` project with an in-memory SQLite fixture runs 293 tests in ~10 seconds, enabling a full Core mutation run in ~30 minutes via `dotnet-stryker`. Baseline scores: **Core 99.60%** (743 killed / 3 survived), Worker 51.53%. Fixed a `RecurringJobPublisher` race condition surfaced during mutation analysis — `AddOrUpdateRecurringJob` now uses `IJoblyLockProvider` to prevent duplicate inserts on concurrent calls.
-- **.slnx Solution Format** — Migrated from `src/Jobly.sln` to `src/Jobly.slnx` (XML-based solution format).
+- **Server Memory Benchmarks** — New benchmark project at `src/benchmarks/Warp.ServerBenchmarks/` with four benchmarks (`ScopeMemoryBenchmark`, `WorkerMemoryBenchmark`, `ServerMemoryBenchmark`, `MemoryStressTest`) and a custom `TotalAllocatedDiagnoser` that tracks allocations across all threads. Baseline: ~50 KB per job regardless of scale; 100K-job stress test shows 0.3 MB retained growth (no leak) at 420–496 jobs/sec steady throughput. Documented in [Operations → Benchmarks](/docs/operations/benchmarks).
+- **Mutation Testing** — New `Warp.Tests.Mutation` project with an in-memory SQLite fixture runs 293 tests in ~10 seconds, enabling a full Core mutation run in ~30 minutes via `dotnet-stryker`. Baseline scores: **Core 99.60%** (743 killed / 3 survived), Worker 51.53%. Fixed a `RecurringJobPublisher` race condition surfaced during mutation analysis — `AddOrUpdateRecurringJob` now uses `IWarpLockProvider` to prevent duplicate inserts on concurrent calls.
+- **.slnx Solution Format** — Migrated from `src/Warp.sln` to `src/Warp.slnx` (XML-based solution format).
 
 ### Bug Fixes
 
-- **Recurring job race on concurrent update** — `RecurringJobPublisher.AddOrUpdateRecurringJob` could insert duplicate rows when called concurrently with the same name. Now uses `IJoblyLockProvider` for exclusive access during the upsert.
+- **Recurring job race on concurrent update** — `RecurringJobPublisher.AddOrUpdateRecurringJob` could insert duplicate rows when called concurrently with the same name. Now uses `IWarpLockProvider` for exclusive access during the upsert.
 - **Trace page group node highlighting** — Fixed group node highlighting and edge behavior in the trace visualization page.
 
 ### Migration
 
 This is a large release with several breaking changes. Plan the upgrade accordingly.
 
-- **Retry is opt-in** — Add `services.AddJoblyRetry()` to enable retries. Without it, failed jobs go directly to `Failed`. Replace the removed `maxRetries` publisher overloads and `JoblyConfiguration.RetryCount` with `[Retry(n)]` attributes, `new JobParameters().WithRetry(n)`, or the global options callback.
-- **Mutex is opt-in** — Add `services.AddJoblyMutex()` to enable mutex enforcement. The `JobParameters.Mutex` property is removed — use `.WithMutex("key")` or `[Mutex("key")]` instead. The `ConcurrencyKey` column on the `Job` entity is removed (keys now live in metadata).
+- **Retry is opt-in** — Add `services.AddWarpRetry()` to enable retries. Without it, failed jobs go directly to `Failed`. Replace the removed `maxRetries` publisher overloads and `WarpConfiguration.RetryCount` with `[Retry(n)]` attributes, `new JobParameters().WithRetry(n)`, or the global options callback.
+- **Mutex is opt-in** — Add `services.AddWarpMutex()` to enable mutex enforcement. The `JobParameters.Mutex` property is removed — use `.WithMutex("key")` or `[Mutex("key")]` instead. The `ConcurrencyKey` column on the `Job` entity is removed (keys now live in metadata).
 - **Typed metadata API** — `IJobContext<T>` / `JobContext<T>` are removed. Read typed metadata via `ctx.GetMetadata<IMyMetadata>()` and configure at publish via `new JobParameters().Configure<IMyMetadata>(m => ...)`.
 - **Reduced public surface** — `JobHelper`, `JobDispatcher`, `MetadataSerializer`, and EF interceptors are now `internal`. The Retry and Mutex addons demonstrate that everything needed to build addons is available through the public API — no `InternalsVisibleTo` needed.
 - **Database migration required** — New `DisabledAt` column on `RecurringJob`, `Skipped` column on `RecurringJobLog`, `ConcurrencyKey` dropped from `Job`. Run an EF Core migration after upgrading.
-- **Solution file renamed** — Update build scripts and IDE shortcuts from `Jobly.sln` to `Jobly.slnx`.
+- **Solution file renamed** — Update build scripts and IDE shortcuts from `Warp.sln` to `Warp.slnx`.
 
 ### Stats
 
@@ -243,10 +243,10 @@ This is a large release with several breaking changes. Plan the upgrade accordin
 ### New Features
 
 - **OpenTelemetry Distributed Tracing** — Every job execution creates a `System.Diagnostics.Activity` with W3C-format TraceId, SpanId, and ParentSpanId. Trace context is automatically propagated through job chains: when a handler enqueues a child job, the child's `ParentSpanId` links back to the handler's span. Message routing and batch creation also propagate span context. New `ParentSpanId` column on the Job entity stores the spawner's span ID.
-- **Span Attributes** — Job execution spans include OTel semantic convention tags (`messaging.system`, `messaging.destination.name`, `messaging.operation.name`, `messaging.message.id`) and Jobly-specific tags (`jobly.job.type`, `jobly.job.kind`, `jobly.job.status`, `jobly.job.duration_ms`, `jobly.job.retry_count`). Failed spans are marked with `ActivityStatusCode.Error`.
-- **Span Events** — Key lifecycle moments recorded as events on the span: `jobly.job.completed`, `jobly.job.failed` (with exception info), `jobly.job.retried` (with retry/max counts), `jobly.job.cancelled`.
-- **OTel Metrics** — Four `System.Diagnostics.Metrics` instruments via a `Meter` named `"Jobly"`: `jobly.job.duration` (histogram, ms), `jobly.job.active` (up-down counter), `jobly.job.completed` (counter with status tag), `jobly.job.enqueued` (counter with kind tag). All tagged by queue and type for filtering.
-- **Automatic Log Correlation** — `AddJoblyWorker` configures `ActivityTrackingOptions` so TraceId, SpanId, and ParentId appear in log output by default. No additional configuration needed.
+- **Span Attributes** — Job execution spans include OTel semantic convention tags (`messaging.system`, `messaging.destination.name`, `messaging.operation.name`, `messaging.message.id`) and Warp-specific tags (`warp.job.type`, `warp.job.kind`, `warp.job.status`, `warp.job.duration_ms`, `warp.job.retry_count`). Failed spans are marked with `ActivityStatusCode.Error`.
+- **Span Events** — Key lifecycle moments recorded as events on the span: `warp.job.completed`, `warp.job.failed` (with exception info), `warp.job.retried` (with retry/max counts), `warp.job.cancelled`.
+- **OTel Metrics** — Four `System.Diagnostics.Metrics` instruments via a `Meter` named `"Warp"`: `warp.job.duration` (histogram, ms), `warp.job.active` (up-down counter), `warp.job.completed` (counter with status tag), `warp.job.enqueued` (counter with kind tag). All tagged by queue and type for filtering.
+- **Automatic Log Correlation** — `AddWarpWorker` configures `ActivityTrackingOptions` so TraceId, SpanId, and ParentId appear in log output by default. No additional configuration needed.
 
 ### Integration
 
@@ -254,8 +254,8 @@ All features are on by default with zero configuration. To export to OTel backen
 
 ```csharp
 builder.Services.AddOpenTelemetry()
-    .WithTracing(t => t.AddSource("Jobly"))
-    .WithMetrics(m => m.AddMeter("Jobly"));
+    .WithTracing(t => t.AddSource("Warp"))
+    .WithMetrics(m => m.AddMeter("Warp"));
 ```
 
 ### Migration
@@ -284,7 +284,7 @@ This release adds a new nullable `ParentSpanId` column to the Job table. Run an 
 - **Real-time Handler Logs** — Handler `ILogger` output is now flushed to the database every ~1 second during execution, instead of only after the handler completes. Logs are visible in the dashboard while the job is still processing.
 - **Multi-server Integration Tests** — 16 new tests (8 per database) verify distributed coordination: row locks, advisory locks, orchestration, message routing, and mutex enforcement across two independent servers sharing one database.
 - **Deterministic Query Ordering** — Job and message fetch queries now use explicit ordering by queue and schedule time, ensuring predictable behavior in multi-server deployments.
-- **Naming Convention Support** — Entity configurations respect EF Core naming conventions (e.g., `UseSnakeCaseNamingConvention()`). All Jobly tables default to the `jobly` schema, configurable via `JoblyConfiguration.Schema`.
+- **Naming Convention Support** — Entity configurations respect EF Core naming conventions (e.g., `UseSnakeCaseNamingConvention()`). All Warp tables default to the `warp` schema, configurable via `WarpConfiguration.Schema`.
 - **Configurable Handler Logging** — `EnableHandlerLogging` option (default true) to suppress handler `ILogger` output from the JobLog table when not needed. Lifecycle events are always recorded.
 - **AI-friendly Documentation** — Added `llms.txt` and `llms-full.txt` for LLM/agent consumption, following the llms.txt convention.
 
@@ -311,7 +311,7 @@ This release adds a new nullable `ParentSpanId` column to the Job table. Run an 
 
 ### Links
 
-- [GitHub Release](https://github.com/moberghr/jobly/releases/tag/0.4.0)
+- [GitHub Release](https://github.com/moberghr/warp/releases/tag/0.4.0)
 
 ---
 
@@ -325,4 +325,4 @@ This release adds a new nullable `ParentSpanId` column to the Job table. Run an 
 
 ### Links
 
-- [GitHub Release](https://github.com/moberghr/jobly/releases/tag/0.3.0)
+- [GitHub Release](https://github.com/moberghr/warp/releases/tag/0.3.0)

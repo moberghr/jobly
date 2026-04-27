@@ -37,29 +37,29 @@ jobs:
       run: npm ci
 
     # Pack Core first — UI and Worker depend on it
-    - name: Pack Moberg.Jobly.Core
-      working-directory: src/core/Jobly.Core
+    - name: Pack Moberg.Warp.Core
+      working-directory: src/core/Warp.Core
       run: dotnet pack -c Release -p:PackageVersion=${{ env.PACKAGE_VERSION }} -o ${{ github.workspace }}/nupkgs
 
     # Add local folder as NuGet source so UI/Worker can resolve Core during pack
     - name: Add local NuGet source
       run: dotnet nuget add source ${{ github.workspace }}/nupkgs --name local
 
-    - name: Pack Moberg.Jobly.UI
-      working-directory: src/core/Jobly.UI
+    - name: Pack Moberg.Warp.UI
+      working-directory: src/core/Warp.UI
       run: dotnet pack -c Release -p:PackageVersion=${{ env.PACKAGE_VERSION }} -o ${{ github.workspace }}/nupkgs
 
-    - name: Pack Moberg.Jobly.Worker
-      working-directory: src/core/Jobly.Worker
+    - name: Pack Moberg.Warp.Worker
+      working-directory: src/core/Warp.Worker
       run: dotnet pack -c Release -p:PackageVersion=${{ env.PACKAGE_VERSION }} -o ${{ github.workspace }}/nupkgs
 
     # Providers depend on both Core and Worker — pack after both are available on the local feed
-    - name: Pack Moberg.Jobly.Provider.PostgreSql
-      working-directory: src/core/providers/Jobly.Provider.PostgreSql
+    - name: Pack Moberg.Warp.Provider.PostgreSql
+      working-directory: src/core/providers/Warp.Provider.PostgreSql
       run: dotnet pack -c Release -p:PackageVersion=${{ env.PACKAGE_VERSION }} -o ${{ github.workspace }}/nupkgs
 
-    - name: Pack Moberg.Jobly.Provider.SqlServer
-      working-directory: src/core/providers/Jobly.Provider.SqlServer
+    - name: Pack Moberg.Warp.Provider.SqlServer
+      working-directory: src/core/providers/Warp.Provider.SqlServer
       run: dotnet pack -c Release -p:PackageVersion=${{ env.PACKAGE_VERSION }} -o ${{ github.workspace }}/nupkgs
 
     # Get short-lived API key via trusted publishing (OIDC, no stored secrets)

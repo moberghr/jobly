@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 const PAGE_SIZES = [10, 20, 50, 100] as const;
-const STORAGE_KEY = 'jobly:pageSize';
+const STORAGE_KEY = 'warp:pageSize';
 
 export function usePersistedPageSize(): [number, (size: number) => void] {
   const [pageSize, setPageSize] = useState<number>(() => {

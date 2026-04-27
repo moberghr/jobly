@@ -1,0 +1,33 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-net/master/src/Stryker.Core/Stryker.Core/stryker-config.schema.json",
+  "stryker-config": {
+    "project": "Warp.Core.csproj",
+    "solution": "stryker.slnx",
+    "test-projects": ["./Warp.Tests.Mutation.csproj"],
+    "target-framework": "net10.0",
+    "mutation-level": "Standard",
+    "thresholds": {
+      "high": 80,
+      "low": 70,
+      "break": 60
+    },
+    "reporters": ["html", "progress", "cleartext", "json"],
+    "test-runner": "mtp",
+    "concurrency": 4,
+    "mutate": [
+      "!**/Data/Entities/**",
+      "!**/Data/Enums/**",
+      "!**/Data/Interfaces/**",
+      "!**/Models/**",
+      "!**/Handlers/I*.cs",
+      "!**/Handlers/Unit.cs",
+      "!**/Handlers/JobFailureOutcome.cs",
+      "!**/Handlers/RetryAttribute.cs",
+      "!**/Handlers/MetadataImplementationAttribute.cs",
+      "!**/Logging/WarpTelemetry.cs",
+      "!**/Common/PagedList.cs",
+      "!**/Configuration.cs",
+      "!**/WarpException.cs"
+    ]
+  }
+}

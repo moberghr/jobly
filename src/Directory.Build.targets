@@ -9,7 +9,7 @@
     <InformationalVersion Condition="'$(Version)' != ''">$(Version)</InformationalVersion>
   </PropertyGroup>
 
-  <!-- Source Link for library packages so consumers can step into Jobly source while debugging. -->
+  <!-- Source Link for library packages so consumers can step into Warp source while debugging. -->
   <ItemGroup Condition="'$(PackageId)' != ''">
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
   </ItemGroup>

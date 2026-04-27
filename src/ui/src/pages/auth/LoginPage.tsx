@@ -38,7 +38,7 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
       </button>
       <Card className="w-[360px]">
         <CardHeader>
-          <CardTitle>Jobly Dashboard</CardTitle>
+          <CardTitle>Warp Dashboard</CardTitle>
         </CardHeader>
         <CardContent>
           {error && (

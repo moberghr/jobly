@@ -7,7 +7,7 @@ declare global {
 }
 
 export const config = {
-  apiPath: window.apiPath || '/jobly/api/',
-  basePath: window.basePath || '/jobly',
+  apiPath: window.apiPath || '/warp/api/',
+  basePath: window.basePath || '/warp',
   hasBuiltInLogin: window.hasBuiltInLogin === true,
 };

@@ -1,0 +1,32 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Benchmarks/">
+    <Project Path="benchmarks/Warp.Benchmarks/Warp.Benchmarks.csproj" />
+    <Project Path="benchmarks/Warp.PerfTest/Warp.PerfTest.csproj" />
+    <Project Path="benchmarks/Warp.ServerBenchmarks/Warp.ServerBenchmarks.csproj" />
+  </Folder>
+  <Folder Name="/core/">
+    <Project Path="core/Warp.Core/Warp.Core.csproj" />
+    <Project Path="core/Warp.SourceGenerator/Warp.SourceGenerator.csproj" />
+    <Project Path="core/Warp.UI/Warp.UI.csproj" />
+    <Project Path="core/Warp.Worker/Warp.Worker.csproj" />
+  </Folder>
+  <Folder Name="/core/providers/">
+    <Project Path="core/providers/Warp.Provider.PostgreSql/Warp.Provider.PostgreSql.csproj" />
+    <Project Path="core/providers/Warp.Provider.SqlServer/Warp.Provider.SqlServer.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Warp.Tests/Warp.Tests.csproj" />
+    <Project Path="tests/Warp.Tests.Mutation/Warp.Tests.Mutation.csproj" />
+    <Project Path="tests/Warp.Tests.SourceGenerator/Warp.Tests.SourceGenerator.csproj" />
+  </Folder>
+  <Folder Name="/demo/">
+    <Project Path="demo/Warp.Test.Shared/Warp.Test.Shared.csproj" />
+    <Project Path="demo/Warp.TestApp/Warp.Test.App.csproj" />
+    <Project Path="demo/Warp.TestWorker/Warp.Test.Worker.csproj" />
+  </Folder>
+</Solution>

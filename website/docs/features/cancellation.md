@@ -4,7 +4,7 @@ sidebar_position: 5
 
 # Job Cancellation
 
-Jobly uses a `CancellationMode` enum for graceful job cancellation. When you cancel a processing job, it doesn't immediately change state — the handler gets a chance to stop cleanly.
+Warp uses a `CancellationMode` enum for graceful job cancellation. When you cancel a processing job, it doesn't immediately change state — the handler gets a chance to stop cleanly.
 
 ## How It Works
 

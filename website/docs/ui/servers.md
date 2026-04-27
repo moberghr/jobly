@@ -9,7 +9,7 @@ Live server and worker status. Shows custom server name, worker count, start tim
 Configure a custom server name:
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+builder.Services.AddWarpWorker<AppDbContext>(options =>
 {
     options.ServerName = "my-api-server";
 });
@@ -23,7 +23,7 @@ Click a server to see its detail page with worker groups and background task sta
 
 ### Background Tasks
 
-Each Jobly server runs 8 background tasks that handle orchestration and maintenance:
+Each Warp server runs 8 background tasks that handle orchestration and maintenance:
 
 | Task | Default Interval | Purpose |
 |------|------------------|---------|

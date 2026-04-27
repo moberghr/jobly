@@ -80,7 +80,7 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
         <div className="flex items-center gap-2 text-muted-foreground">
           <Loader className="h-4 w-4 animate-spin" />
-          <span>Connecting to Jobly...</span>
+          <span>Connecting to Warp...</span>
         </div>
       </div>
     );

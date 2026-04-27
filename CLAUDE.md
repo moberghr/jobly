@@ -2,9 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## What is Jobly
+## What is Warp
 
-Jobly is a distributed job processing and message queue library for .NET 10. Four patterns:
+Warp is a distributed job processing and message queue library for .NET 10. Four patterns:
 
 - **Messages** (`IMessage`) — Pub/sub queue. Multiple handlers per message, each an independent job.
 - **Jobs** (`IJob`) — Orchestrated background work. Single handler, scheduling, retries, continuations, batches, named queues.
@@ -13,23 +13,23 @@ Jobly is a distributed job processing and message queue library for .NET 10. Fou
 
 **Optional DB push**: `opt.UseDatabasePush()` on the builder replaces polling wake-up with push notifications (Postgres LISTEN/NOTIFY, SQL Server Service Broker) for the dispatcher, `MessageRouter`, and `Orchestrator`. Worker fetch push requires `UseDispatcher = true` — individual-worker mode has a thundering-herd problem and is left on polling. See §2.9 and the DB Push section in `README.md`.
 
-Ships as NuGet packages: `Jobly.Core` (provider-agnostic), `Jobly.Provider.PostgreSql` (PG-specific), `Jobly.Provider.SqlServer` (SQL Server-specific), `Jobly.Worker` (worker runtime), `Jobly.UI` (dashboard). Users install the provider package that matches their database and call `opt.UsePostgreSql()` or `opt.UseSqlServer()` inside the `AddJobly` / `AddJoblyWorker` lambda.
+Ships as NuGet packages: `Warp.Core` (provider-agnostic), `Warp.Provider.PostgreSql` (PG-specific), `Warp.Provider.SqlServer` (SQL Server-specific), `Warp.Worker` (worker runtime), `Warp.UI` (dashboard). Users install the provider package that matches their database and call `opt.UsePostgreSql()` or `opt.UseSqlServer()` inside the `AddWarp` / `AddWarpWorker` lambda.
 
 ## Build & Test Commands
 
 ```bash
 # Backend (from src/)
-dotnet build Jobly.slnx
-dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj                                          # Full suite (1,024 tests, ~1m 30s)
+dotnet build Warp.slnx
+dotnet test --project tests/Warp.Tests/Warp.Tests.csproj                                          # Full suite (1,024 tests, ~1m 30s)
 
 # By database requirement (CI uses this matrix)
-dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=NoDb"        # Pure-unit, no container (~3s)
-dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=PostgreSql"  # PG-backed (~1m 10s)
-dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-trait "Category=SqlServer"   # SQL Server-backed (~1m 20s)
+dotnet test --project tests/Warp.Tests/Warp.Tests.csproj -- --filter-trait "Category=NoDb"        # Pure-unit, no container (~3s)
+dotnet test --project tests/Warp.Tests/Warp.Tests.csproj -- --filter-trait "Category=PostgreSql"  # PG-backed (~1m 10s)
+dotnet test --project tests/Warp.Tests/Warp.Tests.csproj -- --filter-trait "Category=SqlServer"   # SQL Server-backed (~1m 20s)
 
 # Run specific test suites
-dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-namespace "Jobly.Tests.Unit"         # Unit tests only
-dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj -- --filter-namespace "Jobly.Tests.Integration"  # Integration tests only
+dotnet test --project tests/Warp.Tests/Warp.Tests.csproj -- --filter-namespace "Warp.Tests.Unit"         # Unit tests only
+dotnet test --project tests/Warp.Tests/Warp.Tests.csproj -- --filter-namespace "Warp.Tests.Integration"  # Integration tests only
 
 # Frontend (from src/ui/)
 npm install
@@ -161,7 +161,7 @@ Uses `CancellationMode` enum (`None=0, Graceful=1`) instead of immediate state c
 
 ### Mutex (Concurrency Control)
 
-Opt-in addon via `services.AddJoblyMutex()`. Only one job per concurrency key can be Processing at a time. Set at publish time via `.WithMutex("key")` extension or `[Mutex("key")]` attribute on the job class. Implemented as `MutexPipelineBehavior` — acquires a distributed lock before the handler runs, short-circuits to Deleted via `IJobContext.Outcome` if the lock is held. Lock released after handler completes. Zero overhead for jobs without a key. Concurrency key stored in job metadata (not a dedicated column).
+Opt-in addon via `services.AddWarpMutex()`. Only one job per concurrency key can be Processing at a time. Set at publish time via `.WithMutex("key")` extension or `[Mutex("key")]` attribute on the job class. Implemented as `MutexPipelineBehavior` — acquires a distributed lock before the handler runs, short-circuits to Deleted via `IJobContext.Outcome` if the lock is held. Lock released after handler completes. Zero overhead for jobs without a key. Concurrency key stored in job metadata (not a dedicated column).
 
 ### Recurring Jobs
 
@@ -174,7 +174,7 @@ Opt-in addon via `services.AddJoblyMutex()`. Only one job per concurrency key ca
 ### Dashboard Authorization
 
 Two modes:
-- **Built-in login**: `options.UseBuiltInLogin<TValidator>()` — Jobly serves a React login page, manages HTTP-only signed cookie (7 day expiry via ASP.NET Data Protection). Register `IJoblyCredentialValidator` in DI (scoped, can inject DbContext). Login/logout via `/api/auth/login` and `/api/auth/logout`. SPA catches 401 from Axios interceptor and shows login component.
+- **Built-in login**: `options.UseBuiltInLogin<TValidator>()` — Warp serves a React login page, manages HTTP-only signed cookie (7 day expiry via ASP.NET Data Protection). Register `IWarpCredentialValidator` in DI (scoped, can inject DbContext). Login/logout via `/api/auth/login` and `/api/auth/logout`. SPA catches 401 from Axios interceptor and shows login component.
 - **Custom redirect**: `options.Authorization = new MyFilter()` + `options.UnauthorizedRedirectUrl = "/login"` — your app handles login. Filter checks `HttpContext` (claims, roles, etc.). API gets 401, SPA gets 302 redirect.
 
 Default: no auth (open access).
@@ -183,8 +183,8 @@ Default: no auth (open access).
 
 - **No raw SQL** — all queries use EF Core LINQ. No `_context.Set<>()` subqueries inside `.Select()` projections — use navigation properties or two-step fetch instead.
 - **Naming conventions respected** — entity configurations do NOT use `.ToTable()`, so EF Core naming conventions (e.g., `UseSnakeCaseNamingConvention()`) can transform table/column names freely. Schema is set via `entity.Metadata.SetSchema()` to avoid re-pinning table names.
-- **Default schema** — All Jobly tables default to the `"jobly"` schema. Configurable via `JoblyConfiguration.Schema`. Set to `null` for the database's default schema.
-- **TimeProvider** — all production code uses injectable `TimeProvider` instead of `DateTime.UtcNow`. Registered as `TryAddSingleton(TimeProvider.System)` in `AddJobly`. Test code can use `DateTime.UtcNow` directly.
+- **Default schema** — All Warp tables default to the `"warp"` schema. Configurable via `WarpConfiguration.Schema`. Set to `null` for the database's default schema.
+- **TimeProvider** — all production code uses injectable `TimeProvider` instead of `DateTime.UtcNow`. Registered as `TryAddSingleton(TimeProvider.System)` in `AddWarp`. Test code can use `DateTime.UtcNow` directly.
 - **DbContext must be registered as Scoped** (not Transient). The outbox pattern requires the publisher and application code to share the same DbContext instance within a scope.
 - Everything is a Job. `ParentJobId` replaces both the old MessageId and BatchId foreign keys.
 - Workers never touch parent/child orchestration — that's the `Orchestrator`'s job.
@@ -194,16 +194,16 @@ Default: no auth (open access).
 - Every background task implements `IServerTask` and is driven by the single `ServerTaskHost<TContext>`. Signal-driven wake-up (`ServerTaskSignals<TContext>`) wakes `Orchestrator` on `JobFinalized` and `MessageRouter` on `MessageEnqueued`; the other tasks are time-driven.
 - `RequeueJob` resets `ScheduleTime` to now — requeued jobs always execute immediately.
 - Count-based cleanup: `MaxExpirableJobCount` (default null/disabled) — deletes oldest by `ExpireAt` when threshold exceeded. Failed jobs excluded (null `ExpireAt`).
-- `JobExpirationTimeout` configurable on base `JoblyConfiguration` (default 1 day). Used by worker, command service, and orchestration task.
+- `JobExpirationTimeout` configurable on base `WarpConfiguration` (default 1 day). Used by worker, command service, and orchestration task.
 - Job metadata: `JobParameters.Metadata` (key-value dictionary), stored as JSON on the Job entity. `IJobContext` gives handlers access to metadata, job ID, and trace ID. `IPublishPipelineBehavior<T>` intercepts publish for cross-cutting metadata. Metadata inherited by child jobs via ambient context.
 - Pause/Resume: Server and worker group level. `PausedAt` timestamp on Server and WorkerGroup entities. `PauseStateHolder` (in-memory snapshot) updated by `Heartbeat`, checked by workers before each poll. API endpoints: `POST /api/servers/{id}/pause|resume`, `POST /api/groups/{id}/pause|resume`.
 - Real-time log flushing: `RunJobMonitor` drains `JobLogCollector` every ~1s during handler execution and persists logs to the database. Logs visible in dashboard while the job is still processing.
 
 ### Backend (.NET 10)
 
-- **Jobly.Core** — Entities (Job, RecurringJob, RecurringJobLog, JobLog, Server, Worker, ServerTask, ServerLog), handlers, JobDispatcher (cached reflection), Publisher, BatchPublisher, logging (JobLogContext/JobLoggerProvider). Services: `JobQueryService`, `JobCommandService`, `JobGroupQueryService`, `RecurringJobService`, `DashboardStatsService`.
-- **Jobly.Worker** — JoblyWorkerService (pure executor), JoblyDispatcher/JoblyDispatcherWorker (batch-fetch mode), worker groups. Server-task services driven by `ServerTaskHost<TContext>` (all implement `IServerTask`): `Heartbeat`, `CounterAggregator`, `ServerCleanup`, `StaleJobRecovery`, `ExpirationCleanup`, `RecurringJobScheduler`, `ScheduledJobActivation`, `MessageRouter`, `Orchestrator`. Push → wake plumbing: `ServerTaskSignals<TContext>`.
-- **Jobly.UI** — Minimal API endpoints + embedded SPA served at `/jobly`. Auth middleware (`IJoblyAuthorizationFilter`, `IJoblyCredentialValidator`, built-in cookie login). Typed `config.ts` for window globals.
+- **Warp.Core** — Entities (Job, RecurringJob, RecurringJobLog, JobLog, Server, Worker, ServerTask, ServerLog), handlers, JobDispatcher (cached reflection), Publisher, BatchPublisher, logging (JobLogContext/JobLoggerProvider). Services: `JobQueryService`, `JobCommandService`, `JobGroupQueryService`, `RecurringJobService`, `DashboardStatsService`.
+- **Warp.Worker** — WarpWorkerService (pure executor), WarpDispatcher/WarpDispatcherWorker (batch-fetch mode), worker groups. Server-task services driven by `ServerTaskHost<TContext>` (all implement `IServerTask`): `Heartbeat`, `CounterAggregator`, `ServerCleanup`, `StaleJobRecovery`, `ExpirationCleanup`, `RecurringJobScheduler`, `ScheduledJobActivation`, `MessageRouter`, `Orchestrator`. Push → wake plumbing: `ServerTaskSignals<TContext>`.
+- **Warp.UI** — Minimal API endpoints + embedded SPA served at `/warp`. Auth middleware (`IWarpAuthorizationFilter`, `IWarpCredentialValidator`, built-in cookie login). Typed `config.ts` for window globals.
 - **Static analyzers** — StyleCop, Roslynator, SonarAnalyzer, Meziantou.
 
 ### Frontend (Vite + React 18 + TypeScript)
@@ -212,9 +212,9 @@ Default: no auth (open access).
 
 ## Testing
 
-1,024 tests (135 NoDb + 445 PostgreSQL + 444 SQL Server) in `src/tests/Jobly.Tests/`, using xUnit v3, Shouldly, Testcontainers + Respawn. Full suite ~1m 30s locally; per-category ~3s / ~1m 10s / ~1m 20s.
+1,024 tests (135 NoDb + 445 PostgreSQL + 444 SQL Server) in `src/tests/Warp.Tests/`, using xUnit v3, Shouldly, Testcontainers + Respawn. Full suite ~1m 30s locally; per-category ~3s / ~1m 10s / ~1m 20s.
 
-Tests are organized by **feature folder** (`Admin/`, `Core/`, `Features/Retry/`, `Worker/`, `Notifications/`, etc.), not by unit-vs-integration split. The `[GenerateDatabaseTests(FixtureKind.X)]` source generator (`src/tests/Jobly.Tests.SourceGenerator/`) emits `_PostgreSql` and `_SqlServer` concrete subclasses from a single abstract base, so each behavior is asserted on both backends.
+Tests are organized by **feature folder** (`Admin/`, `Core/`, `Features/Retry/`, `Worker/`, `Notifications/`, etc.), not by unit-vs-integration split. The `[GenerateDatabaseTests(FixtureKind.X)]` source generator (`src/tests/Warp.Tests.SourceGenerator/`) emits `_PostgreSql` and `_SqlServer` concrete subclasses from a single abstract base, so each behavior is asserted on both backends.
 
 ### Test Categories (xUnit traits)
 
@@ -224,11 +224,11 @@ Tests are organized by **feature folder** (`Admin/`, `Core/`, `Features/Retry/`,
 
 1. **Unit-style against a real DB** (most tests): each test calls exactly ONE public method on ONE class. State set up via direct DB inserts. Fresh `CreateContext()` for arrange / act / assert — no shared change tracking. Uses `[GenerateDatabaseTests(FixtureKind.Default)]` → `PostgreSqlFixture` / `SqlServerFixture` with Respawn between tests.
 
-2. **Integration via `JoblyTestServer`**: boots full worker + all background tasks against a real database. Tests publish jobs and wait for completion via `Server.WaitForCompletion()` / `Server.WaitForJobState()`. Uses `[GenerateDatabaseTests(FixtureKind.Integration)]` → `PostgreSqlIntegrationFixture` / `SqlServerIntegrationFixture` (server boots once per fixture). Variants: `FixtureKind.BatchedCompletion` for dispatcher-mode batching; `FixtureKind.MultiServer` for 2-server distributed-coordination tests.
+2. **Integration via `WarpTestServer`**: boots full worker + all background tasks against a real database. Tests publish jobs and wait for completion via `Server.WaitForCompletion()` / `Server.WaitForJobState()`. Uses `[GenerateDatabaseTests(FixtureKind.Integration)]` → `PostgreSqlIntegrationFixture` / `SqlServerIntegrationFixture` (server boots once per fixture). Variants: `FixtureKind.BatchedCompletion` for dispatcher-mode batching; `FixtureKind.MultiServer` for 2-server distributed-coordination tests.
 
 ### TimedFact default
 
-Every test-affecting attribute defaults to **10s** (`[TimedFact]`, `[TimedTheory]`). Tests exercising genuinely slow behavior (retry chains with real delays, end-to-end workload tests) opt in explicitly with `[TimedFact(N_000)]`. A short default surfaces deadlocks and hangs immediately instead of hiding them behind a half-minute wait. See `src/tests/Jobly.Tests/TestData/TimedFactAttribute.cs`.
+Every test-affecting attribute defaults to **10s** (`[TimedFact]`, `[TimedTheory]`). Tests exercising genuinely slow behavior (retry chains with real delays, end-to-end workload tests) opt in explicitly with `[TimedFact(N_000)]`. A short default surfaces deadlocks and hangs immediately instead of hiding them behind a half-minute wait. See `src/tests/Warp.Tests/TestData/TimedFactAttribute.cs`.
 
 ### Writing Unit Tests
 
@@ -254,7 +254,7 @@ public abstract class MyTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         // Act: call ONE method on ONE class
-        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new JoblyConfiguration()));
+        var svc = new JobCommandService<TestContext>(_fixture.CreateContext(), TimeProvider.System, Options.Create(new WarpConfiguration()));
         await svc.DeleteJob(jobId);
 
         // Assert: query DB for result
@@ -287,12 +287,12 @@ public abstract class MyIntegrationTestsBase : IntegrationTestBase
 }
 ```
 
-Use `FixtureKind.BatchedCompletion` for dispatcher-mode completion-batch tests, `FixtureKind.MultiServer` for two-server distributed-coordination tests. A test that needs a one-off custom worker config can call `JoblyTestServer.StartAsync(_fixture, configure: cfg => ...)` inline, as the durability and batched-completion tests do.
+Use `FixtureKind.BatchedCompletion` for dispatcher-mode completion-batch tests, `FixtureKind.MultiServer` for two-server distributed-coordination tests. A test that needs a one-off custom worker config can call `WarpTestServer.StartAsync(_fixture, configure: cfg => ...)` inline, as the durability and batched-completion tests do.
 
 ### Test Principles
 
 - Each test tests ONE public method. No chaining multiple calls to simulate flows.
-- If testing a multi-step flow (worker + orchestration + routing), use integration tests with `JoblyTestServer`.
+- If testing a multi-step flow (worker + orchestration + routing), use integration tests with `WarpTestServer`.
 - No `Task.Delay` in tests except for handlers meant to be cancelled (`CancellableCommand`).
 - No unnecessary abstractions — test handlers are simple (empty, throw, increment counter).
 - Tests run on both PostgreSQL and SQL Server via abstract base + concrete subclasses.
@@ -300,15 +300,15 @@ Use `FixtureKind.BatchedCompletion` for dispatcher-mode completion-batch tests, 
 
 ### Registration
 
-`AddJobly<TContext>(opt => ...)` / `AddJoblyWorker<TContext>(opt => ...)` take a single `Action<JoblyBuilder<TContext>>` / `Action<JoblyWorkerBuilder<TContext>>` lambda and automatically configure the user's DbContext:
+`AddWarp<TContext>(opt => ...)` / `AddWarpWorker<TContext>(opt => ...)` take a single `Action<WarpBuilder<TContext>>` / `Action<WarpWorkerBuilder<TContext>>` lambda and automatically configure the user's DbContext:
 - Wraps the existing `DbContextOptions<TContext>` service descriptor to add row-lock interceptors
-- Replaces `IModelCustomizer` with `JoblyModelCustomizer` to auto-apply entity configurations
+- Replaces `IModelCustomizer` with `WarpModelCustomizer` to auto-apply entity configurations
 - Registers `TimeProvider.System` via `TryAddSingleton` (overridable for testing)
-- Registers `IJoblyLockProvider` (wraps `IDistributedLockProvider` — Medallion.Threading is internal; the concrete `IDistributedLockProvider` is registered by the provider package)
+- Registers `IWarpLockProvider` (wraps `IDistributedLockProvider` — Medallion.Threading is internal; the concrete `IDistributedLockProvider` is registered by the provider package)
 - Users just register their DbContext normally — no manual configuration needed
-- The builder inherits from `JoblyConfiguration` / `JoblyWorkerConfiguration`, so config fields (`WorkerCount`, `PollingInterval`, `DefaultQueue`, etc.) are set directly on `opt`
+- The builder inherits from `WarpConfiguration` / `WarpWorkerConfiguration`, so config fields (`WorkerCount`, `PollingInterval`, `DefaultQueue`, etc.) are set directly on `opt`
 - Opt-in addons on the builder: `opt.AddRetry()`, `opt.AddMutex()`, `opt.AddCircuitBreaker()`, `opt.AddNoRestart()`, `opt.UseDatabasePush()`
-- Provider selection via `opt.UsePostgreSql()` / `opt.UseSqlServer()` (from `Jobly.Provider.PostgreSql` / `Jobly.Provider.SqlServer`) — mandatory for real use; registers `IJoblySqlQueries`, `IDatabaseExceptionClassifier`, `IJoblyNotificationTransportFactory`, and the provider-specific `IDistributedLockProvider`
+- Provider selection via `opt.UsePostgreSql()` / `opt.UseSqlServer()` (from `Warp.Provider.PostgreSql` / `Warp.Provider.SqlServer`) — mandatory for real use; registers `IWarpSqlQueries`, `IDatabaseExceptionClassifier`, `IWarpNotificationTransportFactory`, and the provider-specific `IDistributedLockProvider`
 
 ### Worker Groups
 
@@ -338,11 +338,11 @@ Workers can be split into groups with independent queues and polling intervals. 
 - **§2.2** Workers are pure executors. Never add orchestration, routing, or parent/child logic to worker code. That belongs in an `IServerTask` implementation driven by `ServerTaskHost<TContext>`.
 - **§2.3** Every background task implements `IServerTask` and is registered as `Scoped`. Wake-up is push-driven via `ServerTaskSignals<TContext>` (`SignalJobFinalized` / `SignalMessageEnqueued`) rather than reducing poll intervals; tasks that don't need push (heartbeat, cleanups) just poll at `DefaultInterval`.
 - **§2.4** Services expose interfaces (`IJobCommandService`, `IJobQueryService`, etc.). Generic implementations take `TContext : DbContext`.
-- **§2.5** `AddJobly<TContext>()` / `AddJoblyWorker<TContext>()` auto-configure the user's DbContext. Users register their DbContext normally — no manual Jobly configuration needed.
+- **§2.5** `AddWarp<TContext>()` / `AddWarpWorker<TContext>()` auto-configure the user's DbContext. Users register their DbContext normally — no manual Warp configuration needed.
 - **§2.6** In-memory requests (`IRequest<TResponse>`) go through `IMediator.Send()` — same `IPipelineBehavior` pipeline as jobs/messages, but no database persistence.
 - **§2.7** In-memory streams (`IStreamRequest<TResponse>`) go through `IMediator.CreateStream()` — `IPipelineBehavior` applies at request level, `IStreamPipelineBehavior` wraps enumeration, returns `IAsyncEnumerable<TResponse>`, no database persistence.
-- **§2.8** Future-dated jobs land in `State.Scheduled`; `ScheduledJobActivation` flips them to `Enqueued` when `ScheduleTime <= now`. Activation cadence is controlled by `JoblyWorkerConfiguration.ScheduledActivationInterval` (default 5s) — this is the worst-case latency between `ScheduleTime` and pickup eligibility. The task is time-driven and does not participate in DB-push wake-up; push only accelerates what happens *after* activation. Worker fetch queries always check `CurrentState == Enqueued` with a defensive `ScheduleTime <= now` predicate for pre-upgrade legacy rows. Adding new query sites that filter by `Enqueued` without the time predicate is a latent bug on upgraded deployments.
-- **§2.9** DB push is an opt-in addon. `opt.UseDatabasePush()` on the builder replaces the default `NullNotificationTransport` with a provider-specific one (Postgres LISTEN/NOTIFY or SQL Server Service Broker) and registers `NotificationListenerTask`. The provider-specific transport is resolved via `IJoblyNotificationTransportFactory`, which the provider package (`Jobly.Provider.PostgreSql` / `Jobly.Provider.SqlServer`) registers when you call `opt.UsePostgreSql()` / `opt.UseSqlServer()` — call the provider first, push second. Worker-fetch push only fires when `UseDispatcher = true`. Transports must not throw from `PublishAsync` — they log + increment `JoblyTelemetry.NotificationPublishFailures` instead. Missed notifications are caught by drain-on-reconnect in the listener.
+- **§2.8** Future-dated jobs land in `State.Scheduled`; `ScheduledJobActivation` flips them to `Enqueued` when `ScheduleTime <= now`. Activation cadence is controlled by `WarpWorkerConfiguration.ScheduledActivationInterval` (default 5s) — this is the worst-case latency between `ScheduleTime` and pickup eligibility. The task is time-driven and does not participate in DB-push wake-up; push only accelerates what happens *after* activation. Worker fetch queries always check `CurrentState == Enqueued` with a defensive `ScheduleTime <= now` predicate for pre-upgrade legacy rows. Adding new query sites that filter by `Enqueued` without the time predicate is a latent bug on upgraded deployments.
+- **§2.9** DB push is an opt-in addon. `opt.UseDatabasePush()` on the builder replaces the default `NullNotificationTransport` with a provider-specific one (Postgres LISTEN/NOTIFY or SQL Server Service Broker) and registers `NotificationListenerTask`. The provider-specific transport is resolved via `IWarpNotificationTransportFactory`, which the provider package (`Warp.Provider.PostgreSql` / `Warp.Provider.SqlServer`) registers when you call `opt.UsePostgreSql()` / `opt.UseSqlServer()` — call the provider first, push second. Worker-fetch push only fires when `UseDispatcher = true`. Transports must not throw from `PublishAsync` — they log + increment `WarpTelemetry.NotificationPublishFailures` instead. Missed notifications are caught by drain-on-reconnect in the listener.
 
 ### §3 — Coding Style
 
@@ -390,7 +390,7 @@ var activeJobs = await _context.Set<Job>()
 - **§4.2** Unit test pattern: abstract base class with `IDatabaseFixture`, concrete subclasses per database with `[Collection("PostgreSql")]` / `[Collection("SqlServer")]`.
 - **§4.3** Each unit test calls exactly ONE public method on ONE class. State set up via direct DB inserts.
 - **§4.4** Fresh `CreateContext()` for setup, act, and assert — no shared tracking.
-- **§4.5** Integration tests use `JoblyTestServer` with `Server.WaitForCompletion()` / `Server.WaitForJobState()`. Use `[Collection("PostgreSql-Integration")]` / `[Collection("SqlServer-Integration")]` fixtures.
+- **§4.5** Integration tests use `WarpTestServer` with `Server.WaitForCompletion()` / `Server.WaitForJobState()`. Use `[Collection("PostgreSql-Integration")]` / `[Collection("SqlServer-Integration")]` fixtures.
 - **§4.6** No `Task.Delay` in tests except handlers designed to be cancelled.
 - **§4.7** Test handlers are simple: empty body, throw, or increment counter. No unnecessary abstractions.
 - **§4.8** Test naming: `MethodName_Scenario_ExpectedResult`.
@@ -399,10 +399,10 @@ var activeJobs = await _context.Set<Job>()
 
 ### §5 — Data Layer
 
-- **§5.1** No raw SQL. All queries use EF Core LINQ. This ensures dual-database compatibility. **Exception**: provider-native APIs with no EF Core abstraction are allowed inside the provider packages (`src/core/providers/Jobly.Provider.PostgreSql/` — LISTEN/NOTIFY via `NpgsqlConnection`, row-lock SQL; `src/core/providers/Jobly.Provider.SqlServer/` — Service Broker via `SqlConnection`, row-lock SQL). `Jobly.Core` itself must stay provider-agnostic — no `Npgsql` or `Microsoft.Data.SqlClient` references.
+- **§5.1** No raw SQL. All queries use EF Core LINQ. This ensures dual-database compatibility. **Exception**: provider-native APIs with no EF Core abstraction are allowed inside the provider packages (`src/core/providers/Warp.Provider.PostgreSql/` — LISTEN/NOTIFY via `NpgsqlConnection`, row-lock SQL; `src/core/providers/Warp.Provider.SqlServer/` — Service Broker via `SqlConnection`, row-lock SQL). `Warp.Core` itself must stay provider-agnostic — no `Npgsql` or `Microsoft.Data.SqlClient` references.
 - **§5.2** No `_context.Set<>()` subqueries inside `.Select()` projections. Use navigation properties or two-step fetch.
 - **§5.3** `AsNoTracking()` on read-only queries. `Select()` projections over `Include()` for reads.
-- **§5.4** EF Core entity configurations applied via `JoblyModelCustomizer` (auto-registered by `AddJobly`). Fluent API in `OnModelCreating` overrides.
+- **§5.4** EF Core entity configurations applied via `WarpModelCustomizer` (auto-registered by `AddWarp`). Fluent API in `OnModelCreating` overrides.
 - **§5.5** DbContext lifetime is `Scoped`. Never register as Transient — outbox pattern requires shared instance.
 - **§5.6** `TimeProvider` for all timestamps. Never `DateTime.UtcNow` in production code.
 - **§5.7** One `SaveChanges` per handler/operation. Services should not call `SaveChanges` — the caller saves.
@@ -426,11 +426,11 @@ var activeJobs = await _context.Set<Job>()
 
 ### §8 — Project-Specific Patterns
 
-- **§8.1** `JoblyConfiguration` via `IOptions<JoblyConfiguration>`. All configurable values go through this pattern.
+- **§8.1** `WarpConfiguration` via `IOptions<WarpConfiguration>`. All configurable values go through this pattern.
 - **§8.2** Failed jobs never auto-deleted (`ExpireAt = null`). Only explicit user action or count-based cleanup.
 - **§8.3** `ContinuationOptions` is generalized to all job kinds — any job with children can control child activation on failure.
 - **§8.4** `RequeueJob` resets `ScheduleTime` to now. Requeued jobs always execute immediately.
 - **§8.5** Cancellation uses `CancellationMode` enum, not immediate state change. Worker monitors and cancels handler token.
-- **§8.6** Mutex is an opt-in addon (`opt.AddMutex()` on the builder). `MutexPipelineBehavior` uses distributed lock via `IJoblyLockProvider`. Set key via `.WithMutex("key")` or `[Mutex("key")]` attribute. Concurrency key stored in metadata.
+- **§8.6** Mutex is an opt-in addon (`opt.AddMutex()` on the builder). `MutexPipelineBehavior` uses distributed lock via `IWarpLockProvider`. Set key via `.WithMutex("key")` or `[Mutex("key")]` attribute. Concurrency key stored in metadata.
 - **§8.7** `RecurringJobScheduler` creates jobs, `AddOrUpdateRecurringJob` only registers/updates definitions.
-- **§8.8** Source generator (`Jobly.SourceGenerator`) for zero-allocation mediator and worker dispatch.
+- **§8.8** Source generator (`Warp.SourceGenerator`) for zero-allocation mediator and worker dispatch.

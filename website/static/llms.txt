@@ -1,27 +1,27 @@
-# Jobly
+# Warp
 
 > Distributed job processing, message queue, and in-memory mediator library for .NET 10. Three patterns, one unified pipeline, a real-time dashboard.
 
-Jobly ships as three NuGet packages: Moberg.Jobly.Core (publishing), Moberg.Jobly.Worker (processing), and Moberg.Jobly.UI (dashboard). Supports PostgreSQL and SQL Server. Uses the transactional outbox pattern — jobs are committed atomically with your business data.
+Warp ships as three NuGet packages: Moberg.Warp.Core (publishing), Moberg.Warp.Worker (processing), and Moberg.Warp.UI (dashboard). Supports PostgreSQL and SQL Server. Uses the transactional outbox pattern — jobs are committed atomically with your business data.
 
 ## Docs
 
-- [Getting Started](https://moberghr.github.io/jobly/docs/getting-started): Installation, DbContext setup, service registration, first handler
-- [Messages](https://moberghr.github.io/jobly/docs/patterns/messages): Pub/sub IMessage with multiple handlers, fan-out routing
-- [Jobs](https://moberghr.github.io/jobly/docs/patterns/jobs): IJob with scheduling, retries, continuations, batches, named queues, mutex
-- [Requests](https://moberghr.github.io/jobly/docs/patterns/requests): In-memory IRequest<TResponse> via IMediator.Send(), no persistence
-- [Patterns Overview](https://moberghr.github.io/jobly/docs/patterns): Type hierarchy, unified pipeline behaviors
-- [Outbox Pattern](https://moberghr.github.io/jobly/docs/features/outbox-pattern): Transactional outbox — jobs committed with business data
-- [Recurring Jobs](https://moberghr.github.io/jobly/docs/features/recurring-jobs): Cron-based scheduling, deduplication, execution history
-- [Job Metadata](https://moberghr.github.io/jobly/docs/features/metadata): Key-value metadata, publish pipeline behaviors, IJobContext
-- [Mutex](https://moberghr.github.io/jobly/docs/features/mutex): ConcurrencyKey-based mutual exclusion for jobs
-- [Job Cancellation](https://moberghr.github.io/jobly/docs/features/cancellation): Graceful CancellationMode, handler CancellationToken
-- [Pause / Resume](https://moberghr.github.io/jobly/docs/features/pause): Pause servers and worker groups, resume processing
-- [Job Tracing](https://moberghr.github.io/jobly/docs/features/tracing): TraceId and SpawnedByJobId for cross-job flow visibility
-- [Configuration](https://moberghr.github.io/jobly/docs/operations/configuration): Worker, polling, retention, dispatcher mode, worker groups, schema, naming conventions
-- [Crash Recovery](https://moberghr.github.io/jobly/docs/operations/crash-recovery): Sliding invisibility timeout, keep-alive, stale job recovery
-- [Dashboard Auth](https://moberghr.github.io/jobly/docs/operations/dashboard-auth): IJoblyAuthorizationFilter, built-in login, cookie auth
+- [Getting Started](https://moberghr.github.io/warp/docs/getting-started): Installation, DbContext setup, service registration, first handler
+- [Messages](https://moberghr.github.io/warp/docs/patterns/messages): Pub/sub IMessage with multiple handlers, fan-out routing
+- [Jobs](https://moberghr.github.io/warp/docs/patterns/jobs): IJob with scheduling, retries, continuations, batches, named queues, mutex
+- [Requests](https://moberghr.github.io/warp/docs/patterns/requests): In-memory IRequest<TResponse> via IMediator.Send(), no persistence
+- [Patterns Overview](https://moberghr.github.io/warp/docs/patterns): Type hierarchy, unified pipeline behaviors
+- [Outbox Pattern](https://moberghr.github.io/warp/docs/features/outbox-pattern): Transactional outbox — jobs committed with business data
+- [Recurring Jobs](https://moberghr.github.io/warp/docs/features/recurring-jobs): Cron-based scheduling, deduplication, execution history
+- [Job Metadata](https://moberghr.github.io/warp/docs/features/metadata): Key-value metadata, publish pipeline behaviors, IJobContext
+- [Mutex](https://moberghr.github.io/warp/docs/features/mutex): ConcurrencyKey-based mutual exclusion for jobs
+- [Job Cancellation](https://moberghr.github.io/warp/docs/features/cancellation): Graceful CancellationMode, handler CancellationToken
+- [Pause / Resume](https://moberghr.github.io/warp/docs/features/pause): Pause servers and worker groups, resume processing
+- [Job Tracing](https://moberghr.github.io/warp/docs/features/tracing): TraceId and SpawnedByJobId for cross-job flow visibility
+- [Configuration](https://moberghr.github.io/warp/docs/operations/configuration): Worker, polling, retention, dispatcher mode, worker groups, schema, naming conventions
+- [Crash Recovery](https://moberghr.github.io/warp/docs/operations/crash-recovery): Sliding invisibility timeout, keep-alive, stale job recovery
+- [Dashboard Auth](https://moberghr.github.io/warp/docs/operations/dashboard-auth): IWarpAuthorizationFilter, built-in login, cookie auth
 
 ## Optional
 
-- [Full AI Reference](https://moberghr.github.io/jobly/llms-full.txt): Complete self-contained reference with all patterns, API, configuration, and examples
+- [Full AI Reference](https://moberghr.github.io/warp/llms-full.txt): Complete self-contained reference with all patterns, API, configuration, and examples

@@ -1,19 +1,19 @@
-# Jobly — Complete AI Reference
+# Warp — Complete AI Reference
 
 > Distributed job processing, message queue, and in-memory mediator library for .NET 10.
 
-Jobly provides three patterns — Messages (pub/sub), Jobs (orchestrated background work), and Requests (in-memory mediator) — through a unified pipeline. It uses the transactional outbox pattern: jobs are committed atomically with business data in the same DbContext. No separate message broker required.
+Warp provides three patterns — Messages (pub/sub), Jobs (orchestrated background work), and Requests (in-memory mediator) — through a unified pipeline. It uses the transactional outbox pattern: jobs are committed atomically with business data in the same DbContext. No separate message broker required.
 
-Ships as NuGet packages: Moberg.Jobly.Core, Moberg.Jobly.Worker, Moberg.Jobly.UI. Supports PostgreSQL and SQL Server.
+Ships as NuGet packages: Moberg.Warp.Core, Moberg.Warp.Worker, Moberg.Warp.UI. Supports PostgreSQL and SQL Server.
 
 ---
 
 ## Installation
 
 ```bash
-dotnet add package Moberg.Jobly.Core    # Publishing (required)
-dotnet add package Moberg.Jobly.Worker  # Worker service (if processing jobs)
-dotnet add package Moberg.Jobly.UI      # Dashboard (optional)
+dotnet add package Moberg.Warp.Core    # Publishing (required)
+dotnet add package Moberg.Warp.Worker  # Worker service (if processing jobs)
+dotnet add package Moberg.Warp.UI      # Dashboard (optional)
 ```
 
 ---
@@ -22,26 +22,26 @@ dotnet add package Moberg.Jobly.UI      # Dashboard (optional)
 
 ### 1. Register DbContext
 
-Register your DbContext normally. Jobly hooks into it automatically:
+Register your DbContext normally. Warp hooks into it automatically:
 
 ```csharp
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 ```
 
-### 2. Register Jobly
+### 2. Register Warp
 
 For publisher-only apps (create jobs but don't process them):
 
 ```csharp
-builder.Services.AddJobly<AppDbContext>();
+builder.Services.AddWarp<AppDbContext>();
 builder.Services.AddJobHandlers(typeof(Program).Assembly);
 ```
 
 For worker apps (create AND process jobs):
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+builder.Services.AddWarpWorker<AppDbContext>(options =>
 {
     options.WorkerCount = 10;
     options.Queues = ["default"];
@@ -50,21 +50,21 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 builder.Services.AddJobHandlers(typeof(Program).Assembly);
 ```
 
-`AddJoblyWorker` includes `AddJobly` internally — don't call both.
+`AddWarpWorker` includes `AddWarp` internally — don't call both.
 
 ### 3. Create Database Schema
 
-Jobly entities are added to your DbContext model automatically. Use standard EF Core migrations:
+Warp entities are added to your DbContext model automatically. Use standard EF Core migrations:
 
 ```bash
-dotnet ef migrations add AddJobly
+dotnet ef migrations add AddWarp
 dotnet ef database update
 ```
 
-When upgrading the Jobly NuGet package:
+When upgrading the Warp NuGet package:
 
 ```bash
-dotnet ef migrations add UpgradeJobly
+dotnet ef migrations add UpgradeWarp
 dotnet ef database update
 ```
 
@@ -77,7 +77,7 @@ await context.Database.EnsureCreatedAsync();
 ### 4. Add Dashboard (Optional)
 
 ```csharp
-app.UseJoblyUI(); // Serves at /jobly
+app.UseWarpUI(); // Serves at /warp
 ```
 
 ### 5. Complete Minimal Example
@@ -88,7 +88,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+builder.Services.AddWarpWorker<AppDbContext>(options =>
 {
     options.WorkerCount = 5;
     options.Queues = ["default"];
@@ -98,7 +98,7 @@ builder.Services.AddJobHandlers(typeof(Program).Assembly);
 
 var app = builder.Build();
 
-app.UseJoblyUI();
+app.UseWarpUI();
 app.Run();
 ```
 
@@ -228,7 +228,7 @@ public class GenerateReportHandler : IJobHandler<GenerateReport> { ... }
 Or configure global defaults:
 
 ```csharp
-services.AddJoblyRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; o.JitterFactor = 0.2; });
+services.AddWarpRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; o.JitterFactor = 0.2; });
 ```
 
 Priority: per-enqueue metadata > handler attribute > job attribute > global RetryOptions. Failed jobs are retried automatically. Crash requeues do NOT count against the retry limit.
@@ -299,7 +299,7 @@ If a worker picks up a job whose mutex is already held by another processing job
 
 ### NoRestart (stale-recovery opt-out)
 
-Opt-in addon: `services.AddJoblyNoRestart()`. Lets specific job types stay `Failed` on worker crash instead of being auto-requeued by `StaleJobRecovery`.
+Opt-in addon: `services.AddWarpNoRestart()`. Lets specific job types stay `Failed` on worker crash instead of being auto-requeued by `StaleJobRecovery`.
 
 ```csharp
 [NoRestart]
@@ -310,10 +310,10 @@ Override chain (first non-null wins): per-publish `.WithRestart(bool)` > `[NoRes
 
 ### Circuit Breaker
 
-Opt-in addon: `services.AddJoblyCircuitBreaker<TContext>()`. Adds a `CircuitBreakerState` entity (migration required). Opens after `Threshold` consecutive failures, stays open for `Duration`, then transitions to **HalfOpen** where an atomic CAS guarantees exactly one worker probes while others reschedule.
+Opt-in addon: `services.AddWarpCircuitBreaker<TContext>()`. Adds a `CircuitBreakerState` entity (migration required). Opens after `Threshold` consecutive failures, stays open for `Duration`, then transitions to **HalfOpen** where an atomic CAS guarantees exactly one worker probes while others reschedule.
 
 ```csharp
-services.AddJoblyCircuitBreaker<AppDbContext>(o =>
+services.AddWarpCircuitBreaker<AppDbContext>(o =>
 {
     o.Threshold = 5;
     o.Duration = TimeSpan.FromMinutes(1);
@@ -553,7 +553,7 @@ Before creating a new job, the scheduler checks if the most recent execution is 
 
 ## Job Cancellation
 
-Jobly uses graceful cancellation. When you cancel a processing job, the handler gets a chance to stop cleanly.
+Warp uses graceful cancellation. When you cancel a processing job, the handler gets a chance to stop cleanly.
 
 ### Cancel a job
 
@@ -588,7 +588,7 @@ public class LongRunningHandler : IJobHandler<LongRunningJob>
 
 ## Crash Recovery
 
-Jobly uses a sliding invisibility timeout to detect and recover from worker crashes.
+Warp uses a sliding invisibility timeout to detect and recover from worker crashes.
 
 1. When a worker picks up a job, it sets `LastKeepAlive = now`
 2. During execution, keep-alive is refreshed every `InvisibilityTimeout / 5` (default: every 60s with a 5-minute timeout)
@@ -728,21 +728,21 @@ The `RunJobMonitor` task runs alongside each handler execution, periodically dra
 
 ## Configuration Reference
 
-### Core Configuration (AddJobly)
+### Core Configuration (AddWarp)
 
 ```csharp
-builder.Services.AddJobly<AppDbContext>(options =>
+builder.Services.AddWarp<AppDbContext>(options =>
 {
-    options.Schema = "jobly";                                  // Database schema (default: "jobly", null for default)
+    options.Schema = "warp";                                  // Database schema (default: "warp", null for default)
     options.DefaultQueue = "default";                          // Default queue name (default: "default")
     options.JobExpirationTimeout = TimeSpan.FromDays(1);       // Completed/deleted job retention (default: 1 day)
 });
 ```
 
-### Worker Configuration (AddJoblyWorker)
+### Worker Configuration (AddWarpWorker)
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+builder.Services.AddWarpWorker<AppDbContext>(options =>
 {
     // Worker
     options.WorkerCount = 10;                                  // Concurrent workers (default: min(CPU*5, 20))
@@ -787,7 +787,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     options.StaleJobRecoveryInterval = TimeSpan.FromSeconds(30);
     options.ExpirationCleanupInterval = TimeSpan.FromSeconds(60);
 
-    // Inherited from JoblyConfiguration
+    // Inherited from WarpConfiguration
     options.DefaultQueue = "default";
 });
 ```
@@ -797,7 +797,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 Split workers into groups with independent queues and polling intervals:
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+builder.Services.AddWarpWorker<AppDbContext>(options =>
 {
     // Top-level settings become the first worker group
     options.WorkerCount = 5;
@@ -822,7 +822,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
 ### Dashboard Configuration
 
 ```csharp
-app.UseJoblyUI(options =>
+app.UseWarpUI(options =>
 {
     options.Authorization = new MyAuthFilter();
     options.UnauthorizedRedirectUrl = "/login";   // optional redirect for browsers
@@ -840,7 +840,7 @@ By default, the dashboard is open. Two approaches to restrict access:
 Use your existing authentication:
 
 ```csharp
-public class MyAuthFilter : IJoblyAuthorizationFilter
+public class MyAuthFilter : IWarpAuthorizationFilter
 {
     public bool Authorize(HttpContext httpContext)
     {
@@ -849,31 +849,31 @@ public class MyAuthFilter : IJoblyAuthorizationFilter
     }
 }
 
-app.UseJoblyUI(options =>
+app.UseWarpUI(options =>
 {
     options.Authorization = new MyAuthFilter();
     options.UnauthorizedRedirectUrl = "/login";
 });
 ```
 
-`UseJoblyUI()` must come AFTER `UseAuthentication()` and `UseAuthorization()` in the pipeline.
+`UseWarpUI()` must come AFTER `UseAuthentication()` and `UseAuthorization()` in the pipeline.
 
 ### Built-in login
 
-Jobly serves its own login page and manages session via HTTP-only signed cookie:
+Warp serves its own login page and manages session via HTTP-only signed cookie:
 
 ```csharp
 builder.Services.AddDataProtection();
-builder.Services.AddScoped<IJoblyCredentialValidator, MyCredentialValidator>();
+builder.Services.AddScoped<IWarpCredentialValidator, MyCredentialValidator>();
 
-app.UseJoblyUI(options =>
+app.UseWarpUI(options =>
 {
     options.UseBuiltInLogin<MyCredentialValidator>();
 });
 ```
 
 ```csharp
-public class MyCredentialValidator : IJoblyCredentialValidator
+public class MyCredentialValidator : IWarpCredentialValidator
 {
     private readonly AppDbContext _db;
 
@@ -907,7 +907,7 @@ options.Authorization = new LocalRequestsOnlyAuthorizationFilter();
 
 ## DI Services Available
 
-After calling `AddJobly<TContext>()` or `AddJoblyWorker<TContext>()`, these services are available via dependency injection:
+After calling `AddWarp<TContext>()` or `AddWarpWorker<TContext>()`, these services are available via dependency injection:
 
 | Service | Purpose |
 |---------|---------|
@@ -1049,19 +1049,19 @@ public interface IRecurringJobPublisher
 }
 ```
 
-### IJoblyAuthorizationFilter
+### IWarpAuthorizationFilter
 
 ```csharp
-public interface IJoblyAuthorizationFilter
+public interface IWarpAuthorizationFilter
 {
     bool Authorize(HttpContext httpContext);
 }
 ```
 
-### IJoblyCredentialValidator
+### IWarpCredentialValidator
 
 ```csharp
-public interface IJoblyCredentialValidator
+public interface IWarpCredentialValidator
 {
     Task<bool> ValidateAsync(string username, string password);
 }
@@ -1094,20 +1094,20 @@ public enum CancellationMode { None = 0, Graceful = 1 }
 
 ```csharp
 // Core registration
-IServiceCollection.AddJobly<TContext>();
-IServiceCollection.AddJobly<TContext>(Action<JoblyConfiguration> options);
+IServiceCollection.AddWarp<TContext>();
+IServiceCollection.AddWarp<TContext>(Action<WarpConfiguration> options);
 
-// Worker registration (includes AddJobly internally)
-IServiceCollection.AddJoblyWorker<TContext>();
-IServiceCollection.AddJoblyWorker<TContext>(Action<JoblyWorkerConfiguration> options);
+// Worker registration (includes AddWarp internally)
+IServiceCollection.AddWarpWorker<TContext>();
+IServiceCollection.AddWarpWorker<TContext>(Action<WarpWorkerConfiguration> options);
 
 // Handler scanning
 IServiceCollection.AddJobHandlers(Assembly assembly);        // IJobHandler<>, IMessageHandler<>, IRequestHandler<,>
 IServiceCollection.AddPipelineBehaviors(Assembly assembly);  // IPipelineBehavior<,>
 
 // Dashboard
-WebApplication.UseJoblyUI();
-WebApplication.UseJoblyUI(Action<JoblyUIOptions> setupAction);
+WebApplication.UseWarpUI();
+WebApplication.UseWarpUI(Action<WarpUIOptions> setupAction);
 ```
 
 ---
@@ -1205,7 +1205,7 @@ Publisher app (web API):
 ```csharp
 // Only creates jobs, doesn't process them
 builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connStr));
-builder.Services.AddJobly<AppDbContext>();
+builder.Services.AddWarp<AppDbContext>();
 builder.Services.AddJobHandlers(typeof(Program).Assembly);
 ```
 
@@ -1214,7 +1214,7 @@ Worker app (background service):
 ```csharp
 // Only processes jobs
 builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connStr));
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+builder.Services.AddWarpWorker<AppDbContext>(options =>
 {
     options.WorkerCount = 20;
     options.Queues = ["default"];
@@ -1232,11 +1232,11 @@ Both apps share the same database. The worker polls for and executes jobs create
 2. **Call SaveChangesAsync()** after publishing — jobs are not committed until you save
 3. **Failed jobs never auto-delete** — they persist until manually handled
 4. **Queue order is alphabetical** — use prefixes like "a-", "b-", "c-" for priority
-5. **AddJoblyWorker includes AddJobly** — don't call both
-6. **UseJoblyUI after auth middleware** — so HttpContext.User is populated
-7. **TimeProvider is injectable** — use it for testability, Jobly registers TimeProvider.System by default
+5. **AddWarpWorker includes AddWarp** — don't call both
+6. **UseWarpUI after auth middleware** — so HttpContext.User is populated
+7. **TimeProvider is injectable** — use it for testability, Warp registers TimeProvider.System by default
 8. **Handler ILogger output is captured** — logs are flushed every ~1s and appear in the dashboard in real time
 9. **Job metadata is inherited** — child jobs automatically inherit parent metadata via ambient context
 10. **Pause is propagated via heartbeat** — there may be a ~3s delay between pause command and workers stopping
-11. **Jobly tables use the `jobly` schema by default** — configurable via `JoblyConfiguration.Schema`, set to `null` for default schema
+11. **Warp tables use the `warp` schema by default** — configurable via `WarpConfiguration.Schema`, set to `null` for default schema
 12. **Naming conventions are respected** — entity configs don't hardcode table/column names, so `UseSnakeCaseNamingConvention()` works
