@@ -6,7 +6,9 @@ sidebar_position: 6
 
 ## 0.10.0
 
-*2026-04-23*
+*2026-04-27*
+
+The library has been **renamed from Jobly to Warp**. NuGet package IDs change from `Moberg.Jobly.*` to `Moberg.Warp.*`, public types/namespaces from `Jobly.*` to `Warp.*`, default schema from `"jobly"` to `"warp"`, and the dashboard URL from `/jobly` to `/warp`. The old `Moberg.Jobly.*` packages will be deprecated on nuget.org with pointers to the new IDs.
 
 ### New Features
 
@@ -30,10 +32,30 @@ sidebar_position: 6
 - **`IMessageHandler<T>` multi-handler fix** — The generator's per-message-type handler map was a `Dictionary` that silently overwrote earlier handlers when a message had multiple subscribers. Now it collects them all so pub/sub with N handlers registers N `AddTransient` entries and produces N child jobs — the behavior the reflection path already had, now available to the source-generated path.
 - **Scoped behavior scan** — The generator's behavior scan is restricted to the *current* compilation (was walking referenced assemblies via `GetAllTypes`). Core's opt-in addon behaviors (`MutexPipelineBehavior<,>`, `RetryPipelineBehavior<,>`, `CircuitBreakerPipelineBehavior<,>`, `NoRestartPublishBehavior<>`) are still registered only by the explicit `AddMutex` / `AddRetry` / `AddCircuitBreaker` / `AddNoRestart` calls. Core's own compilation short-circuits generation entirely.
 
+### Bug Fixes
+
+- **SQL Server push setup stall is now cancellable** — `SqlServerNotificationTransport.PublishAsync` and `ListenAsync` now await the cached `_setup.Value` via `Task.WaitAsync(ct)` instead of a raw `await`. A stalled broker setup (e.g., schema lock contention on a busy SQL Server) no longer blocks every caller indefinitely — each caller's `CancellationToken` bails out of the wait without invalidating the cached setup task. The next caller with a live token re-awaits and proceeds. This closes the class of intermittent `"Test execution timed out after 30000 milliseconds"` failures in `SqlServerDatabasePushIntegrationTests` under heavy CI contention.
+- **Race in `ServerTaskLoop.Signal` fixed** — `Signal()` had a check-then-act TOCTOU on its `SemaphoreSlim(0, 1)`: two threads could both pass `CurrentCount == 0` and both call `Release()`, second throwing `SemaphoreFullException`. Surfaced under dispatcher-mode contention (many workers calling `SignalJobFinalized` concurrently as batches flush) as `"Adding the specified count to the semaphore would cause it to exceed its maximum count"` and cascading downstream failures in the affected task loop. Fixed with a lock around the check-and-release — same pattern `WarpDispatcher.SignalAll` already used. Regression test runs 32 threads × 500 calls concurrently and asserts no exception.
+
+### Test Suite Improvements
+
+- **`TimedFact` default 30s → 10s** — Individual tests should finish in seconds; the 30s default was a band-aid for overly generous inner waits and could hide real hangs. Tests exercising deliberately slow behaviour (retry chains, multi-job integration workloads, two-server orchestration) opt in explicitly with `[TimedFact(N_000)]`. Twenty-three inner-wait timeouts (retry / cancellation / batch / continuation tests) were tightened from 15–30s to 5–10s to match actual runtime, with comfortable headroom for CI jitter.
+- **Durability tests for "no job left unprocessed"** — Added three integration tests covering the core recovery guarantees that had no prior coverage:
+  - `DispatcherShutdownIntegrationTests.GivenWorkInProgress_WhenServerReplaced_ThenAllJobsEventuallyComplete` — pod-rolling-restart scenario. Server A is disposed mid-flight, server B takes over the same queue; every enqueued job must reach `Completed` via whichever recovery path fires (`UnclaimUndelivered`, channel drain, or `StaleJobRecovery`).
+  - `PushFailurePollingBackstopTests.GivenPushEnabledButTransportBroken_WhenJobEnqueued_ThenPollingStillPicksItUp` — proves that when the notification transport is completely broken (both `PublishAsync` and `ListenAsync` throw), polling still delivers the job within a small multiple of `PollingInterval`. Protects the "polling is the correctness backstop for push" invariant.
+  - `ListenerReconnectDrainTests.GivenListenerAlwaysFails_WhenJobEnqueued_ThenReconnectDrainStillDelivers` — proves that `NotificationListenerTask.DrainSignals` fires on every reconnect iteration, waking the dispatcher even while the listener connection is permanently down. Jobs enqueued during the listener's offline window are not stranded.
+- **`WorkerHostMode` lifecycle smoke tests deflaked** — two `*_CompletesLifecycleWithoutThrowing` tests were occasionally hitting the `TimedFact` budget on SQL Server CI under shared-container contention. Pre-cancel the token passed to `StartAsync` / `StopAsync` so each `BackgroundService.ExecuteAsync` short-circuits on its first `stoppingToken` check — DI wiring + constructors are still exercised, just without the polling loop. Local SQL Server: 360ms → 16ms.
+- **SQL Server integration test deflakes** — two test-setup artifacts that surfaced as ~25–50% flake rates on shared SQL Server CI runners. (1) Per-test-server SqlConnection pool isolation: each `WarpTestServer` now gets a unique `Application Name` (which Microsoft.Data.SqlClient includes in the pool key) so a disposed server's cancel-poisoned connections never reach the replacement server's pool — this mirrors production pod-restart, where new process = new pool. Skipped on Npgsql to avoid blowing past `max_connections=100`. (2) The auto `CounterAggregator` 5s sweep was racing test assertions that read `Counter` rows directly; `CounterAggregationInterval` is now `null` in test defaults — every test that needs aggregation already triggers it explicitly via `TestTasks.CreateCounterAggregator`.
+- **Full suite runtime** — now **~1m 30s** for 1,024 tests (was ~2m 40s for 947 in 0.8.0), down primarily from the inner-wait tightenings and the shorter `TimedFact` default.
+
 ### Migration
 
-Breaking release because the reflection-based registration helpers are gone.
+Breaking release because of both the rename and the removal of reflection-based registration helpers.
 
+- **Switch to `Moberg.Warp.*` packages** — `Moberg.Jobly.Core` → `Moberg.Warp.Core`, `Moberg.Jobly.UI` → `Moberg.Warp.UI`, `Moberg.Jobly.Worker` → `Moberg.Warp.Worker`, `Moberg.Jobly.Provider.PostgreSql` → `Moberg.Warp.Provider.PostgreSql`, `Moberg.Jobly.Provider.SqlServer` → `Moberg.Warp.Provider.SqlServer`. The old IDs are deprecated on nuget.org but remain restorable.
+- **Update namespaces, types, and method calls** — `Jobly.*` → `Warp.*` across all `using` directives and types. `AddJobly` → `AddWarp`, `IJoblyLockProvider` → `IWarpLockProvider`, `IJoblyCredentialValidator` → `IWarpCredentialValidator`, etc. A solution-wide find/replace of `Jobly` → `Warp` (case-sensitive) plus `jobly` → `warp` (lowercase, for env vars / strings) covers it.
+- **Database schema** — default schema is now `"warp"` instead of `"jobly"`. Existing deployments must either rename the schema (`ALTER SCHEMA jobly RENAME TO warp;` on PostgreSQL; equivalent on SQL Server) or set `options.Schema = "jobly"` explicitly to keep the old name.
+- **Dashboard URL** — `/jobly` → `/warp`. Update any reverse proxy / ingress rules and bookmarked links.
 - **Drop the reflection calls** — if your `Program.cs` or test setup calls any of these, delete them:
   ```csharp
   services.AddHandlers(assembly);
@@ -49,26 +71,6 @@ Breaking release because the reflection-based registration helpers are gone.
                     OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   ```
   In practice most consumers already pick this up transitively from `Moberg.Warp.Core`.
-
----
-
-## 0.9.2
-
-*2026-04-22*
-
-### Bug Fixes
-
-- **SQL Server push setup stall is now cancellable** — `SqlServerNotificationTransport.PublishAsync` and `ListenAsync` now await the cached `_setup.Value` via `Task.WaitAsync(ct)` instead of a raw `await`. A stalled broker setup (e.g., schema lock contention on a busy SQL Server) no longer blocks every caller indefinitely — each caller's `CancellationToken` bails out of the wait without invalidating the cached setup task. The next caller with a live token re-awaits and proceeds. This closes the class of intermittent `"Test execution timed out after 30000 milliseconds"` failures in `SqlServerDatabasePushIntegrationTests` under heavy CI contention.
-- **Race in `ServerTaskLoop.Signal` fixed** — `Signal()` had a check-then-act TOCTOU on its `SemaphoreSlim(0, 1)`: two threads could both pass `CurrentCount == 0` and both call `Release()`, second throwing `SemaphoreFullException`. Surfaced under dispatcher-mode contention (many workers calling `SignalJobFinalized` concurrently as batches flush) as `"Adding the specified count to the semaphore would cause it to exceed its maximum count"` and cascading downstream failures in the affected task loop. Fixed with a lock around the check-and-release — same pattern `WarpDispatcher.SignalAll` already used. Regression test runs 32 threads × 500 calls concurrently and asserts no exception.
-
-### Test Suite Improvements
-
-- **`TimedFact` default 30s → 10s** — Individual tests should finish in seconds; the 30s default was a band-aid for overly generous inner waits and could hide real hangs. Tests exercising deliberately slow behaviour (retry chains, multi-job integration workloads, two-server orchestration) opt in explicitly with `[TimedFact(N_000)]`. Twenty-three inner-wait timeouts (retry / cancellation / batch / continuation tests) were tightened from 15–30s to 5–10s to match actual runtime, with comfortable headroom for CI jitter.
-- **Durability tests for "no job left unprocessed"** — Added three integration tests covering the core recovery guarantees that had no prior coverage:
-  - `DispatcherShutdownIntegrationTests.GivenWorkInProgress_WhenServerReplaced_ThenAllJobsEventuallyComplete` — pod-rolling-restart scenario. Server A is disposed mid-flight, server B takes over the same queue; every enqueued job must reach `Completed` via whichever recovery path fires (`UnclaimUndelivered`, channel drain, or `StaleJobRecovery`).
-  - `PushFailurePollingBackstopTests.GivenPushEnabledButTransportBroken_WhenJobEnqueued_ThenPollingStillPicksItUp` — proves that when the notification transport is completely broken (both `PublishAsync` and `ListenAsync` throw), polling still delivers the job within a small multiple of `PollingInterval`. Protects the "polling is the correctness backstop for push" invariant.
-  - `ListenerReconnectDrainTests.GivenListenerAlwaysFails_WhenJobEnqueued_ThenReconnectDrainStillDelivers` — proves that `NotificationListenerTask.DrainSignals` fires on every reconnect iteration, waking the dispatcher even while the listener connection is permanently down. Jobs enqueued during the listener's offline window are not stranded.
-- **Full suite runtime** — now **~1m 30s** for 1,024 tests (was ~2m 40s for 947 in 0.8.0), down primarily from the inner-wait tightenings and the shorter `TimedFact` default.
 
 ---
 
