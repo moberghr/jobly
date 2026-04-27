@@ -39,7 +39,11 @@ public abstract class DispatcherShutdownIntegrationTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [TimedFact(30_000)]
+    // 60s budget: locally ~20s, but two server bring-ups + Service Broker setup on shared
+    // SQL Server CI runners regularly push past 30s. WaitForCompletion below caps the actual
+    // job-completion wait at 20s, so this only widens the outer test envelope, not the
+    // assertion window.
+    [TimedFact(60_000)]
     public async Task GivenWorkInProgress_WhenServerReplaced_ThenAllJobsEventuallyComplete()
     {
         // Server A takes work, gets disposed mid-flight. Server B starts on the same queue.
