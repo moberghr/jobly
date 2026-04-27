@@ -107,9 +107,20 @@ public class WarpTestServer : IAsyncDisposable
         Action<IServiceCollection>? configureServices)
     {
         var tempCtx = fixture.CreateContext();
-        var connectionString = tempCtx.Database.GetConnectionString()!;
+        var baseConnectionString = tempCtx.Database.GetConnectionString()!;
         var isPostgres = tempCtx.Database.ProviderName?.Contains("Npgsql", StringComparison.Ordinal) == true;
         await tempCtx.DisposeAsync();
+
+        // For SQL Server only: give each test-server instance its own ADO.NET connection pool by
+        // appending a unique Application Name (which Microsoft.Data.SqlClient includes in the pool
+        // key). This mirrors production pod-restart (new process = new pool) so that one disposed
+        // server's cancelled-mid-flight SqlConnections — left in 'attention-sent' state — don't
+        // poison the pool that a replacement server then borrows from. Npgsql doesn't have the
+        // same session-on-cancel pathology, and per-server pools blow past PostgreSQL's
+        // max_connections under parallel test load, so we skip it there.
+        var connectionString = isPostgres
+            ? baseConnectionString
+            : $"{baseConnectionString};Application Name=warp-test-{Guid.NewGuid():N}";
 
         var host = Host.CreateDefaultBuilder()
             .ConfigureLogging(logging =>
@@ -178,6 +189,12 @@ public class WarpTestServer : IAsyncDisposable
                     // sweep tight so retry loops don't stall waiting for the 5s default.
                     config.ScheduledActivationInterval = TimeSpan.FromMilliseconds(250);
                     config.UseDispatcher = false;
+
+                    // Turn off the auto Counter→Statistic aggregator. No test relies on it
+                    // firing automatically — tests that need aggregation invoke
+                    // TestTasks.CreateCounterAggregator(...).AggregateCountersAsync(...) directly.
+                    // Leaving it on creates a 5s race against any test that reads Counter rows.
+                    config.CounterAggregationInterval = null;
 
                     configure?.Invoke(config);
 
