@@ -112,15 +112,8 @@ internal static class JobDispatcher
 
         // Build pipeline with typed delegate
         var typedMessage = (TRequest)message;
-        RequestHandlerDelegate<TRequest, Unit> innermost = async (req, ct) =>
-        {
-            await ((Task)handleMethod.Invoke(handler, [req, ct])!);
-
-            return Unit.Value;
-        };
-
         var behaviors = provider.GetServices<IPipelineBehavior<TRequest, Unit>>().ToArray();
-        var chain = innermost;
+        RequestHandlerDelegate<TRequest, Unit> chain = Innermost;
         for (var i = behaviors.Length - 1; i >= 0; i--)
         {
             var b = behaviors[i];
@@ -129,6 +122,13 @@ internal static class JobDispatcher
         }
 
         await chain(typedMessage, cancellationToken);
+
+        async Task<Unit> Innermost(TRequest req, CancellationToken ct)
+        {
+            await ((Task)handleMethod.Invoke(handler, [req, ct])!);
+
+            return Unit.Value;
+        }
     }
 
     /// <summary>

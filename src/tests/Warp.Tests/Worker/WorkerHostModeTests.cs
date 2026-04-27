@@ -4,13 +4,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Shouldly;
 using Warp.Core.Data.Entities;
-using Warp.Core.Data.Queries;
-using Warp.Core.Entities;
 using Warp.Core.Notifications;
 using Warp.Tests.Fixtures;
 using Warp.Tests.Helpers;
 using Warp.Worker;
-using Warp.Worker.Services;
 
 namespace Warp.Tests.Worker;
 
@@ -50,18 +47,22 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
         await AssertNoServerSideEffectsAsync();
     }
 
-    [TimedFact(60_000)] // real DB Start/Stop roundtrip + 3 assertion queries; CI contention on SS can push this past 30s.
+    [TimedFact]
     public async Task DispatcherHost_UseDispatcherTrue_CompletesLifecycleWithoutThrowing()
     {
         // Arrange
         var state = PopulateState(groupEntityId: Guid.NewGuid(), workerCount: 1);
         var host = CreateDispatcherHost(useDispatcher: true, state);
 
-        // Act — the dispatcher and its workers actually start (scope factory points at the real
-        // test DB), poll briefly, then stop. The full job-processing loop is covered by integration
-        // tests; here we just pin the DI wiring + StartAsync/StopAsync round-trip.
-        await host.StartAsync(Xunit.TestContext.Current.CancellationToken);
-        await host.StopAsync(Xunit.TestContext.Current.CancellationToken);
+        // Act — pre-cancelled token short-circuits each BackgroundService.ExecuteAsync at
+        // its first stoppingToken check, so we exercise the dispatcher + worker constructors
+        // and the StartAsync/StopAsync round-trip without running the polling loop. The full
+        // processing path is covered by the integration tests; this test pins the
+        // mode-branching contract.
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        await host.StartAsync(cts.Token);
+        await host.StopAsync(cts.Token);
 
         // Assert — host consumes state, doesn't produce it; no Server/Worker/WorkerGroup rows.
         await AssertNoServerSideEffectsAsync();
@@ -82,16 +83,19 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
         await AssertNoServerSideEffectsAsync();
     }
 
-    [TimedFact(60_000)] // real DB Start/Stop roundtrip + 3 assertion queries; CI contention on SS can push this past 30s.
+    [TimedFact]
     public async Task SingleWorkerHost_UseDispatcherFalse_CompletesLifecycleWithoutThrowing()
     {
         // Arrange
         var state = PopulateState(groupEntityId: Guid.NewGuid(), workerCount: 1);
         var host = CreateSingleWorkerHost(useDispatcher: false, state);
 
-        // Act
-        await host.StartAsync(Xunit.TestContext.Current.CancellationToken);
-        await host.StopAsync(Xunit.TestContext.Current.CancellationToken);
+        // Act — pre-cancelled token short-circuits the worker's polling loop on entry.
+        // See DispatcherHost_UseDispatcherTrue for the full rationale.
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        await host.StartAsync(cts.Token);
+        await host.StopAsync(cts.Token);
 
         // Assert
         await AssertNoServerSideEffectsAsync();
@@ -168,42 +172,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
     {
         var services = new ServiceCollection();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
-
-        // Lifecycle smoke test — the dispatcher and single-worker both poll in their
-        // ExecuteAsync loops. Using real hand-SQL queries means each poll fires an
-        // UPDATE ... OUTPUT INSERTED.* against SQL Server, and cancelling that in-flight
-        // command on shutdown forces a round-trip for the server to acknowledge the abort
-        // (Error 3980). On a loaded CI container that can take seconds, pushing the test
-        // past its 30s TimedFact budget. A no-op fake returns empty instantly, so shutdown
-        // only has to unwind WaitAsync / Task.Delay — millisecond timescale.
-        services.AddSingleton<IWarpSqlQueries<TestContext>>(new NoopSqlQueries());
         return services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
-    }
-
-    /// <summary>
-    /// No-op implementation used only by the lifecycle smoke tests in this file. Any method
-    /// called by a code path actually under test throws — the fetch-methods return empty so
-    /// the polling loops observe "no work" without ever hitting the database.
-    /// </summary>
-    private sealed class NoopSqlQueries : IWarpSqlQueries<TestContext>
-    {
-        public Task<List<Job>> ClaimEnqueuedJobsAsync(TestContext context, string[] queues, Guid workerId, DateTime now, int limit, CancellationToken ct) =>
-            Task.FromResult(new List<Job>());
-
-        public Task<Job?> LockNextEnqueuedMessageAsync(TestContext context, CancellationToken ct) =>
-            Task.FromResult<Job?>(null);
-
-        public Task<List<Job>> LockStaleProcessingJobsAsync(TestContext context, DateTime cutoff, CancellationToken ct) =>
-            Task.FromResult(new List<Job>());
-
-        public Task<Job?> LockJobByIdAsync(TestContext context, Guid jobId, CancellationToken ct) =>
-            throw new NotSupportedException();
-
-        public Task<Job?> LockJobByIdWaitAsync(TestContext context, Guid jobId, CancellationToken ct) =>
-            throw new NotSupportedException();
-
-        public Task<List<Server>> LockAllServersAsync(TestContext context, CancellationToken ct) =>
-            Task.FromResult(new List<Server>());
     }
 
     private static ServerRegistrationState PopulateState(Guid groupEntityId, int workerCount)
