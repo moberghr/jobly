@@ -43,11 +43,8 @@ public class RecurringJobPublisher<TContext> : IRecurringJobPublisher
     {
         ValidateCronExpression(cron);
 
-        var handle = await _lockProvider.TryAcquireAsync($"warp:recurring:{name}", RecurringJobPublisherConstants.LockTimeout, CancellationToken.None);
-        if (handle == null)
-        {
-            throw new TimeoutException($"Could not acquire lock for recurring job '{name}' within {RecurringJobPublisherConstants.LockTimeout.TotalSeconds}s.");
-        }
+        var handle = await _lockProvider.TryAcquireAsync($"warp:recurring:{name}", RecurringJobPublisherConstants.LockTimeout, CancellationToken.None)
+            ?? throw new TimeoutException($"Could not acquire lock for recurring job '{name}' within {RecurringJobPublisherConstants.LockTimeout.TotalSeconds}s.");
 
         await using (handle)
         {
