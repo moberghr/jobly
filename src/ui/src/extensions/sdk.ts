@@ -1,5 +1,5 @@
 /**
- * Exposes shared dependencies on window.Jobly for extension JS modules.
+ * Exposes shared dependencies on window.Warp for extension JS modules.
  * Extensions access React, ReactDOM, UI components, and the API client
  * without bundling their own copies.
  */
@@ -12,11 +12,11 @@ import { Badge } from '@/components/ui/badge';
 
 declare global {
   interface Window {
-    Jobly?: JoblySDK;
+    Warp?: WarpSDK;
   }
 }
 
-export interface JoblySDK {
+export interface WarpSDK {
   React: typeof React;
   ReactDOM: typeof ReactDOM;
   api: typeof api;
@@ -33,7 +33,7 @@ export interface JoblySDK {
 }
 
 export function initSDK(): void {
-  window.Jobly = {
+  window.Warp = {
     React,
     ReactDOM,
     api,

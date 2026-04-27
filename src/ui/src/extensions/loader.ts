@@ -34,7 +34,7 @@ export async function loadExtensions(): Promise<ExtensionManifest[]> {
     }
 
     try {
-      // Prepend basePath since scriptUrl is relative to the Jobly route prefix.
+      // Prepend basePath since scriptUrl is relative to the Warp route prefix.
       // Use fetch + blob URL to load the module — this avoids Vite's transform
       // pipeline intercepting the dynamic import() during development.
       const url = config.basePath + manifest.scriptUrl;
@@ -46,7 +46,7 @@ export async function loadExtensions(): Promise<ExtensionManifest[]> {
       URL.revokeObjectURL(blobUrl);
       module.install(extensionAPI);
     } catch (err) {
-      console.error(`[Jobly] Failed to load extension "${manifest.name}":`, err);
+      console.error(`[Warp] Failed to load extension "${manifest.name}":`, err);
     }
   }
 

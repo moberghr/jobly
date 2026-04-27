@@ -36,7 +36,7 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Setup Node.js (for Jobly.UI npm build)
+      - name: Setup Node.js (for Warp.UI npm build)
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -49,16 +49,16 @@ jobs:
 
       - name: Restore
         working-directory: src
-        run: dotnet restore tests/Jobly.Tests/Jobly.Tests.csproj
+        run: dotnet restore tests/Warp.Tests/Warp.Tests.csproj
 
       - name: Build
         working-directory: src
-        run: dotnet build tests/Jobly.Tests/Jobly.Tests.csproj --no-restore --configuration Debug
+        run: dotnet build tests/Warp.Tests/Warp.Tests.csproj --no-restore --configuration Debug
 
       - name: Test (${{ matrix.database }})
         working-directory: src
         run: |
-          dotnet test --project tests/Jobly.Tests/Jobly.Tests.csproj --no-build --configuration Debug -- \
+          dotnet test --project tests/Warp.Tests/Warp.Tests.csproj --no-build --configuration Debug -- \
             ${{ matrix.filter }} \
             --report-trx --report-trx-filename test-results.trx \
             --results-directory "$GITHUB_WORKSPACE/test-results"

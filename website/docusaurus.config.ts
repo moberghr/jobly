@@ -3,7 +3,7 @@ import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
-  title: 'Jobly',
+  title: 'Warp',
   tagline: 'Distributed job processing and message queue for .NET',
   favicon: 'img/favicon.ico',
 
@@ -12,10 +12,10 @@ const config: Config = {
   },
 
   url: 'https://moberghr.github.io',
-  baseUrl: '/jobly/',
+  baseUrl: '/warp/',
 
   organizationName: 'moberghr',
-  projectName: 'jobly',
+  projectName: 'warp',
 
   onBrokenLinks: 'throw',
 
@@ -31,7 +31,7 @@ const config: Config = {
         rel: 'alternate',
         type: 'text/plain',
         title: 'LLM-friendly docs',
-        href: '/jobly/llms.txt',
+        href: '/warp/llms.txt',
       },
     },
     {
@@ -40,7 +40,7 @@ const config: Config = {
         rel: 'alternate',
         type: 'text/plain',
         title: 'LLM-friendly full reference',
-        href: '/jobly/llms-full.txt',
+        href: '/warp/llms-full.txt',
       },
     },
   ],
@@ -51,7 +51,7 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/moberghr/jobly/tree/main/website/',
+          editUrl: 'https://github.com/moberghr/warp/tree/main/website/',
         },
         blog: false,
         theme: {
@@ -68,7 +68,7 @@ const config: Config = {
       disableSwitch: false,
     },
     navbar: {
-      title: 'Jobly',
+      title: 'Warp',
       items: [
         {
           type: 'docSidebar',
@@ -77,7 +77,7 @@ const config: Config = {
           label: 'Docs',
         },
         {
-          href: 'https://github.com/moberghr/jobly',
+          href: 'https://github.com/moberghr/warp',
           label: 'GitHub',
           position: 'right',
         },
@@ -98,13 +98,13 @@ const config: Config = {
         {
           title: 'More',
           items: [
-            { label: 'GitHub', href: 'https://github.com/moberghr/jobly' },
-            { label: 'AI Docs (llms.txt)', href: 'pathname:///jobly/llms.txt' },
-            { label: 'AI Full Reference', href: 'pathname:///jobly/llms-full.txt' },
+            { label: 'GitHub', href: 'https://github.com/moberghr/warp' },
+            { label: 'AI Docs (llms.txt)', href: 'pathname:///warp/llms.txt' },
+            { label: 'AI Full Reference', href: 'pathname:///warp/llms-full.txt' },
           ],
         },
       ],
-      copyright: `Copyright ${new Date().getFullYear()} Jobly. Built with Docusaurus.`,
+      copyright: `Copyright ${new Date().getFullYear()} Warp. Built with Docusaurus.`,
     },
     prism: {
       theme: prismThemes.github,

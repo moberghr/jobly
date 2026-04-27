@@ -52,7 +52,7 @@ export const useDashboardStore = create<DashboardStore>((set) => {
             : state.realtimeData,
         }));
       } catch {
-        set({ loading: false, error: 'Unable to connect to Jobly API' });
+        set({ loading: false, error: 'Unable to connect to Warp API' });
         prevTotals = null;
       }
     },

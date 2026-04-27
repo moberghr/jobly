@@ -4,18 +4,18 @@ sidebar_position: 8
 
 # NoRestart (Stale-Recovery Opt-Out)
 
-When a worker crashes mid-job, Jobly's `StaleJobRecovery` normally requeues the job so another worker can pick it up. That's the right default for idempotent work — but some jobs must never run twice (charge a card, send an email, call a non-idempotent API). The NoRestart feature lets those jobs opt out: on worker crash they are marked `Failed` instead of requeued.
+When a worker crashes mid-job, Warp's `StaleJobRecovery` normally requeues the job so another worker can pick it up. That's the right default for idempotent work — but some jobs must never run twice (charge a card, send an email, call a non-idempotent API). The NoRestart feature lets those jobs opt out: on worker crash they are marked `Failed` instead of requeued.
 
 ## Setup
 
-NoRestart is an opt-in addon. Register it alongside `AddJobly` / `AddJoblyWorker`:
+NoRestart is an opt-in addon. Register it alongside `AddWarp` / `AddWarpWorker`:
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>();
-builder.Services.AddJoblyNoRestart();
+builder.Services.AddWarpWorker<AppDbContext>();
+builder.Services.AddWarpNoRestart();
 ```
 
-Without `AddJoblyNoRestart()`, the `[NoRestart]` / `[Restart]` attributes are silently ignored (the publish behavior isn't registered). `.WithRestart(bool)` still works — it writes metadata directly and doesn't need the addon.
+Without `AddWarpNoRestart()`, the `[NoRestart]` / `[Restart]` attributes are silently ignored (the publish behavior isn't registered). `.WithRestart(bool)` still works — it writes metadata directly and doesn't need the addon.
 
 ## Usage
 
@@ -61,10 +61,10 @@ await publisher.Enqueue(
 
 ### Global default
 
-Set `RestartStaleJobsByDefault` on `JoblyWorkerConfiguration` to flip the fleet-wide default:
+Set `RestartStaleJobsByDefault` on `WarpWorkerConfiguration` to flip the fleet-wide default:
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(config =>
+builder.Services.AddWarpWorker<AppDbContext>(config =>
 {
     config.RestartStaleJobsByDefault = false; // jobs fail on crash unless they opt in
 });
@@ -76,7 +76,7 @@ When `StaleJobRecovery` evaluates a stale job, it resolves `CanBeRestarted` in t
 
 1. Per-publish metadata set via `.WithRestart()`
 2. `[NoRestart]` / `[Restart]` attribute on the job class (written at publish time by `NoRestartPublishBehavior`)
-3. `RestartStaleJobsByDefault` on `JoblyWorkerConfiguration` (default `true`)
+3. `RestartStaleJobsByDefault` on `WarpWorkerConfiguration` (default `true`)
 
 ## How It Works
 

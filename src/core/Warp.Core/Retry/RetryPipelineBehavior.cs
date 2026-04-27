@@ -1,0 +1,93 @@
+using System.Collections.Concurrent;
+using System.Reflection;
+using Microsoft.Extensions.Options;
+using Warp.Core.Handlers;
+
+namespace Warp.Core.Retry;
+
+public class RetryPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>, IJob
+{
+    private static readonly ConcurrentDictionary<Type, RetryAttribute?> AttributeCache = new();
+
+    private readonly IJobContext _jobContext;
+    private readonly IOptions<RetryOptions> _options;
+    private readonly TimeProvider _timeProvider;
+
+    public RetryPipelineBehavior(IJobContext jobContext, IOptions<RetryOptions> options, TimeProvider timeProvider)
+    {
+        _jobContext = jobContext;
+        _options = options;
+        _timeProvider = timeProvider;
+    }
+
+    public async Task<TResponse> HandleAsync(TRequest request, RequestHandlerDelegate<TRequest, TResponse> next, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await next(request, cancellationToken);
+        }
+        catch (Exception)
+        {
+            var meta = _jobContext.GetMetadata<IRetryMetadata>();
+            var attr = GetRetryAttribute();
+            var maxRetries = meta.MaxRetries ?? attr?.MaxRetries ?? _options.Value.MaxRetries;
+            var retriedTimes = meta.RetriedTimes;
+
+            if (retriedTimes < maxRetries)
+            {
+                var delays = meta.RetryDelays ?? attr?.Delays ?? _options.Value.Delays;
+                var now = _timeProvider.GetUtcNow().UtcDateTime;
+                DateTime? scheduleTime = null;
+
+                if (delays.Length > 0)
+                {
+                    var idx = Math.Min(retriedTimes, delays.Length - 1);
+                    var baseDelaySeconds = (double)delays[idx];
+                    var jitterFactor = Math.Clamp(_options.Value.JitterFactor, 0.0, 1.0);
+
+                    if (jitterFactor > 0)
+                    {
+                        // Random.Shared.NextDouble() returns [0.0, 1.0) so r ∈ [-1.0, +1.0).
+                        // With jitterFactor ∈ [0, 1] (clamped above) and non-negative
+                        // baseDelaySeconds, the result stays in [0, 2 * baseDelaySeconds).
+                        var r = (Random.Shared.NextDouble() * 2.0) - 1.0;
+                        baseDelaySeconds *= 1.0 + (jitterFactor * r);
+                    }
+
+                    // Defensive floor: a user-supplied negative delay (or a pathological
+                    // RetryOptions constructed directly, bypassing Math.Clamp) would put
+                    // ScheduleTime in the past and run the retry immediately.
+                    baseDelaySeconds = Math.Max(0.0, baseDelaySeconds);
+                    scheduleTime = now + TimeSpan.FromSeconds(baseDelaySeconds);
+                }
+
+                meta.RetriedTimes = retriedTimes + 1;
+
+                _jobContext.Outcome = new JobOutcome
+                {
+                    State = JobOutcome.RescheduledState(scheduleTime ?? now, now),
+                    ScheduleTime = scheduleTime,
+                    ClearHandlerType = true,
+                };
+            }
+
+            throw;
+        }
+    }
+
+    private RetryAttribute? GetRetryAttribute()
+    {
+        var handlerType = _jobContext.HandlerType;
+        if (handlerType != null)
+        {
+            var handlerAttr = AttributeCache.GetOrAdd(handlerType, static t => t.GetCustomAttribute<RetryAttribute>());
+            if (handlerAttr != null)
+            {
+                return handlerAttr;
+            }
+        }
+
+        return AttributeCache.GetOrAdd(typeof(TRequest), static t => t.GetCustomAttribute<RetryAttribute>());
+    }
+}

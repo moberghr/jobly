@@ -17,7 +17,7 @@ export function ErrorState({ message }: { message?: string }) {
         <AlertTriangle className="h-10 w-10 text-destructive mx-auto mb-3" />
         <p className="text-lg font-medium">{message ?? 'Something went wrong'}</p>
         <p className="text-sm text-muted-foreground mt-1">
-          Make sure the Jobly backend is running and accessible.
+          Make sure the Warp backend is running and accessible.
         </p>
       </CardContent>
     </Card>

@@ -11,7 +11,7 @@ When running in dispatcher mode (`UseDispatcher = true`), each worker buffers jo
 Batched completions are automatic when dispatcher mode is enabled. Tune the batch size and flush interval if the defaults don't fit your workload:
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(config =>
+builder.Services.AddWarpWorker<AppDbContext>(config =>
 {
     config.UseDispatcher = true;
     config.CompletionBatchSize = 50;                         // default: 50
@@ -23,7 +23,7 @@ Opt out by setting `CompletionBatchSize = 1` — each completion flushes immedia
 
 ## How It Works
 
-Each `JoblyDispatcherWorker` owns its own in-memory batch. When a handler finishes:
+Each `WarpDispatcherWorker` owns its own in-memory batch. When a handler finishes:
 
 1. The worker builds a `PendingCompletion` containing the mutated `Job` row (with its new terminal state), the counters to insert, and any JobLog entries.
 2. The completion is added to the worker's batch. If the batch is full or the flush interval has elapsed, the batch commits immediately. Otherwise it waits for more completions.

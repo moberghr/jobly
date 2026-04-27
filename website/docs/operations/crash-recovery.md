@@ -4,7 +4,7 @@ sidebar_position: 2
 
 # Crash Recovery
 
-Jobly uses a **sliding invisibility timeout** to detect and recover from worker/server crashes.
+Warp uses a **sliding invisibility timeout** to detect and recover from worker/server crashes.
 
 ## How It Works
 
@@ -23,7 +23,7 @@ Jobly uses a **sliding invisibility timeout** to detect and recover from worker/
 ## Configuration
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+builder.Services.AddWarpWorker<AppDbContext>(options =>
 {
     // How long before a stale job is requeued (default: 5 minutes)
     options.InvisibilityTimeout = TimeSpan.FromMinutes(5);

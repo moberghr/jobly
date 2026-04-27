@@ -1,0 +1,51 @@
+using Microsoft.EntityFrameworkCore;
+using Shouldly;
+using Warp.Core.Data.Entities;
+using Warp.Core.Enums;
+using Warp.Core.Helper;
+using Warp.Core.Mutex;
+using Warp.Tests.Fixtures;
+using Warp.Tests.TestData.Handlers;
+
+namespace Warp.Tests.Features.Mutex;
+
+[GenerateDatabaseTests(FixtureKind.Integration)]
+public abstract class MutexIntegrationTestsBase : IntegrationTestBase
+{
+    protected MutexIntegrationTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
+    {
+    }
+
+    [TimedFact]
+    public async Task GivenTwoJobsWithSameMutex_WhenProcessed_ThenSecondIsCancelled()
+    {
+        var publisher = Server.CreatePublisher();
+
+        // Enqueue a slow job that holds the mutex
+        var job1Id = await publisher.Enqueue(new CancellableRequest(), new JobParameters().WithMutex("test-mutex"));
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        // Wait for it to start processing
+        await Server.WaitForJobState(job1Id, State.Processing);
+
+        // Enqueue a second job with the same mutex
+        var publisher2 = Server.CreatePublisher();
+        var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("test-mutex"));
+        await publisher2.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        await Server.WaitForJobState(job2Id, State.Deleted);
+
+        // Verify job2 was cancelled due to mutex
+        var logs = await Server.GetJobLogs(job2Id);
+        logs.ShouldContain(l => l.EventType == "Deleted" && l.Message.Contains("mutex"));
+
+        // Job1 should still be processing (it's the slow one)
+        var job1 = await Server.GetJob(job1Id);
+        job1.CurrentState.ShouldBe(State.Processing);
+
+        // Cancel the slow job so the test doesn't wait 30s
+        var cmd = Server.CreateCommandService();
+        await cmd.DeleteJob(job1Id);
+    }
+}

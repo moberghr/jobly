@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="../Warp.Core/Warp.Core.csproj" />
+  <Project Path="../Warp.Worker/Warp.Worker.csproj" />
+  <Project Path="../Warp.SourceGenerator/Warp.SourceGenerator.csproj" />
+  <Project Path="Warp.Tests.Mutation.csproj" />
+</Solution>

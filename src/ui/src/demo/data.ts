@@ -519,7 +519,7 @@ function makeWorkers(serverId: string, count: number, startSeed: number): import
 export const servers: ServerModel[] = [
   {
     id: IDS.server1,
-    serverName: 'jobly-prod-server-1',
+    serverName: 'warp-prod-server-1',
     startedTime: ago(7200),
     lastHeartbeatTime: ago(3),
     serviceCount: 10,
@@ -530,7 +530,7 @@ export const servers: ServerModel[] = [
   },
   {
     id: IDS.server2,
-    serverName: 'jobly-prod-server-2',
+    serverName: 'warp-prod-server-2',
     startedTime: ago(3600),
     lastHeartbeatTime: ago(5),
     serviceCount: 5,
@@ -568,7 +568,7 @@ export function getServerLogs(taskName?: string): ServerLogModel[] {
         taskName: task,
         status: isWarning ? 'Warning' : 'Completed',
         message: isWarning
-          ? 'Lock contention on jobly.jobs, retrying...'
+          ? 'Lock contention on warp.jobs, retrying...'
           : `${task} executed successfully`,
         timestamp: ago(i * 60 + tasks.indexOf(task) * 10),
         durationMs: Math.round(10 + seeded(logId) * 200),
@@ -611,7 +611,7 @@ export function getWorkerDetail(workerId: string): WorkerDetailModel {
     currentJobId: null,
     currentJobType: null,
     serverId: IDS.server1,
-    serverName: 'jobly-prod-server-1',
+    serverName: 'warp-prod-server-1',
     queues: 'default',
     pollingIntervalMs: 1000,
     serverPausedAt: null,
@@ -645,7 +645,7 @@ export function getWorkerLogs(): WorkerJobLogModel[] {
               'System.TimeoutException: The operation has timed out.',
               '   at Acme.Notifications.SmtpEmailClient.SendAsync(EmailMessage msg, CancellationToken ct)',
               '   at Acme.Notifications.SendEmailCommand.HandleAsync(SendEmailRequest request, CancellationToken ct)',
-              '   at Jobly.Worker.JoblyWorkerService.ExecuteJobAsync(Job job, CancellationToken ct)',
+              '   at Warp.Worker.WarpWorkerService.ExecuteJobAsync(Job job, CancellationToken ct)',
             ].join('\n')
           : null,
       durationMs: eventType === 'Completed' ? dur : null,

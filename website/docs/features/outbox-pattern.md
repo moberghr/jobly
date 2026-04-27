@@ -4,9 +4,9 @@ sidebar_position: 1
 
 # Outbox Pattern
 
-Jobly implements the **transactional outbox pattern** — jobs are created inside the same database transaction as your business data. This guarantees that if your `SaveChangesAsync()` succeeds, the jobs are committed too. If it fails, everything rolls back. No orphaned jobs, no lost work.
+Warp implements the **transactional outbox pattern** — jobs are created inside the same database transaction as your business data. This guarantees that if your `SaveChangesAsync()` succeeds, the jobs are committed too. If it fails, everything rolls back. No orphaned jobs, no lost work.
 
-This is a core design principle of Jobly, not an opt-in feature. Every call to `publisher.Enqueue()`, `publisher.Publish()`, or `batchPublisher.StartNew()` writes to the same DbContext your application code uses.
+This is a core design principle of Warp, not an opt-in feature. Every call to `publisher.Enqueue()`, `publisher.Publish()`, or `batchPublisher.StartNew()` writes to the same DbContext your application code uses.
 
 ## How It Works
 
@@ -44,11 +44,11 @@ Without the outbox pattern, distributed systems face two classic failure modes:
 
 2. **Job enqueued, business data lost** — The job is dispatched but the database transaction rolls back. The worker processes a job for an order that doesn't exist.
 
-Jobly eliminates both by using a single database transaction. There is no separate message broker — the database **is** the queue.
+Warp eliminates both by using a single database transaction. There is no separate message broker — the database **is** the queue.
 
 ## DbContext Must Be Scoped
 
-For the outbox pattern to work, the publisher and your application code must share the same `DbContext` instance. This is why Jobly requires your DbContext to be registered as **Scoped** (the EF Core default):
+For the outbox pattern to work, the publisher and your application code must share the same `DbContext` instance. This is why Warp requires your DbContext to be registered as **Scoped** (the EF Core default):
 
 ```csharp
 // Correct — Scoped (default)
@@ -94,11 +94,11 @@ Jobs are only visible to workers after the transaction commits. This prevents wo
 
 ## No Separate Message Broker
 
-Jobly uses the same database for business data and job storage. This means:
+Warp uses the same database for business data and job storage. This means:
 
 - **No infrastructure dependency** — no Redis, RabbitMQ, or Kafka needed
 - **Atomic guarantees** — impossible for jobs and data to get out of sync
 - **Simpler deployment** — one database connection string, one backup strategy
 - **ACID transactions** — full database transaction semantics
 
-The trade-off is throughput at extreme scale. For most applications, the database handles the queue load easily. Jobly is optimized for this with row-level locking and efficient polling.
+The trade-off is throughput at extreme scale. For most applications, the database handles the queue load easily. Warp is optimized for this with row-level locking and efficient polling.

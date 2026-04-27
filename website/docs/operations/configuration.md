@@ -4,14 +4,14 @@ sidebar_position: 1
 
 # Configuration
 
-## Core Configuration (`JoblyConfiguration`)
+## Core Configuration (`WarpConfiguration`)
 
-Used by the publisher side (`AddJobly<TContext>`):
+Used by the publisher side (`AddWarp<TContext>`):
 
 ```csharp
-builder.Services.AddJobly<AppDbContext>(options =>
+builder.Services.AddWarp<AppDbContext>(options =>
 {
-    options.Schema = "jobly";      // Database schema for all Jobly tables (default: "jobly", null for default schema)
+    options.Schema = "warp";      // Database schema for all Warp tables (default: "warp", null for default schema)
     options.DefaultQueue = "default"; // Queue name when none specified (default: "default")
     options.JobExpirationTimeout = TimeSpan.FromDays(1); // How long completed/deleted jobs kept (default: 1 day)
 });
@@ -19,13 +19,13 @@ builder.Services.AddJobly<AppDbContext>(options =>
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `Schema` | `string?` | `"jobly"` | Database schema for all Jobly tables. Set to `null` for the database's default schema. |
+| `Schema` | `string?` | `"warp"` | Database schema for all Warp tables. Set to `null` for the database's default schema. |
 | `DefaultQueue` | `string` | `"default"` | Queue used when no queue is specified at publish time |
 | `JobExpirationTimeout` | `TimeSpan` | `1 day` | How long completed/deleted jobs are kept before cleanup. Failed jobs never expire. |
 
 ### Naming Conventions
 
-Jobly's entity configurations do **not** hardcode table or column names. If you use a naming convention plugin (e.g., `UseSnakeCaseNamingConvention()`), it will transform Jobly's tables and columns just like your own entities:
+Warp's entity configurations do **not** hardcode table or column names. If you use a naming convention plugin (e.g., `UseSnakeCaseNamingConvention()`), it will transform Warp's tables and columns just like your own entities:
 
 ```csharp
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -33,14 +33,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
            .UseSnakeCaseNamingConvention());
 ```
 
-This produces tables like `jobly.job`, `jobly.job_log`, `jobly.server`, etc.
+This produces tables like `warp.job`, `warp.job_log`, `warp.server`, etc.
 
 ## Retry Configuration
 
-Configure retry behavior with `AddJoblyRetry()`:
+Configure retry behavior with `AddWarpRetry()`:
 
 ```csharp
-services.AddJoblyRetry(options =>
+services.AddWarpRetry(options =>
 {
     options.MaxRetries = 3;               // Default max retries (default: 0)
     options.Delays = [15, 60, 300];       // Retry delays in seconds (default: [15, 60, 300])
@@ -58,20 +58,20 @@ Per-job override via `[Retry]` attribute on handler or job class, or per-enqueue
 
 ## Mutex Configuration
 
-Enable mutex (concurrency control) with `AddJoblyMutex()`:
+Enable mutex (concurrency control) with `AddWarpMutex()`:
 
 ```csharp
-services.AddJoblyMutex();
+services.AddWarpMutex();
 ```
 
 No options — just register and use `.WithMutex("key")` or `[Mutex("key")]` at publish time. See [Mutex](/docs/features/mutex) for details.
 
 ## Circuit Breaker Configuration
 
-Enable the circuit breaker with `AddJoblyCircuitBreaker<TContext>()`:
+Enable the circuit breaker with `AddWarpCircuitBreaker<TContext>()`:
 
 ```csharp
-services.AddJoblyCircuitBreaker<AppDbContext>(options =>
+services.AddWarpCircuitBreaker<AppDbContext>(options =>
 {
     options.Threshold = 5;                         // default: 3
     options.Duration = TimeSpan.FromMinutes(1);    // default: 1 minute
@@ -89,22 +89,22 @@ Per-handler overrides on `[CircuitBreaker]` use `Group`, `Threshold`, `DurationS
 
 ## NoRestart Configuration
 
-Enable the stale-recovery opt-out with `AddJoblyNoRestart()`:
+Enable the stale-recovery opt-out with `AddWarpNoRestart()`:
 
 ```csharp
-services.AddJoblyNoRestart();
+services.AddWarpNoRestart();
 ```
 
 No options. Register it to make `[NoRestart]` / `[Restart]` attributes take effect at publish time. `.WithRestart(bool)` works without the addon. See [NoRestart](/docs/features/no-restart) for details.
 
-The fleet-wide default is controlled by `JoblyWorkerConfiguration.RestartStaleJobsByDefault` (default `true`). Flip to `false` to fail stale jobs on crash unless they explicitly opt in.
+The fleet-wide default is controlled by `WarpWorkerConfiguration.RestartStaleJobsByDefault` (default `true`). Flip to `false` to fail stale jobs on crash unless they explicitly opt in.
 
-## Worker Configuration (`JoblyWorkerConfiguration`)
+## Worker Configuration (`WarpWorkerConfiguration`)
 
-Extends `JoblyConfiguration`. Used by the worker side (`AddJoblyWorker<TContext>`):
+Extends `WarpConfiguration`. Used by the worker side (`AddWarpWorker<TContext>`):
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+builder.Services.AddWarpWorker<AppDbContext>(options =>
 {
     // Worker
     options.WorkerCount = 10;
@@ -141,7 +141,7 @@ builder.Services.AddJoblyWorker<AppDbContext>(options =>
     options.StaleJobRecoveryInterval = TimeSpan.FromSeconds(30);
     options.ExpirationCleanupInterval = TimeSpan.FromSeconds(60);
 
-    // Inherited from JoblyConfiguration
+    // Inherited from WarpConfiguration
     options.DefaultQueue = "default";
 });
 ```
@@ -203,7 +203,7 @@ Use dispatcher mode when you have many workers (20+) and want to reduce database
 By default, all workers share the same queues and polling interval. Use worker groups for fine-grained control:
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+builder.Services.AddWarpWorker<AppDbContext>(options =>
 {
     // Top-level settings become the first worker group
     options.WorkerCount = 5;
@@ -251,7 +251,7 @@ This creates 7 workers total: 5 polling `critical` every 100ms, and 2 polling `r
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `JobExpirationTimeout` | `TimeSpan` | `1 day` | How long completed/deleted jobs are kept before cleanup (inherited from `JoblyConfiguration`) |
+| `JobExpirationTimeout` | `TimeSpan` | `1 day` | How long completed/deleted jobs are kept before cleanup (inherited from `WarpConfiguration`) |
 | `ExpirationBatchSize` | `int` | `1000` | Batch size for cleanup operations |
 | `MaxExpirableJobCount` | `int?` | `null` | Max jobs with `ExpireAt` to retain. Oldest deleted first. `null` = disabled (no cap). |
 

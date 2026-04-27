@@ -10,7 +10,7 @@
 
 ### Solution
 
-**Retry as pipeline module:** `AddJoblyRetry()` registers `RetryPipelineBehavior` (catches failures, reads typed metadata, sets `FailureOutcome`) and `RetryPublishBehavior` (injects retry config at publish time). Jobly Core has zero retry knowledge.
+**Retry as pipeline module:** `AddWarpRetry()` registers `RetryPipelineBehavior` (catches failures, reads typed metadata, sets `FailureOutcome`) and `RetryPublishBehavior` (injects retry config at publish time). Warp Core has zero retry knowledge.
 
 **Typed metadata:** `IJobMetadata` marker interface + source generator produces `Dictionary<string, object>` subclasses with typed property accessors. `IJobContext.GetMetadata<T>()` provides typed access. `MetadataSerializer` uses a custom `JsonConverter` for native types.
 
@@ -34,8 +34,8 @@ Execute: workerScope creates handlerScope
 
 ```csharp
 // Registration
-services.AddJoblyWorker<AppDbContext>();
-services.AddJoblyRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; });
+services.AddWarpWorker<AppDbContext>();
+services.AddWarpRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; });
 
 // Custom typed metadata (source-generated)
 public partial interface IOrderMetadata : IJobMetadata

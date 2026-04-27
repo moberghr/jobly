@@ -4,24 +4,24 @@ sidebar_position: 3
 
 # Dashboard Authorization
 
-By default, the Jobly dashboard is open to everyone. Use `IJoblyAuthorizationFilter` to restrict access.
+By default, the Warp dashboard is open to everyone. Use `IWarpAuthorizationFilter` to restrict access.
 
 ## Setup
 
 ```csharp
-app.UseJoblyUI(options =>
+app.UseWarpUI(options =>
 {
     options.Authorization = new MyAuthFilter();
     options.UnauthorizedRedirectUrl = "/login"; // optional
 });
 ```
 
-## IJoblyAuthorizationFilter
+## IWarpAuthorizationFilter
 
 Implement this interface to control who can access the dashboard:
 
 ```csharp
-public class MyAuthFilter : IJoblyAuthorizationFilter
+public class MyAuthFilter : IWarpAuthorizationFilter
 {
     public bool Authorize(HttpContext httpContext)
     {
@@ -31,35 +31,35 @@ public class MyAuthFilter : IJoblyAuthorizationFilter
 }
 ```
 
-The filter is called for both the SPA (HTML/CSS/JS) and the API endpoints (`/jobly/api/...`).
+The filter is called for both the SPA (HTML/CSS/JS) and the API endpoints (`/warp/api/...`).
 
 ## Redirect Behavior
 
 When `UnauthorizedRedirectUrl` is set:
-- **Browser requests** to `/jobly` get a 302 redirect to the login URL with `?returnUrl=/jobly`
-- **API requests** (`/jobly/api/...`) always return 401 — no redirect
+- **Browser requests** to `/warp` get a 302 redirect to the login URL with `?returnUrl=/warp`
+- **API requests** (`/warp/api/...`) always return 401 — no redirect
 
 When `UnauthorizedRedirectUrl` is null:
 - All unauthorized requests return 401
 
 ## Built-in Login
 
-Jobly can serve its own login page — no external auth setup needed. Users authenticate with credentials you validate, and Jobly manages the session via an HTTP-only signed cookie.
+Warp can serve its own login page — no external auth setup needed. Users authenticate with credentials you validate, and Warp manages the session via an HTTP-only signed cookie.
 
 ```csharp
 builder.Services.AddDataProtection(); // Required for cookie signing
-builder.Services.AddScoped<IJoblyCredentialValidator, MyCredentialValidator>();
+builder.Services.AddScoped<IWarpCredentialValidator, MyCredentialValidator>();
 
-app.UseJoblyUI(options =>
+app.UseWarpUI(options =>
 {
     options.UseBuiltInLogin<MyCredentialValidator>();
 });
 ```
 
-Implement `IJoblyCredentialValidator` to check credentials against your database, LDAP, or any source:
+Implement `IWarpCredentialValidator` to check credentials against your database, LDAP, or any source:
 
 ```csharp
-public class MyCredentialValidator : IJoblyCredentialValidator
+public class MyCredentialValidator : IWarpCredentialValidator
 {
     private readonly AppDbContext _db;
 
@@ -81,19 +81,19 @@ import Screenshot from '@site/src/components/Screenshot';
 
 ### How it works
 
-1. Unauthenticated users see the built-in login page at `/jobly`
-2. The SPA posts credentials to `/jobly/api/auth/login`
-3. On success, Jobly sets an HTTP-only signed cookie (1-day expiry via ASP.NET Data Protection)
+1. Unauthenticated users see the built-in login page at `/warp`
+2. The SPA posts credentials to `/warp/api/auth/login`
+3. On success, Warp sets an HTTP-only signed cookie (1-day expiry via ASP.NET Data Protection)
 4. API requests include the cookie automatically — 401 triggers the login page
-5. Logout via `/jobly/api/auth/logout` clears the cookie
+5. Logout via `/warp/api/auth/logout` clears the cookie
 
 ### When to use built-in login vs custom auth
 
 | | Built-in Login | Custom Auth Filter |
 |---|---|---|
 | Setup | `UseBuiltInLogin<T>()` | `options.Authorization = new MyFilter()` |
-| Login page | Jobly serves it | Your app serves it |
-| Session | Jobly cookie | Your existing auth (cookies, JWT, etc.) |
+| Login page | Warp serves it | Your app serves it |
+| Session | Warp cookie | Your existing auth (cookies, JWT, etc.) |
 | Best for | Standalone dashboard access | Apps with existing authentication |
 
 ## Built-in Filters
@@ -103,7 +103,7 @@ import Screenshot from '@site/src/components/Screenshot';
 Allows access only from localhost (127.0.0.1 / ::1):
 
 ```csharp
-app.UseJoblyUI(options =>
+app.UseWarpUI(options =>
 {
     options.Authorization = new LocalRequestsOnlyAuthorizationFilter();
 });
@@ -123,8 +123,8 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// UseJoblyUI AFTER auth middleware so HttpContext.User is populated
-app.UseJoblyUI(options =>
+// UseWarpUI AFTER auth middleware so HttpContext.User is populated
+app.UseWarpUI(options =>
 {
     options.Authorization = new AuthenticatedUserFilter();
     options.UnauthorizedRedirectUrl = "/login";
@@ -132,7 +132,7 @@ app.UseJoblyUI(options =>
 ```
 
 ```csharp
-public class AuthenticatedUserFilter : IJoblyAuthorizationFilter
+public class AuthenticatedUserFilter : IWarpAuthorizationFilter
 {
     public bool Authorize(HttpContext httpContext)
     {
@@ -142,5 +142,5 @@ public class AuthenticatedUserFilter : IJoblyAuthorizationFilter
 ```
 
 :::important Pipeline Order
-`UseJoblyUI()` must come **after** `UseAuthentication()` and `UseAuthorization()` so that `HttpContext.User` is populated when the filter runs.
+`UseWarpUI()` must come **after** `UseAuthentication()` and `UseAuthorization()` so that `HttpContext.User` is populated when the filter runs.
 :::

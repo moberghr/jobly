@@ -1,12 +1,12 @@
 # UI Extensions
 
-Jobly's dashboard can be extended by external NuGet packages. Extensions can add new sections to existing pages, replace built-in components, insert content before/after any section, or add entirely new pages with navigation items.
+Warp's dashboard can be extended by external NuGet packages. Extensions can add new sections to existing pages, replace built-in components, insert content before/after any section, or add entirely new pages with navigation items.
 
 ## How It Works
 
 The extension system has three layers:
 
-1. **Backend (.NET)** — An `IJoblyUIExtension` implementation declares a manifest and optionally registers API endpoints. The extension's JS file is shipped as an embedded resource and served by the middleware.
+1. **Backend (.NET)** — An `IWarpUIExtension` implementation declares a manifest and optionally registers API endpoints. The extension's JS file is shipped as an embedded resource and served by the middleware.
 
 2. **Extension JS module** — A plain ES module that exports an `install()` function. It receives an API with `mount`, `append`, `insertBefore`, and `insertAfter` operations that target DOM elements by CSS selector.
 
@@ -15,18 +15,18 @@ The extension system has three layers:
 ### Data Flow
 
 ```
-1. User registers IJoblyUIExtension in DI
-2. UseJoblyUI() discovers extensions, serves their embedded JS at /_ext/{name}/
+1. User registers IWarpUIExtension in DI
+2. UseWarpUI() discovers extensions, serves their embedded JS at /_ext/{name}/
 3. GET /api/extensions returns all manifests (name, scriptUrl, pages)
 4. SPA imports each extension's JS module
 5. Extension's install() registers mount/append/insert operations via CSS selectors
-6. MutationObserver watches for matching data-jobly-slot elements
+6. MutationObserver watches for matching data-warp-slot elements
 7. When found, extension component renders into/beside the target element
 ```
 
 ### Extension Slots
 
-The dashboard marks key sections with `data-jobly-slot` attributes. Extensions target these with CSS selectors. Each slot also has a `data-jobly-context` attribute with JSON context (e.g., `{ "jobId": "..." }`).
+The dashboard marks key sections with `data-warp-slot` attributes. Extensions target these with CSS selectors. Each slot also has a `data-warp-context` attribute with JSON context (e.g., `{ "jobId": "..." }`).
 
 **Job detail page slots:**
 - `detail.header` — Title, state badge, action buttons
@@ -49,23 +49,23 @@ The dashboard marks key sections with `data-jobly-slot` attributes. Extensions t
 
 ### Shared Dependencies
 
-Extensions don't bundle React or UI components. The host SPA exposes shared dependencies on `window.Jobly`:
+Extensions don't bundle React or UI components. The host SPA exposes shared dependencies on `window.Warp`:
 
-- `window.Jobly.React` — React
-- `window.Jobly.ReactDOM` — ReactDOM
-- `window.Jobly.api` — Pre-configured Axios instance (base URL, auth cookie)
-- `window.Jobly.components` — shadcn/ui components (Card, Button, Badge, etc.)
+- `window.Warp.React` — React
+- `window.Warp.ReactDOM` — ReactDOM
+- `window.Warp.api` — Pre-configured Axios instance (base URL, auth cookie)
+- `window.Warp.components` — shadcn/ui components (Card, Button, Badge, etc.)
 
 ## Building a UI Extension
 
-### 1. Implement IJoblyUIExtension
+### 1. Implement IWarpUIExtension
 
 ```csharp
 using System.Reflection;
-using Jobly.UI.Extensions;
+using Warp.UI.Extensions;
 using Microsoft.AspNetCore.Routing;
 
-public class RetryUIExtension : IJoblyUIExtension
+public class RetryUIExtension : IWarpUIExtension
 {
     public string Name => "retry";
 
@@ -93,10 +93,10 @@ public class RetryUIExtension : IJoblyUIExtension
 
 ### 2. Write the JS Module
 
-The extension JS uses `window.Jobly` for React and UI components. No build step is required — plain ES modules work. For a better developer experience (JSX, TypeScript), use Vite in library mode with React externalized.
+The extension JS uses `window.Warp` for React and UI components. No build step is required — plain ES modules work. For a better developer experience (JSX, TypeScript), use Vite in library mode with React externalized.
 
 ```javascript
-const { React, api, components } = window.Jobly;
+const { React, api, components } = window.Warp;
 const { createElement: h, useState, useEffect } = React;
 const { Card, CardContent, CardHeader, CardTitle } = components;
 
@@ -130,8 +130,8 @@ function RetryCard(props) {
   );
 }
 
-export function install(jobly) {
-  jobly.insertAfter('[data-jobly-slot="detail.details"]', RetryCard);
+export function install(warp) {
+  warp.insertAfter('[data-warp-slot="detail.details"]', RetryCard);
 }
 ```
 
@@ -148,14 +148,14 @@ In your `.csproj`:
 ### 4. Register in DI
 
 ```csharp
-builder.Services.AddSingleton<IJoblyUIExtension, RetryUIExtension>();
+builder.Services.AddSingleton<IWarpUIExtension, RetryUIExtension>();
 ```
 
-That's it. The extension's JS is served at `/jobly/_ext/retry/index.js`, the SPA loads it after login, and the retry card appears on every job detail page that has retry metadata.
+That's it. The extension's JS is served at `/warp/_ext/retry/index.js`, the SPA loads it after login, and the retry card appears on every job detail page that has retry metadata.
 
 ## Built-in Retry Extension
 
-Jobly ships a built-in retry UI extension that shows retry configuration and progress on the job detail page. It renders a card with:
+Warp ships a built-in retry UI extension that shows retry configuration and progress on the job detail page. It renders a card with:
 
 - Status indicator ("Retry policy active", "Retrying...", or "Retries exhausted")
 - Progress bar showing attempts vs max retries
@@ -185,7 +185,7 @@ The extension code uses normal JSX:
 
 ```tsx
 import React, { useState, useEffect } from 'react';
-const { api, components: { Card, CardContent } } = window.Jobly;
+const { api, components: { Card, CardContent } } = window.Warp;
 
 function MyDashboard() {
   const [data, setData] = useState(null);
@@ -198,10 +198,10 @@ function MyDashboard() {
   );
 }
 
-export function install(jobly) {
-  jobly.addPage({ path: '/my-addon', label: 'My Addon', icon: 'puzzle', component: MyDashboard });
-  jobly.insertAfter('[data-jobly-slot="detail.details"]', MyDetailSection);
+export function install(warp) {
+  warp.addPage({ path: '/my-addon', label: 'My Addon', icon: 'puzzle', component: MyDashboard });
+  warp.insertAfter('[data-warp-slot="detail.details"]', MyDetailSection);
 }
 ```
 
-At build time, Vite externalizes `react` and `react-dom`. At runtime, configure an import map or use `window.Jobly.React` directly.
+At build time, Vite externalizes `react` and `react-dom`. At runtime, configure an import map or use `window.Warp.React` directly.

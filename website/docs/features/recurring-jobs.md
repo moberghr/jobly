@@ -4,7 +4,7 @@ sidebar_position: 2
 
 # Recurring Jobs
 
-Recurring jobs execute on a cron schedule. Jobly handles scheduling, deduplication, and execution history.
+Recurring jobs execute on a cron schedule. Warp handles scheduling, deduplication, and execution history.
 
 ## Register a Recurring Job
 

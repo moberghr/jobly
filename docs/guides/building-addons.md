@@ -1,10 +1,10 @@
-# Building Addons for Jobly
+# Building Addons for Warp
 
-Jobly's pipeline and metadata system lets you build addons that control job behavior without modifying Jobly's core. This guide explains the architecture using the built-in retry module as a reference implementation.
+Warp's pipeline and metadata system lets you build addons that control job behavior without modifying Warp's core. This guide explains the architecture using the built-in retry module as a reference implementation.
 
 ## Architecture Overview
 
-Jobly provides three extension points for addons:
+Warp provides three extension points for addons:
 
 1. **`IPublishPipelineBehavior<T>`** — runs at publish time, can modify job metadata
 2. **`IPipelineBehavior<TRequest, TResponse>`** — wraps handler execution, can catch exceptions and influence failure handling
@@ -70,7 +70,7 @@ public class ProcessOrderHandler(IJobContext ctx) : IJobHandler<ProcessOrder>
 
 The typed view IS the dictionary — property writes go directly to the underlying `Dictionary<string, object>`. No sync, no flush, no copy.
 
-**Registration:** `IJobContext` is registered in `AddJobly()`. Call `GetMetadata<T>()` to get a typed view. The typed impl replaces the underlying dictionary, so writes flow through directly.
+**Registration:** `IJobContext` is registered in `AddWarp()`. Call `GetMetadata<T>()` to get a typed view. The typed impl replaces the underlying dictionary, so writes flow through directly.
 
 **Nullable properties:** Use `int?` for properties where "not set" must be distinguishable from `0`:
 
@@ -83,7 +83,7 @@ public partial interface IMyMetadata : IJobMetadata
 
 ## How Retries Are Implemented
 
-The retry module (`AddJoblyRetry`) is built entirely on these primitives. No Jobly core code knows about retries.
+The retry module (`AddWarpRetry`) is built entirely on these primitives. No Warp core code knows about retries.
 
 ### IRetryMetadata
 
@@ -185,10 +185,10 @@ The worker applies whatever the pipeline decided. It doesn't know if the outcome
 ### Worker Scope Isolation
 
 The worker and handler use separate DI scopes:
-- **Worker scope** — owns Jobly state (Job entity, JobLog, Counter). Only Jobly entities are saved here.
+- **Worker scope** — owns Warp state (Job entity, JobLog, Counter). Only Warp entities are saved here.
 - **Handler scope** — handler + pipeline behaviors get their own DbContext. If the handler throws, the scope is disposed and its change tracker is discarded. No partial handler work leaks into the worker's save.
 
-On success, the worker commits the handler's DbContext (outbox pattern: business entities + published child jobs), then commits Jobly state.
+On success, the worker commits the handler's DbContext (outbox pattern: business entities + published child jobs), then commits Warp state.
 
 ## Building Your Own Addon
 
@@ -252,7 +252,7 @@ Pipeline behaviors execute as nested middleware (onion model). The last register
 
 ```csharp
 // Dead letter wraps retry — catches permanent failures after retry gives up
-services.AddJoblyRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; });
+services.AddWarpRetry(o => { o.MaxRetries = 3; o.Delays = [15, 60, 300]; });
 services.AddDeadLetterQueue();
 ```
 

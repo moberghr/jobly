@@ -102,7 +102,7 @@ export default function DetailPage() {
   return (
     <div>
       {/* Header */}
-      <div data-jobly-slot="detail.header" data-jobly-context={jobContext} key={`header-${job.id}`} className="flex items-center gap-4 mb-6">
+      <div data-warp-slot="detail.header" data-warp-context={jobContext} key={`header-${job.id}`} className="flex items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">{kindLabel(job.kind)} {shortId(job.id)}</h1>
         <StateBadge state={job.currentState} cancellationMode={job.cancellationMode} />
         {job.queue && <span className="text-sm text-muted-foreground">Queue: {job.queue}</span>}
@@ -123,7 +123,7 @@ export default function DetailPage() {
         <div className="space-y-4">
           {/* Progress bar (batches) */}
           {totalJobs > 0 && (
-            <div data-jobly-slot="detail.progress" data-jobly-context={jobContext} key={`progress-${job.id}`}>
+            <div data-warp-slot="detail.progress" data-warp-context={jobContext} key={`progress-${job.id}`}>
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Progress</CardTitle></CardHeader>
                 <CardContent>
@@ -141,7 +141,7 @@ export default function DetailPage() {
 
           {/* Payload & Metadata */}
           {(job.message || (job.metadata && Object.keys(job.metadata).length > 0)) && (
-            <div data-jobly-slot="detail.payload" data-jobly-context={jobContext} key={`payload-${job.id}`}>
+            <div data-warp-slot="detail.payload" data-warp-context={jobContext} key={`payload-${job.id}`}>
               <Card>
                 <CardContent className="pt-4 space-y-4">
                   {job.message && (
@@ -162,7 +162,7 @@ export default function DetailPage() {
           )}
 
           {/* Details */}
-          <div data-jobly-slot="detail.details" data-jobly-context={jobContext} key={`details-${job.id}`}>
+          <div data-warp-slot="detail.details" data-warp-context={jobContext} key={`details-${job.id}`}>
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm">Details</CardTitle></CardHeader>
               <CardContent className="space-y-2 text-sm">
@@ -177,7 +177,7 @@ export default function DetailPage() {
           </div>
 
           {/* Flow */}
-          <div data-jobly-slot="detail.flow" data-jobly-context={jobContext} key={`flow-${job.id}`}>
+          <div data-warp-slot="detail.flow" data-warp-context={jobContext} key={`flow-${job.id}`}>
             <FlowCard
               jobId={job.id}
               traceId={job.traceId}
@@ -193,7 +193,7 @@ export default function DetailPage() {
         <div className="space-y-4">
           {/* State History */}
           {systemEvents.length > 0 && (
-            <div data-jobly-slot="detail.history" data-jobly-context={jobContext} key={`history-${job.id}`}>
+            <div data-warp-slot="detail.history" data-warp-context={jobContext} key={`history-${job.id}`}>
               <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">History</h2>
               <div className="space-y-3">
                 {systemEvents.map((event, index) => {
@@ -223,7 +223,7 @@ export default function DetailPage() {
 
           {/* Handler Logs */}
           {handlerLogs.length > 0 && (
-            <div data-jobly-slot="detail.logs" data-jobly-context={jobContext} key={`logs-${job.id}`}>
+            <div data-warp-slot="detail.logs" data-warp-context={jobContext} key={`logs-${job.id}`}>
               <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Handler Output ({handlerLogs.length})</CardTitle></CardHeader>
                 <CardContent>

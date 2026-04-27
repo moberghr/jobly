@@ -19,13 +19,13 @@
   <PropertyGroup>
     <Authors>Moberg</Authors>
     <Copyright>Copyright (c) Moberg 2026</Copyright>
-    <PackageProjectUrl>https://github.com/moberghr/jobly</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/moberghr/jobly</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/moberghr/warp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/moberghr/warp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>jobs;background;queue;mediator;scheduling;dotnet</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>See https://moberghr.github.io/jobly/docs/releases for full release notes.</PackageReleaseNotes>
+    <PackageReleaseNotes>See https://moberghr.github.io/warp/docs/releases for full release notes.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -49,5 +49,5 @@
 
   <!-- Library-only settings (documentation, symbol packaging, source link) live in
        src/core/Directory.Build.props and apply only to projects under src/core/ — i.e. the
-       packaged libraries and the source generator that ships with Jobly.Core. -->
+       packaged libraries and the source generator that ships with Warp.Core. -->
 </Project>

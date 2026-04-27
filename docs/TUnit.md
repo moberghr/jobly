@@ -9,13 +9,13 @@ We evaluated migrating from xUnit v3 to TUnit v1.33.0. After a full side-by-side
 - **Larger binaries** — test assembly 2.9 MB vs 1.1 MB; output directory 96 MB vs 51 MB.
 - **More verbose syntax** — `[ClassDataSource<T>(Shared = SharedType.Keyed, Key = "...")]` + `[NotInParallel("...")]` vs xUnit's `[Collection<T>]`.
 - **Required `[InheritsTests]`** on all 128 concrete subclasses — TUnit's source generator doesn't auto-discover inherited `[Test]` methods.
-- **`[Retry]` name collision** — TUnit has its own `[Retry]` attribute that conflicts with Jobly's `[Retry]`.
+- **`[Retry]` name collision** — TUnit has its own `[Retry]` attribute that conflicts with Warp's `[Retry]`.
 - **Activity.Current interference** — TUnit creates an `Activity` per test for tracing, which broke 10 tests that assert on ambient `Activity.Current` state. Fixable with save/restore, but adds boilerplate.
 - **TUnit's unique features (Native AOT, `[DependsOn]`, `[Retry]`, `[ParallelLimiter]`)** are not needed by this project.
 
 ## What We Did Instead
 
-Added `TimedFactAttribute` / `TimedTheoryAttribute` with a default 10-second timeout — the one TUnit feature we wanted. See `src/tests/Jobly.Tests/TestData/TimedFactAttribute.cs`.
+Added `TimedFactAttribute` / `TimedTheoryAttribute` with a default 10-second timeout — the one TUnit feature we wanted. See `src/tests/Warp.Tests/TestData/TimedFactAttribute.cs`.
 
 ## Benchmark Results
 

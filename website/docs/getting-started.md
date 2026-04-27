@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Getting Started
 
-Jobly is a distributed job processing and message queue library for .NET 10. It provides four patterns:
+Warp is a distributed job processing and message queue library for .NET 10. It provides four patterns:
 
 - **[Messages](./patterns/messages.md)** (`IMessage`) — Pub/sub queue. Multiple handlers per message, each becomes an independent job.
 - **[Jobs](./patterns/jobs.md)** (`IJob`) — Orchestrated background work. Single handler, scheduling, retries, continuations, batches.
@@ -14,9 +14,9 @@ Jobly is a distributed job processing and message queue library for .NET 10. It 
 ## Installation
 
 ```bash
-dotnet add package Jobly.Core    # Publishing (your app)
-dotnet add package Jobly.Worker  # Worker service
-dotnet add package Jobly.UI      # Dashboard
+dotnet add package Warp.Core    # Publishing (your app)
+dotnet add package Warp.Worker  # Worker service
+dotnet add package Warp.UI      # Dashboard
 ```
 
 ## Setup
@@ -30,27 +30,27 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 ```
 
-Jobly automatically adds its interceptors (row locking) and entity configuration (Job, Message, Batch, etc.) when you register Jobly services in the next step. All Jobly tables are placed in the `jobly` schema by default.
+Warp automatically adds its interceptors (row locking) and entity configuration (Job, Message, Batch, etc.) when you register Warp services in the next step. All Warp tables are placed in the `warp` schema by default.
 
 :::tip Naming Conventions
-Jobly respects EF Core naming conventions. If you use `UseSnakeCaseNamingConvention()`, Jobly's tables and columns will follow your convention automatically.
+Warp respects EF Core naming conventions. If you use `UseSnakeCaseNamingConvention()`, Warp's tables and columns will follow your convention automatically.
 :::
 
 ### 2. Create the database schema
 
-Jobly adds its tables (Job, JobLog, Server, Worker, etc.) to your DbContext model automatically. You just need to create the schema.
+Warp adds its tables (Job, JobLog, Server, Worker, etc.) to your DbContext model automatically. You just need to create the schema.
 
 **Using EF Core migrations** (recommended for production):
 
 ```bash
-dotnet ef migrations add AddJobly
+dotnet ef migrations add AddWarp
 dotnet ef database update
 ```
 
-The migration will include all Jobly tables alongside your own. When you upgrade the Jobly NuGet package and the schema has changed, just add a new migration:
+The migration will include all Warp tables alongside your own. When you upgrade the Warp NuGet package and the schema has changed, just add a new migration:
 
 ```bash
-dotnet ef migrations add UpgradeJobly
+dotnet ef migrations add UpgradeWarp
 dotnet ef database update
 ```
 
@@ -64,34 +64,34 @@ await context.Database.EnsureCreatedAsync();
 ```
 
 :::warning EnsureCreated doesn't support upgrades
-`EnsureCreatedAsync()` creates the schema from scratch but cannot apply incremental changes. Use EF migrations for production deployments where you need to upgrade Jobly versions without dropping the database.
+`EnsureCreatedAsync()` creates the schema from scratch but cannot apply incremental changes. Use EF migrations for production deployments where you need to upgrade Warp versions without dropping the database.
 :::
 
-### 3. Register Jobly
+### 3. Register Warp
 
 ```csharp
 // Publisher only — for apps that create jobs but don't process them
-builder.Services.AddJobly<AppDbContext>();
+builder.Services.AddWarp<AppDbContext>();
 builder.Services.AddHandlers(typeof(Program).Assembly);
 ```
 
 :::tip TimeProvider
-Jobly automatically registers `TimeProvider.System` if one is not already registered. Override it in tests to control time.
+Warp automatically registers `TimeProvider.System` if one is not already registered. Override it in tests to control time.
 :::
 
 ### 4. Add a worker (optional)
 
-For apps that process jobs, use `AddJoblyWorker` instead (includes `AddJobly` internally):
+For apps that process jobs, use `AddWarpWorker` instead (includes `AddWarp` internally):
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(options =>
+builder.Services.AddWarpWorker<AppDbContext>(options =>
 {
     options.WorkerCount = 10;
     options.Queues = ["default", "critical"];
 });
 
 // Enable automatic retries with backoff delays
-builder.Services.AddJoblyRetry(options =>
+builder.Services.AddWarpRetry(options =>
 {
     options.MaxRetries = 3;
     options.Delays = [15, 60, 300]; // seconds
@@ -101,14 +101,14 @@ builder.Services.AddJoblyRetry(options =>
 ### 5. Add the dashboard (optional)
 
 ```csharp
-app.UseJoblyUI(); // Serves at /jobly
+app.UseWarpUI(); // Serves at /warp
 ```
 
 To protect the dashboard with authentication:
 
 ```csharp
 // Dashboard with auth (optional)
-app.UseJoblyUI(options =>
+app.UseWarpUI(options =>
 {
     options.Authorization = new MyAuthFilter();
     options.UnauthorizedRedirectUrl = "/login";
@@ -188,5 +188,5 @@ public class OrderController : ControllerBase
 ```
 
 :::info Transactional Outbox
-Jobly uses the [outbox pattern](/docs/features/outbox-pattern) — jobs are written to the same DbContext as your business data and committed in a single `SaveChangesAsync()`. This guarantees atomicity: if the transaction fails, both your data and the jobs roll back. No orphaned jobs, no lost work.
+Warp uses the [outbox pattern](/docs/features/outbox-pattern) — jobs are written to the same DbContext as your business data and committed in a single `SaveChangesAsync()`. This guarantees atomicity: if the transaction fails, both your data and the jobs roll back. No orphaned jobs, no lost work.
 :::

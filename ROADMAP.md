@@ -1,4 +1,4 @@
-# Jobly Roadmap
+# Warp Roadmap
 
 Feature ideas for future development.
 
@@ -42,7 +42,7 @@ Configure a URL to POST to when a job reaches a terminal state. Useful for async
 ## Performance & Compilation
 
 ### Native AOT Support
-Make Jobly compatible with Native AOT compilation. Replace reflection-based handler discovery (JobDispatcher) with source generators. Eliminates startup cost and enables trimming.
+Make Warp compatible with Native AOT compilation. Replace reflection-based handler discovery (JobDispatcher) with source generators. Eliminates startup cost and enables trimming.
 
 ### Source Generators
 Generate handler registration, type mappings, and serialization code at compile time. Replaces runtime reflection in JobDispatcher (DiscoverJobHandler, DiscoverMessageHandlers, ExecuteHandler). Enables AOT and improves startup performance.
@@ -50,7 +50,7 @@ Generate handler registration, type mappings, and serialization code at compile 
 ## Infrastructure
 
 ### ~~Database Migrations~~ ✅
-Jobly's entities are added to the user's DbContext model via `JoblyModelCustomizer`. Standard EF Core migrations (`dotnet ef migrations add`) pick up Jobly's tables automatically, including on NuGet upgrades. Documented in Getting Started.
+Warp's entities are added to the user's DbContext model via `WarpModelCustomizer`. Standard EF Core migrations (`dotnet ef migrations add`) pick up Warp's tables automatically, including on NuGet upgrades. Documented in Getting Started.
 
 ### ~~In-Memory Mediator~~ ✅
 Implemented as `IRequest<TResponse>` with `IMediator.Send()`. Supports `IPipelineBehavior<TRequest, TResponse>` for cross-cutting concerns. Same pipeline as jobs and messages, no database persistence.
@@ -59,4 +59,4 @@ Implemented as `IRequest<TResponse>` with `IMediator.Send()`. Supports `IPipelin
 Implemented as `IStreamRequest<TResponse>` extending `IRequest<IAsyncEnumerable<TResponse>>`. Preserves the unified type hierarchy — `IPipelineBehavior` applies at request level. `IStreamPipelineBehavior<TRequest, TResponse>` wraps enumeration. Source generator provides zero-allocation dispatch.
 
 ### Runtime Schema Migration Helper
-Optional `MigrateJoblySchemaAsync()` for users who don't use EF migrations. Diffs the EF model against the database at runtime, generates and executes only Jobly table DDL. Respects naming conventions. Lower priority — EF migrations cover most users.
+Optional `MigrateWarpSchemaAsync()` for users who don't use EF migrations. Diffs the EF model against the database at runtime, generates and executes only Warp table DDL. Respects naming conventions. Lower priority — EF migrations cover most users.

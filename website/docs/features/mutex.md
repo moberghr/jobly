@@ -8,11 +8,11 @@ Mutexes prevent duplicate processing — only one job per key can be processing 
 
 ## Setup
 
-Mutex is an opt-in addon. Register it alongside `AddJoblyWorker`:
+Mutex is an opt-in addon. Register it alongside `AddWarpWorker`:
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>();
-builder.Services.AddJoblyMutex();
+builder.Services.AddWarpWorker<AppDbContext>();
+builder.Services.AddWarpMutex();
 ```
 
 ## Usage
@@ -51,13 +51,13 @@ Mutex is implemented as a `MutexPipelineBehavior` — a pipeline behavior that w
 
 1. **Enqueue** always succeeds — the mutex is not checked at publish time.
 2. **Worker picks up** the job and marks it as `Processing`.
-3. **Pipeline runs**: `MutexPipelineBehavior` attempts to acquire a distributed lock keyed by `jobly:mutex:{key}`.
+3. **Pipeline runs**: `MutexPipelineBehavior` attempts to acquire a distributed lock keyed by `warp:mutex:{key}`.
 4. **If held**: The behavior sets `IJobContext.Outcome` to `Deleted` and returns without calling the handler. The worker finalizes the job as Deleted with a log entry "Cancelled — mutex 'payment:123' held by another job".
 5. **If free**: The lock is acquired, the handler executes, and the lock is released when the handler completes (or fails).
 
 ## Race Condition Safety
 
-The distributed lock (via `IJoblyLockProvider`) ensures mutual exclusion across all workers and servers. If two workers fetch two jobs with the same mutex key simultaneously, the first to acquire the lock wins — the second sees the lock as held and cancels.
+The distributed lock (via `IWarpLockProvider`) ensures mutual exclusion across all workers and servers. If two workers fetch two jobs with the same mutex key simultaneously, the first to acquire the lock wins — the second sees the lock as held and cancels.
 
 ## Zero Overhead for Regular Jobs
 

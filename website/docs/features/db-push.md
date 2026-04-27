@@ -9,7 +9,7 @@ Replaces polling wake-up with push notifications — PostgreSQL `LISTEN`/`NOTIFY
 ## Setup
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>(opt =>
+builder.Services.AddWarpWorker<AppDbContext>(opt =>
 {
     opt.UsePostgreSql();         // or opt.UseSqlServer()
 
@@ -41,7 +41,7 @@ Push accelerates *immediate* enqueues. Jobs published via `Schedule(job, at)` si
 
 ## SQL Server Setup Requirements
 
-Service Broker must be enabled on the target database. Jobly creates the message type / contract / queue / service idempotently on first publish, but it cannot run `ALTER DATABASE ... SET ENABLE_BROKER` for you (that requires exclusive DB access). If broker isn't enabled, the transport logs an actionable error and degrades silently to polling:
+Service Broker must be enabled on the target database. Warp creates the message type / contract / queue / service idempotently on first publish, but it cannot run `ALTER DATABASE ... SET ENABLE_BROKER` for you (that requires exclusive DB access). If broker isn't enabled, the transport logs an actionable error and degrades silently to polling:
 
 ```sql
 ALTER DATABASE [YourDb] SET ENABLE_BROKER WITH ROLLBACK IMMEDIATE;
@@ -49,14 +49,14 @@ ALTER DATABASE [YourDb] SET ENABLE_BROKER WITH ROLLBACK IMMEDIATE;
 
 ## Observability
 
-Transport failures are logged at Warning and incremented on `jobly.notifications.publish_failures` (OpenTelemetry counter). Successful publishes increment `jobly.notifications.published`. Alert on the failure counter if push health matters to your SLOs. Missed notifications caused by transient connection loss are picked up by the drain-on-reconnect signal, so a rare publish failure is not a correctness issue — it costs at most one poll interval of latency.
+Transport failures are logged at Warning and incremented on `warp.notifications.publish_failures` (OpenTelemetry counter). Successful publishes increment `warp.notifications.published`. Alert on the failure counter if push health matters to your SLOs. Missed notifications caused by transient connection loss are picked up by the drain-on-reconnect signal, so a rare publish failure is not a correctness issue — it costs at most one poll interval of latency.
 
 ## Upgrading From &lt;0.9
 
 The `Scheduled` state was introduced alongside DB push. Future-dated jobs published on the old codebase land in `Enqueued` with `ScheduleTime > now` and are correctly gated by a defensive predicate in worker queries — but they won't appear in the dashboard's Scheduled list until their time arrives. To migrate them eagerly, run once after upgrade:
 
 ```sql
-UPDATE jobly.job
+UPDATE warp.job
 SET    current_state = 7  -- State.Scheduled
 WHERE  current_state = 1  -- State.Enqueued
   AND  schedule_time > now();

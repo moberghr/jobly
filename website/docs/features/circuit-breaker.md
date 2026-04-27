@@ -8,11 +8,11 @@ Stops hammering a failing downstream when a handler's failure rate crosses a thr
 
 ## Setup
 
-Circuit Breaker is an opt-in addon. Register it alongside `AddJoblyWorker`:
+Circuit Breaker is an opt-in addon. Register it alongside `AddWarpWorker`:
 
 ```csharp
-builder.Services.AddJoblyWorker<AppDbContext>();
-builder.Services.AddJoblyCircuitBreaker<AppDbContext>(o =>
+builder.Services.AddWarpWorker<AppDbContext>();
+builder.Services.AddWarpCircuitBreaker<AppDbContext>(o =>
 {
     o.Threshold = 5;                         // open after 5 consecutive failures
     o.Duration = TimeSpan.FromMinutes(1);    // stay open for 1 minute
@@ -20,7 +20,7 @@ builder.Services.AddJoblyCircuitBreaker<AppDbContext>(o =>
 });
 ```
 
-The addon adds a new `CircuitBreakerState` entity to your DbContext via `JoblyConfiguration.EntityConfigurators`, so an EF Core migration is required after enabling it.
+The addon adds a new `CircuitBreakerState` entity to your DbContext via `WarpConfiguration.EntityConfigurators`, so an EF Core migration is required after enabling it.
 
 ## Usage
 

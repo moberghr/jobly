@@ -67,7 +67,7 @@ await publisher.Enqueue(new GenerateReport { ReportId = 1 },
 Configure global defaults:
 
 ```csharp
-services.AddJoblyRetry(o =>
+services.AddWarpRetry(o =>
 {
     o.MaxRetries = 3;
     o.Delays = [15, 60, 300]; // seconds
@@ -150,7 +150,7 @@ If the job is processing, this sets `CancellationMode = Graceful` instead of imm
 
 ## Mutex
 
-Only one job per mutex key can be processing at a time. Requires `AddJoblyMutex()`:
+Only one job per mutex key can be processing at a time. Requires `AddWarpMutex()`:
 
 ```csharp
 await publisher.Enqueue(new ProcessPayment { CustomerId = 123 },

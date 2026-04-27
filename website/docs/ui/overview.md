@@ -4,12 +4,12 @@ sidebar_position: 1
 
 # Overview
 
-Jobly ships with a built-in web dashboard for monitoring and managing jobs.
+Warp ships with a built-in web dashboard for monitoring and managing jobs.
 
 ## Setup
 
 ```csharp
-app.UseJoblyUI(); // Serves at /jobly
+app.UseWarpUI(); // Serves at /warp
 ```
 
 To restrict access to the dashboard, see [Dashboard Auth](/docs/operations/dashboard-auth).
