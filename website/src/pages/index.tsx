@@ -8,9 +8,6 @@ function Hero() {
     <header style={{padding: '4rem 0', textAlign: 'center'}}>
       <div className="container">
         <h1 style={{fontSize: '3rem'}}>{siteConfig.title}</h1>
-        <p style={{fontSize: '1.25rem', fontStyle: 'italic', color: 'var(--ifm-color-secondary-darkest)'}}>
-          It gets the job done.
-        </p>
         <p style={{fontSize: '1.1rem', color: 'var(--ifm-color-secondary-darkest)'}}>
           {siteConfig.tagline}
         </p>
