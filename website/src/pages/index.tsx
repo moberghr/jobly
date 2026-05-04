@@ -1,46 +1,203 @@
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
+import styles from './index.module.css';
 
-function Hero() {
-  const {siteConfig} = useDocusaurusContext();
+// ─── Primitives ──────────────────────────────────────────────────────────────
+
+function Terminal({ label, lines }: { label?: string; lines: string }) {
   return (
-    <header style={{padding: '4rem 0', textAlign: 'center'}}>
-      <div className="container">
-        <h1 style={{fontSize: '3rem'}}>{siteConfig.title}</h1>
-        <p style={{fontSize: '1.1rem', color: 'var(--ifm-color-secondary-darkest)'}}>
-          {siteConfig.tagline}
-        </p>
-        <div style={{marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center'}}>
-          <Link className="button button--primary button--lg" to="/docs/getting-started">
-            Get Started
-          </Link>
-          <Link className="button button--secondary button--lg" href="https://github.com/moberghr/warp">
-            GitHub
-          </Link>
-        </div>
+    <div className={styles.terminal}>
+      <div className={styles.terminalBar}>
+        <i /><i /><i />
+        {label && <span className={styles.terminalLabel}>{label}</span>}
       </div>
-    </header>
+      <pre
+        className={styles.terminalPre}
+        dangerouslySetInnerHTML={{ __html: lines }}
+      />
+    </div>
   );
 }
 
-function Features() {
-  const features = [
-    { title: 'Messages & Jobs', description: 'Two patterns in one library. Pub/sub messages with multiple handlers, and orchestrated jobs with scheduling, retries, continuations, and batches.' },
-    { title: 'Built on EF Core', description: 'Uses your existing DbContext. Jobs are created in the same transaction as your business data (outbox pattern). Supports PostgreSQL and SQL Server.' },
-    { title: 'Real-time Dashboard', description: 'Built-in dashboard with live graphs, job detail with full exception traces, pipeline logging, and job tracing across handlers.' },
-    { title: 'Crash Recovery', description: 'Per-job keep-alive heartbeat with automatic requeue on crash. No lost jobs, no wasted retries. Sliding invisibility timeout with configurable thresholds.' },
-    { title: 'Pipeline Behaviors', description: 'Middleware chain wrapping all handler invocations. Add logging, metrics, validation, or authorization across all jobs and messages.' },
-    { title: 'Job Tracing', description: 'Automatic trace propagation. When a handler spawns new jobs, they share a TraceId. See the full execution flow in the dashboard.' },
+function SectionHead({ num, label }: { num: string; label: string }) {
+  return (
+    <div className={styles.secHead}>
+      <span className={styles.secNum}>{num}</span>
+      {label}
+    </div>
+  );
+}
+
+function GitHubIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 .5C5.73.5.75 5.48.75 11.75c0 5 3.24 9.24 7.73 10.74.57.1.78-.25.78-.55v-1.93c-3.14.68-3.81-1.51-3.81-1.51-.51-1.3-1.25-1.65-1.25-1.65-1.02-.7.08-.68.08-.68 1.13.08 1.72 1.16 1.72 1.16 1 1.72 2.63 1.22 3.27.93.1-.73.39-1.22.71-1.5-2.51-.29-5.15-1.25-5.15-5.57 0-1.23.44-2.23 1.16-3.02-.12-.29-.5-1.43.11-2.98 0 0 .95-.3 3.1 1.15a10.8 10.8 0 0 1 5.64 0c2.15-1.45 3.1-1.15 3.1-1.15.61 1.55.23 2.69.11 2.98.72.79 1.16 1.79 1.16 3.02 0 4.33-2.64 5.28-5.16 5.56.4.35.76 1.04.76 2.1v3.11c0 .3.2.66.79.55 4.49-1.5 7.73-5.74 7.73-10.74C23.25 5.48 18.27.5 12 .5Z" />
+    </svg>
+  );
+}
+
+// ─── Content ──────────────────────────────────────────────────────────────────
+
+const HERO_SETUP = `<span class="k-dim">// Register with your existing DbContext</span>
+<span class="k-blue">builder</span>.Services.<span class="k-green">AddWarp</span>&lt;AppDbContext&gt;(opt =&gt; {
+    opt.<span class="k-green">UsePostgreSql</span>();
+    opt.<span class="k-green">AddRetry</span>();
+    opt.<span class="k-green">AddMutex</span>();
+});
+
+<span class="k-blue">builder</span>.Services.<span class="k-green">AddWarpWorker</span>&lt;AppDbContext&gt;(opt =&gt; {
+    opt.<span class="k-green">UsePostgreSql</span>();
+    opt.WorkerCount = <span class="k-yellow">10</span>;
+});`;
+
+const HERO_USAGE = `<span class="k-dim">// Pub/sub — every handler becomes a job</span>
+<span class="k-blue">await</span> publisher.<span class="k-green">Publish</span>(<span class="k-blue">new</span> <span class="k-purple">OrderCreated</span> { Id = orderId });
+<span class="k-blue">await</span> publisher.<span class="k-green">SaveChangesAsync</span>(ct);
+
+<span class="k-dim">// Job — single handler, retries, scheduling</span>
+<span class="k-blue">await</span> publisher.<span class="k-green">Enqueue</span>(<span class="k-blue">new</span> <span class="k-purple">GenerateReport</span> { UserId = id });
+
+<span class="k-dim">// Request — in-memory, typed response</span>
+<span class="k-blue">var</span> user = <span class="k-blue">await</span> mediator.<span class="k-green">Send</span>(<span class="k-blue">new</span> <span class="k-purple">GetUser</span> { Id = id });`;
+
+const INSTALL_PACKAGES = `<span class="k-dim">$</span> dotnet add package Warp.Core
+<span class="k-dim">$</span> dotnet add package Warp.Provider.PostgreSql
+<span class="k-dim">$</span> dotnet add package Warp.Worker
+<span class="k-dim">$</span> dotnet add package Warp.UI
+
+<span class="k-green">✓</span> DbContext auto-configured — no manual setup
+<span class="k-green">✓</span> Outbox publisher registered (same transaction)
+<span class="k-green">✓</span> Worker service ready, dashboard at /warp`;
+
+// ─── Sections ────────────────────────────────────────────────────────────────
+
+function Hero() {
+  return (
+    <section className={styles.hero}>
+      <div className="container">
+        <div className={styles.heroGrid}>
+          <div className={styles.heroLeft}>
+            <div className={styles.eyebrow}>
+              <span className={styles.eyebrowDot} />
+              Distributed job processing · .NET 10
+            </div>
+            <h1 className={styles.heroTitle}>
+              Background processing<br />
+              that <em>scales</em> with your app.
+            </h1>
+            <p className={styles.heroSub}>
+              Warp is a distributed job processing and message queue for .NET&nbsp;10.
+              Pub/sub messages, orchestrated jobs, in-memory requests — built on your
+              existing EF&nbsp;Core DbContext with the outbox pattern included.
+            </p>
+            <div className={styles.heroActions}>
+              <Link className={styles.btnPrimary} to="/docs/getting-started">
+                Get Started
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+              </Link>
+              <Link className={styles.btnSecondary} href="https://github.com/moberghr/warp">
+                <GitHubIcon />
+                GitHub
+              </Link>
+            </div>
+            <div className={styles.heroStats}>
+              <span>PostgreSQL</span>
+              <span>SQL Server</span>
+              <span>.NET 10</span>
+              <span>MIT licensed</span>
+              <span>1,024 tests</span>
+            </div>
+          </div>
+
+          <div className={styles.heroRight}>
+            <Terminal label="Program.cs" lines={HERO_SETUP} />
+            <Terminal label="OrderService.cs" lines={HERO_USAGE} />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Marquee() {
+  const items = [
+    'PostgreSQL', 'SQL Server', '.NET 10', 'EF Core', 'ASP.NET Core',
+    'Outbox Pattern', 'Pub/Sub', 'Worker Services', 'Distributed Locks',
+    'Retries & Backoff', 'Cron Scheduling', 'Live Dashboard',
+    'PostgreSQL', 'SQL Server', '.NET 10', 'EF Core', 'ASP.NET Core',
+    'Outbox Pattern', 'Pub/Sub', 'Worker Services', 'Distributed Locks',
+    'Retries & Backoff', 'Cron Scheduling', 'Live Dashboard',
   ];
   return (
-    <section style={{padding: '4rem 0'}}>
+    <div className={styles.marqueeWrap}>
       <div className="container">
-        <div className="row">
-          {features.map((f, i) => (
-            <div key={i} className="col col--4" style={{marginBottom: '2rem'}}>
-              <h3>{f.title}</h3>
-              <p>{f.description}</p>
+        <div className={styles.marqueeInner}>
+          <span className={styles.marqueeLabel}>Built for</span>
+          <div className={styles.marqueeViewport}>
+            <div className={styles.marqueeTrack}>
+              {items.map((item, i) => <span key={i}>{item}</span>)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const PATTERNS = [
+  {
+    num: '01',
+    name: 'Messages',
+    iface: 'IMessage',
+    desc: 'Pub/sub queue. Multiple handlers per message — each becomes an independent job. Fan out to any number of subscribers in the same transaction.',
+    code: 'publisher.Publish(\n  new OrderCreated { Id = orderId });',
+  },
+  {
+    num: '02',
+    name: 'Jobs',
+    iface: 'IJob',
+    desc: 'Orchestrated background work. Single handler with scheduling, configurable retries, continuations, batches, named queues, and mutex control.',
+    code: 'publisher.Enqueue(\n  new GenerateReport(),\n  queue: "reports");',
+  },
+  {
+    num: '03',
+    name: 'Requests',
+    iface: 'IRequest<T>',
+    desc: 'In-memory request/response. Single handler, no persistence, returns a typed response immediately. Goes through the same pipeline behavior chain.',
+    code: 'var user = await mediator\n  .Send(new GetUser { Id = id });',
+  },
+  {
+    num: '04',
+    name: 'Streams',
+    iface: 'IStreamRequest<T>',
+    desc: 'In-memory streaming. Returns IAsyncEnumerable<T> via CreateStream(). Request-level and enumeration-level pipeline behaviors, no persistence.',
+    code: 'await foreach (var item in\n  mediator.CreateStream(\n    new GetItems()));',
+  },
+];
+
+function Patterns() {
+  return (
+    <section className={styles.section} id="patterns">
+      <div className="container">
+        <SectionHead num="01" label="Four patterns" />
+        <h2 className={styles.h2}>One library. Every background processing need.</h2>
+        <p className={styles.lede}>
+          Messages for fan-out, Jobs for durable orchestration, Requests for in-process
+          queries, Streams for async sequences. All share the same pipeline, the same
+          dashboard, the same worker.
+        </p>
+        <div className={styles.patternsGrid}>
+          {PATTERNS.map((p) => (
+            <div key={p.num} className={styles.patternCard}>
+              <span className={styles.patternNum}>{p.num}</span>
+              <h3 className={styles.patternName}>{p.name}</h3>
+              <code className={styles.patternIface}>{p.iface}</code>
+              <p className={styles.patternDesc}>{p.desc}</p>
+              <div className={styles.patternCode}>
+                <pre>{p.code}</pre>
+              </div>
             </div>
           ))}
         </div>
@@ -49,26 +206,186 @@ function Features() {
   );
 }
 
-function Screenshots() {
-  const imgStyle = {width: '100%', borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)'};
+const FEATURES = [
+  {
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+    title: 'Outbox pattern built in',
+    desc: 'Jobs and messages are created inside your EF Core transaction. No lost events, no dual-write race conditions. Your DbContext owns the consistency boundary.',
+  },
+  {
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>,
+    title: 'Real-time dashboard',
+    desc: 'Built-in React dashboard with live graphs, job detail, full exception traces, handler output, batch progress, and recurring job history — served at /warp.',
+  },
+  {
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>,
+    title: 'Crash recovery',
+    desc: 'Per-job keep-alive heartbeat with automatic requeue on crash. No lost jobs, no wasted retries. Configurable sliding invisibility timeout.',
+  },
+  {
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>,
+    title: 'Pipeline behaviors',
+    desc: 'Middleware chain wrapping every handler. Add retry, mutex, logging, metrics, or auth across all jobs, messages, and requests in one place.',
+  },
+  {
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>,
+    title: 'Cron scheduling',
+    desc: 'Recurring jobs with cron expressions. Idempotent definition API — safe to call on every app start. Scheduler creates jobs at the right time.',
+  },
+  {
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L3 7v6c0 5 4 9 9 10 5-1 9-5 9-10V7l-9-5z"/></svg>,
+    title: 'Distributed mutex',
+    desc: 'Opt-in concurrency control. Annotate with [Mutex("key")] or publish with .WithMutex("key") — only one job per key processes at a time across all workers.',
+  },
+  {
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>,
+    title: 'DB push notifications',
+    desc: 'Opt-in push wake-up via Postgres LISTEN/NOTIFY or SQL Server Service Broker. Workers react instantly to new jobs — no unnecessary polling overhead.',
+  },
+  {
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/></svg>,
+    title: 'Two databases, one API',
+    desc: 'PostgreSQL and SQL Server supported out of the box. Provider packages wire everything up — just call opt.UsePostgreSql() or opt.UseSqlServer().',
+  },
+  {
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>,
+    title: 'Batches & continuations',
+    desc: 'Group related jobs into batches. Configure child activation on failure, await all children, and chain follow-up jobs when a batch completes.',
+  },
+];
+
+function Features() {
   return (
-    <section style={{padding: '2rem 0 4rem', background: 'var(--ifm-color-emphasis-100)'}}>
+    <section className={`${styles.section} ${styles.sectionAlt}`} id="features">
       <div className="container">
-        <h2 style={{textAlign: 'center', marginBottom: '2rem'}}>Dashboard</h2>
-        <img src="/warp/img/screenshots/01-dashboard.png" alt="Dashboard" style={imgStyle} data-theme-target="light" />
-        <img src="/warp/img/screenshots/01-dashboard-dark.png" alt="Dashboard" style={imgStyle} data-theme-target="dark" />
+        <SectionHead num="02" label="Capabilities" />
+        <h2 className={styles.h2}>Everything you need. Nothing you don't.</h2>
+        <p className={styles.lede}>
+          Warp covers the full spectrum of background processing requirements for
+          production .NET applications — out of the box, no assembly required.
+        </p>
+        <div className={styles.featuresGrid}>
+          {FEATURES.map((f, i) => (
+            <div key={i} className={styles.featureCard}>
+              <div className={styles.featureIcon}>{f.icon}</div>
+              <h3 className={styles.featureTitle}>{f.title}</h3>
+              <p className={styles.featureText}>{f.desc}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
 }
 
+function Dashboard() {
+  return (
+    <section className={styles.section} id="dashboard">
+      <div className="container">
+        <SectionHead num="03" label="Dashboard" />
+        <h2 className={styles.h2}>Full visibility into your job queue.</h2>
+        <p className={styles.lede}>
+          Built-in React dashboard with live graphs, job detail with full exception traces,
+          pipeline log output, batch progress bars, worker health, and recurring job history.
+          Served at <code>/warp</code> with zero configuration.
+        </p>
+        <div className={styles.screenshotWrap}>
+          <img
+            src="/warp/img/screenshots/01-dashboard.png"
+            alt="Warp dashboard — job overview with live graphs"
+            className={styles.screenshot}
+            data-theme-target="light"
+          />
+          <img
+            src="/warp/img/screenshots/01-dashboard-dark.png"
+            alt="Warp dashboard — dark mode"
+            className={styles.screenshot}
+            data-theme-target="dark"
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Install() {
+  return (
+    <section className={`${styles.section} ${styles.sectionAlt}`} id="install">
+      <div className="container">
+        <SectionHead num="04" label="Get started" />
+        <h2 className={styles.h2}>Up and running in minutes.</h2>
+        <p className={styles.lede}>
+          Register your DbContext as usual — Warp wraps it automatically. No manual
+          schema migrations, no special context configuration, no dual registration.
+        </p>
+        <div className={styles.installGrid}>
+          <div>
+            <div className={styles.installHead}>
+              <span className={styles.installLabel}>1 · Add packages</span>
+              <span className={styles.installMeta}>dotnet CLI</span>
+            </div>
+            <Terminal lines={INSTALL_PACKAGES} />
+          </div>
+          <div>
+            <div className={styles.installHead}>
+              <span className={styles.installLabel}>2 · Register &amp; publish</span>
+              <span className={styles.installMeta}>Program.cs → OrderService.cs</span>
+            </div>
+            <Terminal label="Program.cs" lines={HERO_SETUP} />
+          </div>
+        </div>
+        <div className={styles.installActions}>
+          <Link className={styles.btnPrimary} to="/docs/getting-started">
+            Read the docs →
+          </Link>
+          <Link className={styles.btnSecondary} href="https://github.com/moberghr/warp">
+            <GitHubIcon />
+            View on GitHub
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Callout() {
+  return (
+    <section className={styles.section}>
+      <div className="container">
+        <div className={styles.callout}>
+          <h2>Background processing done right.</h2>
+          <p>
+            Stop duct-taping Hangfire, raw queues, and manual retry logic together.
+            Warp gives you a production-ready job processor that lives inside your
+            existing EF Core stack — no new infrastructure required.
+          </p>
+          <div className={styles.calloutActions}>
+            <Link className={styles.calloutBtnPrimary} to="/docs/getting-started">
+              Get Started
+            </Link>
+            <Link className={styles.calloutBtnSecondary} href="https://github.com/moberghr/warp">
+              View on GitHub
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function Home(): JSX.Element {
   return (
-    <Layout description="Distributed job processing and message queue for .NET">
-      <Hero />
+    <Layout description="Distributed job processing and message queue for .NET 10. Built on EF Core with pub/sub messages, orchestrated jobs, retries, scheduling, and a real-time dashboard.">
       <main>
+        <Hero />
+        <Marquee />
+        <Patterns />
         <Features />
-        <Screenshots />
+        <Dashboard />
+        <Install />
+        <Callout />
       </main>
     </Layout>
   );
