@@ -14,9 +14,10 @@ Warp is a distributed job processing and message queue library for .NET 10. It p
 ## Installation
 
 ```bash
-dotnet add package Warp.Core    # Publishing (your app)
-dotnet add package Warp.Worker  # Worker service
-dotnet add package Warp.UI      # Dashboard
+dotnet add package Moberg.Warp.Core                  # Publisher + mediator
+dotnet add package Moberg.Warp.Provider.PostgreSql   # PostgreSQL provider (or SqlServer)
+dotnet add package Moberg.Warp.Worker                # Worker service
+dotnet add package Moberg.Warp.UI                    # Dashboard
 ```
 
 ## Setup
@@ -71,9 +72,15 @@ await context.Database.EnsureCreatedAsync();
 
 ```csharp
 // Publisher only — for apps that create jobs but don't process them
-builder.Services.AddWarp<AppDbContext>();
-builder.Services.AddHandlers(typeof(Program).Assembly);
+builder.Services.AddWarp<AppDbContext>(opt =>
+{
+    opt.UsePostgreSql();
+});
 ```
+
+:::tip Handler registration is automatic
+Handlers are discovered and registered automatically via the Warp source generator — no `AddHandlers()` call needed.
+:::
 
 :::tip TimeProvider
 Warp automatically registers `TimeProvider.System` if one is not already registered. Override it in tests to control time.
@@ -86,15 +93,16 @@ For apps that process jobs, use `AddWarpWorker` instead (includes `AddWarp` inte
 ```csharp
 builder.Services.AddWarpWorker<AppDbContext>(options =>
 {
+    options.UsePostgreSql();
     options.WorkerCount = 10;
     options.Queues = ["default", "critical"];
-});
 
-// Enable automatic retries with backoff delays
-builder.Services.AddWarpRetry(options =>
-{
-    options.MaxRetries = 3;
-    options.Delays = [15, 60, 300]; // seconds
+    // Optional addons — call inside the same lambda
+    options.AddRetry(o =>
+    {
+        o.MaxRetries = 3;
+        o.Delays = [15, 60, 300]; // seconds
+    });
 });
 ```
 

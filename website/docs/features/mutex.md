@@ -8,11 +8,14 @@ Mutexes prevent duplicate processing — only one job per key can be processing 
 
 ## Setup
 
-Mutex is an opt-in addon. Register it alongside `AddWarpWorker`:
+Mutex is an opt-in addon. Register it inside the `AddWarpWorker` lambda:
 
 ```csharp
-builder.Services.AddWarpWorker<AppDbContext>();
-builder.Services.AddWarpMutex();
+builder.Services.AddWarpWorker<AppDbContext>(opt =>
+{
+    opt.UsePostgreSql();
+    opt.AddMutex();
+});
 ```
 
 ## Usage

@@ -39,16 +39,14 @@ function GitHubIcon() {
 // ─── Content ──────────────────────────────────────────────────────────────────
 
 const HERO_SETUP = `<span class="k-dim">// Register with your existing DbContext</span>
-<span class="k-blue">builder</span>.Services.<span class="k-green">AddWarp</span>&lt;AppDbContext&gt;(opt =&gt; {
+<span class="k-blue">builder</span>.Services.<span class="k-green">AddWarpWorker</span>&lt;AppDbContext&gt;(opt =&gt; {
     opt.<span class="k-green">UsePostgreSql</span>();
+    opt.WorkerCount = <span class="k-yellow">10</span>;
     opt.<span class="k-green">AddRetry</span>();
     opt.<span class="k-green">AddMutex</span>();
 });
 
-<span class="k-blue">builder</span>.Services.<span class="k-green">AddWarpWorker</span>&lt;AppDbContext&gt;(opt =&gt; {
-    opt.<span class="k-green">UsePostgreSql</span>();
-    opt.WorkerCount = <span class="k-yellow">10</span>;
-});`;
+app.<span class="k-green">UseWarpUI</span>(); <span class="k-dim">// dashboard at /warp</span>`;
 
 const HERO_USAGE = `<span class="k-dim">// Pub/sub — every handler becomes a job</span>
 <span class="k-blue">await</span> publisher.<span class="k-green">Publish</span>(<span class="k-blue">new</span> <span class="k-purple">OrderCreated</span> { Id = orderId });
@@ -60,10 +58,10 @@ const HERO_USAGE = `<span class="k-dim">// Pub/sub — every handler becomes a j
 <span class="k-dim">// Request — in-memory, typed response</span>
 <span class="k-blue">var</span> user = <span class="k-blue">await</span> mediator.<span class="k-green">Send</span>(<span class="k-blue">new</span> <span class="k-purple">GetUser</span> { Id = id });`;
 
-const INSTALL_PACKAGES = `<span class="k-dim">$</span> dotnet add package Warp.Core
-<span class="k-dim">$</span> dotnet add package Warp.Provider.PostgreSql
-<span class="k-dim">$</span> dotnet add package Warp.Worker
-<span class="k-dim">$</span> dotnet add package Warp.UI
+const INSTALL_PACKAGES = `<span class="k-dim">$</span> dotnet add package Moberg.Warp.Core
+<span class="k-dim">$</span> dotnet add package Moberg.Warp.Provider.PostgreSql
+<span class="k-dim">$</span> dotnet add package Moberg.Warp.Worker
+<span class="k-dim">$</span> dotnet add package Moberg.Warp.UI
 
 <span class="k-green">✓</span> DbContext auto-configured — no manual setup
 <span class="k-green">✓</span> Outbox publisher registered (same transaction)
@@ -243,14 +241,19 @@ const FEATURES = [
     desc: 'Opt-in push wake-up via Postgres LISTEN/NOTIFY or SQL Server Service Broker. Workers react instantly to new jobs — no unnecessary polling overhead.',
   },
   {
-    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/></svg>,
-    title: 'Two databases, one API',
-    desc: 'PostgreSQL and SQL Server supported out of the box. Provider packages wire everything up — just call opt.UsePostgreSql() or opt.UseSqlServer().',
-  },
-  {
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>,
     title: 'Batches & continuations',
     desc: 'Group related jobs into batches. Configure child activation on failure, await all children, and chain follow-up jobs when a batch completes.',
+  },
+  {
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>,
+    title: 'OpenTelemetry built in',
+    desc: 'Native OTel integration — Activity traces, 4 metrics instruments (duration, active, completed, enqueued), span attributes per OTEL messaging conventions. Plug into any backend.',
+  },
+  {
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>,
+    title: 'Circuit breaker',
+    desc: 'Opt-in circuit breaker stops hammering a failing downstream. Closed → Open → HalfOpen probe gate. Group handlers by circuit key. Rescheduled jobs preserve their retry budget.',
   },
 ];
 

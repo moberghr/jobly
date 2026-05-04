@@ -64,14 +64,17 @@ await publisher.Enqueue(new GenerateReport { ReportId = 1 },
     new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 5));
 ```
 
-Configure global defaults:
+Configure global defaults inside the `AddWarpWorker` lambda:
 
 ```csharp
-services.AddWarpRetry(o =>
+builder.Services.AddWarpWorker<AppDbContext>(opt =>
 {
-    o.MaxRetries = 3;
-    o.Delays = [15, 60, 300]; // seconds
-    o.JitterFactor = 0.2;     // ±20% random jitter on each delay (default: 0, no jitter)
+    opt.AddRetry(o =>
+    {
+        o.MaxRetries = 3;
+        o.Delays = [15, 60, 300]; // seconds
+        o.JitterFactor = 0.2;     // ±20% random jitter on each delay (default: 0, no jitter)
+    });
 });
 ```
 
@@ -102,9 +105,13 @@ await publisher.Enqueue(new SendReceipt { OrderId = 1 }, parentId); // Runs afte
 
 ## Batches
 
-```csharp
-var batchPublisher = serviceProvider.GetRequiredService<IBatchPublisher>();
+Batches use `IBatchPublisher` — a separate service from `IPublisher`. Inject it directly:
 
+```csharp
+public class MyService(IBatchPublisher batchPublisher) { }
+```
+
+```csharp
 var jobs = orders.Select(o => new ProcessOrder { OrderId = o.Id }).ToList();
 var batchId = await batchPublisher.StartNew(jobs);
 
@@ -150,7 +157,7 @@ If the job is processing, this sets `CancellationMode = Graceful` instead of imm
 
 ## Mutex
 
-Only one job per mutex key can be processing at a time. Requires `AddWarpMutex()`:
+Only one job per mutex key can be processing at a time. Requires `opt.AddMutex()` inside `AddWarpWorker`:
 
 ```csharp
 await publisher.Enqueue(new ProcessPayment { CustomerId = 123 },

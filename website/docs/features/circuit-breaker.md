@@ -8,15 +8,18 @@ Stops hammering a failing downstream when a handler's failure rate crosses a thr
 
 ## Setup
 
-Circuit Breaker is an opt-in addon. Register it alongside `AddWarpWorker`:
+Circuit Breaker is an opt-in addon. Register it inside the `AddWarpWorker` lambda:
 
 ```csharp
-builder.Services.AddWarpWorker<AppDbContext>();
-builder.Services.AddWarpCircuitBreaker<AppDbContext>(o =>
+builder.Services.AddWarpWorker<AppDbContext>(opt =>
 {
-    o.Threshold = 5;                         // open after 5 consecutive failures
-    o.Duration = TimeSpan.FromMinutes(1);    // stay open for 1 minute
-    o.ResetJitter = TimeSpan.FromSeconds(10); // ±10s reschedule jitter
+    opt.UsePostgreSql();
+    opt.AddCircuitBreaker(o =>
+    {
+        o.Threshold = 5;                          // open after 5 consecutive failures
+        o.Duration = TimeSpan.FromMinutes(1);     // stay open for 1 minute
+        o.ResetJitter = TimeSpan.FromSeconds(10); // ±10s reschedule jitter
+    });
 });
 ```
 
