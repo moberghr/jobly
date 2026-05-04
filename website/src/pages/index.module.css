@@ -1,23 +1,534 @@
-/**
- * CSS files with the .module.css suffix will be treated as CSS modules
- * and scoped locally.
- */
+/* ── Hero ──────────────────────────────────────────────────────────────────── */
+.hero {
+  padding: 80px 0 72px;
+}
 
-.heroBanner {
-  padding: 4rem 0;
-  text-align: center;
-  position: relative;
+.heroGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+
+@media (max-width: 1024px) {
+  .heroGrid { grid-template-columns: 1fr; gap: 40px; }
+  .heroRight { display: none; }
+}
+
+.heroLeft { max-width: 600px; }
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--wp-text-dim);
+  margin-bottom: 24px;
+}
+
+.eyebrowDot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wp-accent);
+  flex-shrink: 0;
+}
+
+.heroTitle {
+  font-size: clamp(38px, 5vw, 60px);
+  font-weight: 300;
+  letter-spacing: -0.025em;
+  line-height: 1.07;
+  color: var(--wp-text);
+  margin: 0 0 22px;
+}
+
+.heroTitle em {
+  font-style: normal;
+  color: var(--wp-accent);
+  font-weight: 500;
+}
+
+.heroSub {
+  font-size: 18px;
+  color: var(--wp-text-muted);
+  line-height: 1.6;
+  margin: 0 0 32px;
+}
+
+.heroActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+
+.heroStats {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 11.5px;
+  color: var(--wp-text-dim);
+}
+
+.heroStats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.heroStats span::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--wp-accent);
+  flex-shrink: 0;
+}
+
+.heroRight {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 11px 22px;
+  border-radius: var(--wp-radius-sm);
+  background: var(--wp-accent);
+  color: #fff !important;
+  text-decoration: none !important;
+  border: 1px solid transparent;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.btnPrimary:hover {
+  background: var(--wp-accent-dark);
+  box-shadow: 0 4px 18px rgba(78, 14, 255, 0.25);
+  transform: translateY(-1px);
+  color: #fff !important;
+}
+
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 11px 22px;
+  border-radius: var(--wp-radius-sm);
+  background: var(--wp-surface2);
+  color: var(--wp-text) !important;
+  text-decoration: none !important;
+  border: 1px solid var(--wp-border);
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btnSecondary:hover {
+  border-color: var(--wp-accent);
+  color: var(--wp-accent) !important;
+}
+
+/* ── Terminal ────────────────────────────────────────────────────────────── */
+.terminal {
+  background: var(--wp-terminal-bg);
+  border: 1px solid var(--wp-terminal-border);
+  border-radius: var(--wp-radius);
+  overflow: hidden;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 13px;
+  line-height: 1.75;
+  box-shadow: 0 16px 48px -8px rgba(14, 10, 50, 0.25);
+}
+
+.terminalBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--wp-terminal-border);
+  background: var(--wp-terminal-bar-bg);
+}
+
+.terminalBar i {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2a303e;
+  flex-shrink: 0;
+}
+
+.terminalLabel {
+  margin-left: 12px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.terminalPre {
+  margin: 0;
+  padding: 18px 20px;
+  color: #CFD4E2;
+  overflow-x: auto;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+/* ── Section layout ──────────────────────────────────────────────────────── */
+.section {
+  padding: 88px 0;
+  border-top: 1px solid var(--wp-border);
+}
+
+.sectionAlt {
+  background: var(--wp-surface2);
+}
+
+.secHead {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--wp-text-dim);
+  margin: 0 0 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--wp-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.secNum {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--wp-accent);
+  min-width: 24px;
+}
+
+.h2 {
+  font-size: clamp(26px, 3.5vw, 42px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  color: var(--wp-text);
+  margin: 0 0 18px;
+  max-width: 700px;
+}
+
+.lede {
+  font-size: 17px;
+  color: var(--wp-text-muted);
+  max-width: 620px;
+  margin: 0 0 44px;
+  line-height: 1.6;
+}
+
+/* ── Marquee ──────────────────────────────────────────────────────────────── */
+.marqueeWrap {
+  border-top: 1px solid var(--wp-border);
+  border-bottom: 1px solid var(--wp-border);
+  background: var(--wp-surface2);
   overflow: hidden;
 }
 
-@media screen and (max-width: 996px) {
-  .heroBanner {
-    padding: 2rem;
-  }
-}
-
-.buttons {
+.marqueeInner {
   display: flex;
   align-items: center;
+  gap: 40px;
+  padding: 18px 0;
+}
+
+.marqueeLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--wp-text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.marqueeViewport {
+  flex: 1;
+  overflow: hidden;
+}
+
+.marqueeTrack {
+  display: inline-flex;
+  gap: 3rem;
+  animation: marqueeScroll 40s linear infinite;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--wp-text-muted);
+  white-space: nowrap;
+}
+
+@keyframes marqueeScroll {
+  to { transform: translateX(-50%); }
+}
+
+/* ── Patterns ────────────────────────────────────────────────────────────── */
+.patternsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 1024px) {
+  .patternsGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .patternsGrid { grid-template-columns: 1fr; }
+}
+
+.patternCard {
+  background: var(--wp-surface);
+  border: 1px solid var(--wp-border);
+  border-radius: var(--wp-radius);
+  padding: 24px;
+  transition: border-color 0.15s;
+}
+
+.patternCard:hover {
+  border-color: var(--wp-border-bright);
+}
+
+.patternNum {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 11px;
+  color: var(--wp-text-dim);
+  margin-bottom: 12px;
+  display: block;
+}
+
+.patternName {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--wp-text);
+  margin: 0 0 6px;
+  line-height: 1.2;
+}
+
+.patternIface {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 12px;
+  color: var(--wp-accent);
+  background: var(--wp-accent-dim);
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-bottom: 14px;
+}
+
+.patternDesc {
+  font-size: 14px;
+  color: var(--wp-text-muted);
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+
+.patternCode pre {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--wp-surface2);
+  border: 1px solid var(--wp-border);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--wp-text-muted);
+  font-family: var(--ifm-font-family-monospace);
+  overflow-x: auto;
+}
+
+/* ── Features grid ───────────────────────────────────────────────────────── */
+.featuresGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .featuresGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 580px) {
+  .featuresGrid { grid-template-columns: 1fr; }
+}
+
+.featureCard {
+  background: var(--wp-surface);
+  border: 1px solid var(--wp-border);
+  border-radius: var(--wp-radius);
+  padding: 22px 24px;
+  transition: border-color 0.15s;
+}
+
+.featureCard:hover {
+  border-color: var(--wp-border-bright);
+}
+
+.featureIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--wp-accent-dim);
+  color: var(--wp-accent);
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  margin-bottom: 14px;
+}
+
+.featureTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wp-text);
+  margin: 0 0 8px;
+}
+
+.featureText {
+  font-size: 14px;
+  color: var(--wp-text-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── Dashboard screenshots ───────────────────────────────────────────────── */
+.screenshotWrap {
+  border: 1px solid var(--wp-border);
+  border-radius: var(--wp-radius);
+  overflow: hidden;
+  box-shadow: 0 16px 48px -8px rgba(0, 0, 0, 0.12);
+}
+
+.screenshot {
+  display: block;
+  width: 100%;
+  border-radius: 0;
+  margin: 0;
+}
+
+/* ── Install ──────────────────────────────────────────────────────────────── */
+.installGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+@media (max-width: 860px) {
+  .installGrid { grid-template-columns: 1fr; }
+}
+
+.installHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+
+.installLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--wp-text-dim);
+}
+
+.installMeta {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 11px;
+  color: var(--wp-text-dim);
+}
+
+.installActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ── Callout ─────────────────────────────────────────────────────────────── */
+.callout {
+  background: var(--wp-accent-gradient);
+  color: #fff;
+  padding: 56px 48px;
+  border-radius: var(--wp-radius);
+}
+
+.callout h2 {
+  color: #fff;
+  font-weight: 300;
+  margin: 0 0 14px;
+  font-size: clamp(24px, 3.5vw, 40px);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.callout p {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 17px;
+  margin: 0 0 28px;
+  max-width: 560px;
+  line-height: 1.6;
+}
+
+.calloutActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.calloutBtnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 11px 22px;
+  border-radius: var(--wp-radius-sm);
+  background: #fff;
+  color: var(--wp-accent-dark) !important;
+  text-decoration: none !important;
+  border: 1px solid transparent;
+  transition: background 0.15s, color 0.15s;
+}
+
+.calloutBtnPrimary:hover {
+  background: #f0ecff;
+  color: var(--wp-accent) !important;
+}
+
+.calloutBtnSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 11px 22px;
+  border-radius: var(--wp-radius-sm);
+  background: transparent;
+  color: #fff !important;
+  text-decoration: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  transition: border-color 0.15s;
+}
+
+.calloutBtnSecondary:hover {
+  border-color: #fff;
 }
