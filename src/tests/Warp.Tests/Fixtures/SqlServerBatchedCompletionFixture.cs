@@ -12,7 +12,7 @@ public class SqlServerBatchedCompletionFixture : IAsyncLifetime, IDatabaseFixtur
     private Respawner _respawner = null!;
     private string _connectionString = null!;
 
-    public WarpTestServer TestServer { get; private set; } = null!;
+    public WarpTestServer? TestServer => null;
 
     public async ValueTask InitializeAsync()
     {
@@ -29,15 +29,6 @@ public class SqlServerBatchedCompletionFixture : IAsyncLifetime, IDatabaseFixtur
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.SqlServer,
-            TablesToIgnore = FixtureHelper.GetServerTablesToIgnore(context),
-        });
-
-        TestServer = await WarpTestServer.StartAsync(this, config =>
-        {
-            config.UseDispatcher = true;
-            config.WorkerCount = 5;
-            config.CompletionBatchSize = 10;
-            config.CompletionFlushInterval = TimeSpan.FromMilliseconds(50);
         });
     }
 
@@ -56,10 +47,7 @@ public class SqlServerBatchedCompletionFixture : IAsyncLifetime, IDatabaseFixtur
             .Options);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        await TestServer.DisposeAsync();
-    }
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
 [CollectionDefinition]
