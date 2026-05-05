@@ -90,37 +90,85 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
     /// </summary>
     internal async Task RunAsync(CancellationToken ct)
     {
-        await EnsureRegisteredAsync(ct);
+        // Initial registration: if the DB is momentarily unhappy (transient SqlException —
+        // "session busy" / "severe error" under load), don't let the exception escape and
+        // crash the host (BackgroundServiceExceptionBehavior=StopHost is the default in
+        // .NET 6+). Log and back off; the next iteration retries.
+        while (!ct.IsCancellationRequested && _serverTaskId == null)
+        {
+            try
+            {
+                await EnsureRegisteredAsync(ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Server task {Name} registration failed; retrying", _name);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1), ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+            }
+        }
 
         while (!ct.IsCancellationRequested)
         {
-            var interval = await GetIntervalAsync(ct);
-            if (interval == null)
+            try
             {
+                var interval = await GetIntervalAsync(ct);
+                if (interval == null)
+                {
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(10), ct);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+
+                    continue;
+                }
+
+                var didWork = await RunOneIterationAsync(ct);
+                if (ct.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                if (didWork && _rerunImmediately)
+                {
+                    continue;
+                }
+
+                await WaitForNextRunAsync(interval.Value, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                // Any transient failure outside RunOneIterationAsync (which has its own
+                // bookkeeping + swallow). Logged here so a flaky DB connection during
+                // GetIntervalAsync / WaitForNextRunAsync doesn't crash the host.
+                _logger.LogError(ex, "Server task {Name} loop iteration failed", _name);
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(10), ct);
+                    await Task.Delay(TimeSpan.FromSeconds(1), ct);
                 }
                 catch (OperationCanceledException)
                 {
                     break;
                 }
-
-                continue;
             }
-
-            var didWork = await RunOneIterationAsync(ct);
-            if (ct.IsCancellationRequested)
-            {
-                break;
-            }
-
-            if (didWork && _rerunImmediately)
-            {
-                continue;
-            }
-
-            await WaitForNextRunAsync(interval.Value, ct);
         }
     }
 

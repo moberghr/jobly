@@ -99,10 +99,19 @@ public class WarpServerRegistration<TContext> : IHostedService
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        // Cleanup must happen even if the shutdown token is already cancelled — otherwise stale
+        // Server/Worker/WorkerGroup rows are left behind. In production this happens when the
+        // host's graceful shutdown budget (default 30s) elapses while pending completions are
+        // still draining; ServerCleanup on a surviving server would eventually GC them via
+        // heartbeat-staleness, but the leak window is ugly. Use a fresh, time-bounded token so
+        // cleanup is decoupled from the upstream cancel but still bounded if the DB is unreachable.
+        using var cleanupCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var ct = cleanupCts.Token;
+
         using var scope = _serviceScopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
-        var server = await context.Set<Server>().FindAsync([_configuration.ServerId], cancellationToken);
+        var server = await context.Set<Server>().FindAsync([_configuration.ServerId], ct);
         if (server == null)
         {
             return;
@@ -110,7 +119,7 @@ public class WarpServerRegistration<TContext> : IHostedService
 
         var workers = await context.Set<Warp.Core.Data.Entities.Worker>()
             .Where(x => x.ServerId == server.Id)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(ct);
         context.Set<Warp.Core.Data.Entities.Worker>().RemoveRange(workers);
 
         // WorkerGroup rows are FK-linked to Server without OnDelete(Cascade) — we must remove
@@ -118,10 +127,10 @@ public class WarpServerRegistration<TContext> : IHostedService
         // ServerCleanup, which cleans up WorkerGroup rows for timed-out servers.
         var workerGroups = await context.Set<Warp.Core.Data.Entities.WorkerGroup>()
             .Where(x => x.ServerId == server.Id)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(ct);
         context.Set<Warp.Core.Data.Entities.WorkerGroup>().RemoveRange(workerGroups);
 
         context.Set<Server>().Remove(server);
-        await context.SaveChangesAsync(cancellationToken);
+        await context.SaveChangesAsync(ct);
     }
 }

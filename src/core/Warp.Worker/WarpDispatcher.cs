@@ -18,11 +18,6 @@ namespace Warp.Worker;
 public class WarpDispatcher<TContext> : BackgroundService
     where TContext : DbContext
 {
-    // Push-path wake-up: the NotificationListenerTask holds no reference to dispatcher instances,
-    // so we register ourselves in a static list and SignalAll fans out. Fine because dispatchers
-    // are per-group and there's typically a handful. SemaphoreSlim is cross-thread safe.
-    private static readonly List<WarpDispatcher<TContext>> _instances = [];
-
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<WarpDispatcher<TContext>> _logger;
     private readonly WorkerGroupConfiguration _groupConfiguration;
@@ -32,6 +27,7 @@ public class WarpDispatcher<TContext> : BackgroundService
     private readonly PauseStateHolder _pauseStateHolder;
     private readonly Guid _workerGroupId;
     private readonly SemaphoreSlim _signal = new(0);
+    private readonly IDisposable _registration;
 
     public WarpDispatcher(
         IServiceScopeFactory scopeFactory,
@@ -40,7 +36,8 @@ public class WarpDispatcher<TContext> : BackgroundService
         WorkerGroupConfiguration groupConfiguration,
         TimeProvider timeProvider,
         PauseStateHolder pauseStateHolder,
-        Guid workerGroupId)
+        Guid workerGroupId,
+        DispatcherRegistry registry)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
@@ -56,31 +53,10 @@ public class WarpDispatcher<TContext> : BackgroundService
             SingleWriter = true,
         });
 
-        lock (_instances)
-        {
-            _instances.Add(this);
-        }
+        _registration = registry.Register(_signal);
     }
 
     public ChannelReader<Job> JobReader => _jobChannel.Reader;
-
-    /// <summary>
-    /// Wakes all registered dispatchers — used by the notification listener so a <c>JobEnqueued</c>
-    /// push shortcuts the current exponential-backoff sleep.
-    /// </summary>
-    public static void SignalAll()
-    {
-        lock (_instances)
-        {
-            foreach (var signal in _instances.Select(instance => instance._signal))
-            {
-                if (signal.CurrentCount == 0)
-                {
-                    signal.Release();
-                }
-            }
-        }
-    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -89,52 +65,66 @@ public class WarpDispatcher<TContext> : BackgroundService
         var factor = _groupConfiguration.PollingIntervalFactor;
         var currentDelay = floor;
 
-        while (!stoppingToken.IsCancellationRequested)
+        // Cleanup MUST run even if an unexpected exception escapes the loop body — the channel
+        // writer must be completed so DispatcherWorkers waiting on WaitToReadAsync can exit.
+        // A leaked exception that skipped this would block IHost.StopAsync until ShutdownTimeout
+        // (default 30s) fires, masking the real failure.
+        try
         {
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                if (_pauseStateHolder.IsPaused(_workerGroupId))
+                try
                 {
-                    currentDelay = floor;
-                    await _signal.WaitAsync(floor, stoppingToken);
-                    continue;
-                }
+                    if (_pauseStateHolder.IsPaused(_workerGroupId))
+                    {
+                        currentDelay = floor;
+                        await _signal.WaitAsync(floor, stoppingToken);
+                        continue;
+                    }
 
-                var result = await FetchAndDistribute(stoppingToken);
-                if (result == FetchResult.Empty)
-                {
-                    currentDelay = PollingBackoff.Next(currentDelay, floor, max, factor);
-                    await _signal.WaitAsync(currentDelay, stoppingToken);
-                    continue;
-                }
+                    var result = await FetchAndDistribute(stoppingToken);
+                    if (result == FetchResult.Empty)
+                    {
+                        currentDelay = PollingBackoff.Next(currentDelay, floor, max, factor);
+                        await _signal.WaitAsync(currentDelay, stoppingToken);
+                        continue;
+                    }
 
-                if (result == FetchResult.Fetched)
-                {
-                    // Real work happened — reset the idle backoff. ChannelFull is not evidence
-                    // of work done (workers are saturated), so leave currentDelay alone; the
-                    // 10ms wait inside FetchAndDistribute is the channel-full throttle.
-                    currentDelay = floor;
+                    if (result == FetchResult.Fetched)
+                    {
+                        // Real work happened — reset the idle backoff. ChannelFull is not evidence
+                        // of work done (workers are saturated), so leave currentDelay alone; the
+                        // 10ms wait inside FetchAndDistribute is the channel-full throttle.
+                        currentDelay = floor;
+                    }
                 }
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                // Exception is a transient signal, not an idle-queue signal — do not compound
-                // the polling backoff. A single floor delay keeps the dispatcher responsive
-                // after recovery instead of sitting at MaxPollingInterval for 30s.
-                _logger.LogError(ex, "Dispatcher fetch failed");
-                await Task.Delay(floor, stoppingToken);
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    // Exception is a transient signal, not an idle-queue signal — do not compound
+                    // the polling backoff. A single floor delay keeps the dispatcher responsive
+                    // after recovery instead of sitting at MaxPollingInterval for 30s. The wait is
+                    // wrapped in its own try/catch so an OCE during shutdown doesn't escape and
+                    // skip the writer cleanup below.
+                    _logger.LogError(ex, "Dispatcher fetch failed");
+                    try
+                    {
+                        await Task.Delay(floor, stoppingToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                }
             }
         }
-
-        _jobChannel.Writer.Complete();
-
-        lock (_instances)
+        finally
         {
-            _instances.Remove(this);
+            _jobChannel.Writer.Complete();
+            _registration.Dispose();
         }
     }
 

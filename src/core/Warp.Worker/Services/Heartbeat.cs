@@ -44,28 +44,42 @@ public sealed class Heartbeat<TContext> : IServerTask
 
     public async Task<string?> ExecuteAsync(CancellationToken ct)
     {
-        var server = await _context.Set<Server>()
-            .FindAsync([_configuration.ServerId], ct)
-            ?? throw new InvalidOperationException("Server not found in the database.");
+        // Use ExecuteUpdate (no entity load, no change tracker) so the heartbeat write doesn't
+        // pull a Server snapshot whose PausedAt could go stale before we read it back. Then
+        // read PausedAt fresh below — every iteration of this task sees the latest committed
+        // pause state, never a load-time snapshot.
+        var now = _time.GetUtcNow().UtcDateTime;
+        var snapshot = _cpuTracker.Sample(now);
+        var memoryBytes = snapshot?.WorkingSet;
+        var cpuPercent = snapshot?.CpuPercent;
 
-        server.LastHeartbeatTime = _time.GetUtcNow().UtcDateTime;
+        var affected = await _context.Set<Server>()
+            .Where(s => s.Id == _configuration.ServerId)
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(p => p.LastHeartbeatTime, now)
+                    .SetProperty(p => p.MemoryWorkingSetBytes, p => memoryBytes ?? p.MemoryWorkingSetBytes)
+                    .SetProperty(p => p.CpuUsagePercent, p => cpuPercent ?? p.CpuUsagePercent),
+                ct);
 
-        var snapshot = _cpuTracker.Sample(_time.GetUtcNow().UtcDateTime);
-        if (snapshot != null)
+        if (affected == 0)
         {
-            server.MemoryWorkingSetBytes = snapshot.Value.WorkingSet;
-            if (snapshot.Value.CpuPercent.HasValue)
-            {
-                server.CpuUsagePercent = snapshot.Value.CpuPercent.Value;
-            }
+            throw new InvalidOperationException("Server not found in the database.");
         }
 
-        await _context.SaveChangesAsync(ct);
+        // Pause-state snapshot. Both reads are fresh DB queries — no change tracker, no
+        // load-time staleness. AsNoTracking() makes the projections explicit.
+        var serverPausedAt = await _context.Set<Server>()
+            .AsNoTracking()
+            .Where(s => s.Id == _configuration.ServerId)
+            .Select(s => s.PausedAt)
+            .FirstOrDefaultAsync(ct);
 
         var groupPauseStates = await _context.Set<WorkerGroup>()
+            .AsNoTracking()
             .Where(g => g.ServerId == _configuration.ServerId)
             .ToDictionaryAsync(g => g.Id, g => g.PausedAt != null, ct);
-        _pauseStateHolder.Update(server.PausedAt != null, groupPauseStates);
+        _pauseStateHolder.Update(serverPausedAt != null, groupPauseStates);
 
         return null;
     }

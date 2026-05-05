@@ -19,6 +19,7 @@ public class NotificationListenerTask<TContext> : BackgroundService
     private readonly WarpDatabasePushConfiguration _options;
     private readonly WarpWorkerConfiguration _workerConfiguration;
     private readonly ServerTaskSignals<TContext> _signals;
+    private readonly DispatcherRegistry _dispatcherRegistry;
     private readonly ILogger<NotificationListenerTask<TContext>> _logger;
 
     public NotificationListenerTask(
@@ -26,12 +27,14 @@ public class NotificationListenerTask<TContext> : BackgroundService
         WarpDatabasePushConfiguration options,
         IOptions<WarpWorkerConfiguration> workerConfiguration,
         ServerTaskSignals<TContext> signals,
+        DispatcherRegistry dispatcherRegistry,
         ILogger<NotificationListenerTask<TContext>> logger)
     {
         _transport = transport;
         _options = options;
         _workerConfiguration = workerConfiguration.Value;
         _signals = signals;
+        _dispatcherRegistry = dispatcherRegistry;
         _logger = logger;
     }
 
@@ -101,7 +104,7 @@ public class NotificationListenerTask<TContext> : BackgroundService
 
     private void DrainSignals()
     {
-        WarpDispatcher<TContext>.SignalAll();
+        _dispatcherRegistry.SignalAll();
         _signals.SignalMessageEnqueued();
         _signals.SignalJobFinalized();
     }
@@ -111,7 +114,7 @@ public class NotificationListenerTask<TContext> : BackgroundService
         switch (notification.Kind)
         {
             case NotificationKind.JobEnqueued:
-                WarpDispatcher<TContext>.SignalAll();
+                _dispatcherRegistry.SignalAll();
                 break;
             case NotificationKind.MessageEnqueued:
                 _signals.SignalMessageEnqueued();

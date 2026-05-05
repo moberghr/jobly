@@ -152,9 +152,27 @@ public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBas
 
             await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-            // Wait for handlers to run (empty handlers complete ~instantly).
-            // Completions are buffered; the long flush interval means they won't auto-flush.
-            await server.WaitForJobsToLeaveEnqueued(isolatedQueue, 5, TimeSpan.FromSeconds(10));
+            // Wait until all 5 jobs have been picked up by a worker (CurrentWorkerId set by
+            // MarkWorkerOwnership at handler entry). This avoids a race: WaitForJobsToLeaveEnqueued
+            // alone returns as soon as the dispatcher's batch claim commits Processing, but before
+            // the in-memory channel delivery + worker pickup completes. If we disposed in that
+            // window, the dispatcher's UnclaimUndelivered would roll the undelivered jobs back to
+            // Enqueued — defeating the test's premise that pending completions get flushed.
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            while (DateTime.UtcNow < deadline)
+            {
+                var pollCtx = Fixture.CreateContext();
+                var pickedUp = await pollCtx.Set<Job>()
+                    .CountAsync(
+                        j => j.Queue == isolatedQueue && j.CurrentWorkerId != null,
+                        Xunit.TestContext.Current.CancellationToken);
+                if (pickedUp == 5)
+                {
+                    break;
+                }
+
+                await Task.Delay(100, Xunit.TestContext.Current.CancellationToken);
+            }
         }
         finally
         {

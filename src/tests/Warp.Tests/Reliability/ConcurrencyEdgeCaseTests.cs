@@ -89,31 +89,25 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
 
         try
         {
-            // Act — requeue from 2 threads concurrently
-            var successCount = 0;
+            // Act — requeue from 2 threads concurrently. Both should succeed (the row-level
+            // WAIT lock serializes them); the second observes State.Enqueued and early-returns
+            // without re-running the requeue logic.
             var tasks = new List<Task>();
             for (var i = 0; i < 2; i++)
             {
                 tasks.Add(Task.Run(
                     async () =>
                     {
-                        try
-                        {
-                            var svc = server.CreateCommandService();
-                            await svc.RequeueJob(jobId);
-                            Interlocked.Increment(ref successCount);
-                        }
-                        catch (ArgumentException)
-                        {
-                            // Expected — SKIP LOCKED causes second call to not find the row
-                        }
+                        var svc = server.CreateCommandService();
+                        await svc.RequeueJob(jobId);
                     },
                     Xunit.TestContext.Current.CancellationToken));
             }
 
             await Task.WhenAll(tasks);
 
-            // Assert — state should be consistent (Enqueued), exactly 1 successful requeue
+            // Assert — state is consistent (Enqueued) and exactly one Requeued log was written,
+            // proving the second call early-returned without performing a second requeue.
             var ctx = Fixture.CreateContext();
             var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
             job.CurrentState.ShouldBe(State.Enqueued);
@@ -121,8 +115,6 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
             var requeuedLogs = await ctx.Set<JobLog>()
                 .CountAsync(l => l.JobId == jobId && l.EventType == "Requeued", Xunit.TestContext.Current.CancellationToken);
             requeuedLogs.ShouldBe(1);
-
-            successCount.ShouldBe(1);
         }
         finally
         {
