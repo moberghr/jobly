@@ -10,30 +10,18 @@ using Warp.Worker;
 namespace Warp.Tests.Worker;
 
 [GenerateDatabaseTests(FixtureKind.BatchedCompletion)]
-public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
+public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBase
 {
-    private readonly IDatabaseFixture _fixture;
-
-    protected BatchedCompletionIntegrationTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
-
-    protected WarpTestServer Server => _fixture.TestServer!;
-
-    public async ValueTask InitializeAsync()
+    protected BatchedCompletionIntegrationTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
     {
-        try
-        {
-            await _fixture.ResetAsync();
-        }
-        catch
-        {
-            await Task.Delay(100, Xunit.TestContext.Current.CancellationToken);
-            await _fixture.ResetAsync();
-        }
-
-        await Server.ReRegisterServer();
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public override async ValueTask InitializeAsync()
+    {
+        await base.InitializeAsync();
+        await Server.ReRegisterServer();
+    }
 
     [TimedFact(timeout: 60_000)]
     public async Task GivenManyShortJobs_WhenProcessed_ThenAllReachCompletedState()
@@ -140,7 +128,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
         // Arrange — spin up a test-local server on an isolated queue so the fixture server doesn't race us.
         // A long flush interval ensures completions stay buffered until StopAsync drains them.
         const string isolatedQueue = "batch-shutdown-flush";
-        var server = await WarpTestServer.StartAsync(_fixture, config =>
+        var server = await WarpTestServer.StartAsync(Fixture, config =>
         {
             config.UseDispatcher = true;
             config.WorkerCount = 2;
@@ -170,7 +158,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
         }
 
         // Assert — after shutdown, all jobs must be persisted as Completed.
-        var ctx = _fixture.CreateContext();
+        var ctx = Fixture.CreateContext();
         var jobs = await ctx.Set<Job>()
             .Where(j => j.Queue == isolatedQueue)
             .AsNoTracking()
@@ -225,7 +213,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
     {
         // Arrange — isolated server with batching disabled (opt-out path).
         const string isolatedQueue = "batch-size-one";
-        await using var server = await WarpTestServer.StartAsync(_fixture, config =>
+        await using var server = await WarpTestServer.StartAsync(Fixture, config =>
         {
             config.UseDispatcher = true;
             config.WorkerCount = 2;
@@ -246,7 +234,7 @@ public abstract class BatchedCompletionIntegrationTestsBase : IAsyncLifetime
         await server.WaitForCompletion(TimeSpan.FromSeconds(30));
 
         // Assert
-        var ctx = _fixture.CreateContext();
+        var ctx = Fixture.CreateContext();
         var jobs = await ctx.Set<Job>()
             .Where(j => j.Queue == isolatedQueue)
             .CountAsync(j => j.CurrentState == State.Completed, Xunit.TestContext.Current.CancellationToken);

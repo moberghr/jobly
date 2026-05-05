@@ -17,28 +17,18 @@ namespace Warp.Tests.Notifications;
 // If this property regresses, any deploy that ships with a broken transport becomes a silent
 // job-loss incident.
 [GenerateDatabaseTests(FixtureKind.Integration)]
-public abstract class PushFailurePollingBackstopTestsBase : IAsyncLifetime
+public abstract class PushFailurePollingBackstopTestsBase : IntegrationTestBase
 {
-    private readonly IDatabaseFixture _fixture;
-
-    protected PushFailurePollingBackstopTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
-
-    public async ValueTask InitializeAsync()
+    protected PushFailurePollingBackstopTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
     {
-        try
-        {
-            await _fixture.ResetAsync();
-        }
-        catch
-        {
-            await Task.Delay(100, Xunit.TestContext.Current.CancellationToken);
-            await _fixture.ResetAsync();
-        }
-
-        await _fixture.TestServer!.ReRegisterServer();
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public override async ValueTask InitializeAsync()
+    {
+        await base.InitializeAsync();
+        await Server.ReRegisterServer();
+    }
 
     [TimedFact]
     public async Task GivenPushEnabledButTransportBroken_WhenJobEnqueued_ThenPollingStillPicksItUp()
@@ -53,7 +43,7 @@ public abstract class PushFailurePollingBackstopTestsBase : IAsyncLifetime
         var failingTransport = new FailingTransport();
 
         await using var server = await WarpTestServer.StartAsync(
-            _fixture,
+            Fixture,
             configure: cfg =>
             {
                 cfg.UseDispatcher = true;

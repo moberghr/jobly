@@ -16,28 +16,18 @@ namespace Warp.Tests.Worker;
 //   * StaleJobRecovery — any Processing orphans the first two paths miss are reclaimed
 //     after InvisibilityTimeout
 [GenerateDatabaseTests(FixtureKind.Integration)]
-public abstract class DispatcherShutdownIntegrationTestsBase : IAsyncLifetime
+public abstract class DispatcherShutdownIntegrationTestsBase : IntegrationTestBase
 {
-    private readonly IDatabaseFixture _fixture;
-
-    protected DispatcherShutdownIntegrationTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
-
-    public async ValueTask InitializeAsync()
+    protected DispatcherShutdownIntegrationTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
     {
-        try
-        {
-            await _fixture.ResetAsync();
-        }
-        catch
-        {
-            await Task.Delay(100, Xunit.TestContext.Current.CancellationToken);
-            await _fixture.ResetAsync();
-        }
-
-        await _fixture.TestServer!.ReRegisterServer();
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public override async ValueTask InitializeAsync()
+    {
+        await base.InitializeAsync();
+        await Server.ReRegisterServer();
+    }
 
     [TimedFact(30_000)]
     public async Task GivenWorkInProgress_WhenServerReplaced_ThenAllJobsEventuallyComplete()
@@ -49,7 +39,7 @@ public abstract class DispatcherShutdownIntegrationTestsBase : IAsyncLifetime
         const string queue = "dispatcher-shutdown-baton";
         var invisibilityTimeout = TimeSpan.FromSeconds(2);
 
-        var serverA = await WarpTestServer.StartAsync(_fixture, cfg =>
+        var serverA = await WarpTestServer.StartAsync(Fixture, cfg =>
         {
             cfg.UseDispatcher = true;
             cfg.WorkerCount = 2;
@@ -74,7 +64,7 @@ public abstract class DispatcherShutdownIntegrationTestsBase : IAsyncLifetime
         // A leaves the DB in, B drives every job to Completed.
         await serverA.DisposeAsync();
 
-        await using var serverB = await WarpTestServer.StartAsync(_fixture, cfg =>
+        await using var serverB = await WarpTestServer.StartAsync(Fixture, cfg =>
         {
             cfg.UseDispatcher = true;
             cfg.WorkerCount = 2;
@@ -88,7 +78,7 @@ public abstract class DispatcherShutdownIntegrationTestsBase : IAsyncLifetime
         // one recovery sweep (~0.5s) + handler time. 20s leaves comfortable CI headroom.
         await serverB.WaitForCompletion(timeout: TimeSpan.FromSeconds(20));
 
-        var ctx = _fixture.CreateContext();
+        var ctx = Fixture.CreateContext();
         var jobs = await ctx.Set<Job>()
             .Where(j => j.Queue == queue)
             .AsNoTracking()
