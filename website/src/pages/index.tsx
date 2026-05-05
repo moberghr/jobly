@@ -77,20 +77,21 @@ function Hero() {
           <div className={styles.heroLeft}>
             <div className={styles.eyebrow}>
               <span className={styles.eyebrowDot} />
-              Distributed job processing · .NET 10
+              Distributed job processing for .NET 10
             </div>
             <h1 className={styles.heroTitle}>
-              Background processing<br />
-              that <em>scales</em> with your app.
+              Reliable background processing<br />
+              for .NET production systems.
             </h1>
             <p className={styles.heroSub}>
               Warp is a distributed job processing and message queue for .NET&nbsp;10.
-              Pub/sub messages, orchestrated jobs, in-memory requests — built on your
-              existing EF&nbsp;Core DbContext with the outbox pattern included.
+              Pub/sub messaging, orchestrated background jobs, and in-memory request
+              dispatch — integrated with your existing EF&nbsp;Core DbContext using
+              the transactional outbox pattern.
             </p>
             <div className={styles.heroActions}>
               <Link className={styles.btnPrimary} to="/docs/getting-started">
-                Get Started
+                View Documentation
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
                   <path d="M5 12h14M13 6l6 6-6 6" />
                 </svg>
@@ -180,11 +181,11 @@ function Patterns() {
     <section className={styles.section} id="patterns">
       <div className="container">
         <SectionHead num="01" label="Four patterns" />
-        <h2 className={styles.h2}>One library. Every background processing need.</h2>
+        <h2 className={styles.h2}>Four processing patterns. One unified library.</h2>
         <p className={styles.lede}>
-          Messages for fan-out, Jobs for durable orchestration, Requests for in-process
-          queries, Streams for async sequences. All share the same pipeline, the same
-          dashboard, the same worker.
+          Messages for fan-out delivery, Jobs for durable orchestrated execution,
+          Requests for in-process query dispatch, and Streams for asynchronous
+          sequences — all running through a shared pipeline, dashboard, and worker runtime.
         </p>
         <div className={styles.patternsGrid}>
           {PATTERNS.map((p) => (
@@ -208,52 +209,52 @@ const FEATURES = [
   {
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
     title: 'Outbox pattern built in',
-    desc: 'Jobs and messages are created inside your EF Core transaction. No lost events, no dual-write race conditions. Your DbContext owns the consistency boundary.',
+    desc: 'Jobs and messages are created inside your EF Core transaction. Eliminates lost events and dual-write inconsistencies. The DbContext transaction is the consistency boundary.',
   },
   {
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>,
     title: 'Real-time dashboard',
-    desc: 'Built-in React dashboard with live graphs, job detail, full exception traces, handler output, batch progress, and recurring job history — served at /warp.',
+    desc: 'Built-in operations dashboard with live throughput graphs, job detail view, exception traces, handler log output, batch progress, and recurring job history — served at /warp with no additional configuration.',
   },
   {
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>,
     title: 'Crash recovery',
-    desc: 'Per-job keep-alive heartbeat with automatic requeue on crash. No lost jobs, no wasted retries. Configurable sliding invisibility timeout.',
+    desc: 'Per-job keep-alive heartbeat with automatic requeue on worker crash. Configurable sliding invisibility timeout prevents duplicate execution.',
   },
   {
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>,
     title: 'Pipeline behaviors',
-    desc: 'Middleware chain wrapping every handler. Add retry, mutex, logging, metrics, or auth across all jobs, messages, and requests in one place.',
+    desc: 'Middleware chain applied to every handler. Retry, mutex, logging, metrics, and authorization concerns are registered once and applied uniformly across all jobs, messages, and requests.',
   },
   {
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>,
     title: 'Cron scheduling',
-    desc: 'Recurring jobs with cron expressions. Idempotent definition API — safe to call on every app start. Scheduler creates jobs at the right time.',
+    desc: 'Recurring jobs defined with cron expressions. The registration API is idempotent and safe to call on every application start. The scheduler creates jobs at the configured time.',
   },
   {
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L3 7v6c0 5 4 9 9 10 5-1 9-5 9-10V7l-9-5z"/></svg>,
     title: 'Distributed mutex',
-    desc: 'Opt-in concurrency control. Annotate with [Mutex("key")] or publish with .WithMutex("key") — only one job per key processes at a time across all workers.',
+    desc: 'Opt-in concurrency control via [Mutex("key")] attribute or .WithMutex("key") at publish time. Enforces single-execution per key across all worker instances.',
   },
   {
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>,
     title: 'DB push notifications',
-    desc: 'Opt-in push wake-up via Postgres LISTEN/NOTIFY or SQL Server Service Broker. Workers react instantly to new jobs — no unnecessary polling overhead.',
+    desc: 'Opt-in push wake-up via PostgreSQL LISTEN/NOTIFY or SQL Server Service Broker. Workers receive push notifications for new jobs, eliminating unnecessary polling latency.',
   },
   {
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>,
     title: 'Batches & continuations',
-    desc: 'Group related jobs into batches. Configure child activation on failure, await all children, and chain follow-up jobs when a batch completes.',
+    desc: 'Group related jobs into batches with configurable child activation on failure. Chain continuation jobs that execute after all batch members reach a terminal state.',
   },
   {
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>,
     title: 'OpenTelemetry built in',
-    desc: 'Native OTel integration — Activity traces, 4 metrics instruments (duration, active, completed, enqueued), span attributes per OTEL messaging conventions. Plug into any backend.',
+    desc: 'Native OTel integration with Activity traces, four metrics instruments (duration, active, completed, enqueued), and span attributes conforming to OTEL messaging semantic conventions.',
   },
   {
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>,
     title: 'Circuit breaker',
-    desc: 'Opt-in circuit breaker stops hammering a failing downstream. Closed → Open → HalfOpen probe gate. Group handlers by circuit key. Rescheduled jobs preserve their retry budget.',
+    desc: 'Opt-in circuit breaker prevents repeated calls to a failing downstream dependency. Closed → Open → HalfOpen state machine with configurable thresholds. Jobs are rescheduled and retain their retry budget.',
   },
 ];
 
@@ -262,10 +263,11 @@ function Features() {
     <section className={`${styles.section} ${styles.sectionAlt}`} id="features">
       <div className="container">
         <SectionHead num="02" label="Capabilities" />
-        <h2 className={styles.h2}>Everything you need. Nothing you don't.</h2>
+        <h2 className={styles.h2}>Comprehensive background processing capabilities.</h2>
         <p className={styles.lede}>
-          Warp covers the full spectrum of background processing requirements for
-          production .NET applications — out of the box, no assembly required.
+          Warp addresses the full range of background processing requirements for
+          production .NET applications, with no additional infrastructure or manual
+          configuration.
         </p>
         <div className={styles.featuresGrid}>
           {FEATURES.map((f, i) => (
@@ -286,11 +288,11 @@ function Dashboard() {
     <section className={styles.section} id="dashboard">
       <div className="container">
         <SectionHead num="03" label="Dashboard" />
-        <h2 className={styles.h2}>Full visibility into your job queue.</h2>
+        <h2 className={styles.h2}>Operational visibility into your job processing pipeline.</h2>
         <p className={styles.lede}>
-          Built-in React dashboard with live graphs, job detail with full exception traces,
-          pipeline log output, batch progress bars, worker health, and recurring job history.
-          Served at <code>/warp</code> with zero configuration.
+          Built-in operations dashboard with live throughput graphs, job detail view,
+          exception traces, handler log output, batch progress bars, worker health status,
+          and recurring job history. Served at <code>/warp</code> with no additional configuration.
         </p>
         <div className={styles.screenshotWrap}>
           <img
@@ -316,10 +318,11 @@ function Install() {
     <section className={`${styles.section} ${styles.sectionAlt}`} id="install">
       <div className="container">
         <SectionHead num="04" label="Get started" />
-        <h2 className={styles.h2}>Up and running in minutes.</h2>
+        <h2 className={styles.h2}>Minimal setup. No infrastructure changes required.</h2>
         <p className={styles.lede}>
-          Register your DbContext as usual — Warp wraps it automatically. No manual
-          schema migrations, no special context configuration, no dual registration.
+          Register your existing DbContext as usual — Warp wraps it automatically.
+          No manual schema migrations, no special context configuration, and no
+          secondary registration.
         </p>
         <div className={styles.installGrid}>
           <div>
@@ -356,15 +359,16 @@ function Callout() {
     <section className={styles.section}>
       <div className="container">
         <div className={styles.callout}>
-          <h2>Background processing done right.</h2>
+          <h2>A structured approach to background processing.</h2>
           <p>
-            Stop duct-taping Hangfire, raw queues, and manual retry logic together.
-            Warp gives you a production-ready job processor that lives inside your
-            existing EF Core stack — no new infrastructure required.
+            Warp provides a structured, production-grade job processor built on your
+            existing EF Core stack. Consistent patterns for messaging, scheduling,
+            retries, and observability — without introducing additional infrastructure
+            dependencies.
           </p>
           <div className={styles.calloutActions}>
             <Link className={styles.calloutBtnPrimary} to="/docs/getting-started">
-              Get Started
+              View Documentation
             </Link>
             <Link className={styles.calloutBtnSecondary} href="https://github.com/moberghr/warp">
               View on GitHub
@@ -380,7 +384,7 @@ function Callout() {
 
 export default function Home(): JSX.Element {
   return (
-    <Layout description="Distributed job processing and message queue for .NET 10. Built on EF Core with pub/sub messages, orchestrated jobs, retries, scheduling, and a real-time dashboard.">
+    <Layout description="Distributed job processing and message queue for .NET 10. Integrated with EF Core — pub/sub messaging, orchestrated background jobs, configurable retries, cron scheduling, and a real-time operations dashboard.">
       <main>
         <Hero />
         <Marquee />
