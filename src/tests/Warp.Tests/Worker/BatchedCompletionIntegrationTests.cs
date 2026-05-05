@@ -9,7 +9,7 @@ using Warp.Worker;
 
 namespace Warp.Tests.Worker;
 
-[GenerateDatabaseTests(FixtureKind.BatchedCompletion)]
+[GenerateDatabaseTests]
 public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBase
 {
     protected BatchedCompletionIntegrationTestsBase(IDatabaseFixture fixture)

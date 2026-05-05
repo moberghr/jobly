@@ -10,7 +10,7 @@ using Warp.Tests.Fixtures;
 
 namespace Warp.Tests.Admin;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class JobCommandServiceTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

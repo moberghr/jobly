@@ -9,7 +9,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Features.Mutex;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class MutexIntegrationTestsBase : IntegrationTestBase
 {
     protected MutexIntegrationTestsBase(IDatabaseFixture fixture)

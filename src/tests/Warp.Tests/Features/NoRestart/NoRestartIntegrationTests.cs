@@ -9,7 +9,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Features.NoRestart;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class NoRestartIntegrationTestsBase : IntegrationTestBase
 {
     protected NoRestartIntegrationTestsBase(IDatabaseFixture fixture)

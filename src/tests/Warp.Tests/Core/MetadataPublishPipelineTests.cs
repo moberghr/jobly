@@ -15,7 +15,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Core;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class MetadataPublishPipelineTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

@@ -1,37 +1,46 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using Respawn;
 using Warp.Core.Interceptors;
 
 namespace Warp.Tests.Fixtures;
 
-public class PostgreSqlIntegrationFixture : IAsyncLifetime, IDatabaseFixture
+/// <summary>
+/// Per-test-class SQL Server fixture. Each test class gets its own database inside the
+/// shared SQL Server container, so test classes run fully in parallel up to xunit's
+/// MaxParallelThreads. Tests within a class share the database and rely on Respawn between
+/// tests for isolation. Service Broker is enabled on every database so notification-transport
+/// tests can opt into push without a separate fixture variant.
+/// </summary>
+public class SqlServerClassFixture : IAsyncLifetime, IDatabaseFixture
 {
-    private const string DatabaseName = "warp_integration";
-
     private Respawner _respawner = null!;
     private string _connectionString = null!;
 
+    public string ConnectionString => _connectionString;
+
     public async ValueTask InitializeAsync()
     {
-        _connectionString = await SharedPostgreSqlContainer.CreateDatabaseAsync(
-            DatabaseName,
+        var databaseName = $"warp_t_{Guid.NewGuid():N}".Substring(0, 16);
+        _connectionString = await SharedSqlServerContainer.CreateDatabaseAsync(
+            databaseName,
+            enableServiceBroker: true,
             Xunit.TestContext.Current.CancellationToken);
 
         await using var context = CreateContext();
         await context.Database.EnsureCreatedAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await using var conn = new NpgsqlConnection(_connectionString);
+        await using var conn = new SqlConnection(_connectionString);
         await conn.OpenAsync(Xunit.TestContext.Current.CancellationToken);
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
-            DbAdapter = DbAdapter.Postgres,
+            DbAdapter = DbAdapter.SqlServer,
         });
     }
 
     public async Task ResetAsync()
     {
-        await using var conn = new NpgsqlConnection(_connectionString);
+        await using var conn = new SqlConnection(_connectionString);
         await conn.OpenAsync(Xunit.TestContext.Current.CancellationToken);
         await _respawner.ResetAsync(conn);
     }
@@ -39,14 +48,10 @@ public class PostgreSqlIntegrationFixture : IAsyncLifetime, IDatabaseFixture
     public TestContext CreateContext()
     {
         return new TestContext(new DbContextOptionsBuilder<TestContext>()
-            .UseNpgsql(_connectionString)
-            .UseSnakeCaseNamingConvention()
+            .UseSqlServer(_connectionString)
             .AddInterceptors(new SaveChangesConcurrencyTokenInterceptor())
             .Options);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
-
-[CollectionDefinition]
-public class PostgreSqlIntegrationCollection : ICollectionFixture<PostgreSqlIntegrationFixture>;

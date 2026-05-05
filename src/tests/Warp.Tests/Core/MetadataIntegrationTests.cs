@@ -9,7 +9,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Core;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class MetadataIntegrationTestsBase : IntegrationTestBase
 {
     protected MetadataIntegrationTestsBase(IDatabaseFixture fixture)

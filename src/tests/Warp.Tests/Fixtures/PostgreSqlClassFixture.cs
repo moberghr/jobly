@@ -5,21 +5,24 @@ using Warp.Core.Interceptors;
 
 namespace Warp.Tests.Fixtures;
 
-public class PostgreSqlFixture : IAsyncLifetime, IDatabaseFixture
+/// <summary>
+/// Per-test-class PostgreSQL fixture. Each test class gets its own database inside the
+/// shared PostgreSQL container, so test classes run fully in parallel up to xunit's
+/// MaxParallelThreads. Tests within a class share the database and rely on Respawn between
+/// tests for isolation.
+/// </summary>
+public class PostgreSqlClassFixture : IAsyncLifetime, IDatabaseFixture
 {
-    private const string DatabaseName = "warp_default";
-
     private Respawner _respawner = null!;
     private string _connectionString = null!;
 
     public string ConnectionString => _connectionString;
 
-    internal SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();
-
     public async ValueTask InitializeAsync()
     {
+        var databaseName = $"warp_t_{Guid.NewGuid():N}".Substring(0, 16);
         _connectionString = await SharedPostgreSqlContainer.CreateDatabaseAsync(
-            DatabaseName,
+            databaseName,
             Xunit.TestContext.Current.CancellationToken);
 
         await using var context = CreateContext();
@@ -45,12 +48,9 @@ public class PostgreSqlFixture : IAsyncLifetime, IDatabaseFixture
         return new TestContext(new DbContextOptionsBuilder<TestContext>()
             .UseNpgsql(_connectionString)
             .UseSnakeCaseNamingConvention()
-            .AddInterceptors(ConcurrencyInterceptor)
+            .AddInterceptors(new SaveChangesConcurrencyTokenInterceptor())
             .Options);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
-
-[CollectionDefinition]
-public class PostgreSqlCollection : ICollectionFixture<PostgreSqlFixture>;

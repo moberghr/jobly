@@ -10,7 +10,7 @@ using Warp.Tests.Fixtures;
 
 namespace Warp.Tests.Reliability;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class RequeueEdgeCaseTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

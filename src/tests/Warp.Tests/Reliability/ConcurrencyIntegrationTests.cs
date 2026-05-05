@@ -8,7 +8,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Reliability;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
 {
     protected ConcurrencyIntegrationTestsBase(IDatabaseFixture fixture)

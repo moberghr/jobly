@@ -11,7 +11,7 @@ namespace Warp.Tests.Worker;
 /// tests don't cover this because their server is disposed once at fixture teardown — and
 /// because Respawn wipes the DB between tests, a silently broken StopAsync wouldn't fail them.
 /// </summary>
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class GracefulShutdownIntegrationTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

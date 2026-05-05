@@ -54,6 +54,7 @@ internal static class SharedPostgreSqlContainer
             {
                 var container = new PostgreSqlBuilder()
                     .WithImage("postgres:latest")
+                    .WithCommand("-c", "max_connections=500")
                     .Build();
                 await container.StartAsync(ct);
                 _container = container;

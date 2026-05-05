@@ -20,7 +20,7 @@ using Warp.Worker;
 
 namespace Warp.Tests.Features.CircuitBreaker;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class CircuitBreakerTestsBase : IAsyncLifetime
 {
     private static readonly Guid WorkerId = Guid.NewGuid();

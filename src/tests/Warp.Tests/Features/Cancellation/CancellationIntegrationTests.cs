@@ -7,7 +7,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Features.Cancellation;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
 {
     protected CancellationIntegrationTestsBase(IDatabaseFixture fixture)

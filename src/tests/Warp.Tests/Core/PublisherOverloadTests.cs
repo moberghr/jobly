@@ -11,7 +11,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Core;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class PublisherOverloadTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

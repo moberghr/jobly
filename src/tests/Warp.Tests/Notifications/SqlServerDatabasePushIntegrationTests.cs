@@ -16,13 +16,12 @@ namespace Warp.Tests.Notifications;
 /// with UseDispatcher=true, long PollingInterval, and DB push enabled, then asserts that
 /// jobs are picked up quickly via push (not via the long poll).
 /// </summary>
-[Collection<SqlServerIntegrationCollection>]
 [Trait("Category", "SqlServer")]
-public class SqlServerDatabasePushIntegrationTests : IAsyncLifetime
+public class SqlServerDatabasePushIntegrationTests : IAsyncLifetime, IClassFixture<SqlServerClassFixture>
 {
-    private readonly SqlServerIntegrationFixture _fixture;
+    private readonly SqlServerClassFixture _fixture;
 
-    public SqlServerDatabasePushIntegrationTests(SqlServerIntegrationFixture fixture) => _fixture = fixture;
+    public SqlServerDatabasePushIntegrationTests(SqlServerClassFixture fixture) => _fixture = fixture;
 
     public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 

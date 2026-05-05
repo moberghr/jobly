@@ -7,7 +7,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Observability;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
 {
     protected RealTimeLogIntegrationTestsBase(IDatabaseFixture fixture)

@@ -10,7 +10,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Core;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
 {
     private static readonly int[] OneSecondDelay = [1];

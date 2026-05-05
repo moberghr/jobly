@@ -10,7 +10,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.EndToEnd;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
 {
     protected EndToEndIntegrationTestsBase(IDatabaseFixture fixture)

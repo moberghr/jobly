@@ -8,7 +8,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Messaging;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class MessageIntegrationTestsBase : IntegrationTestBase
 {
     protected MessageIntegrationTestsBase(IDatabaseFixture fixture)

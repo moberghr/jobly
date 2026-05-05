@@ -13,7 +13,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Features.NoRestart;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class NoRestartAddonTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

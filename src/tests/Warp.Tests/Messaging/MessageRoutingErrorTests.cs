@@ -13,7 +13,7 @@ using Warp.Worker.Services;
 
 namespace Warp.Tests.Messaging;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class MessageRoutingErrorTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

@@ -10,7 +10,7 @@ using Warp.Tests.Fixtures;
 
 namespace Warp.Tests.Features.Cancellation;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class CancellationModeTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

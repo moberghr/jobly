@@ -18,7 +18,7 @@ using Warp.Worker.Services;
 
 namespace Warp.Tests.Worker;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class WorkerTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

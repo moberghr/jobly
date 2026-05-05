@@ -10,7 +10,7 @@ using Warp.Worker.Services;
 
 namespace Warp.Tests.Orchestration;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class BackgroundTaskTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

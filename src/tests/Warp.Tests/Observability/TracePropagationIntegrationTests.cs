@@ -7,7 +7,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Observability;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
 {
     protected TracePropagationIntegrationTestsBase(IDatabaseFixture fixture)

@@ -15,7 +15,7 @@ namespace Warp.Tests.Worker;
 //   * channel drain — buffered rows complete as the worker empties its channel
 //   * StaleJobRecovery — any Processing orphans the first two paths miss are reclaimed
 //     after InvisibilityTimeout
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class DispatcherShutdownIntegrationTestsBase : IntegrationTestBase
 {
     protected DispatcherShutdownIntegrationTestsBase(IDatabaseFixture fixture)

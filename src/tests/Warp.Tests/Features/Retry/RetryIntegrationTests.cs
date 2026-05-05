@@ -11,7 +11,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Features.Retry;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class RetryIntegrationTestsBase : IntegrationTestBase
 {
     protected RetryIntegrationTestsBase(IDatabaseFixture fixture)

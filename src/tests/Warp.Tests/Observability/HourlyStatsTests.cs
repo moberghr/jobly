@@ -18,7 +18,7 @@ using Warp.Worker.Services;
 
 namespace Warp.Tests.Observability;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class HourlyStatsTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

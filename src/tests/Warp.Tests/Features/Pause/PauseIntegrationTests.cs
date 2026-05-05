@@ -7,7 +7,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Features.Pause;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class PauseIntegrationTestsBase : IntegrationTestBase
 {
     protected PauseIntegrationTestsBase(IDatabaseFixture fixture)

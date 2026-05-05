@@ -8,7 +8,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Orchestration;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class BatchIntegrationTestsBase : IntegrationTestBase
 {
     protected BatchIntegrationTestsBase(IDatabaseFixture fixture)

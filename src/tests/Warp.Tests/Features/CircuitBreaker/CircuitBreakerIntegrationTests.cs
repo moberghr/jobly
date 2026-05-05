@@ -11,7 +11,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Features.CircuitBreaker;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
 {
     protected CircuitBreakerIntegrationTestsBase(IDatabaseFixture fixture)

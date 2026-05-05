@@ -21,7 +21,7 @@ using Warp.Worker;
 
 namespace Warp.Tests.Observability;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class OTelMetricsTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

@@ -14,7 +14,7 @@ using Warp.Worker.Services;
 
 namespace Warp.Tests.EndToEnd;
 
-[GenerateDatabaseTests(FixtureKind.MultiServer)]
+[GenerateDatabaseTests]
 public abstract class MultiServerTestsBase : IntegrationTestBase
 {
     protected MultiServerTestsBase(IDatabaseFixture fixture)

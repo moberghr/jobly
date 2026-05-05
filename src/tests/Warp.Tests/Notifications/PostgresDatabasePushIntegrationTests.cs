@@ -15,13 +15,12 @@ namespace Warp.Tests.Notifications;
 /// fresh WarpTestServer with UseDispatcher=true, long PollingInterval, and DB push enabled,
 /// then asserts that jobs are picked up quickly via push (not via the long poll).
 /// </summary>
-[Collection<PostgreSqlIntegrationCollection>]
 [Trait("Category", "PostgreSql")]
-public class PostgresDatabasePushIntegrationTests : IAsyncLifetime
+public class PostgresDatabasePushIntegrationTests : IAsyncLifetime, IClassFixture<PostgreSqlClassFixture>
 {
-    private readonly PostgreSqlIntegrationFixture _fixture;
+    private readonly PostgreSqlClassFixture _fixture;
 
-    public PostgresDatabasePushIntegrationTests(PostgreSqlIntegrationFixture fixture) => _fixture = fixture;
+    public PostgresDatabasePushIntegrationTests(PostgreSqlClassFixture fixture) => _fixture = fixture;
 
     public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 

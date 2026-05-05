@@ -13,7 +13,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Core;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class PublisherTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

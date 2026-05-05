@@ -13,7 +13,7 @@ using Warp.Worker.Services;
 
 namespace Warp.Tests.Scheduling;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class RecurringJobBugTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;
