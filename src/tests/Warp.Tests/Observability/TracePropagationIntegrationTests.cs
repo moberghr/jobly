@@ -19,15 +19,16 @@ public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
     public async Task GivenJobThatSpawnsChild_ThenChildHasSpawnedByJobId()
     {
         // Arrange
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var parentId = await publisher.Enqueue(new SpawnChildJobRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
         // Assert
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var parent = await ctx.Set<Job>().FirstAsync(j => j.Id == parentId, Xunit.TestContext.Current.CancellationToken);
         parent.CurrentState.ShouldBe(State.Completed);
 
@@ -41,15 +42,16 @@ public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
     public async Task GivenJobThatSpawnsBatch_ThenBatchJobsHaveTraceId()
     {
         // Arrange
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var parentId = await publisher.Enqueue(new SpawnBatchRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
         // Assert
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var parent = await ctx.Set<Job>().FirstAsync(j => j.Id == parentId, Xunit.TestContext.Current.CancellationToken);
         parent.TraceId.ShouldNotBeNull();
         var traceId = parent.TraceId!.Value;
@@ -71,15 +73,16 @@ public abstract class TracePropagationIntegrationTestsBase : IntegrationTestBase
     public async Task GivenJobThatSpawnsBatch_ThenBatchJobsHaveSpawnedByJobId()
     {
         // Arrange
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var parentId = await publisher.Enqueue(new SpawnBatchRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
         // Assert
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // The batch job spawned by the parent handler
         var batchJob = await ctx.Set<Job>()

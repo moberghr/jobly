@@ -14,8 +14,6 @@ public class PostgreSqlFixture : IAsyncLifetime, IDatabaseFixture
 
     public string ConnectionString => _connectionString;
 
-    public WarpTestServer? TestServer => null;
-
     internal SaveChangesConcurrencyTokenInterceptor ConcurrencyInterceptor { get; } = new();
 
     public async ValueTask InitializeAsync()

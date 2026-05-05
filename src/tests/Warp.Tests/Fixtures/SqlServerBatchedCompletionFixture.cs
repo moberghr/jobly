@@ -12,8 +12,6 @@ public class SqlServerBatchedCompletionFixture : IAsyncLifetime, IDatabaseFixtur
     private Respawner _respawner = null!;
     private string _connectionString = null!;
 
-    public WarpTestServer? TestServer => null;
-
     public async ValueTask InitializeAsync()
     {
         _connectionString = await SharedSqlServerContainer.CreateDatabaseAsync(

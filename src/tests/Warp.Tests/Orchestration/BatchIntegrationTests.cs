@@ -19,14 +19,15 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenBatchOfFive_WhenAllComplete_ThenBatchFinalizes()
     {
-        var batchPublisher = Server.CreateBatchPublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var batchPublisher = server.CreateBatchPublisher();
         var jobs = Enumerable.Range(0, 5).Select(_ => new UnitRequest()).ToList();
         var batchId = await batchPublisher.StartNew(jobs);
         await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // Batch job should be completed
         var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
@@ -45,7 +46,8 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenBatchWithContinuation_WhenFirstBatchCompletes_ThenContinuationActivatesAndCompletes()
     {
-        var batchPublisher = Server.CreateBatchPublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var batchPublisher = server.CreateBatchPublisher();
 
         var batchJobs = Enumerable.Range(0, 3).Select(_ => new UnitRequest()).ToList();
         var batchId = await batchPublisher.StartNew(batchJobs);
@@ -55,9 +57,9 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
 
         await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // First batch completed
         var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
@@ -79,7 +81,8 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenThreeChainedBatches_WhenProcessed_ThenAllComplete()
     {
-        var batchPublisher = Server.CreateBatchPublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var batchPublisher = server.CreateBatchPublisher();
 
         // Batch 1
         var batch1Jobs = Enumerable.Range(0, 2).Select(_ => new UnitRequest()).ToList();
@@ -95,9 +98,9 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
 
         await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         var batch1 = await ctx.Set<Job>().FirstAsync(j => j.Id == batch1Id, Xunit.TestContext.Current.CancellationToken);
         var batch2 = await ctx.Set<Job>().FirstAsync(j => j.Id == batch2Id, Xunit.TestContext.Current.CancellationToken);
@@ -111,7 +114,8 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenBatchWithOnAnyFinishedState_WhenSomeJobsFail_ThenContinuationStillFires()
     {
-        var batchPublisher = Server.CreateBatchPublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var batchPublisher = server.CreateBatchPublisher();
 
         // Batch with mix of succeeding and failing jobs, using OnAnyFinishedState
         var batchJobs = new List<ThrowExceptionRequest>
@@ -127,9 +131,9 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
 
         await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // Batch with OnAnyFinishedState completes even when children fail
         var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
@@ -148,7 +152,8 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenBatchWithOnlyOnSucceeded_WhenJobFails_ThenContinuationStaysAwaiting()
     {
-        var batchPublisher = Server.CreateBatchPublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var batchPublisher = server.CreateBatchPublisher();
 
         // Batch with failing jobs, using default OnlyOnSucceeded
         var batchJobs = new List<ThrowExceptionRequest>
@@ -164,14 +169,14 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
         await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait for batch to fail
-        await Server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(8));
+        await server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
         // Give orchestration a few ticks (100ms interval in the test server) to confirm the
         // continuation is not activated. 500ms covers ~5 passes — more than enough to catch
         // an erroneous activation without adding 2s to the test.
         await Task.Delay(500, Xunit.TestContext.Current.CancellationToken);
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // Batch should be failed
         var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
@@ -191,16 +196,17 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenBatchWithRetryJobs_WhenRetriesExhausted_ThenBatchReflectsOutcome()
     {
-        var batchPublisher = Server.CreateBatchPublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var batchPublisher = server.CreateBatchPublisher();
 
         // Batch with OnlyOnSucceeded (default) and all-failing children should fail
         var failingJobs = new List<ThrowExceptionRequest> { new(), new() };
         var batchId = await batchPublisher.StartNew(failingJobs);
         await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(8));
+        await server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         var batch = await ctx.Set<Job>().FirstAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
         batch.CurrentState.ShouldBe(State.Failed);

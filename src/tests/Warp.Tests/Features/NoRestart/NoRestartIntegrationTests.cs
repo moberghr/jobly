@@ -29,6 +29,8 @@ public abstract class NoRestartIntegrationTestsBase : IntegrationTestBase
     [TimedFact(60_000)]
     public async Task GivenStaleNoRestartJob_WhenRecovered_ThenMarkedFailed()
     {
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+
         // Build metadata through the generated proxy so the serialized key matches what
         // the stale-recovery reader expects. Bypassing MetadataFactory couples the test to
         // whatever string the generator happens to produce today — a rename would silently
@@ -36,7 +38,7 @@ public abstract class NoRestartIntegrationTestsBase : IntegrationTestBase
         var metadata = SerializeCanBeRestarted(false);
         var staleKeepAlive = DateTime.UtcNow.AddMinutes(-10);
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var jobId = Guid.NewGuid();
         ctx.Set<Job>().Add(new Job
         {
@@ -51,34 +53,36 @@ public abstract class NoRestartIntegrationTestsBase : IntegrationTestBase
         });
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Failed);
+        await server.WaitForJobState(jobId, State.Failed);
 
-        var job = await Server.GetJob(jobId);
+        var job = await server.GetJob(jobId);
         job.CurrentState.ShouldBe(State.Failed);
         job.ExpireAt.ShouldBeNull();
 
-        var logs = await Server.GetJobLogs(jobId);
+        var logs = await server.GetJobLogs(jobId);
         logs.ShouldContain(l => l.EventType == "Failed" && l.Message.Contains("opted out of restart"));
     }
 
     [TimedFact(60_000)]
     public async Task GivenNoRestartAttributeJob_WhenPublishedAndStale_ThenMarkedFailed()
     {
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+
         // Publish through the real pipeline so NoRestartPublishBehavior writes CanBeRestarted=false.
-        var publisher = Server.CreatePublisher();
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new NoRestartAttributeRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Let the worker run it to completion so we know the behavior wrote metadata that persisted.
-        await Server.WaitForJobState(jobId, State.Completed);
-        var published = await Server.GetJob(jobId);
+        await server.WaitForJobState(jobId, State.Completed);
+        var published = await server.GetJob(jobId);
         published.Metadata.ShouldNotBeNull();
         var publishedMeta = MetadataSerializer.Deserialize(published.Metadata);
         publishedMeta[nameof(ICanBeRestartedMetadata.CanBeRestarted)].ShouldBe(false);
 
         // Force the completed job back into Processing with a stale keep-alive — simulates a
         // crashed worker. The stale recovery task must now honor the metadata and mark it Failed.
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         await ctx.Set<Job>()
             .Where(x => x.Id == jobId)
             .ExecuteUpdateAsync(
@@ -87,9 +91,9 @@ public abstract class NoRestartIntegrationTestsBase : IntegrationTestBase
                     .SetProperty(p => p.LastKeepAlive, DateTime.UtcNow.AddMinutes(-10)),
                 Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Failed);
+        await server.WaitForJobState(jobId, State.Failed);
 
-        var job = await Server.GetJob(jobId);
+        var job = await server.GetJob(jobId);
         job.CurrentState.ShouldBe(State.Failed);
         job.ExpireAt.ShouldBeNull();
     }

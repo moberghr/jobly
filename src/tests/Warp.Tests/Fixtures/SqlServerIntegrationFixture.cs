@@ -12,8 +12,6 @@ public class SqlServerIntegrationFixture : IAsyncLifetime, IDatabaseFixture
     private Respawner _respawner = null!;
     private string _connectionString = null!;
 
-    public WarpTestServer TestServer { get; private set; } = null!;
-
     public async ValueTask InitializeAsync()
     {
         _connectionString = await SharedSqlServerContainer.CreateDatabaseAsync(
@@ -29,10 +27,7 @@ public class SqlServerIntegrationFixture : IAsyncLifetime, IDatabaseFixture
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.SqlServer,
-            TablesToIgnore = FixtureHelper.GetServerTablesToIgnore(context),
         });
-
-        TestServer = await WarpTestServer.StartAsync(this);
     }
 
     public async Task ResetAsync()
@@ -50,10 +45,7 @@ public class SqlServerIntegrationFixture : IAsyncLifetime, IDatabaseFixture
             .Options);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        await TestServer.DisposeAsync();
-    }
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
 [CollectionDefinition]

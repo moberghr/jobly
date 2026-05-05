@@ -11,8 +11,6 @@ public abstract class IntegrationTestBase : IAsyncLifetime
 
     protected IDatabaseFixture Fixture { get; }
 
-    protected WarpTestServer Server => Fixture.TestServer!;
-
     public virtual async ValueTask InitializeAsync()
     {
         try

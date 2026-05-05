@@ -7,6 +7,7 @@ using Warp.Core.Entities;
 using Warp.Core.Enums;
 using Warp.Core.Handlers;
 using Warp.Core.Helper;
+using Warp.Core.Notifications;
 
 namespace Warp.Worker.Services;
 
@@ -22,6 +23,7 @@ public sealed class MessageRouter<TContext> : IServerTask
     private readonly TimeProvider _time;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IWarpSqlQueries<TContext> _sqlQueries;
+    private readonly IWarpNotificationTransport _notificationTransport;
     private readonly WarpWorkerConfiguration _configuration;
 
     public MessageRouter(
@@ -29,12 +31,14 @@ public sealed class MessageRouter<TContext> : IServerTask
         TimeProvider time,
         IServiceScopeFactory scopeFactory,
         IWarpSqlQueries<TContext> sqlQueries,
+        IWarpNotificationTransport notificationTransport,
         IOptions<WarpWorkerConfiguration> configuration)
     {
         _context = context;
         _time = time;
         _scopeFactory = scopeFactory;
         _sqlQueries = sqlQueries;
+        _notificationTransport = notificationTransport;
         _configuration = configuration.Value;
     }
 
@@ -131,7 +135,14 @@ public sealed class MessageRouter<TContext> : IServerTask
             }
 
             message.CurrentState = State.Processing;
+
+            // Capture pending JobEnqueued notifications before commit so push wakes the
+            // dispatcher as soon as the child rows are visible. Without this, push works
+            // for direct enqueues but messages-via-routing fall back to polling.
+            var pending = NotificationDispatch.CapturePending(_context);
             await _context.SaveChangesAsync(ct);
+            await NotificationDispatch.FireAsync(_notificationTransport, pending, ct);
+
             totalRouted++;
         }
 

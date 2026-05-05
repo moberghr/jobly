@@ -24,12 +24,6 @@ public abstract class ListenerReconnectDrainTestsBase : IntegrationTestBase
     {
     }
 
-    public override async ValueTask InitializeAsync()
-    {
-        await base.InitializeAsync();
-        await Server.ReRegisterServer();
-    }
-
     [TimedFact]
     public async Task GivenListenerAlwaysFails_WhenJobEnqueued_ThenReconnectDrainStillDelivers()
     {

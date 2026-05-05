@@ -15,11 +15,11 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
     {
     }
 
-    private async Task<Guid> GetFirstGroupId()
+    private async Task<Guid> GetFirstGroupId(WarpTestServer server)
     {
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var group = await ctx.Set<WorkerGroup>()
-            .Where(g => g.ServerId == Server.ServerId)
+            .Where(g => g.ServerId == server.ServerId)
             .FirstAsync(Xunit.TestContext.Current.CancellationToken);
         return group.Id;
     }
@@ -27,30 +27,32 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task PauseServer_PauseStateHolder_UpdatedByHeartbeat()
     {
-        var groupId = await GetFirstGroupId();
-        var svc = Server.CreateServerCommandService();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var groupId = await GetFirstGroupId(server);
+        var svc = server.CreateServerCommandService();
 
-        await svc.PauseServer(Server.ServerId);
-        await Server.WaitForPauseState(groupId, expectedPaused: true);
-        Server.PauseState.IsPaused(groupId).ShouldBeTrue();
+        await svc.PauseServer(server.ServerId);
+        await server.WaitForPauseState(groupId, expectedPaused: true);
+        server.PauseState.IsPaused(groupId).ShouldBeTrue();
 
         // Cleanup
-        await svc.ResumeServer(Server.ServerId);
-        await Server.WaitForPauseState(groupId, expectedPaused: false);
+        await svc.ResumeServer(server.ServerId);
+        await server.WaitForPauseState(groupId, expectedPaused: false);
     }
 
     [TimedFact]
     public async Task PauseServer_JobsStayEnqueued()
     {
-        var groupId = await GetFirstGroupId();
-        var svc = Server.CreateServerCommandService();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var groupId = await GetFirstGroupId(server);
+        var svc = server.CreateServerCommandService();
 
         // Pause and wait for propagation
-        await svc.PauseServer(Server.ServerId);
-        await Server.WaitForPauseState(groupId, expectedPaused: true);
+        await svc.PauseServer(server.ServerId);
+        await server.WaitForPauseState(groupId, expectedPaused: true);
 
         // Publish a job
-        var publisher = Server.CreatePublisher();
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
@@ -58,50 +60,52 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
         while (DateTime.UtcNow < deadline)
         {
-            var job = await Server.GetJob(jobId);
+            var job = await server.GetJob(jobId);
             job.CurrentState.ShouldBe(State.Enqueued);
             await Task.Delay(200, Xunit.TestContext.Current.CancellationToken);
         }
 
         // Resume and let it process
-        await svc.ResumeServer(Server.ServerId);
-        await Server.WaitForCompletion();
+        await svc.ResumeServer(server.ServerId);
+        await server.WaitForCompletion();
     }
 
     [TimedFact]
     public async Task PauseServer_Resume_JobsGetProcessed()
     {
-        var groupId = await GetFirstGroupId();
-        var svc = Server.CreateServerCommandService();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var groupId = await GetFirstGroupId(server);
+        var svc = server.CreateServerCommandService();
 
         // Pause, publish, then resume
-        await svc.PauseServer(Server.ServerId);
-        await Server.WaitForPauseState(groupId, expectedPaused: true);
+        await svc.PauseServer(server.ServerId);
+        await server.WaitForPauseState(groupId, expectedPaused: true);
 
-        var publisher = Server.CreatePublisher();
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Resume — job should complete
-        await svc.ResumeServer(Server.ServerId);
-        await Server.WaitForCompletion();
+        await svc.ResumeServer(server.ServerId);
+        await server.WaitForCompletion();
 
-        var job = await Server.GetJob(jobId);
+        var job = await server.GetJob(jobId);
         job.CurrentState.ShouldBe(State.Completed);
     }
 
     [TimedFact]
     public async Task PauseWorkerGroup_JobsStayEnqueued()
     {
-        var groupId = await GetFirstGroupId();
-        var svc = Server.CreateServerCommandService();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var groupId = await GetFirstGroupId(server);
+        var svc = server.CreateServerCommandService();
 
         // Pause group and wait for propagation
         await svc.PauseWorkerGroup(groupId);
-        await Server.WaitForPauseState(groupId, expectedPaused: true);
+        await server.WaitForPauseState(groupId, expectedPaused: true);
 
         // Publish a job
-        var publisher = Server.CreatePublisher();
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
@@ -109,34 +113,35 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
         while (DateTime.UtcNow < deadline)
         {
-            var job = await Server.GetJob(jobId);
+            var job = await server.GetJob(jobId);
             job.CurrentState.ShouldBe(State.Enqueued);
             await Task.Delay(200, Xunit.TestContext.Current.CancellationToken);
         }
 
         // Resume and let it process
         await svc.ResumeWorkerGroup(groupId);
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
     }
 
     [TimedFact]
     public async Task PauseWorkerGroup_Resume_JobsGetProcessed()
     {
-        var groupId = await GetFirstGroupId();
-        var svc = Server.CreateServerCommandService();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var groupId = await GetFirstGroupId(server);
+        var svc = server.CreateServerCommandService();
 
         // Pause, publish, resume
         await svc.PauseWorkerGroup(groupId);
-        await Server.WaitForPauseState(groupId, expectedPaused: true);
+        await server.WaitForPauseState(groupId, expectedPaused: true);
 
-        var publisher = Server.CreatePublisher();
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await svc.ResumeWorkerGroup(groupId);
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var job = await Server.GetJob(jobId);
+        var job = await server.GetJob(jobId);
         job.CurrentState.ShouldBe(State.Completed);
     }
 }

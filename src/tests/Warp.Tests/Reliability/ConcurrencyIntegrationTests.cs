@@ -21,7 +21,8 @@ public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
     {
         // The test server runs with 5 workers. Enqueue 50 counter jobs.
         // Row locking (FOR UPDATE SKIP LOCKED) ensures each job is processed exactly once.
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobIds = new List<Guid>();
         for (var i = 0; i < 50; i++)
         {
@@ -30,9 +31,9 @@ public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
 
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // All 50 jobs should be completed — proving each was processed exactly once
         var completedCount = await ctx.Set<Job>()
@@ -61,13 +62,14 @@ public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenSingleJob_WithFiveWorkers_ThenOnlyOneProcessesIt()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Completed);
@@ -85,7 +87,8 @@ public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenFiveMessages_WithFiveWorkers_ThenAllRoutedExactlyOnce()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var messageIds = new List<Guid>();
         for (var i = 0; i < 5; i++)
         {
@@ -94,9 +97,9 @@ public abstract class ConcurrencyIntegrationTestsBase : IntegrationTestBase
 
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // Each message should be completed
         foreach (var messageId in messageIds)

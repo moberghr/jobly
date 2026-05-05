@@ -222,48 +222,6 @@ public class WarpTestServer : IAsyncDisposable
         return new WarpTestServer(host, fixture);
     }
 
-    /// <summary>
-    /// Re-registers the server and workers in the DB after Respawn clears all tables.
-    /// The host's background services expect these rows to exist.
-    /// </summary>
-    public async Task ReRegisterServer()
-    {
-        await using var scope = _host.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<TestContext>();
-
-        // Check if server still exists (Respawn may have deleted it)
-        var config = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<WarpWorkerConfiguration>>().Value;
-        var serverExists = await context.Set<Server>().AnyAsync(s => s.Id == config.ServerId, Xunit.TestContext.Current.CancellationToken);
-        if (serverExists)
-        {
-            return;
-        }
-
-        var now = DateTime.UtcNow;
-        context.Set<Server>().Add(new Server
-        {
-            Id = config.ServerId,
-            ServerName = config.ServerName ?? "test-server",
-            StartedTime = now,
-            LastHeartbeatTime = now,
-            ServiceCount = config.WorkerCount,
-        });
-
-        // Re-register workers — get IDs from existing Worker entities if any, otherwise create new ones
-        for (var i = 0; i < config.WorkerCount; i++)
-        {
-            context.Set<Warp.Core.Data.Entities.Worker>().Add(new Warp.Core.Data.Entities.Worker
-            {
-                Id = Guid.NewGuid(),
-                ServerId = config.ServerId,
-                StartedTime = now,
-                LastHeartbeatTime = now,
-            });
-        }
-
-        await context.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
-    }
-
     public async Task WaitForJobState(Guid jobId, State state, TimeSpan? timeout = null)
     {
         // Default 5s — with idle backoff disabled (see WarpTestServer.StartAsync), worker

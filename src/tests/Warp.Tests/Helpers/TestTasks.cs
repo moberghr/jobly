@@ -88,6 +88,7 @@ public static class TestTasks
             timeProvider,
             scopeFactory,
             Warp.Tests.Helpers.TestTasks.QueriesFor(context),
+            NullTransport,
             Options.Create(new WarpWorkerConfiguration()));
     }
 

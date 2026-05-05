@@ -19,13 +19,14 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenSpawnChildJobRequest_WhenProcessed_ThenChildInheritsParentTraceId()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var parentId = await publisher.Enqueue(new SpawnChildJobRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         var parent = await ctx.Set<Job>().FirstAsync(j => j.Id == parentId, Xunit.TestContext.Current.CancellationToken);
         parent.CurrentState.ShouldBe(State.Completed);
@@ -41,13 +42,14 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenSpawnGrandchildJobRequest_WhenProcessed_ThenThreeLevelChainSharesTraceId()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var grandparentId = await publisher.Enqueue(new SpawnGrandchildJobRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         var grandparent = await ctx.Set<Job>().FirstAsync(j => j.Id == grandparentId, Xunit.TestContext.Current.CancellationToken);
         grandparent.TraceId.ShouldNotBeNull();
@@ -72,13 +74,14 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenMultiHandlerMessage_WhenRouted_ThenAllHandlerJobsShareSameTraceId()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var messageId = await publisher.Publish(new MultiRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
         message.TraceId.ShouldNotBeNull();
@@ -94,14 +97,15 @@ public abstract class TraceIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenTwoSeparateJobs_WhenPublished_ThenEachHasDifferentTraceId()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId1 = await publisher.Enqueue(new UnitRequest());
         var jobId2 = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         var job1 = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId1, Xunit.TestContext.Current.CancellationToken);
         var job2 = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId2, Xunit.TestContext.Current.CancellationToken);

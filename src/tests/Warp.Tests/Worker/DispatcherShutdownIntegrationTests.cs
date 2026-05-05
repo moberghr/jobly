@@ -23,12 +23,6 @@ public abstract class DispatcherShutdownIntegrationTestsBase : IntegrationTestBa
     {
     }
 
-    public override async ValueTask InitializeAsync()
-    {
-        await base.InitializeAsync();
-        await Server.ReRegisterServer();
-    }
-
     [TimedFact(30_000)]
     public async Task GivenWorkInProgress_WhenServerReplaced_ThenAllJobsEventuallyComplete()
     {

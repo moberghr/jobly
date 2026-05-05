@@ -24,12 +24,6 @@ public abstract class PushFailurePollingBackstopTestsBase : IntegrationTestBase
     {
     }
 
-    public override async ValueTask InitializeAsync()
-    {
-        await base.InitializeAsync();
-        await Server.ReRegisterServer();
-    }
-
     [TimedFact]
     public async Task GivenPushEnabledButTransportBroken_WhenJobEnqueued_ThenPollingStillPicksItUp()
     {
