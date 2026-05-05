@@ -519,3 +519,7 @@ cd src/ui && npm run dev                                         # Dashboard on 
 ```
 
 Requires Docker for tests (Testcontainers + Respawn).
+
+## License
+
+MIT — see [LICENSE](LICENSE).
