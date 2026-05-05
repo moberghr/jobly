@@ -4,31 +4,32 @@ namespace Warp.Tests.Fixtures;
 
 public abstract class MultiServerIntegrationTestBase : IAsyncLifetime
 {
-    private readonly IMultiServerDatabaseFixture _fixture;
-
     protected MultiServerIntegrationTestBase(IMultiServerDatabaseFixture fixture)
     {
-        _fixture = fixture;
+        Fixture = fixture;
     }
 
-    protected WarpTestServer Server1 => _fixture.Server1;
+    protected IMultiServerDatabaseFixture Fixture { get; }
 
-    protected WarpTestServer Server2 => _fixture.Server2;
+    protected WarpTestServer Server1 => Fixture.Server1;
 
-    protected TestContext CreateContext() => _fixture.CreateContext();
+    protected WarpTestServer Server2 => Fixture.Server2;
 
-    public async ValueTask InitializeAsync()
+    protected TestContext CreateContext() => Fixture.CreateContext();
+
+    public virtual async ValueTask InitializeAsync()
     {
         try
         {
-            await _fixture.ResetAsync();
+            await Fixture.ResetAsync();
         }
         catch
         {
             await Task.Delay(100, Xunit.TestContext.Current.CancellationToken);
-            await _fixture.ResetAsync();
+            await Fixture.ResetAsync();
         }
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public virtual ValueTask DisposeAsync()
+        => FixtureDiagnostics.DumpOnFailureAsync(Fixture.DumpDiagnosticsAsync);
 }

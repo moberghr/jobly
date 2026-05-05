@@ -17,28 +17,18 @@ namespace Warp.Tests.Notifications;
 // up whatever was enqueued during the listener's offline window. Without this, a single
 // transport hiccup would strand every job that arrived during the gap until the next slow poll.
 [GenerateDatabaseTests(FixtureKind.Integration)]
-public abstract class ListenerReconnectDrainTestsBase : IAsyncLifetime
+public abstract class ListenerReconnectDrainTestsBase : IntegrationTestBase
 {
-    private readonly IDatabaseFixture _fixture;
-
-    protected ListenerReconnectDrainTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
-
-    public async ValueTask InitializeAsync()
+    protected ListenerReconnectDrainTestsBase(IDatabaseFixture fixture)
+        : base(fixture)
     {
-        try
-        {
-            await _fixture.ResetAsync();
-        }
-        catch
-        {
-            await Task.Delay(100, Xunit.TestContext.Current.CancellationToken);
-            await _fixture.ResetAsync();
-        }
-
-        await _fixture.TestServer!.ReRegisterServer();
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public override async ValueTask InitializeAsync()
+    {
+        await base.InitializeAsync();
+        await Server.ReRegisterServer();
+    }
 
     [TimedFact]
     public async Task GivenListenerAlwaysFails_WhenJobEnqueued_ThenReconnectDrainStillDelivers()
@@ -53,7 +43,7 @@ public abstract class ListenerReconnectDrainTestsBase : IAsyncLifetime
         var transport = new ListenFailingTransport();
 
         await using var server = await WarpTestServer.StartAsync(
-            _fixture,
+            Fixture,
             configure: cfg =>
             {
                 cfg.UseDispatcher = true;
