@@ -5,19 +5,14 @@ using Warp.Core.Interceptors;
 
 namespace Warp.Tests.Fixtures;
 
-public class SqlServerMultiServerFixture : IAsyncLifetime, IMultiServerDatabaseFixture, IDatabaseFixture
+public class SqlServerMultiServerFixture : IAsyncLifetime, IDatabaseFixture
 {
     private const string DatabaseName = "warp_multi";
 
     private Respawner _respawner = null!;
     private string _connectionString = null!;
 
-    public WarpTestServer Server1 { get; private set; } = null!;
-
-    public WarpTestServer Server2 { get; private set; } = null!;
-
-    // IDatabaseFixture.TestServer — not used, but required by the interface for CreateContext reuse
-    WarpTestServer? IDatabaseFixture.TestServer => Server1;
+    public WarpTestServer? TestServer => null;
 
     public async ValueTask InitializeAsync()
     {
@@ -34,11 +29,7 @@ public class SqlServerMultiServerFixture : IAsyncLifetime, IMultiServerDatabaseF
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.SqlServer,
-            TablesToIgnore = FixtureHelper.GetServerTablesToIgnore(context),
         });
-
-        Server1 = await WarpTestServer.StartAsync(this, config => config.WorkerCount = 3);
-        Server2 = await WarpTestServer.StartAsync(this, config => config.WorkerCount = 3);
     }
 
     public async Task ResetAsync()
@@ -56,11 +47,7 @@ public class SqlServerMultiServerFixture : IAsyncLifetime, IMultiServerDatabaseF
             .Options);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        await Server2.DisposeAsync();
-        await Server1.DisposeAsync();
-    }
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
 [CollectionDefinition]

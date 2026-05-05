@@ -18,9 +18,6 @@ public static class FixtureDiagnostics
     public static Task<string> DumpDiagnosticsAsync(this IDatabaseFixture fixture, string header, CancellationToken ct)
         => DumpAsync(fixture.CreateContext(), header, ct);
 
-    public static Task<string> DumpDiagnosticsAsync(this IMultiServerDatabaseFixture fixture, string header, CancellationToken ct)
-        => DumpAsync(fixture.CreateContext(), header, ct);
-
     /// <summary>
     /// Shared failure-dump tail for integration test bases. On any non-passing test result,
     /// invokes <paramref name="dumper"/> with a fresh CancellationToken (xunit's is already
