@@ -20,7 +20,7 @@ public class PostgreSqlClassFixture : IAsyncLifetime, IDatabaseFixture
 
     public async ValueTask InitializeAsync()
     {
-        var databaseName = $"warp_t_{Guid.NewGuid():N}".Substring(0, 16);
+        var databaseName = $"warp_t_{Guid.NewGuid():N}";
         _connectionString = await SharedPostgreSqlContainer.CreateDatabaseAsync(
             databaseName,
             Xunit.TestContext.Current.CancellationToken);

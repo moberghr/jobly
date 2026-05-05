@@ -9,8 +9,12 @@ namespace Warp.Tests.Fixtures;
 /// Per-test-class SQL Server fixture. Each test class gets its own database inside the
 /// shared SQL Server container, so test classes run fully in parallel up to xunit's
 /// MaxParallelThreads. Tests within a class share the database and rely on Respawn between
-/// tests for isolation. Service Broker is enabled on every database so notification-transport
-/// tests can opt into push without a separate fixture variant.
+/// tests for isolation.
+/// <para>
+/// Service Broker is NOT enabled by default — it adds ~100–200ms per fixture-init via
+/// <c>ALTER DATABASE … SET ENABLE_BROKER</c>. Tests that exercise the SQL Server
+/// notification transport (push) must use <see cref="SqlServerPushClassFixture"/> instead.
+/// </para>
 /// </summary>
 public class SqlServerClassFixture : IAsyncLifetime, IDatabaseFixture
 {
@@ -19,12 +23,14 @@ public class SqlServerClassFixture : IAsyncLifetime, IDatabaseFixture
 
     public string ConnectionString => _connectionString;
 
+    protected virtual bool EnableServiceBroker => false;
+
     public async ValueTask InitializeAsync()
     {
-        var databaseName = $"warp_t_{Guid.NewGuid():N}".Substring(0, 16);
+        var databaseName = $"warp_t_{Guid.NewGuid():N}";
         _connectionString = await SharedSqlServerContainer.CreateDatabaseAsync(
             databaseName,
-            enableServiceBroker: true,
+            EnableServiceBroker,
             Xunit.TestContext.Current.CancellationToken);
 
         await using var context = CreateContext();
@@ -54,4 +60,14 @@ public class SqlServerClassFixture : IAsyncLifetime, IDatabaseFixture
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}
+
+/// <summary>
+/// SQL Server fixture variant with Service Broker enabled. Use for test classes that exercise
+/// <c>SqlServerNotificationTransport</c> directly or call <c>UseDatabasePush()</c> in their
+/// server config — without Broker, the transport's listener can't subscribe.
+/// </summary>
+public sealed class SqlServerPushClassFixture : SqlServerClassFixture
+{
+    protected override bool EnableServiceBroker => true;
 }

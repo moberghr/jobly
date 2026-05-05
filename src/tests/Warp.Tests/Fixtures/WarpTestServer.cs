@@ -72,6 +72,27 @@ public class WarpTestServer : IAsyncDisposable
     public PauseStateHolder PauseState => _host.Services.GetRequiredService<PauseStateHolder>();
 
     /// <summary>
+    /// Synchronously runs the Heartbeat task once — refreshing <see cref="PauseStateHolder"/>
+    /// from the DB. Use after a Pause/Resume DB write when the test config has disabled the
+    /// auto Heartbeat (HealthCheckInterval = null), so that pause propagation is deterministic
+    /// rather than dependent on the periodic heartbeat tick.
+    /// </summary>
+    public async Task<string?> RunHeartbeatOnceAsync(CancellationToken ct = default)
+    {
+        // Resolve the Heartbeat task in its own scope and call ExecuteAsync directly. This
+        // sidesteps the ServerTaskHost auto-loop (which doesn't register tasks whose
+        // DefaultInterval is null) so tests that disable HealthCheckInterval can still drive
+        // a heartbeat tick deterministically. Heartbeat takes no distributed lock, so running
+        // it without the host's lock guard is safe.
+        await using var scope = _host.Services.CreateAsyncScope();
+        var heartbeat = scope.ServiceProvider
+            .GetServices<Warp.Worker.Services.IServerTask>()
+            .OfType<Warp.Worker.Services.Heartbeat<TestContext>>()
+            .Single();
+        return await heartbeat.ExecuteAsync(ct);
+    }
+
+    /// <summary>
     /// Polls until the PauseStateHolder reflects the expected paused/resumed state for a group.
     /// Use instead of Task.Delay after calling pause/resume APIs.
     /// </summary>
@@ -217,7 +238,10 @@ public class WarpTestServer : IAsyncDisposable
             })
             .Build();
 
+        var serverId = host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<WarpWorkerConfiguration>>().Value.ServerId;
+        ServerLifecycleTrace.Record(serverId, "IHost.StartAsync starting");
         await host.StartAsync(Xunit.TestContext.Current.CancellationToken);
+        ServerLifecycleTrace.Record(serverId, "IHost.StartAsync returned");
 
         return new WarpTestServer(host, fixture);
     }
@@ -355,7 +379,9 @@ public class WarpTestServer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         GC.SuppressFinalize(this);
+        ServerLifecycleTrace.Record(ServerId, "IHost.StopAsync starting");
         await _host.StopAsync(Xunit.TestContext.Current.CancellationToken);
+        ServerLifecycleTrace.Record(ServerId, "IHost.StopAsync returned");
         _host.Dispose();
     }
 }

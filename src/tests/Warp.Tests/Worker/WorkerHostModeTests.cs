@@ -132,6 +132,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
             new NullNotificationTransport(),
             state,
             TestTasks.NullSignals,
+            new DispatcherRegistry(),
             NullLoggerFactory.Instance);
     }
 

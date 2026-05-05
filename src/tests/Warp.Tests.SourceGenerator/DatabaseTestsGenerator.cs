@@ -14,6 +14,13 @@ public sealed class DatabaseTestsGenerator : IIncrementalGenerator
         [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
         internal sealed class GenerateDatabaseTestsAttribute : System.Attribute
         {
+            /// <summary>
+            /// Set to true for test classes that exercise the database-push path
+            /// (UseDatabasePush, SqlServerNotificationTransport). Picks the SQL Server
+            /// fixture variant with Service Broker enabled. PostgreSQL's LISTEN/NOTIFY
+            /// works without setup, so this only affects the SQL Server side.
+            /// </summary>
+            public bool WithPush { get; set; }
         }
         """;
 
@@ -55,14 +62,26 @@ public sealed class DatabaseTestsGenerator : IIncrementalGenerator
             return null;
         }
 
+        var withPush = false;
+        foreach (var named in attr.NamedArguments)
+        {
+            if (string.Equals(named.Key, "WithPush", System.StringComparison.Ordinal)
+                && named.Value.Value is bool b)
+            {
+                withPush = b;
+            }
+        }
+
         return new Target(
             @namespace: symbol.ContainingNamespace.ToDisplayString(),
-            baseName: symbol.Name);
+            baseName: symbol.Name,
+            withPush: withPush);
     }
 
     private static void Emit(SourceProductionContext spc, Target target)
     {
-        var (ns, baseName) = target;
+        var (ns, baseName, withPush) = target;
+        var sqlFixture = withPush ? "SqlServerPushClassFixture" : "SqlServerClassFixture";
 
         // Strip the Base suffix if present — produces RetryTests_PostgreSql for RetryTestsBase.
         var concreteName = baseName.EndsWith("Base", System.StringComparison.Ordinal)
@@ -82,31 +101,35 @@ public sealed class DatabaseTestsGenerator : IIncrementalGenerator
         sb.AppendLine("}");
         sb.AppendLine();
         sb.AppendLine("[Xunit.Trait(\"Category\", \"SqlServer\")]");
-        sb.AppendLine($"public sealed class {concreteName}_SqlServer : {baseName}, Xunit.IClassFixture<global::Warp.Tests.Fixtures.SqlServerClassFixture>");
+        sb.AppendLine($"public sealed class {concreteName}_SqlServer : {baseName}, Xunit.IClassFixture<global::Warp.Tests.Fixtures.{sqlFixture}>");
         sb.AppendLine("{");
-        sb.AppendLine($"    public {concreteName}_SqlServer(global::Warp.Tests.Fixtures.SqlServerClassFixture fixture) : base(fixture) {{ }}");
+        sb.AppendLine($"    public {concreteName}_SqlServer(global::Warp.Tests.Fixtures.{sqlFixture} fixture) : base(fixture) {{ }}");
         sb.AppendLine("}");
 
         spc.AddSource($"{ns.Replace('.', '_')}_{concreteName}.g.cs", sb.ToString());
     }
 
-    private sealed class Target(string @namespace, string baseName)
+    private sealed class Target(string @namespace, string baseName, bool withPush)
     {
         public string Namespace { get; } = @namespace;
 
         public string BaseName { get; } = baseName;
 
-        public override int GetHashCode() => (Namespace, BaseName).GetHashCode();
+        public bool WithPush { get; } = withPush;
+
+        public override int GetHashCode() => (Namespace, BaseName, WithPush).GetHashCode();
 
         public override bool Equals(object? obj) =>
             obj is Target other
             && string.Equals(Namespace, other.Namespace, System.StringComparison.Ordinal)
-            && string.Equals(BaseName, other.BaseName, System.StringComparison.Ordinal);
+            && string.Equals(BaseName, other.BaseName, System.StringComparison.Ordinal)
+            && WithPush == other.WithPush;
 
-        public void Deconstruct(out string ns, out string bn)
+        public void Deconstruct(out string ns, out string bn, out bool wp)
         {
             ns = Namespace;
             bn = BaseName;
+            wp = WithPush;
         }
     }
 }

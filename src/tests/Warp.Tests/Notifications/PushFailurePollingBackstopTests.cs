@@ -16,7 +16,7 @@ namespace Warp.Tests.Notifications;
 // failure (transport crash, network blip, missed LISTEN/NOTIFY) cannot leave jobs stranded.
 // If this property regresses, any deploy that ships with a broken transport becomes a silent
 // job-loss incident.
-[GenerateDatabaseTests]
+[GenerateDatabaseTests(WithPush = true)]
 public abstract class PushFailurePollingBackstopTestsBase : IntegrationTestBase
 {
     protected PushFailurePollingBackstopTestsBase(IDatabaseFixture fixture)

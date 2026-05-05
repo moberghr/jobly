@@ -43,20 +43,37 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task PauseServer_JobsStayEnqueued()
     {
-        await using var server = await WarpTestServer.StartAsync(Fixture);
+        // Pause propagation runs through PauseStateHolder, which Heartbeat refreshes on its
+        // periodic tick. Disable the auto Heartbeat and drive it manually so the test fully
+        // owns the timing of the holder flip — no race between auto-heartbeat and the
+        // pause/publish sequence below.
+        await using var server = await WarpTestServer.StartAsync(Fixture, configure: cfg => cfg.HealthCheckInterval = null);
         var groupId = await GetFirstGroupId(server);
         var svc = server.CreateServerCommandService();
 
-        // Pause and wait for propagation
+        // Pause via the API (DB row update) then run Heartbeat once so the in-memory holder
+        // catches up. After this returns, every worker iteration that begins from this point
+        // on will see paused=true and skip the fetch.
         await svc.PauseServer(server.ServerId);
-        await server.WaitForPauseState(groupId, expectedPaused: true);
+        await server.RunHeartbeatOnceAsync(Xunit.TestContext.Current.CancellationToken);
+        server.PauseState.IsPaused(groupId).ShouldBeTrue();
 
-        // Publish a job
+        // Drain in-flight worker iterations. A worker that read holder=false just before the
+        // manual heartbeat is now somewhere in GetAndProcessJob; if we published immediately,
+        // its already-running SQL claim could see the new row even though the holder is now
+        // paused. Waiting one full polling cycle (PollingInterval = 100ms in test config)
+        // plus slack guarantees every such iteration finishes against an empty queue, loops
+        // back, and reads paused=true on its next check.
+        await Task.Delay(500, Xunit.TestContext.Current.CancellationToken);
+
+        // Publish a job — by now all worker iterations are either sleeping in the pause
+        // short-circuit or about to enter it; none can claim this row.
         var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Wait — job should NOT be picked up (poll DB to confirm it stays Enqueued)
+        // Confirm it stays Enqueued for the duration we'd reasonably expect a worker to pick
+        // it up if pause weren't honored.
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
         while (DateTime.UtcNow < deadline)
         {
@@ -65,8 +82,9 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
             await Task.Delay(200, Xunit.TestContext.Current.CancellationToken);
         }
 
-        // Resume and let it process
+        // Resume + manual heartbeat to flip the holder back, then let workers process.
         await svc.ResumeServer(server.ServerId);
+        await server.RunHeartbeatOnceAsync(Xunit.TestContext.Current.CancellationToken);
         await server.WaitForCompletion();
     }
 
@@ -96,20 +114,22 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task PauseWorkerGroup_JobsStayEnqueued()
     {
-        await using var server = await WarpTestServer.StartAsync(Fixture);
+        // See PauseServer_JobsStayEnqueued for why we drive Heartbeat manually.
+        await using var server = await WarpTestServer.StartAsync(Fixture, configure: cfg => cfg.HealthCheckInterval = null);
         var groupId = await GetFirstGroupId(server);
         var svc = server.CreateServerCommandService();
 
-        // Pause group and wait for propagation
         await svc.PauseWorkerGroup(groupId);
-        await server.WaitForPauseState(groupId, expectedPaused: true);
+        await server.RunHeartbeatOnceAsync(Xunit.TestContext.Current.CancellationToken);
+        server.PauseState.IsPaused(groupId).ShouldBeTrue();
 
-        // Publish a job
+        // Drain in-flight worker iterations — see PauseServer_JobsStayEnqueued for rationale.
+        await Task.Delay(500, Xunit.TestContext.Current.CancellationToken);
+
         var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Wait — job should NOT be picked up
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
         while (DateTime.UtcNow < deadline)
         {
@@ -118,8 +138,8 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
             await Task.Delay(200, Xunit.TestContext.Current.CancellationToken);
         }
 
-        // Resume and let it process
         await svc.ResumeWorkerGroup(groupId);
+        await server.RunHeartbeatOnceAsync(Xunit.TestContext.Current.CancellationToken);
         await server.WaitForCompletion();
     }
 
