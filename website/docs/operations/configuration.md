@@ -37,14 +37,17 @@ This produces tables like `warp.job`, `warp.job_log`, `warp.server`, etc.
 
 ## Retry Configuration
 
-Configure retry behavior with `AddWarpRetry()`:
+Configure retry behavior via `opt.AddRetry()` inside the `AddWarpWorker` lambda:
 
 ```csharp
-services.AddWarpRetry(options =>
+builder.Services.AddWarpWorker<AppDbContext>(opt =>
 {
-    options.MaxRetries = 3;               // Default max retries (default: 0)
-    options.Delays = [15, 60, 300];       // Retry delays in seconds (default: [15, 60, 300])
-    options.JitterFactor = 0.2;           // Random ±20% jitter on each delay (default: 0, no jitter)
+    opt.AddRetry(options =>
+    {
+        options.MaxRetries = 3;               // Default max retries (default: 0)
+        options.Delays = [15, 60, 300];       // Retry delays in seconds (default: [15, 60, 300])
+        options.JitterFactor = 0.2;           // Random ±20% jitter on each delay (default: 0, no jitter)
+    });
 });
 ```
 
@@ -58,24 +61,30 @@ Per-job override via `[Retry]` attribute on handler or job class, or per-enqueue
 
 ## Mutex Configuration
 
-Enable mutex (concurrency control) with `AddWarpMutex()`:
+Enable mutex (concurrency control) via `opt.AddMutex()` inside the `AddWarpWorker` lambda:
 
 ```csharp
-services.AddWarpMutex();
+builder.Services.AddWarpWorker<AppDbContext>(opt =>
+{
+    opt.AddMutex();
+});
 ```
 
 No options — just register and use `.WithMutex("key")` or `[Mutex("key")]` at publish time. See [Mutex](/docs/features/mutex) for details.
 
 ## Circuit Breaker Configuration
 
-Enable the circuit breaker with `AddWarpCircuitBreaker<TContext>()`:
+Enable the circuit breaker via `opt.AddCircuitBreaker()` inside the `AddWarpWorker` lambda:
 
 ```csharp
-services.AddWarpCircuitBreaker<AppDbContext>(options =>
+builder.Services.AddWarpWorker<AppDbContext>(opt =>
 {
-    options.Threshold = 5;                         // default: 3
-    options.Duration = TimeSpan.FromMinutes(1);    // default: 1 minute
-    options.ResetJitter = TimeSpan.FromSeconds(10); // default: 10s
+    opt.AddCircuitBreaker(options =>
+    {
+        options.Threshold = 5;                          // default: 3
+        options.Duration = TimeSpan.FromMinutes(1);     // default: 1 minute
+        options.ResetJitter = TimeSpan.FromSeconds(10); // default: 10s
+    });
 });
 ```
 
@@ -89,10 +98,13 @@ Per-handler overrides on `[CircuitBreaker]` use `Group`, `Threshold`, `DurationS
 
 ## NoRestart Configuration
 
-Enable the stale-recovery opt-out with `AddWarpNoRestart()`:
+Enable the stale-recovery opt-out via `opt.AddNoRestart()` inside the `AddWarpWorker` lambda:
 
 ```csharp
-services.AddWarpNoRestart();
+builder.Services.AddWarpWorker<AppDbContext>(opt =>
+{
+    opt.AddNoRestart();
+});
 ```
 
 No options. Register it to make `[NoRestart]` / `[Restart]` attributes take effect at publish time. `.WithRestart(bool)` works without the addon. See [NoRestart](/docs/features/no-restart) for details.
@@ -124,7 +136,7 @@ builder.Services.AddWarpWorker<AppDbContext>(options =>
     options.ServerId = Guid.NewGuid(); // Auto-generated, rarely needs override
 
     // Health & crash recovery
-    options.HealthCheckInterval = TimeSpan.FromSeconds(10);
+    options.HealthCheckInterval = TimeSpan.FromSeconds(3);
     options.HealthCheckTimeout = TimeSpan.FromMinutes(5);
     options.InvisibilityTimeout = TimeSpan.FromMinutes(5);
 
@@ -136,6 +148,7 @@ builder.Services.AddWarpWorker<AppDbContext>(options =>
     // Background task intervals
     options.OrchestrationInterval = TimeSpan.FromSeconds(10);
     options.MessageRoutingInterval = TimeSpan.FromSeconds(1);
+    options.ScheduledActivationInterval = TimeSpan.FromSeconds(5);
     options.CounterAggregationInterval = TimeSpan.FromSeconds(5);
     options.ServerCleanupInterval = TimeSpan.FromSeconds(30);
     options.StaleJobRecoveryInterval = TimeSpan.FromSeconds(30);
@@ -243,7 +256,7 @@ This creates 7 workers total: 5 polling `critical` every 100ms, and 2 polling `r
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `HealthCheckInterval` | `TimeSpan` | `10 seconds` | How often the health manager runs (heartbeat, stale job detection, cleanup) |
+| `HealthCheckInterval` | `TimeSpan` | `3 seconds` | How often the health manager runs (heartbeat, stale job detection, cleanup) |
 | `HealthCheckTimeout` | `TimeSpan` | `5 minutes` | Time without heartbeat before a server is considered dead and removed |
 | `InvisibilityTimeout` | `TimeSpan` | `5 minutes` | Time without keep-alive before a processing job is considered stale and requeued. Workers refresh keep-alive every `InvisibilityTimeout / 5` |
 
@@ -265,6 +278,7 @@ Failed jobs have `ExpireAt = null` and are never automatically deleted. They mus
 |--------|------|---------|-------------|
 | `OrchestrationInterval` | `TimeSpan` | `10 seconds` | Fallback sweep interval for parent finalization |
 | `MessageRoutingInterval` | `TimeSpan` | `1 second` | Message routing poll interval |
+| `ScheduledActivationInterval` | `TimeSpan` | `5 seconds` | How often `ScheduledJobActivation` flips `State.Scheduled` jobs to `Enqueued`. Controls worst-case latency between a job's `ScheduleTime` and when it becomes eligible for pickup |
 | `CounterAggregationInterval` | `TimeSpan` | `5 seconds` | Counter aggregation interval |
 | `ServerCleanupInterval` | `TimeSpan` | `30 seconds` | Dead server cleanup interval |
 | `StaleJobRecoveryInterval` | `TimeSpan` | `30 seconds` | Stale job recovery interval |

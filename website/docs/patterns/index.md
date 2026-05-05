@@ -61,6 +61,29 @@ public class RetryBehavior<T> : IPipelineBehavior<T, Unit> where T : IJob { ... 
 
 For jobs and messages, `TResponse` is `Unit`. For requests, it's your custom response type. For streams, it's `IAsyncEnumerable<T>`. Logger output from pipeline behaviors appears in the job detail "Handler Output" section.
 
+## Publish Pipeline Behaviors
+
+`IPublishPipelineBehavior<T>` intercepts the *publish* side — before a job is written to the database. Use it to attach cross-cutting metadata (tenant ID, correlation ID, user context) to every job automatically:
+
+```csharp
+public class TenantBehavior<T> : IPublishPipelineBehavior<T>
+{
+    public Task PublishAsync(PublishContext<T> context, PublishDelegate next, CancellationToken ct)
+    {
+        context.Metadata["tenant"] = _tenantContext.CurrentTenantId;
+        return next();
+    }
+}
+```
+
+Register as an open generic:
+
+```csharp
+builder.Services.AddTransient(typeof(IPublishPipelineBehavior<>), typeof(TenantBehavior<>));
+```
+
+Metadata set here is inherited by all child jobs spawned during execution. See [Metadata](/docs/features/metadata) for the full model.
+
 Stream requests use a separate pipeline — `IStreamPipelineBehavior<TRequest, TResponse>`:
 
 ```csharp

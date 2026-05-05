@@ -27,7 +27,7 @@ Each Warp server runs 8 background tasks that handle orchestration and maintenan
 
 | Task | Default Interval | Purpose |
 |------|------------------|---------|
-| **Heartbeat** | 10s (`HealthCheckInterval`) | Updates server heartbeat timestamp so other servers know it's alive |
+| **Heartbeat** | 3s (`HealthCheckInterval`) | Updates server heartbeat timestamp so other servers know it's alive |
 | **MessageRouting** | 1s (`MessageRoutingInterval`) | Routes `IMessage` jobs to their handlers by creating child jobs |
 | **Orchestration** | 10s (`OrchestrationInterval`) + signal | Finalizes parent jobs when all children complete, activates continuations |
 | **AggregateCounters** | 5s (`CounterAggregationInterval`) | Rolls up write-optimized Counter rows into Statistic rows for the dashboard |
