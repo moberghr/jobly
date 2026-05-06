@@ -4,6 +4,41 @@ sidebar_position: 6
 
 # Releases
 
+## 0.11.0
+
+*2026-05-06*
+
+Stability release. No breaking API changes. Several latent product bugs surfaced as flakes during a test-infrastructure refactor and are fixed here; pause's "not instant" semantics are now spelled out in the public API surface.
+
+### Improvements
+
+- **Pause is documented as heartbeat-driven** — `IServerCommandService.PauseServer` / `PauseWorkerGroup` only stamp `PausedAt` on the DB row. Each server's worker pool keeps fetching until that server's next `Heartbeat` tick (cadence `HealthCheckInterval`, default 3s) refreshes its in-memory `PauseStateHolder`, and an in-flight worker iteration that already passed its pause check will still complete its current claim. Treat pause as "no new fetches after up to one heartbeat", not as a synchronous barrier — callers needing hard quiesce semantics combine pause with a wait of `HealthCheckInterval + PollingInterval`. The previous docs implicitly suggested instant propagation; the type docs now match the actual behavior.
+- **`HealthCheckInterval` is now nullable** — `WarpWorkerConfiguration.HealthCheckInterval` is `TimeSpan?`. Set it to `null` to disable the auto `Heartbeat` loop entirely (the task stays DI-resolvable for manual invocation). Useful for tests that need to drive heartbeat ticks deterministically; existing values continue to work unchanged.
+- **MIT LICENSE file** — repository root now ships a proper `LICENSE` file alongside the `MIT` `PackageLicenseExpression` already present in NuGet metadata, and the `README` has a license section pointing at it ([#149](https://github.com/moberghr/warp/pull/149)).
+
+### Bug Fixes
+
+- **Dispatcher shutdown is now exception-safe** — `WarpDispatcher.ExecuteAsync` wraps its loop in `try/finally` so the channel writer is always completed and the per-host registration disposed, even when an unexpected exception escapes the loop body. Without this, a non-`OperationCanceledException` slipping through the catch could leave dispatcher workers blocked on `WaitToReadAsync` until `IHostOptions.ShutdownTimeout` (default 30s) fired, masking the real failure. Closes the `DispatcherShutdownIntegrationTests` flake from [#151](https://github.com/moberghr/warp/pull/151).
+- **`WarpServerRegistration.StopAsync` cleanup uses a fresh CTS** — the cancellation token passed to `StopAsync` is often already cancelled by the time host shutdown reaches the registration's stop method; reusing it left the cleanup queries (delete `Worker` / `WorkerGroup` / `Server` rows for this server id) in `(canceled)` state, leaving orphan rows for `ServerCleanup` to find on the next host's tick. Now uses a bounded fresh `CancellationTokenSource` (10s) so graceful cleanup completes regardless of upstream cancellation.
+- **`ServerTaskLoop` survives transient SQL hiccups** — `EnsureRegisteredAsync` and the main iteration are now wrapped in `try/catch` with a short backoff. Previously a transient `SqlException` (e.g., a "session busy" / "severe error" under load) escaping these methods would crash the whole `ServerTaskHost` because `BackgroundServiceExceptionBehavior=StopHost` is the .NET default. Errors are logged and retried on the next iteration.
+- **`MessageRouter` fires push notifications for routed children** — when a `Kind=Message` job fans out into N `Kind=Job` children, the router now captures the pending `JobEnqueued` notifications and fires them after `SaveChanges`. The dispatcher (when `UseDatabasePush()` is enabled) wakes immediately instead of waiting for the next poll. Idle-to-burst pickup latency for messages with many handlers drops from ~`PollingInterval` to &lt;50ms.
+- **`DeleteJob` / `RequeueJob` no longer race the worker keep-alive** — `IWarpSqlQueries` previously had two lock-by-id variants: `LockJobByIdAsync` (with `READPAST` / `SKIP LOCKED`) for user commands and `LockJobByIdWaitAsync` (blocking) for orchestration. The `READPAST` variant raced the worker's brief keep-alive UPDATEs and would falsely return "job not found" while the row was being touched. The two methods are now unified onto the blocking `LockJobByIdWaitAsync`; the wait is bounded by the keep-alive's own commit, so it's microseconds in practice.
+- **Per-host `DispatcherRegistry` replaces process-wide static** — `WarpDispatcher`'s notification-wakeup signal list was previously a `static List<>` on the class. With multiple `IHost`s in one process (typical in integration tests, possible in some embedded scenarios) the static cross-signaled dispatchers across host boundaries and held references to disposed dispatchers' semaphores. Now a DI singleton scoped to each host's container, registered automatically by `AddWarpWorker`.
+
+### Test Suite Improvements
+
+- **Per-class `IClassFixture` topology** — integration tests no longer share a single `WarpTestServer` per "shard" fixture; each test class gets its own database and each test boots its own server inside the test body. Eliminates whole categories of cross-test interference (leftover `Server` rows poisoning `ServerCleanup`, prior-test mid-flight jobs racing the next test's assertions, SQL Server connection-pool poisoning across server-replacement scenarios). The `[GenerateDatabaseTests(...)]` source generator now emits `[Xunit.IClassFixture<>]` per concrete subclass instead of `[Collection(...)]`.
+- **Service Broker is opt-in** — SQL Server Service Broker is no longer always-on for every `_SqlServer` test. Tests that exercise DB push opt in via `[GenerateDatabaseTests(WithPush = true)]`, which routes them to the dedicated `SqlServerPushClassFixture`. Saves significant setup time for the polling-only suite.
+- **Diagnostic dump on integration-test failure** — `FixtureDiagnostics.DumpAsync` runs on every failed integration test and prints stuck-job state, recent `ServerTask` / `ServerLog` rows, and a process-wide `ServerLifecycleTrace` of `IHost.StartAsync` / `StopAsync` events. The lifecycle trace is critical because `WarpServerRegistration.StopAsync` deletes its own `Server` row on graceful shutdown, so post-mortem queries against that row return nothing — the in-memory trace is the only source of truth for "did this server actually finish booting / shut down cleanly?" ([#147](https://github.com/moberghr/warp/pull/147), [#151](https://github.com/moberghr/warp/pull/151)).
+- **`WarpTestServer.RunHeartbeatOnceAsync`** — test helper that resolves `Heartbeat<TestContext>` in a fresh scope and calls `ExecuteAsync` directly, sidestepping the `ServerTaskHost` auto-loop. Lets tests that disable `HealthCheckInterval` flip `PauseStateHolder` deterministically. Used by the rewritten `PauseServer_JobsStayEnqueued` / `PauseWorkerGroup_JobsStayEnqueued` tests.
+- **Full suite stability** — 1,025 tests, ran 5 consecutive full-suite passes with zero flakes (1m 03s – 1m 11s) before tagging this release.
+
+### Website & Docs
+
+- **Enterprise landing page redesign** — new home page with a Moberg-aligned enterprise aesthetic, replacing the prior tagline-driven layout ([#148](https://github.com/moberghr/warp/pull/148), [#150](https://github.com/moberghr/warp/pull/150)).
+
+---
+
 ## 0.10.0
 
 *2026-04-27*
