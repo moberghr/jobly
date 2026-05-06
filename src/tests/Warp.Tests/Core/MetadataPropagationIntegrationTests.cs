@@ -10,7 +10,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Core;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestBase
 {
     private static readonly int[] OneSecondDelay = [1];
@@ -23,13 +23,14 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
     [TimedFact]
     public async Task GivenHandlerThatWritesMetadata_WhenCompleted_ThenHandlerMetadataPersisted()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new MetadataWriterRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Completed);
+        await server.WaitForJobState(jobId, State.Completed);
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var job = await ctx.Set<Job>()
             .Where(x => x.Id == jobId)
             .FirstAsync(Xunit.TestContext.Current.CancellationToken);
@@ -44,13 +45,14 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
     {
         // RetryPublishBehavior sets MaxRetries at publish time
         // Handler sets HandlerWrote at execution time
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new MetadataWriterRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Completed);
+        await server.WaitForJobState(jobId, State.Completed);
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var job = await ctx.Set<Job>()
             .Where(x => x.Id == jobId)
             .FirstAsync(Xunit.TestContext.Current.CancellationToken);
@@ -68,16 +70,17 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
     [TimedFact]
     public async Task GivenUserMetadataAtPublishTime_WhenCompleted_ThenUserMetadataPreserved()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new MetadataWriterRequest(), new JobParameters
         {
             Metadata = new Dictionary<string, object> { ["UserKey"] = "user-value" },
         });
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Completed);
+        await server.WaitForJobState(jobId, State.Completed);
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var job = await ctx.Set<Job>()
             .Where(x => x.Id == jobId)
             .FirstAsync(Xunit.TestContext.Current.CancellationToken);
@@ -98,7 +101,8 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
     [TimedFact]
     public async Task GivenFailingJobWithRetry_WhenFailed_ThenRetryMetadataPersisted()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters
         {
             Metadata = new Dictionary<string, object>
@@ -109,9 +113,9 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
         });
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
+        await server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var job = await ctx.Set<Job>()
             .Where(x => x.Id == jobId)
             .FirstAsync(Xunit.TestContext.Current.CancellationToken);
@@ -125,16 +129,17 @@ public abstract class MetadataPropagationIntegrationTestsBase : IntegrationTestB
     [TimedFact]
     public async Task GivenChildJobSpawnedByHandler_WhenCompleted_ThenChildInheritsParentMetadata()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new SpawnChildJobRequest(), new JobParameters
         {
             Metadata = new Dictionary<string, object> { ["ParentKey"] = "inherited" },
         });
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var children = await ctx.Set<Job>()
             .Where(x => x.SpawnedByJobId == jobId)
             .Where(x => x.Kind == JobKind.Job)

@@ -9,22 +9,29 @@ using Warp.Core.Mutex;
 using Warp.Core.Retry;
 using Warp.Tests.Fixtures;
 using Warp.Tests.TestData.Handlers;
+using Warp.Worker;
 using Warp.Worker.Services;
 
 namespace Warp.Tests.EndToEnd;
 
-[GenerateDatabaseTests(FixtureKind.MultiServer)]
-public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
+[GenerateDatabaseTests]
+public abstract class MultiServerTestsBase : IntegrationTestBase
 {
-    protected MultiServerTestsBase(IMultiServerDatabaseFixture fixture)
+    protected MultiServerTestsBase(IDatabaseFixture fixture)
         : base(fixture)
     {
     }
 
+    private static void Configure3Workers(WarpWorkerBuilder<TestContext> config)
+        => config.WorkerCount = 3;
+
     [TimedFact]
     public async Task GivenManyJobs_WithTwoServers_ThenEachJobProcessedExactlyOnce()
     {
-        var publisher = Server1.CreatePublisher();
+        await using var server1 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+        await using var server2 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+
+        var publisher = server1.CreatePublisher();
         var jobIds = new List<Guid>();
         for (var i = 0; i < 50; i++)
         {
@@ -33,9 +40,9 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
 
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server1.WaitForCompletion();
+        await server1.WaitForCompletion();
 
-        var ctx = CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // All 50 jobs should be completed
         var completedCount = await ctx.Set<Job>()
@@ -73,7 +80,10 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
     [TimedFact]
     public async Task GivenMessages_WithTwoServers_ThenEachRoutedExactlyOnce()
     {
-        var publisher = Server1.CreatePublisher();
+        await using var server1 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+        await using var server2 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+
+        var publisher = server1.CreatePublisher();
         var messageIds = new List<Guid>();
         for (var i = 0; i < 10; i++)
         {
@@ -82,9 +92,9 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
 
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server1.WaitForCompletion();
+        await server1.WaitForCompletion();
 
-        var ctx = CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // Each message should be completed
         foreach (var messageId in messageIds)
@@ -108,7 +118,10 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
     [TimedFact]
     public async Task GivenMultiHandlerMessage_WithTwoServers_ThenCorrectChildCount()
     {
-        var publisher = Server1.CreatePublisher();
+        await using var server1 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+        await using var server2 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+
+        var publisher = server1.CreatePublisher();
         var messageIds = new List<Guid>();
         for (var i = 0; i < 5; i++)
         {
@@ -117,9 +130,9 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
 
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server1.WaitForCompletion();
+        await server1.WaitForCompletion();
 
-        var ctx = CreateContext();
+        var ctx = Fixture.CreateContext();
 
         foreach (var messageId in messageIds)
         {
@@ -143,7 +156,10 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
     [TimedFact(45_000)]
     public async Task GivenBatch_WithTwoServers_ThenBatchCompletesCorrectly()
     {
-        var batchPublisher = Server1.CreateBatchPublisher();
+        await using var server1 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+        await using var server2 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+
+        var batchPublisher = server1.CreateBatchPublisher();
 
         var batchJobs = Enumerable.Range(0, 20)
             .Select(_ => new UnitRequest())
@@ -156,9 +172,9 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
         await batchPublisher.ContinueBatchWith(continuationJobs, batchId);
         await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server1.WaitForCompletion(timeout: TimeSpan.FromSeconds(30));
+        await server1.WaitForCompletion(timeout: TimeSpan.FromSeconds(30));
 
-        var ctx = CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // Batch parent should be completed
         var batch = await ctx.Set<Job>()
@@ -194,7 +210,10 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
     [TimedFact]
     public async Task GivenContinuations_WithTwoServers_ThenContinuationsActivateAndExecute()
     {
-        var publisher = Server1.CreatePublisher();
+        await using var server1 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+        await using var server2 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+
+        var publisher = server1.CreatePublisher();
         var parentIds = new List<Guid>();
 
         // Create 5 parent → child continuation chains
@@ -207,9 +226,9 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
 
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server1.WaitForCompletion();
+        await server1.WaitForCompletion();
 
-        var ctx = CreateContext();
+        var ctx = Fixture.CreateContext();
 
         foreach (var parentId in parentIds)
         {
@@ -231,34 +250,37 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
     [TimedFact]
     public async Task GivenMutexJobs_WithTwoServers_ThenMutexEnforcedAcrossServers()
     {
-        // Enqueue a slow job that holds the mutex — published via Server1
-        var publisher1 = Server1.CreatePublisher();
+        await using var server1 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+        await using var server2 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+
+        // Enqueue a slow job that holds the mutex — published via server1
+        var publisher1 = server1.CreatePublisher();
         var job1Id = await publisher1.Enqueue(new CancellableRequest(), new JobParameters().WithMutex("multi-server-mutex"));
         await publisher1.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait for it to start processing
-        await Server1.WaitForJobState(job1Id, State.Processing);
+        await server1.WaitForJobState(job1Id, State.Processing);
 
-        // Enqueue a second job with the same mutex — published via Server2
-        var publisher2 = Server2.CreatePublisher();
+        // Enqueue a second job with the same mutex — published via server2
+        var publisher2 = server2.CreatePublisher();
         var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("multi-server-mutex"));
         await publisher2.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Job2 should be deleted due to mutex (regardless of which server picks it up).
-        await Server1.WaitForJobState(job2Id, State.Deleted);
+        await server1.WaitForJobState(job2Id, State.Deleted);
 
         // Verify the mutex violation was logged
-        var logs = await Server1.GetJobLogs(job2Id);
+        var logs = await server1.GetJobLogs(job2Id);
         logs.ShouldContain(x => x.EventType == "Deleted" && x.Message.Contains("mutex"));
 
         // Job1 should still be processing
-        var job1 = await Server1.GetJob(job1Id);
+        var job1 = await server1.GetJob(job1Id);
         job1.CurrentState.ShouldBe(State.Processing);
 
         // Cancel the slow job and wait for it to be deleted so it doesn't leak into subsequent tests
-        var cmd = Server1.CreateCommandService();
+        var cmd = server1.CreateCommandService();
         await cmd.DeleteJob(job1Id);
-        await Server1.WaitForJobState(job1Id, State.Deleted, timeout: TimeSpan.FromSeconds(5));
+        await server1.WaitForJobState(job1Id, State.Deleted, timeout: TimeSpan.FromSeconds(5));
     }
 
     // Multi-server complex workload (50+ jobs: simple + messages + failing + retries +
@@ -266,8 +288,11 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
     [TimedFact(90_000)]
     public async Task GivenComplexWorkload_WithTwoServers_ThenAllReachTerminalState()
     {
-        var publisher = Server1.CreatePublisher();
-        var batchPublisher = Server1.CreateBatchPublisher();
+        await using var server1 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+        await using var server2 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+
+        var publisher = server1.CreatePublisher();
+        var batchPublisher = server1.CreateBatchPublisher();
 
         // 1. Simple jobs (30)
         for (var i = 0; i < 30; i++)
@@ -319,9 +344,9 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
 
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server1.WaitForCompletion(timeout: TimeSpan.FromSeconds(60));
+        await server1.WaitForCompletion(timeout: TimeSpan.FromSeconds(60));
 
-        var ctx = CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // No stuck jobs
         var stuckJobs = await ctx.Set<Job>()
@@ -377,19 +402,22 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
     [TimedFact]
     public async Task GivenPausedServer_WithTwoServers_ThenOtherServerProcessesJobs()
     {
-        // Get Server1's worker group and pause it
-        var ctx = CreateContext();
+        await using var server1 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+        await using var server2 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+
+        // Get server1's worker group and pause it
+        var ctx = Fixture.CreateContext();
         var server1GroupId = await ctx.Set<WorkerGroup>()
-            .Where(x => x.ServerId == Server1.ServerId)
+            .Where(x => x.ServerId == server1.ServerId)
             .Select(x => x.Id)
             .FirstAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var svc = Server1.CreateServerCommandService();
-        await svc.PauseServer(Server1.ServerId);
-        await Server1.WaitForPauseState(server1GroupId, expectedPaused: true);
+        var svc = server1.CreateServerCommandService();
+        await svc.PauseServer(server1.ServerId);
+        await server1.WaitForPauseState(server1GroupId, expectedPaused: true);
 
-        // Enqueue jobs while Server1 is paused
-        var publisher = Server2.CreatePublisher();
+        // Enqueue jobs while server1 is paused
+        var publisher = server2.CreatePublisher();
         var jobIds = new List<Guid>();
         for (var i = 0; i < 10; i++)
         {
@@ -398,10 +426,10 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
 
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Jobs should be processed by Server2
-        await Server2.WaitForCompletion();
+        // Jobs should be processed by server2
+        await server2.WaitForCompletion();
 
-        ctx = CreateContext();
+        ctx = Fixture.CreateContext();
 
         // All jobs completed
         var completedCount = await ctx.Set<Job>()
@@ -410,9 +438,9 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
             .CountAsync(Xunit.TestContext.Current.CancellationToken);
         completedCount.ShouldBe(10);
 
-        // All jobs should have been processed by Server2's workers (Server1 is paused)
+        // All jobs should have been processed by server2's workers (server1 is paused)
         var server2WorkerIds = await ctx.Set<Warp.Core.Data.Entities.Worker>()
-            .Where(x => x.ServerId == Server2.ServerId)
+            .Where(x => x.ServerId == server2.ServerId)
             .Select(x => x.Id)
             .ToListAsync(Xunit.TestContext.Current.CancellationToken);
 
@@ -426,10 +454,10 @@ public abstract class MultiServerTestsBase : MultiServerIntegrationTestBase
 
         processingWorkerIds.ShouldAllBe(
             x => server2WorkerIds.Contains(x),
-            "All jobs should have been processed by Server2's workers while Server1 was paused");
+            "All jobs should have been processed by server2's workers while server1 was paused");
 
-        // Resume Server1
-        await svc.ResumeServer(Server1.ServerId);
-        await Server1.WaitForPauseState(server1GroupId, expectedPaused: false);
+        // Resume server1
+        await svc.ResumeServer(server1.ServerId);
+        await server1.WaitForPauseState(server1GroupId, expectedPaused: false);
     }
 }

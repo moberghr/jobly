@@ -8,7 +8,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Reliability;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
 {
     protected ConcurrencyEdgeCaseTestsBase(IDatabaseFixture fixture)
@@ -20,11 +20,12 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
     public async Task GivenConcurrentDeleteOnSameJob_ThenOnlyOneDeleteRecorded()
     {
         // Arrange — enqueue a job and wait for it to complete
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Completed);
+        await server.WaitForJobState(jobId, State.Completed);
 
         // Act — delete from 2 threads concurrently
         // One will succeed, the other will throw (row-lock SKIP LOCKED returns null for locked row)
@@ -37,7 +38,7 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
                 {
                     try
                     {
-                        var svc = Server.CreateCommandService();
+                        var svc = server.CreateCommandService();
                         await svc.DeleteJob(jobId);
                     }
                     catch (Exception ex)
@@ -54,7 +55,7 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
         await Task.WhenAll(tasks);
 
         // Assert — job should be Deleted, with exactly 1 Deleted log entry
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Deleted);
 
@@ -70,70 +71,63 @@ public abstract class ConcurrencyEdgeCaseTestsBase : IntegrationTestBase
     public async Task GivenConcurrentRequeueOnSameJob_ThenStateConsistent()
     {
         // Arrange — enqueue a job and wait for it to complete
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Completed);
+        await server.WaitForJobState(jobId, State.Completed);
 
         // Pause the server before the concurrent requeue. Without this, the fixture's worker
         // re-claims the just-requeued job at its next poll tick (~100ms) and flips the row to
         // Processing before we can assert State.Enqueued — a race with the workers, not the
         // property we're testing. Pause is how PauseIntegrationTests isolates similar races.
-        var groupId = await GetFirstGroupId();
-        var serverSvc = Server.CreateServerCommandService();
-        await serverSvc.PauseServer(Server.ServerId);
-        await Server.WaitForPauseState(groupId, expectedPaused: true);
+        var groupId = await GetFirstGroupId(server);
+        var serverSvc = server.CreateServerCommandService();
+        await serverSvc.PauseServer(server.ServerId);
+        await server.WaitForPauseState(groupId, expectedPaused: true);
 
         try
         {
-            // Act — requeue from 2 threads concurrently
-            var successCount = 0;
+            // Act — requeue from 2 threads concurrently. Both should succeed (the row-level
+            // WAIT lock serializes them); the second observes State.Enqueued and early-returns
+            // without re-running the requeue logic.
             var tasks = new List<Task>();
             for (var i = 0; i < 2; i++)
             {
                 tasks.Add(Task.Run(
                     async () =>
                     {
-                        try
-                        {
-                            var svc = Server.CreateCommandService();
-                            await svc.RequeueJob(jobId);
-                            Interlocked.Increment(ref successCount);
-                        }
-                        catch (ArgumentException)
-                        {
-                            // Expected — SKIP LOCKED causes second call to not find the row
-                        }
+                        var svc = server.CreateCommandService();
+                        await svc.RequeueJob(jobId);
                     },
                     Xunit.TestContext.Current.CancellationToken));
             }
 
             await Task.WhenAll(tasks);
 
-            // Assert — state should be consistent (Enqueued), exactly 1 successful requeue
-            var ctx = Server.CreateContext();
+            // Assert — state is consistent (Enqueued) and exactly one Requeued log was written,
+            // proving the second call early-returned without performing a second requeue.
+            var ctx = Fixture.CreateContext();
             var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
             job.CurrentState.ShouldBe(State.Enqueued);
 
             var requeuedLogs = await ctx.Set<JobLog>()
                 .CountAsync(l => l.JobId == jobId && l.EventType == "Requeued", Xunit.TestContext.Current.CancellationToken);
             requeuedLogs.ShouldBe(1);
-
-            successCount.ShouldBe(1);
         }
         finally
         {
-            await serverSvc.ResumeServer(Server.ServerId);
-            await Server.WaitForPauseState(groupId, expectedPaused: false);
+            await serverSvc.ResumeServer(server.ServerId);
+            await server.WaitForPauseState(groupId, expectedPaused: false);
         }
     }
 
-    private async Task<Guid> GetFirstGroupId()
+    private async Task<Guid> GetFirstGroupId(WarpTestServer server)
     {
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var group = await ctx.Set<WorkerGroup>()
-            .Where(g => g.ServerId == Server.ServerId)
+            .Where(g => g.ServerId == server.ServerId)
             .FirstAsync(Xunit.TestContext.Current.CancellationToken);
         return group.Id;
     }

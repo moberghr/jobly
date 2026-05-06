@@ -8,7 +8,7 @@ using Warp.Tests.Fixtures;
 
 namespace Warp.Tests.Observability;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class StatsTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

@@ -52,15 +52,9 @@ public interface IWarpSqlQueries<TContext>
         CancellationToken ct);
 
     /// <summary>
-    /// Locks a single job by ID with SKIP LOCKED semantics. Used by user-initiated commands
-    /// (DeleteJob, RequeueJob) that should abort if the row is currently being processed by a
-    /// worker or concurrent command.
-    /// </summary>
-    Task<Job?> LockJobByIdAsync(TContext context, Guid jobId, CancellationToken ct);
-
-    /// <summary>
-    /// Locks a single job by ID with a blocking lock (WAIT). Used by RequeueJob when it needs
-    /// to update the parent row and must serialize against concurrent parent writers.
+    /// Locks a single job by ID with a blocking lock (WAIT — no SKIP LOCKED). Used by user-initiated
+    /// commands (DeleteJob, RequeueJob) that must find the row and serialize against the worker's
+    /// brief keep-alive UPDATEs; SKIP LOCKED would race those updates and falsely report "not found".
     /// </summary>
     Task<Job?> LockJobByIdWaitAsync(TContext context, Guid jobId, CancellationToken ct);
 

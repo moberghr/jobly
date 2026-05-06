@@ -19,7 +19,7 @@ using Warp.Worker.Services;
 
 namespace Warp.Tests.Features.Retry;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class RetryTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

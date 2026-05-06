@@ -5,13 +5,12 @@ using Warp.Tests.Fixtures;
 
 namespace Warp.Tests.Notifications;
 
-[Collection<PostgreSqlCollection>]
 [Trait("Category", "PostgreSql")]
-public class PostgresNotificationTransportTests : IAsyncLifetime
+public class PostgresNotificationTransportTests : IAsyncLifetime, IClassFixture<PostgreSqlClassFixture>
 {
-    private readonly PostgreSqlFixture _fixture;
+    private readonly PostgreSqlClassFixture _fixture;
 
-    public PostgresNotificationTransportTests(PostgreSqlFixture fixture) => _fixture = fixture;
+    public PostgresNotificationTransportTests(PostgreSqlClassFixture fixture) => _fixture = fixture;
 
     public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 

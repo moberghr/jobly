@@ -5,13 +5,12 @@ using Warp.Tests.Fixtures;
 
 namespace Warp.Tests.Notifications;
 
-[Collection<SqlServerCollection>]
 [Trait("Category", "SqlServer")]
-public class SqlServerNotificationTransportTests : IAsyncLifetime
+public class SqlServerNotificationTransportTests : IAsyncLifetime, IClassFixture<SqlServerPushClassFixture>
 {
-    private readonly SqlServerFixture _fixture;
+    private readonly SqlServerPushClassFixture _fixture;
 
-    public SqlServerNotificationTransportTests(SqlServerFixture fixture) => _fixture = fixture;
+    public SqlServerNotificationTransportTests(SqlServerPushClassFixture fixture) => _fixture = fixture;
 
     public async ValueTask InitializeAsync() => await _fixture.ResetAsync();
 

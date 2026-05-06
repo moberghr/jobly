@@ -11,7 +11,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Features.Retry;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class RetryIntegrationTestsBase : IntegrationTestBase
 {
     protected RetryIntegrationTestsBase(IDatabaseFixture fixture)
@@ -38,13 +38,14 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenFailingJobWithThreeRetries_WhenProcessed_ThenRetriesThreeTimesThenFails()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 3));
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
+        await server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Failed);
@@ -69,16 +70,17 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenFailingJobWithZeroRetries_WhenProcessed_ThenFailsImmediately()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters
         {
             Metadata = new Dictionary<string, object> { ["MaxRetries"] = 0 },
         });
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
+        await server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
         job.CurrentState.ShouldBe(State.Failed);
@@ -103,16 +105,17 @@ public abstract class RetryIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenFailingJobWithRetries_WhenProcessed_ThenScheduleTimeUpdatedOnRetry()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters
         {
             Metadata = new Dictionary<string, object> { ["MaxRetries"] = 1 },
         }.Configure<IRetryMetadata>(m => m.MaxRetries = 1));
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
+        await server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var requeuedLogs = await ctx.Set<JobLog>()
             .CountAsync(x => x.JobId == jobId && x.EventType == "Requeued", Xunit.TestContext.Current.CancellationToken);
         requeuedLogs.ShouldBe(1);

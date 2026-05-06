@@ -18,9 +18,6 @@ public static class FixtureDiagnostics
     public static Task<string> DumpDiagnosticsAsync(this IDatabaseFixture fixture, string header, CancellationToken ct)
         => DumpAsync(fixture.CreateContext(), header, ct);
 
-    public static Task<string> DumpDiagnosticsAsync(this IMultiServerDatabaseFixture fixture, string header, CancellationToken ct)
-        => DumpAsync(fixture.CreateContext(), header, ct);
-
     /// <summary>
     /// Shared failure-dump tail for integration test bases. On any non-passing test result,
     /// invokes <paramref name="dumper"/> with a fresh CancellationToken (xunit's is already
@@ -86,8 +83,21 @@ public static class FixtureDiagnostics
                 new { l.Timestamp, l.Status, l.Message, l.DurationMs, TaskName = l.ServerTask != null ? l.ServerTask.TaskName : null })
             .ToListAsync(ct);
 
+        var lifecycleEvents = ServerLifecycleTrace.Drain();
+
         var sb = new StringBuilder();
         sb.AppendLine(header);
+
+        sb.AppendLine();
+        sb.AppendLine($"Server lifecycle ({lifecycleEvents.Count} events):");
+        foreach (var grouped in lifecycleEvents.GroupBy(e => e.ServerId))
+        {
+            sb.AppendLine($"  Server {grouped.Key}:");
+            foreach (var e in grouped.OrderBy(x => x.Timestamp))
+            {
+                sb.AppendLine($"    [{e.Timestamp:HH:mm:ss.fff}] {e.Event}");
+            }
+        }
 
         sb.AppendLine();
         sb.AppendLine($"Stuck jobs ({stuckJobs.Count}):");

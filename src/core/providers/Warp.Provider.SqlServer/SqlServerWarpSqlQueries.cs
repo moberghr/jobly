@@ -27,7 +27,6 @@ public sealed class SqlServerWarpSqlQueries<TContext> : IWarpSqlQueries<TContext
     private readonly string _claimEnqueuedJobsSql;
     private readonly string _lockNextEnqueuedMessageSql;
     private readonly string _lockStaleProcessingJobsSql;
-    private readonly string _lockJobByIdSkipSql;
     private readonly string _lockJobByIdWaitSql;
     private readonly string _lockAllServersSql;
 
@@ -41,7 +40,9 @@ public sealed class SqlServerWarpSqlQueries<TContext> : IWarpSqlQueries<TContext
         // Atomic claim via UPDATE with OUTPUT. The candidates CTE picks up to N rows in
         // queue/schedule order with ROWLOCK+UPDLOCK+READPAST so concurrent workers skip each
         // other's locked rows. The UPDATE mutates the same rows and OUTPUT INSERTED.* streams
-        // them back — caller gets tracked Job entities and sees post-update state.
+        // them back — caller gets tracked Job entities and sees post-update state. Pause is
+        // enforced in C# via PauseStateHolder before the worker calls into this query — pause
+        // has heartbeat-cadence latency, see PauseStateHolder for details.
         _claimEnqueuedJobsSql = $@"
             WITH candidates AS (
                 SELECT TOP ({{3}}) *
@@ -71,11 +72,6 @@ public sealed class SqlServerWarpSqlQueries<TContext> : IWarpSqlQueries<TContext
               AND [{_n.CurrentState}] = {(int)State.Processing}
               AND [{_n.LastKeepAlive}] IS NOT NULL
               AND [{_n.LastKeepAlive}] < {{0}}";
-
-        _lockJobByIdSkipSql = $@"
-            SELECT *
-            FROM {table} WITH (ROWLOCK, UPDLOCK, READPAST)
-            WHERE [{_n.Id}] = {{0}}";
 
         _lockJobByIdWaitSql = $@"
             SELECT *
@@ -116,13 +112,6 @@ public sealed class SqlServerWarpSqlQueries<TContext> : IWarpSqlQueries<TContext
         return await context.Set<Job>()
             .FromSqlRaw(_lockStaleProcessingJobsSql, cutoff)
             .ToListAsync(ct);
-    }
-
-    public async Task<Job?> LockJobByIdAsync(TContext context, Guid jobId, CancellationToken ct)
-    {
-        return await context.Set<Job>()
-            .FromSqlRaw(_lockJobByIdSkipSql, jobId)
-            .FirstOrDefaultAsync(ct);
     }
 
     public async Task<Job?> LockJobByIdWaitAsync(TContext context, Guid jobId, CancellationToken ct)

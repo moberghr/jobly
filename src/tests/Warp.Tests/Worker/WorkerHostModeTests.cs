@@ -19,7 +19,7 @@ namespace Warp.Tests.Worker;
 /// actually fetching and processing jobs is covered by the integration tests; these unit tests
 /// just pin the mode-branching contract so a future refactor can't silently break it.
 /// </summary>
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class WorkerHostModeTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;
@@ -132,6 +132,7 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
             new NullNotificationTransport(),
             state,
             TestTasks.NullSignals,
+            new DispatcherRegistry(),
             NullLoggerFactory.Instance);
     }
 

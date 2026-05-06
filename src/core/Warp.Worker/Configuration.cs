@@ -63,7 +63,14 @@ public class WarpWorkerConfiguration : WarpConfiguration
     /// </summary>
     public string[] Queues { get; set; } = ["default"];
 
-    public TimeSpan HealthCheckInterval { get; set; } = TimeSpan.FromSeconds(3);
+    /// <summary>
+    /// Cadence at which <see cref="Services.Heartbeat{TContext}"/> refreshes
+    /// <c>LastHeartbeatTime</c> and re-reads <c>PausedAt</c> into the in-memory
+    /// <see cref="PauseStateHolder"/>. Set to <c>null</c> to disable the auto-run loop —
+    /// useful for tests that drive the heartbeat tick manually via
+    /// <c>ServerTaskHost.RunOnceAsync&lt;Heartbeat&gt;</c>.
+    /// </summary>
+    public TimeSpan? HealthCheckInterval { get; set; } = TimeSpan.FromSeconds(3);
 
     public TimeSpan HealthCheckTimeout { get; set; } = TimeSpan.FromMinutes(5);
 

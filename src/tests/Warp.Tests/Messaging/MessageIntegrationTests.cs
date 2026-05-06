@@ -8,7 +8,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Messaging;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class MessageIntegrationTestsBase : IntegrationTestBase
 {
     protected MessageIntegrationTestsBase(IDatabaseFixture fixture)
@@ -19,13 +19,14 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenSingleHandlerMessage_WhenPublished_ThenMessageCompletesAndHandlerExecutes()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var messageId = await publisher.Publish(new SingleHandlerMessage());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // Message should be completed
         var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
@@ -43,13 +44,14 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenMultiHandlerMessage_WhenPublished_ThenBothHandlersExecuteAndMessageCompletes()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var messageId = await publisher.Publish(new MultiRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // Message should be completed
         var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
@@ -66,13 +68,14 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenMessageWithQueue_WhenPublished_ThenChildrenInheritQueue()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var messageId = await publisher.Publish(new SingleHandlerMessage(), "a-critical");
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
         message.Queue.ShouldBe("a-critical");
@@ -87,7 +90,8 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenMultipleMessages_WhenPublished_ThenAllRouteAndComplete()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var messageIds = new List<Guid>();
         for (var i = 0; i < 5; i++)
         {
@@ -96,9 +100,9 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
 
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         foreach (var messageId in messageIds)
         {
@@ -127,7 +131,8 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
         // but ThrowExceptionRequest is an IJob, not IMessage.
         // Let's test the general case: publish multiple messages including multi-handler,
         // verify all reach terminal state.
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
 
         // Publish several multi-handler messages
         var messageIds = new List<Guid>();
@@ -138,9 +143,9 @@ public abstract class MessageIntegrationTestsBase : IntegrationTestBase
 
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
 
         // All messages should be in a terminal state
         var messages = await ctx.Set<Job>()

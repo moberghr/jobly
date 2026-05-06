@@ -18,7 +18,7 @@ using Warp.Worker;
 
 namespace Warp.Tests.Features.Mutex;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class MutexTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

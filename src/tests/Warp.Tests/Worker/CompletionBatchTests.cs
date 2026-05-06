@@ -10,7 +10,7 @@ using Warp.Worker;
 
 namespace Warp.Tests.Worker;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class CompletionBatchTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

@@ -10,7 +10,7 @@ using Warp.Worker.Services;
 
 namespace Warp.Tests.Reliability;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class CrashRecoveryTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

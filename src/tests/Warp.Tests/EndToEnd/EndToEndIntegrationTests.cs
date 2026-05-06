@@ -10,7 +10,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.EndToEnd;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
 {
     protected EndToEndIntegrationTestsBase(IDatabaseFixture fixture)
@@ -24,8 +24,9 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
     [TimedFact(90_000)]
     public async Task GivenComplexWorkload_WhenProcessedByRealWorkers_ThenAllJobsReachTerminalState()
     {
-        var publisher = Server.CreatePublisher();
-        var batchPublisher = Server.CreateBatchPublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
+        var batchPublisher = server.CreateBatchPublisher();
 
         // 1. Simple jobs (50)
         for (var i = 0; i < 50; i++)
@@ -85,10 +86,10 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait for everything to complete
-        await Server.WaitForCompletion(timeout: TimeSpan.FromSeconds(60));
+        await server.WaitForCompletion(timeout: TimeSpan.FromSeconds(60));
 
         // Assert
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var jobs = ctx.Set<Job>().Where(j => j.Kind == JobKind.Job);
 
         // No stuck jobs

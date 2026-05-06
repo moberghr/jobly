@@ -16,7 +16,7 @@ namespace Warp.Tests.Worker;
 /// row transitions Enqueued → Processing in a single round-trip with <c>FOR UPDATE SKIP LOCKED</c>
 /// (PG) / <c>WITH (ROWLOCK, UPDLOCK, READPAST)</c> (SQL Server) serializing concurrent claimers.
 /// </summary>
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class ConcurrentClaimTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

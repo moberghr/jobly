@@ -46,7 +46,7 @@ public class JobCommandService<TContext> : IJobCommandService
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var job = await _sqlQueries.LockJobByIdAsync(_context, jobId, default);
+        var job = await _sqlQueries.LockJobByIdWaitAsync(_context, jobId, default);
 
         if (job == null)
         {
@@ -104,7 +104,7 @@ public class JobCommandService<TContext> : IJobCommandService
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        var job = await _sqlQueries.LockJobByIdAsync(_context, jobId, default);
+        var job = await _sqlQueries.LockJobByIdWaitAsync(_context, jobId, default);
 
         if (job == null)
         {

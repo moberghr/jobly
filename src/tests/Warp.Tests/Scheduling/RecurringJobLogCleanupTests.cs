@@ -6,7 +6,7 @@ using Warp.Worker.Services;
 
 namespace Warp.Tests.Scheduling;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class RecurringJobLogCleanupTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

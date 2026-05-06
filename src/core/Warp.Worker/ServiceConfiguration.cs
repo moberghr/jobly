@@ -51,6 +51,7 @@ public static class ServiceConfiguration
         services.AddWarp<TContext>();
 
         services.AddSingleton<PauseStateHolder>();
+        services.AddSingleton<DispatcherRegistry>();
 
         services.AddLogging(builder =>
         {

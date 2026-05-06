@@ -11,7 +11,7 @@ using Warp.Worker.Services;
 
 namespace Warp.Tests.Features.NoRestart;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class NoRestartCrashRecoveryTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

@@ -16,18 +16,12 @@ namespace Warp.Tests.Notifications;
 // — dispatcher + MessageRouter + Orchestrator — lets each consumer do a fresh DB poll and pick
 // up whatever was enqueued during the listener's offline window. Without this, a single
 // transport hiccup would strand every job that arrived during the gap until the next slow poll.
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests(WithPush = true)]
 public abstract class ListenerReconnectDrainTestsBase : IntegrationTestBase
 {
     protected ListenerReconnectDrainTestsBase(IDatabaseFixture fixture)
         : base(fixture)
     {
-    }
-
-    public override async ValueTask InitializeAsync()
-    {
-        await base.InitializeAsync();
-        await Server.ReRegisterServer();
     }
 
     [TimedFact]

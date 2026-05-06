@@ -10,7 +10,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Core;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
 {
     private static readonly int[] OneSecondDelay = [1];
@@ -23,16 +23,17 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenHandlerThatAddsEntityAndThrows_WhenProcessed_ThenEntityNotPersisted()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new AddEntityThenThrowRequest(), new JobParameters
         {
             Metadata = new Dictionary<string, object> { ["MaxRetries"] = 0 },
         });
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Failed);
+        await server.WaitForJobState(jobId, State.Failed);
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var leaked = await ctx.Set<Counter>()
             .Where(x => x.Key == "handler-leaked-entity")
             .AnyAsync(Xunit.TestContext.Current.CancellationToken);
@@ -42,16 +43,17 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenHandlerThatAddsEntitySavesAndThrows_WhenProcessed_ThenEntityPersisted()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new AddEntitySaveThenThrowRequest(), new JobParameters
         {
             Metadata = new Dictionary<string, object> { ["MaxRetries"] = 0 },
         });
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Failed);
+        await server.WaitForJobState(jobId, State.Failed);
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var committed = await ctx.Set<Counter>()
             .Where(x => x.Key == "handler-committed-entity")
             .AnyAsync(Xunit.TestContext.Current.CancellationToken);
@@ -61,7 +63,8 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenHandlerThatAddsEntityAndThrows_WithRetry_ThenEntityNotPersisted()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new AddEntityThenThrowRequest(), new JobParameters
         {
             Metadata = new Dictionary<string, object>
@@ -72,9 +75,9 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
         });
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
+        await server.WaitForJobState(jobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var leaked = await ctx.Set<Counter>()
             .Where(x => x.Key == "handler-leaked-entity")
             .AnyAsync(Xunit.TestContext.Current.CancellationToken);
@@ -89,13 +92,14 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenSuccessfulHandler_WhenChildJobPublished_ThenChildJobPersisted()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new SpawnChildJobRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForCompletion();
+        await server.WaitForCompletion();
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var childJobs = await ctx.Set<Job>()
             .Where(x => x.SpawnedByJobId == jobId)
             .Where(x => x.Kind == JobKind.Job)
@@ -106,13 +110,14 @@ public abstract class ScopeIsolationIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenSuccessfulHandler_WhenMetadataModifiedByPipeline_ThenMetadataPersisted()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Completed);
+        await server.WaitForJobState(jobId, State.Completed);
 
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var job = await ctx.Set<Job>()
             .Where(x => x.Id == jobId)
             .FirstAsync(Xunit.TestContext.Current.CancellationToken);

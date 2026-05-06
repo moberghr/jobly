@@ -2,8 +2,21 @@ namespace Warp.Worker;
 
 /// <summary>
 /// Thread-safe singleton that holds the current pause state for this server.
-/// Updated by Heartbeat every 3s, read by workers on each poll iteration.
+/// Workers consult this on every poll iteration before fetching a job.
 /// Uses an immutable snapshot swapped atomically to avoid torn reads.
+/// <para>
+/// <b>Pause is not instantaneous.</b> The holder is only refreshed by the periodic
+/// <see cref="Services.Heartbeat{TContext}"/> task (cadence:
+/// <see cref="WarpWorkerConfiguration.HealthCheckInterval"/>, default 3s). Once a
+/// caller writes <c>PausedAt</c> to <see cref="Warp.Core.Data.Entities.Server"/> /
+/// <see cref="Warp.Core.Data.Entities.WorkerGroup"/>, every server's worker pool keeps
+/// fetching until that server's next heartbeat tick reads the new state and updates its
+/// own holder. In addition, an iteration that already passed its <see cref="IsPaused"/>
+/// check before the holder flipped will still complete its claim. Callers that need
+/// hard "no further job starts" semantics (e.g. drain-before-deploy) must combine
+/// pause with a wait that's at least <c>HealthCheckInterval + PollingInterval</c>
+/// before assuming workers are quiesced.
+/// </para>
 /// </summary>
 public class PauseStateHolder
 {

@@ -26,6 +26,7 @@ public class WarpDispatcherHost<TContext> : IHostedService
     private readonly IWarpNotificationTransport _notificationTransport;
     private readonly ServerRegistrationState _state;
     private readonly ServerTaskSignals<TContext> _signals;
+    private readonly DispatcherRegistry _dispatcherRegistry;
     private readonly ILoggerFactory _loggerFactory;
     private readonly List<BackgroundService> _workers = [];
 
@@ -37,6 +38,7 @@ public class WarpDispatcherHost<TContext> : IHostedService
         IWarpNotificationTransport notificationTransport,
         ServerRegistrationState state,
         ServerTaskSignals<TContext> signals,
+        DispatcherRegistry dispatcherRegistry,
         ILoggerFactory loggerFactory)
     {
         _configuration = configuration.Value;
@@ -47,6 +49,7 @@ public class WarpDispatcherHost<TContext> : IHostedService
         _notificationTransport = notificationTransport;
         _state = state;
         _signals = signals;
+        _dispatcherRegistry = dispatcherRegistry;
         _loggerFactory = loggerFactory;
     }
 
@@ -66,7 +69,8 @@ public class WarpDispatcherHost<TContext> : IHostedService
                 registration.Config,
                 _timeProvider,
                 _pauseStateHolder,
-                registration.GroupEntityId);
+                registration.GroupEntityId,
+                _dispatcherRegistry);
 
             await dispatcher.StartAsync(cancellationToken);
             _workers.Add(dispatcher);

@@ -11,7 +11,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Features.CircuitBreaker;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
 {
     protected CircuitBreakerIntegrationTestsBase(IDatabaseFixture fixture)
@@ -24,9 +24,11 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
     {
         const string groupKey = nameof(ThrowExceptionRequest);
 
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+
         // Seed the state to threshold - 1, then drive one more failure to open the circuit.
         // This avoids waiting through the global Retry (MaxRetries=3) on every failure.
-        var seedCtx = Server.CreateContext();
+        var seedCtx = Fixture.CreateContext();
         seedCtx.Set<CircuitBreakerState>().Add(new CircuitBreakerState
         {
             GroupKey = groupKey,
@@ -35,16 +37,16 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
         });
         await seedCtx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var failingPublisher = Server.CreatePublisher();
+        var failingPublisher = server.CreatePublisher();
         var failingJobId = await failingPublisher.Enqueue(
             new ThrowExceptionRequest(),
             new JobParameters().Configure<IRetryMetadata>(m => m.MaxRetries = 0));
         await failingPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(failingJobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
+        await server.WaitForJobState(failingJobId, State.Failed, timeout: TimeSpan.FromSeconds(8));
 
         // Verify circuit is open
-        var stateCtx = Server.CreateContext();
+        var stateCtx = Fixture.CreateContext();
         var state = await stateCtx.Set<CircuitBreakerState>()
             .Where(x => x.GroupKey == groupKey)
             .FirstOrDefaultAsync(CancellationToken.None);
@@ -53,15 +55,15 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
         state.OpenUntil.ShouldNotBeNull();
 
         // Publish a subsequent job — circuit is open so it should be rescheduled
-        var nextPublisher = Server.CreatePublisher();
+        var nextPublisher = server.CreatePublisher();
         var nextJobId = await nextPublisher.Enqueue(new ThrowExceptionRequest());
         await nextPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobLog(nextJobId, "Requeued", timeout: TimeSpan.FromSeconds(15));
+        await server.WaitForJobLog(nextJobId, "Requeued", timeout: TimeSpan.FromSeconds(15));
 
         // Worker writes Scheduled when the reschedule time is in the future; the activation
         // task only flips it back to Enqueued once OpenUntil has elapsed (several minutes here).
-        var readCtx = Server.CreateContext();
+        var readCtx = Fixture.CreateContext();
         var nextJob = await readCtx.Set<Job>()
             .Where(x => x.Id == nextJobId)
             .FirstOrDefaultAsync(CancellationToken.None);
@@ -77,7 +79,7 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
         log.Message.ShouldContain(groupKey);
 
         // Cancel rescheduled job so it doesn't linger
-        var cmd = Server.CreateCommandService();
+        var cmd = server.CreateCommandService();
         await cmd.DeleteJob(nextJobId);
     }
 
@@ -86,7 +88,9 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
     {
         const string groupKey = nameof(UnitRequest);
 
-        var seedCtx = Server.CreateContext();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+
+        var seedCtx = Fixture.CreateContext();
         seedCtx.Set<CircuitBreakerState>().Add(new CircuitBreakerState
         {
             GroupKey = groupKey,
@@ -95,13 +99,13 @@ public abstract class CircuitBreakerIntegrationTestsBase : IntegrationTestBase
         });
         await seedCtx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var publisher = Server.CreatePublisher();
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Completed, timeout: TimeSpan.FromSeconds(8));
+        await server.WaitForJobState(jobId, State.Completed, timeout: TimeSpan.FromSeconds(8));
 
-        var readCtx = Server.CreateContext();
+        var readCtx = Fixture.CreateContext();
         var state = await readCtx.Set<CircuitBreakerState>()
             .Where(x => x.GroupKey == groupKey)
             .FirstOrDefaultAsync(CancellationToken.None);

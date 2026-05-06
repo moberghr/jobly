@@ -9,7 +9,7 @@ using Warp.Worker;
 
 namespace Warp.Tests.Worker;
 
-[GenerateDatabaseTests(FixtureKind.BatchedCompletion)]
+[GenerateDatabaseTests]
 public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBase
 {
     protected BatchedCompletionIntegrationTestsBase(IDatabaseFixture fixture)
@@ -17,17 +17,20 @@ public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBas
     {
     }
 
-    public override async ValueTask InitializeAsync()
+    private static void ConfigureBatchedServer(WarpWorkerBuilder<TestContext> config)
     {
-        await base.InitializeAsync();
-        await Server.ReRegisterServer();
+        config.UseDispatcher = true;
+        config.WorkerCount = 5;
+        config.CompletionBatchSize = 10;
+        config.CompletionFlushInterval = TimeSpan.FromMilliseconds(50);
     }
 
     [TimedFact(timeout: 60_000)]
     public async Task GivenManyShortJobs_WhenProcessed_ThenAllReachCompletedState()
     {
         // Arrange
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture, ConfigureBatchedServer);
+        var publisher = server.CreatePublisher();
         const int jobCount = 200;
         for (var i = 0; i < jobCount; i++)
         {
@@ -37,12 +40,12 @@ public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBas
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        await Server.WaitForCompletion(TimeSpan.FromSeconds(45));
+        await server.WaitForCompletion(TimeSpan.FromSeconds(45));
 
         // Assert — all jobs reach Completed, and one Completed JobLog exists per job.
         // Per-row terminal-state fields must also match non-dispatcher mode: no worker
         // ownership left, no keep-alive, no lingering cancellation flag, ExpireAt set.
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var completedCount = await ctx.Set<Job>()
             .Where(j => j.Kind == JobKind.Job && j.CurrentState == State.Completed)
             .CountAsync(Xunit.TestContext.Current.CancellationToken);
@@ -67,7 +70,8 @@ public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBas
     public async Task GivenMixedOutcomes_WhenProcessed_ThenStatesMatch()
     {
         // Arrange
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture, ConfigureBatchedServer);
+        var publisher = server.CreatePublisher();
         var successType = typeof(UnitRequest).AssemblyQualifiedName;
         var failType = typeof(ThrowExceptionRequest).AssemblyQualifiedName;
 
@@ -86,10 +90,10 @@ public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBas
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        await Server.WaitForCompletion(TimeSpan.FromSeconds(45));
+        await server.WaitForCompletion(TimeSpan.FromSeconds(45));
 
         // Assert
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var completed = await ctx.Set<Job>()
             .CountAsync(j => j.Type == successType && j.CurrentState == State.Completed, Xunit.TestContext.Current.CancellationToken);
         completed.ShouldBe(successCount);
@@ -102,9 +106,10 @@ public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBas
     [TimedFact(timeout: 60_000)]
     public async Task GivenIdleWorker_WhenFewJobsBelowBatchSize_ThenBufferIsDrainedByIdleTrigger()
     {
-        // Arrange — fixture's CompletionBatchSize is 10; publishing 3 jobs never hits the size threshold.
+        // Arrange — CompletionBatchSize is 10; publishing 3 jobs never hits the size threshold.
         // Idle drain should flush them before workers suspend on the channel.
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture, ConfigureBatchedServer);
+        var publisher = server.CreatePublisher();
         for (var i = 0; i < 3; i++)
         {
             await publisher.Enqueue(new UnitRequest());
@@ -113,10 +118,10 @@ public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBas
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        await Server.WaitForCompletion(TimeSpan.FromSeconds(15));
+        await server.WaitForCompletion(TimeSpan.FromSeconds(15));
 
         // Assert
-        var ctx = Server.CreateContext();
+        var ctx = Fixture.CreateContext();
         var completed = await ctx.Set<Job>()
             .CountAsync(j => j.Kind == JobKind.Job && j.CurrentState == State.Completed, Xunit.TestContext.Current.CancellationToken);
         completed.ShouldBe(3);
@@ -125,8 +130,8 @@ public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBas
     [TimedFact(timeout: 60_000)]
     public async Task GivenShutdown_WhenServerStops_ThenPendingCompletionsAreFlushed()
     {
-        // Arrange — spin up a test-local server on an isolated queue so the fixture server doesn't race us.
-        // A long flush interval ensures completions stay buffered until StopAsync drains them.
+        // Arrange — isolated queue with a long flush interval so completions stay buffered
+        // until StopAsync drains them.
         const string isolatedQueue = "batch-shutdown-flush";
         var server = await WarpTestServer.StartAsync(Fixture, config =>
         {
@@ -147,9 +152,27 @@ public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBas
 
             await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-            // Wait for handlers to run (empty handlers complete ~instantly).
-            // Completions are buffered; the long flush interval means they won't auto-flush.
-            await server.WaitForJobsToLeaveEnqueued(isolatedQueue, 5, TimeSpan.FromSeconds(10));
+            // Wait until all 5 jobs have been picked up by a worker (CurrentWorkerId set by
+            // MarkWorkerOwnership at handler entry). This avoids a race: WaitForJobsToLeaveEnqueued
+            // alone returns as soon as the dispatcher's batch claim commits Processing, but before
+            // the in-memory channel delivery + worker pickup completes. If we disposed in that
+            // window, the dispatcher's UnclaimUndelivered would roll the undelivered jobs back to
+            // Enqueued — defeating the test's premise that pending completions get flushed.
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            while (DateTime.UtcNow < deadline)
+            {
+                var pollCtx = Fixture.CreateContext();
+                var pickedUp = await pollCtx.Set<Job>()
+                    .CountAsync(
+                        j => j.Queue == isolatedQueue && j.CurrentWorkerId != null,
+                        Xunit.TestContext.Current.CancellationToken);
+                if (pickedUp == 5)
+                {
+                    break;
+                }
+
+                await Task.Delay(100, Xunit.TestContext.Current.CancellationToken);
+            }
         }
         finally
         {
@@ -170,32 +193,33 @@ public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBas
     [TimedFact(timeout: 60_000)]
     public async Task GivenProcessingJob_WhenCancelledInDispatcherMode_ThenFlushesAsDeletedWithHourlyCounter()
     {
-        // Arrange — fixture server runs in dispatcher mode. Enqueue a handler that blocks on cancellation.
-        var publisher = Server.CreatePublisher();
+        // Arrange — dispatcher-mode server. Enqueue a handler that blocks on cancellation.
+        await using var server = await WarpTestServer.StartAsync(Fixture, ConfigureBatchedServer);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CancellableRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Processing);
+        await server.WaitForJobState(jobId, State.Processing);
 
         // Act — cancel while in-flight; worker's handler token is cancelled, the catch path builds a
         // PendingCompletion with State.Deleted and the batch flushes.
-        var cmd = Server.CreateCommandService();
+        var cmd = server.CreateCommandService();
         await cmd.DeleteJob(jobId);
 
-        await Server.WaitForJobState(jobId, State.Deleted, TimeSpan.FromSeconds(15));
+        await server.WaitForJobState(jobId, State.Deleted, TimeSpan.FromSeconds(15));
 
         // Assert — terminal state + Cancelled log.
-        var job = await Server.GetJob(jobId);
+        var job = await server.GetJob(jobId);
         job.CurrentState.ShouldBe(State.Deleted);
         job.CancellationMode.ShouldBe(CancellationMode.None);
         job.CurrentWorkerId.ShouldBeNull();
         job.ExpireAt.ShouldNotBeNull();
 
-        var logs = await Server.GetJobLogs(jobId);
+        var logs = await server.GetJobLogs(jobId);
         logs.ShouldContain(l => l.EventType == "Cancelled");
 
-        // W2 — both the aggregate and hourly counters must be written, matching non-dispatcher mode.
-        var ctx = Server.CreateContext();
+        // Both the aggregate and hourly counters must be written, matching non-dispatcher mode.
+        var ctx = Fixture.CreateContext();
         var hourSuffix = DateTime.UtcNow.ToString("yyyy-MM-dd-HH", System.Globalization.CultureInfo.InvariantCulture);
         var aggregateSum = await ctx.Set<Counter>()
             .Where(c => c.Key == "stats:deleted")

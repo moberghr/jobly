@@ -72,6 +72,27 @@ public class WarpTestServer : IAsyncDisposable
     public PauseStateHolder PauseState => _host.Services.GetRequiredService<PauseStateHolder>();
 
     /// <summary>
+    /// Synchronously runs the Heartbeat task once — refreshing <see cref="PauseStateHolder"/>
+    /// from the DB. Use after a Pause/Resume DB write when the test config has disabled the
+    /// auto Heartbeat (HealthCheckInterval = null), so that pause propagation is deterministic
+    /// rather than dependent on the periodic heartbeat tick.
+    /// </summary>
+    public async Task<string?> RunHeartbeatOnceAsync(CancellationToken ct = default)
+    {
+        // Resolve the Heartbeat task in its own scope and call ExecuteAsync directly. This
+        // sidesteps the ServerTaskHost auto-loop (which doesn't register tasks whose
+        // DefaultInterval is null) so tests that disable HealthCheckInterval can still drive
+        // a heartbeat tick deterministically. Heartbeat takes no distributed lock, so running
+        // it without the host's lock guard is safe.
+        await using var scope = _host.Services.CreateAsyncScope();
+        var heartbeat = scope.ServiceProvider
+            .GetServices<Warp.Worker.Services.IServerTask>()
+            .OfType<Warp.Worker.Services.Heartbeat<TestContext>>()
+            .Single();
+        return await heartbeat.ExecuteAsync(ct);
+    }
+
+    /// <summary>
     /// Polls until the PauseStateHolder reflects the expected paused/resumed state for a group.
     /// Use instead of Task.Delay after calling pause/resume APIs.
     /// </summary>
@@ -217,51 +238,12 @@ public class WarpTestServer : IAsyncDisposable
             })
             .Build();
 
+        var serverId = host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<WarpWorkerConfiguration>>().Value.ServerId;
+        ServerLifecycleTrace.Record(serverId, "IHost.StartAsync starting");
         await host.StartAsync(Xunit.TestContext.Current.CancellationToken);
+        ServerLifecycleTrace.Record(serverId, "IHost.StartAsync returned");
 
         return new WarpTestServer(host, fixture);
-    }
-
-    /// <summary>
-    /// Re-registers the server and workers in the DB after Respawn clears all tables.
-    /// The host's background services expect these rows to exist.
-    /// </summary>
-    public async Task ReRegisterServer()
-    {
-        await using var scope = _host.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<TestContext>();
-
-        // Check if server still exists (Respawn may have deleted it)
-        var config = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<WarpWorkerConfiguration>>().Value;
-        var serverExists = await context.Set<Server>().AnyAsync(s => s.Id == config.ServerId, Xunit.TestContext.Current.CancellationToken);
-        if (serverExists)
-        {
-            return;
-        }
-
-        var now = DateTime.UtcNow;
-        context.Set<Server>().Add(new Server
-        {
-            Id = config.ServerId,
-            ServerName = config.ServerName ?? "test-server",
-            StartedTime = now,
-            LastHeartbeatTime = now,
-            ServiceCount = config.WorkerCount,
-        });
-
-        // Re-register workers — get IDs from existing Worker entities if any, otherwise create new ones
-        for (var i = 0; i < config.WorkerCount; i++)
-        {
-            context.Set<Warp.Core.Data.Entities.Worker>().Add(new Warp.Core.Data.Entities.Worker
-            {
-                Id = Guid.NewGuid(),
-                ServerId = config.ServerId,
-                StartedTime = now,
-                LastHeartbeatTime = now,
-            });
-        }
-
-        await context.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
     public async Task WaitForJobState(Guid jobId, State state, TimeSpan? timeout = null)
@@ -397,7 +379,9 @@ public class WarpTestServer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         GC.SuppressFinalize(this);
+        ServerLifecycleTrace.Record(ServerId, "IHost.StopAsync starting");
         await _host.StopAsync(Xunit.TestContext.Current.CancellationToken);
+        ServerLifecycleTrace.Record(ServerId, "IHost.StopAsync returned");
         _host.Dispose();
     }
 }

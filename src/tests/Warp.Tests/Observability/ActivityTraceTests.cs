@@ -19,7 +19,7 @@ using Warp.Worker;
 
 namespace Warp.Tests.Observability;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class ActivityTraceTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;

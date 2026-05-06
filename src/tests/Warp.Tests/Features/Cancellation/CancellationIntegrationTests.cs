@@ -7,7 +7,7 @@ using Warp.Tests.TestData.Handlers;
 
 namespace Warp.Tests.Features.Cancellation;
 
-[GenerateDatabaseTests(FixtureKind.Integration)]
+[GenerateDatabaseTests]
 public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
 {
     protected CancellationIntegrationTestsBase(IDatabaseFixture fixture)
@@ -18,64 +18,70 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenProcessingJob_WhenDeleted_ThenHandlerIsCancelledAndLoggedAsCancelled()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CancellableRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait for worker to pick it up
-        await Server.WaitForJobState(jobId, State.Processing);
+        await server.WaitForJobState(jobId, State.Processing);
 
         // Cancel it (delete while processing)
-        var cmd = Server.CreateCommandService();
+        var cmd = server.CreateCommandService();
         await cmd.DeleteJob(jobId);
 
         // Worker should detect state change, cancel handler, and log "Cancelled"
         // Wait for the cancellation log (not just the state change, which happens immediately from DeleteJob)
-        await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(5));
+        await server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(5));
 
-        var job = await Server.GetJob(jobId);
+        var job = await server.GetJob(jobId);
         job.CurrentState.ShouldBe(State.Deleted);
     }
 
     [TimedFact]
     public async Task GivenProcessingJob_WhenDeleted_ThenCancellationModeIsSetToGraceful()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CancellableRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Processing);
+        await server.WaitForJobState(jobId, State.Processing);
 
-        var cmd = Server.CreateCommandService();
+        var cmd = server.CreateCommandService();
         await cmd.DeleteJob(jobId);
 
         // Immediately after DeleteJob, the job should have CancellationMode=Graceful and still be Processing
-        var job = await Server.GetJob(jobId);
+        var job = await server.GetJob(jobId);
         job.CancellationMode.ShouldBe(CancellationMode.Graceful);
 
         // After the worker processes cancellation, verify the CancellationRequested log exists
-        await Server.WaitForJobLog(jobId, "CancellationRequested", timeout: TimeSpan.FromSeconds(5));
+        await server.WaitForJobLog(jobId, "CancellationRequested", timeout: TimeSpan.FromSeconds(5));
 
-        var logs = await Server.GetJobLogs(jobId);
+        var logs = await server.GetJobLogs(jobId);
         var cancellationLog = logs.First(l => string.Equals(l.EventType, "CancellationRequested", StringComparison.Ordinal));
         cancellationLog.WorkerId.ShouldBeNull();
+
+        // Wait for the handler to actually exit before dispose so server shutdown isn't blocked.
+        await server.WaitForJobState(jobId, State.Deleted, timeout: TimeSpan.FromSeconds(5));
     }
 
     [TimedFact]
     public async Task GivenProcessingJob_WhenDeleted_ThenWorkerLogsHaveWorkerId()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CancellableRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Processing);
+        await server.WaitForJobState(jobId, State.Processing);
 
-        var cmd = Server.CreateCommandService();
+        var cmd = server.CreateCommandService();
         await cmd.DeleteJob(jobId);
 
-        await Server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(5));
+        await server.WaitForJobLog(jobId, "Cancelled", timeout: TimeSpan.FromSeconds(5));
 
-        var logs = await Server.GetJobLogs(jobId);
+        var logs = await server.GetJobLogs(jobId);
 
         // Worker-produced logs (Processing, Cancelled) should have a WorkerId
         var processingLog = logs.FirstOrDefault(l => string.Equals(l.EventType, "Processing", StringComparison.Ordinal));
@@ -89,17 +95,18 @@ public abstract class CancellationIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenProcessingJob_WhenDeleted_ThenCompletesQuicklyNotAfterFullDuration()
     {
-        var publisher = Server.CreatePublisher();
+        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CancellableRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await Server.WaitForJobState(jobId, State.Processing);
+        await server.WaitForJobState(jobId, State.Processing);
 
-        var cmd = Server.CreateCommandService();
+        var cmd = server.CreateCommandService();
         await cmd.DeleteJob(jobId);
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        await Server.WaitForJobState(jobId, State.Deleted, timeout: TimeSpan.FromSeconds(5));
+        await server.WaitForJobState(jobId, State.Deleted, timeout: TimeSpan.FromSeconds(5));
         sw.Stop();
 
         // Should complete within a few seconds (CancellationCheckInterval=1s)

@@ -10,7 +10,7 @@ using Warp.Tests.Fixtures;
 
 namespace Warp.Tests.Scheduling;
 
-[GenerateDatabaseTests(FixtureKind.Default)]
+[GenerateDatabaseTests]
 public abstract class JobExpirationTimeoutTestsBase : IAsyncLifetime
 {
     private readonly IDatabaseFixture _fixture;
