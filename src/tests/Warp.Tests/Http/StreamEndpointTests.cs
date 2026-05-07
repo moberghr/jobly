@@ -56,7 +56,13 @@ public sealed class StreamEndpointTests
         }
         catch (OperationCanceledException)
         {
-            // Expected — cancellation propagated.
+            // Expected — cancellation propagated as cancellation.
+        }
+        catch (HttpRequestException)
+        {
+            // Also expected — when the client aborts mid-body, HttpClient surfaces the
+            // truncated stream as "Error while copying content to a stream." The point
+            // of the test is the timing budget, not the exception shape.
         }
 
         sw.Stop();
