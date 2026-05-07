@@ -29,7 +29,6 @@ function padHistory(data: StatsHistoryPoint[], hours: number) {
         label: hourDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
         succeeded: point?.succeeded ?? 0,
         failed: point?.failed ?? 0,
-        requeued: point?.requeued ?? 0,
       });
     }
     return result;
@@ -43,21 +42,18 @@ function padHistory(data: StatsHistoryPoint[], hours: number) {
     dayStart.setHours(0, 0, 0, 0);
     let succeeded = 0;
     let failed = 0;
-    let requeued = 0;
     for (let h = 0; h < 24; h++) {
       const hourKey = new Date(dayStart.getTime() + h * 3600000).getTime();
       const point = dataMap.get(hourKey);
       if (point) {
         succeeded += point.succeeded;
         failed += point.failed;
-        requeued += point.requeued ?? 0;
       }
     }
     result.push({
       label: `${dayStart.toLocaleDateString([], { weekday: 'short' })} ${String(dayStart.getDate()).padStart(2, '0')}.${String(dayStart.getMonth() + 1).padStart(2, '0')}`,
       succeeded,
       failed,
-      requeued,
     });
   }
   return result;
@@ -146,7 +142,7 @@ export default function DashboardPage() {
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, ChartTooltip, Legend);
 
-function HistoryChart({ data }: { data: { label: string; succeeded: number; failed: number; requeued: number }[] }) {
+function HistoryChart({ data }: { data: { label: string; succeeded: number; failed: number }[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
 
@@ -163,7 +159,6 @@ function HistoryChart({ data }: { data: { label: string; succeeded: number; fail
       data: { labels: [], datasets: [
         { label: 'Succeeded', data: [], borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.15)', borderWidth: 2, fill: true, pointRadius: 0, pointHitRadius: 10, tension: 0.3 },
         { label: 'Failed', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 2, fill: true, pointRadius: 0, pointHitRadius: 10, tension: 0.3 },
-        { label: 'Requeued', data: [], borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.10)', borderWidth: 2, fill: false, pointRadius: 0, pointHitRadius: 10, tension: 0.3, borderDash: [4, 4] },
       ]},
       options: {
         responsive: true,
@@ -196,7 +191,6 @@ function HistoryChart({ data }: { data: { label: string; succeeded: number; fail
     chartRef.current.data.labels = data.map(d => d.label);
     chartRef.current.data.datasets[0].data = data.map(d => d.succeeded);
     chartRef.current.data.datasets[1].data = data.map(d => d.failed);
-    chartRef.current.data.datasets[2].data = data.map(d => d.requeued);
     chartRef.current.update();
   }, [data]);
 

@@ -13,6 +13,8 @@ public interface IDashboardStatsService
 
     Task<List<StatsHistoryPoint>> GetStatsHistory(int hours = 24);
 
+    Task<List<CounterModel>> GetCounters();
+
     Task<List<ServerModel>> GetServers();
 
     Task<int> GetServerCount();
@@ -89,7 +91,6 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
         var totalSucceeded = await GetCombinedStatValue("stats:succeeded");
         var totalFailed = await GetCombinedStatValue("stats:failed");
         var totalDeleted = await GetCombinedStatValue("stats:deleted");
-        var totalRequeued = await GetCombinedStatValue("stats:requeued");
         var model = new DashboardStatistics
         {
             Total = total,
@@ -116,7 +117,6 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             TotalSucceeded = totalSucceeded,
             TotalFailed = totalFailed,
             TotalDeleted = totalDeleted,
-            TotalRequeued = totalRequeued,
             TotalCreated = 0,
             DatabaseConnection = GetSafeDatabaseConnection(),
         };
@@ -286,16 +286,12 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
         var since = _timeProvider.GetUtcNow().UtcDateTime.AddHours(-hours);
 
         var aggregated = await _context.Set<Statistic>()
-            .Where(x => x.Key.StartsWith("stats:succeeded:")
-                || x.Key.StartsWith("stats:failed:")
-                || x.Key.StartsWith("stats:requeued:"))
+            .Where(x => x.Key.StartsWith("stats:succeeded:") || x.Key.StartsWith("stats:failed:"))
             .Select(x => new { x.Key, x.Value })
             .ToListAsync();
 
         var pending = await _context.Set<Counter>()
-            .Where(x => x.Key.StartsWith("stats:succeeded:")
-                || x.Key.StartsWith("stats:failed:")
-                || x.Key.StartsWith("stats:requeued:"))
+            .Where(x => x.Key.StartsWith("stats:succeeded:") || x.Key.StartsWith("stats:failed:"))
             .GroupBy(x => x.Key)
             .Select(g => new { Key = g.Key, Value = (long)g.Sum(c => c.Value) })
             .ToListAsync();
@@ -349,10 +345,6 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             {
                 point.Failed = stat.Value;
             }
-            else if (string.Equals(metric, "requeued", StringComparison.Ordinal))
-            {
-                point.Requeued = stat.Value;
-            }
         }
 
         return [.. points.Values.OrderBy(p => p.Hour)];
@@ -370,6 +362,27 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             .SumAsync(x => x.Value);
 
         return aggregated + pending;
+    }
+
+    public async Task<List<CounterModel>> GetCounters()
+    {
+        // Merge aggregated Statistic rows with pending Counter rows so the page reflects the
+        // same view as the dashboard's metric cards (which use GetCombinedStatValue per key).
+        var aggregated = await _context.Set<Statistic>()
+            .Select(x => new { x.Key, x.Value })
+            .ToListAsync();
+
+        var pending = await _context.Set<Counter>()
+            .GroupBy(x => x.Key)
+            .Select(g => new { Key = g.Key, Value = (long)g.Sum(c => c.Value) })
+            .ToListAsync();
+
+        var merged = aggregated.Concat(pending)
+            .GroupBy(x => x.Key, StringComparer.Ordinal)
+            .Select(g => new CounterModel { Key = g.Key, Value = g.Sum(x => x.Value) })
+            .OrderBy(x => x.Key, StringComparer.Ordinal);
+
+        return [.. merged];
     }
 
     /// <summary>

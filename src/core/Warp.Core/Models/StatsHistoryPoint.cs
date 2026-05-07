@@ -7,6 +7,4 @@ public class StatsHistoryPoint
     public long Succeeded { get; set; }
 
     public long Failed { get; set; }
-
-    public long Requeued { get; set; }
 }

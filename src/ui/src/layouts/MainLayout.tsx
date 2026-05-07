@@ -13,6 +13,7 @@ import {
   Sun,
   LogOut,
   Puzzle,
+  Gauge,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { config } from '@/config';
@@ -26,6 +27,7 @@ const builtInNavItems = [
   { to: '/batches/processing', label: 'Batches', icon: Layers },
   { to: '/recurring', label: 'Recurring', icon: RefreshCw },
   { to: '/servers', label: 'Servers', icon: Server },
+  { to: '/counters', label: 'Counters', icon: Gauge },
 ];
 
 function resolveIcon(name?: string): React.ComponentType<{ className?: string }> {

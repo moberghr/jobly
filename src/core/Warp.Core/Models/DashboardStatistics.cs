@@ -30,8 +30,6 @@ public class DashboardStatistics
 
     public long TotalDeleted { get; set; }
 
-    public long TotalRequeued { get; set; }
-
     public long TotalCreated { get; set; }
 
     public int Batches { get; set; }

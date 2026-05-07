@@ -72,6 +72,9 @@ function routeGet(url: string, params: Record<string, unknown>): unknown {
   if (url === '/stats/history') {
     return data.getStatsHistoryPoints(Number(params.hours ?? 24));
   }
+  if (url === '/stats/counters') {
+    return data.getCountersDemo();
+  }
 
   // Jobs by state
   if (url === '/jobs/enqueued') {

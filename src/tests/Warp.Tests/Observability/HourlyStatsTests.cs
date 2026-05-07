@@ -211,7 +211,6 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         ctx.Set<Statistic>().Add(new Statistic { Key = "stats:succeeded", Value = 42 });
         ctx.Set<Statistic>().Add(new Statistic { Key = "stats:failed", Value = 7 });
         ctx.Set<Statistic>().Add(new Statistic { Key = "stats:deleted", Value = 3 });
-        ctx.Set<Statistic>().Add(new Statistic { Key = "stats:requeued", Value = 11 });
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
@@ -222,6 +221,43 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         status.TotalSucceeded.ShouldBe(42);
         status.TotalFailed.ShouldBe(7);
         status.TotalDeleted.ShouldBe(3);
-        status.TotalRequeued.ShouldBe(11);
+    }
+
+    [TimedFact]
+    public async Task GetCounters_MergesStatisticsAndPendingCounters()
+    {
+        // Arrange — Statistic table has aggregated values, Counter table has pending writes for
+        // the same key. The merged view must sum them.
+        var ctx = _fixture.CreateContext();
+        ctx.Set<Statistic>().Add(new Statistic { Key = "stats:succeeded", Value = 100 });
+        ctx.Set<Statistic>().Add(new Statistic { Key = "stats:failed", Value = 5 });
+        ctx.Set<Counter>().Add(new Counter { Key = "stats:succeeded", Value = 3 });
+        ctx.Set<Counter>().Add(new Counter { Key = "stats:succeeded", Value = 2 });
+        ctx.Set<Counter>().Add(new Counter { Key = "stats:requeued", Value = 4 });
+        ctx.Set<Counter>().Add(new Counter { Key = "addon:custom-metric", Value = 17 });
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        // Act
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var counters = await svc.GetCounters();
+
+        // Assert — merged + sorted alphabetically
+        counters.Count.ShouldBe(4);
+
+        var succeeded = counters.Single(x => string.Equals(x.Key, "stats:succeeded", StringComparison.Ordinal));
+        succeeded.Value.ShouldBe(105);
+
+        var failed = counters.Single(x => string.Equals(x.Key, "stats:failed", StringComparison.Ordinal));
+        failed.Value.ShouldBe(5);
+
+        var requeued = counters.Single(x => string.Equals(x.Key, "stats:requeued", StringComparison.Ordinal));
+        requeued.Value.ShouldBe(4);
+
+        // Addons can write arbitrary keys; they show up too.
+        var custom = counters.Single(x => string.Equals(x.Key, "addon:custom-metric", StringComparison.Ordinal));
+        custom.Value.ShouldBe(17);
+
+        // Sorted by key
+        counters.Select(x => x.Key).ShouldBe(["addon:custom-metric", "stats:failed", "stats:requeued", "stats:succeeded"]);
     }
 }

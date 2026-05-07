@@ -39,7 +39,6 @@ export interface DashboardStatistics {
   totalSucceeded: number;
   totalFailed: number;
   totalDeleted: number;
-  totalRequeued: number;
   totalCreated: number;
   batches: number;
   databaseConnection: string | null;
@@ -253,5 +252,9 @@ export interface StatsHistoryPoint {
   hour: string;
   succeeded: number;
   failed: number;
-  requeued: number;
+}
+
+export interface CounterModel {
+  key: string;
+  value: number;
 }
