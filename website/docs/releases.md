@@ -4,8 +4,6 @@ sidebar_position: 6
 
 # Releases
 
-<a id="v0-12-0"></a>
-
 ## 0.12.0
 
 *2026-05-07*
@@ -186,8 +184,6 @@ Full docs at [features/http](features/http). Shipped in [#154](https://github.co
 
 - **HTTP request-isolation suite** — five concurrency tests bombard the in-memory test app with 200 parallel requests (50 for streaming) and assert per-request DI scope (N requests → N distinct `ScopeProbe` constructions), no `AsyncLocal<T>` bleed between handlers, no request-payload crossover, pipeline behaviors observe per-request inputs, and concurrent `IStreamRequest` endpoints emit only their own block of items.
 
-<a id="v0-11-0"></a>
-
 ## 0.11.0
 
 *2026-05-06*
@@ -222,8 +218,6 @@ Stability release. No breaking API changes. Several latent product bugs surfaced
 - **Enterprise landing page redesign** — new home page with a Moberg-aligned enterprise aesthetic, replacing the prior tagline-driven layout ([#148](https://github.com/moberghr/warp/pull/148), [#150](https://github.com/moberghr/warp/pull/150)).
 
 ---
-
-<a id="v0-10-0"></a>
 
 ## 0.10.0
 
@@ -295,8 +289,6 @@ Breaking release because of both the rename and the removal of reflection-based 
 
 ---
 
-<a id="v0-9-1"></a>
-
 ## 0.9.1
 
 *2026-04-21*
@@ -311,8 +303,6 @@ Breaking release because of both the rename and the removal of reflection-based 
 - **Docs site dependencies** — Docusaurus 3.9.2 → 3.10.0, added `@docusaurus/faster` (required by 3.10 with `future.v4`), and pinned `serialize-javascript ^7.0.5` via `overrides` to close [GHSA-qj8w-gfj5-8c6v](https://github.com/advisories/GHSA-qj8w-gfj5-8c6v) — the build-chain DoS that Docusaurus's bundler transitively pulled in. `npm audit` now reports 0 vulnerabilities on both frontends.
 
 ---
-
-<a id="v0-9-0"></a>
 
 ## 0.9.0
 
@@ -366,8 +356,6 @@ Breaking release because of the provider package split and the DI lambda API.
 
 ---
 
-<a id="v0-8-0"></a>
-
 ## 0.8.0
 
 *2026-04-19*
@@ -403,8 +391,6 @@ Breaking release because of the provider package split and the DI lambda API.
 - **`StaleJobRecoveryTask.RequeueStaleJobs` removed** — Replaced by `RecoverStaleJobs` returning `StaleJobRecoveryResult` (includes `Requeued`, `Failed`, `Deleted` counts). No `[Obsolete]` bridge; callers must migrate to the new signature.
 
 ---
-
-<a id="v0-7-0"></a>
 
 ## 0.7.0
 
@@ -453,8 +439,6 @@ This is a large release with several breaking changes. Plan the upgrade accordin
 
 ---
 
-<a id="v0-6-1"></a>
-
 ## 0.6.1
 
 *2026-04-13*
@@ -468,8 +452,6 @@ This is a large release with several breaking changes. Plan the upgrade accordin
 - **Fix all 401 build warnings** — Zero warnings across the entire solution. Fixes include: regex DoS hardening (NonBacktracking), collection expression simplification, constructor formatting, CancellationToken propagation, string.Equals usage, and async call consistency. All rule suppressions via `.editorconfig` — no `#pragma` or `[SuppressMessage]` attributes.
 
 ---
-
-<a id="v0-6-0"></a>
 
 ## 0.6.0
 
@@ -508,8 +490,6 @@ This release adds a new nullable `ParentSpanId` column to the Job table. Run an 
 
 ---
 
-<a id="v0-5-0"></a>
-
 ## 0.5.0
 
 *2026-04-09*
@@ -538,8 +518,6 @@ This release adds a new nullable `ParentSpanId` column to the Job table. Run an 
 
 ---
 
-<a id="v0-4-0"></a>
-
 ## 0.4.0
 
 *2026-04-08*
@@ -553,8 +531,6 @@ This release adds a new nullable `ParentSpanId` column to the Job table. Run an 
 - [GitHub Release](https://github.com/moberghr/warp/releases/tag/0.4.0)
 
 ---
-
-<a id="v0-3-0"></a>
 
 ## 0.3.0
 

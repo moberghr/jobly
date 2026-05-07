@@ -1,6 +1,37 @@
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+import {visit} from 'unist-util-visit';
+
+// Maps a top-level version-pattern heading (e.g. `## 0.12.0`) to an explicit
+// id like `v0-12-0`. Without this, Docusaurus's slugifier would strip the
+// dots and produce unreadable anchors like `#0120`. We can't use the
+// `## 0.12.0 {#v0-12-0}` syntax because Docusaurus 3.10's stricter MDX
+// expression parser rejects `{#...}` before the heading-id remark plugin
+// sees it (acorn refuses `#v0-12-0` as a JS expression).
+const versionAnchorPlugin = () => {
+  return (tree: any) => {
+    visit(tree, 'heading', (node: any) => {
+      if (node.depth !== 2 || !node.children?.length) {
+        return;
+      }
+      const text = node.children
+        .filter((c: any) => c.type === 'text')
+        .map((c: any) => c.value)
+        .join('');
+      const match = /^(\d+\.\d+(?:\.\d+)?)$/.exec(text.trim());
+      if (!match) {
+        return;
+      }
+      const id = 'v' + match[1].replace(/\./g, '-');
+      node.data = node.data || {};
+      node.data.hProperties = node.data.hProperties || {};
+      node.data.hProperties.id = id;
+      // Keep `id` on the AST itself so docusaurus's TOC extractor uses it.
+      node.data.id = id;
+    });
+  };
+};
 
 const config: Config = {
   title: 'Warp',
@@ -52,6 +83,7 @@ const config: Config = {
         docs: {
           sidebarPath: './sidebars.ts',
           editUrl: 'https://github.com/moberghr/warp/tree/main/website/',
+          beforeDefaultRemarkPlugins: [versionAnchorPlugin],
         },
         blog: false,
         theme: {
