@@ -103,13 +103,14 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
 
         var publisher = server.CreatePublisher();
 
+        const string key = "serial-key";
         const int jobCount = 10;
         var jobIds = new List<Guid>(jobCount);
         for (var i = 0; i < jobCount; i++)
         {
             var id = await publisher.Enqueue(
-                new ConcurrencyTrackerRequest(),
-                new JobParameters().WithMutex("serial-key", MutexMode.Wait));
+                new ConcurrencyTrackerRequest { Key = key },
+                new JobParameters().WithMutex(key, MutexMode.Wait));
             jobIds.Add(id);
         }
 
@@ -126,5 +127,59 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
 
         tracker.Completed.ShouldBe(jobCount);
         tracker.MaxObserved.ShouldBe(1, "Wait mode must guarantee at most one job per key runs at a time");
+    }
+
+    [TimedFact(60_000)]
+    public async Task GivenJobsWithDifferentKeys_WhenWaitMode_ThenKeysRunInParallelButEachKeySerialized()
+    {
+        var tracker = new ConcurrencyTracker();
+
+        await using var server = await WarpTestServer.StartAsync(
+            Fixture,
+            configure: null,
+            configureServices: services => services.AddSingleton(tracker));
+
+        var publisher = server.CreatePublisher();
+
+        const int keyCount = 5;
+        const int jobsPerKey = 3;
+        var keys = Enumerable.Range(0, keyCount).Select(i => $"parallel-key-{i}").ToArray();
+
+        var jobIds = new List<Guid>(keyCount * jobsPerKey);
+        foreach (var key in keys)
+        {
+            for (var j = 0; j < jobsPerKey; j++)
+            {
+                var id = await publisher.Enqueue(
+                    new ConcurrencyTrackerRequest { Key = key },
+                    new JobParameters().WithMutex(key, MutexMode.Wait));
+                jobIds.Add(id);
+            }
+        }
+
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        await server.WaitForCompletion(timeout: TimeSpan.FromSeconds(45));
+
+        foreach (var id in jobIds)
+        {
+            var job = await server.GetJob(id);
+            job.CurrentState.ShouldBe(State.Completed);
+        }
+
+        tracker.Completed.ShouldBe(keyCount * jobsPerKey);
+
+        // Per-key serialization holds — at most one job per key was ever in flight.
+        foreach (var key in keys)
+        {
+            tracker.CompletedFor(key).ShouldBe(jobsPerKey);
+            tracker.MaxObservedFor(key).ShouldBe(1, $"key '{key}' must serialize");
+        }
+
+        // Across keys, parallelism actually happened — at some point at least 2 keys ran
+        // concurrently. We can't reliably assert MaxObserved == keyCount because worker count
+        // / scheduling jitter may stagger them, but observing > 1 proves keys aren't globally
+        // serialized. Default WorkerCount is min(ProcessorCount * 5, 20) so headroom is ample.
+        tracker.MaxObserved.ShouldBeGreaterThan(1, "different keys must be allowed to run in parallel");
     }
 }

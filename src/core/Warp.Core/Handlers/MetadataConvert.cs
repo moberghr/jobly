@@ -44,11 +44,20 @@ public static class MetadataConvert
             return (T)(object)Convert.ToDouble(value);
         }
 
-        // Enum / Nullable<Enum> ← long (NativeObjectConverter returns long for integer JSON numbers)
+        // Enum / Nullable<Enum> ← long (NativeObjectConverter returns long for integer JSON numbers).
+        // Defensive against non-integral values (e.g. a string mistakenly stored against an enum
+        // key) — fall through to default rather than throwing from a metadata accessor.
         var enumType = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
         if (enumType.IsEnum)
         {
-            return (T)Enum.ToObject(enumType, value);
+            try
+            {
+                return (T)Enum.ToObject(enumType, value);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidCastException or OverflowException)
+            {
+                return default;
+            }
         }
 
         // List<object> → T[] conversion (NativeObjectConverter returns List<object> for arrays)

@@ -41,8 +41,9 @@ public class MutexPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
         if (handle == null)
         {
             var mode = meta.Mode ?? MutexMode.Skip;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             _jobContext.Outcome = mode == MutexMode.Wait
-                ? BuildRequeueOutcome(meta.ConcurrencyKey)
+                ? BuildRequeueOutcome(meta.ConcurrencyKey, now)
                 : BuildSkipOutcome(meta.ConcurrencyKey);
 
             return default!;
@@ -58,11 +59,11 @@ public class MutexPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
         }
     }
 
-    private JobOutcome BuildRequeueOutcome(string key) =>
+    private static JobOutcome BuildRequeueOutcome(string key, DateTime now) =>
         new()
         {
             State = State.Enqueued,
-            ScheduleTime = _timeProvider.GetUtcNow().UtcDateTime,
+            ScheduleTime = now,
             ClearHandlerType = true,
             LogMessage = $"Requeued — mutex '{key}' held by another job",
         };
