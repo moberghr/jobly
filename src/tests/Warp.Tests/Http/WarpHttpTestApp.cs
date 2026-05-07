@@ -42,6 +42,15 @@ public sealed class WarpHttpTestApp : IAsyncDisposable
         // assembly's source-gen registers QueueWorkHandler (which depends on IPublisher).
         builder.Services.AddSingleton<Warp.Core.IPublisher>(new FakePublisher());
 
+        // Defaults for concurrency-isolation handlers. The mediator constructor eagerly
+        // resolves every IRequestHandler<,> in the assembly, so these must be registered
+        // even for tests that don't touch the concurrency endpoints. Tests that DO touch
+        // them override these singletons in their own configureServices callback.
+        builder.Services.AddSingleton<ConcurrencyIsolationTests.ScopeConstructionCounter>();
+        builder.Services.AddScoped<ConcurrencyIsolationTests.ScopeProbe>();
+        builder.Services.AddSingleton<ConcurrencyIsolationTests.AsyncLocalLeakRecorder>();
+        builder.Services.AddSingleton<ConcurrencyIsolationTests.BehaviorInvocationSink>();
+
         // Register the source-gen mediator for this test assembly so IMediator and the
         // closed IRequestHandler<,> services resolve. The Warp.SourceGenerator emits
         // AddWarpMediator() into Warp.Core.Handlers.Generated of the consuming assembly.
