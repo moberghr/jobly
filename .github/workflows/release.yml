@@ -53,6 +53,12 @@ jobs:
       working-directory: src/core/Warp.Worker
       run: dotnet pack -c Release -p:PackageVersion=${{ env.PACKAGE_VERSION }} -o ${{ github.workspace }}/nupkgs
 
+    # Warp.Http depends only on Core. The Warp.Http.SourceGenerator project is referenced as
+    # an analyzer and embedded into the package via PackagePath="analyzers/dotnet/cs/".
+    - name: Pack Moberg.Warp.Http
+      working-directory: src/core/Warp.Http
+      run: dotnet pack -c Release -p:PackageVersion=${{ env.PACKAGE_VERSION }} -o ${{ github.workspace }}/nupkgs
+
     # Providers depend on both Core and Worker — pack after both are available on the local feed
     - name: Pack Moberg.Warp.Provider.PostgreSql
       working-directory: src/core/providers/Warp.Provider.PostgreSql
