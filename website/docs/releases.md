@@ -4,7 +4,9 @@ sidebar_position: 6
 
 # Releases
 
-## 0.12.0 {#v0-12-0}
+<a id="v0-12-0"></a>
+
+## 0.12.0
 
 *2026-05-07*
 
@@ -184,7 +186,9 @@ Full docs at [features/http](features/http). Shipped in [#154](https://github.co
 
 - **HTTP request-isolation suite** — five concurrency tests bombard the in-memory test app with 200 parallel requests (50 for streaming) and assert per-request DI scope (N requests → N distinct `ScopeProbe` constructions), no `AsyncLocal<T>` bleed between handlers, no request-payload crossover, pipeline behaviors observe per-request inputs, and concurrent `IStreamRequest` endpoints emit only their own block of items.
 
-## 0.11.0 {#v0-11-0}
+<a id="v0-11-0"></a>
+
+## 0.11.0
 
 *2026-05-06*
 
@@ -219,7 +223,9 @@ Stability release. No breaking API changes. Several latent product bugs surfaced
 
 ---
 
-## 0.10.0 {#v0-10-0}
+<a id="v0-10-0"></a>
+
+## 0.10.0
 
 *2026-04-27*
 
@@ -289,7 +295,9 @@ Breaking release because of both the rename and the removal of reflection-based 
 
 ---
 
-## 0.9.1 {#v0-9-1}
+<a id="v0-9-1"></a>
+
+## 0.9.1
 
 *2026-04-21*
 
@@ -304,7 +312,9 @@ Breaking release because of both the rename and the removal of reflection-based 
 
 ---
 
-## 0.9.0 {#v0-9-0}
+<a id="v0-9-0"></a>
+
+## 0.9.0
 
 *2026-04-21*
 
@@ -356,7 +366,9 @@ Breaking release because of the provider package split and the DI lambda API.
 
 ---
 
-## 0.8.0 {#v0-8-0}
+<a id="v0-8-0"></a>
+
+## 0.8.0
 
 *2026-04-19*
 
@@ -392,7 +404,9 @@ Breaking release because of the provider package split and the DI lambda API.
 
 ---
 
-## 0.7.0 {#v0-7-0}
+<a id="v0-7-0"></a>
+
+## 0.7.0
 
 *2026-04-17*
 
@@ -439,7 +453,9 @@ This is a large release with several breaking changes. Plan the upgrade accordin
 
 ---
 
-## 0.6.1 {#v0-6-1}
+<a id="v0-6-1"></a>
+
+## 0.6.1
 
 *2026-04-13*
 
@@ -453,7 +469,9 @@ This is a large release with several breaking changes. Plan the upgrade accordin
 
 ---
 
-## 0.6.0 {#v0-6-0}
+<a id="v0-6-0"></a>
+
+## 0.6.0
 
 *2026-04-12*
 
@@ -490,7 +508,9 @@ This release adds a new nullable `ParentSpanId` column to the Job table. Run an 
 
 ---
 
-## 0.5.0 {#v0-5-0}
+<a id="v0-5-0"></a>
+
+## 0.5.0
 
 *2026-04-09*
 
@@ -518,7 +538,9 @@ This release adds a new nullable `ParentSpanId` column to the Job table. Run an 
 
 ---
 
-## 0.4.0 {#v0-4-0}
+<a id="v0-4-0"></a>
+
+## 0.4.0
 
 *2026-04-08*
 
@@ -532,7 +554,9 @@ This release adds a new nullable `ParentSpanId` column to the Job table. Run an 
 
 ---
 
-## 0.3.0 {#v0-3-0}
+<a id="v0-3-0"></a>
+
+## 0.3.0
 
 *2026-04-07*
 
