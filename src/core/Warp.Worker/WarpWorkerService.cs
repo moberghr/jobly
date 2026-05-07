@@ -488,6 +488,11 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
             job.ExpireAt = now.Add(_configuration.JobExpirationTimeout);
             AddCounters(context, "stats:deleted", $"stats:deleted:{hourSuffix}");
         }
+        else if (state == State.Enqueued || state == State.Scheduled)
+        {
+            // Covers retry backoff and Mutex Wait — anything that puts the job back on the queue.
+            AddCounters(context, "stats:requeued", $"stats:requeued:{hourSuffix}");
+        }
 
         var logMessage = outcome?.LogMessage
             ?? (error != null ? error.Message : $"Job {job.Id} completed");

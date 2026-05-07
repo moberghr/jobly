@@ -53,15 +53,33 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
-    public async Task RunCleanup_OldHourlyStats_Deleted()
+    public async Task RunCleanup_OldHourlyStats_DeletedAcrossAllPrefixes()
     {
-        // Arrange — use stats:failed: prefix because the cleanup uses a lexicographic comparison
-        // against "stats:failed:{cutoff}" which only matches stats:failed: keys
+        // Cleanup is generic: any key whose last colon-separated segment parses as
+        // yyyy-MM-dd-HH and is older than 7 days is deleted. Built-in stats:* prefixes and
+        // addon-defined keys all get pruned the same way.
         var ctx = _fixture.CreateContext();
         await InsertExpiredJob(ctx);
 
-        const string oldKey = "stats:failed:2020-01-01-10";
-        ctx.Set<Statistic>().Add(new Statistic { Key = oldKey, Value = 5 });
+        string[] oldKeys = [
+            "stats:succeeded:2020-01-01-10",
+            "stats:failed:2020-01-01-10",
+            "stats:deleted:2020-01-01-10",
+            "stats:requeued:2020-01-01-10",
+            "addon:custom-metric:2020-01-01-10",
+        ];
+
+        foreach (var key in oldKeys)
+        {
+            ctx.Set<Statistic>().Add(new Statistic { Key = key, Value = 5 });
+        }
+
+        // Non-hourly key must NOT be touched (no date suffix).
+        ctx.Set<Statistic>().Add(new Statistic { Key = "stats:succeeded", Value = 100 });
+
+        // Hourly key whose suffix isn't a real date must NOT be touched (defensive).
+        ctx.Set<Statistic>().Add(new Statistic { Key = "addon:foo:not-a-date", Value = 9 });
+
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
@@ -70,8 +88,19 @@ public abstract class ExpirationEdgeCaseTestsBase : IAsyncLifetime
 
         // Assert
         var readCtx = _fixture.CreateContext();
-        var stat = await readCtx.Set<Statistic>().FirstOrDefaultAsync(s => s.Key == oldKey, Xunit.TestContext.Current.CancellationToken);
-        stat.ShouldBeNull();
+        foreach (var key in oldKeys)
+        {
+            var stat = await readCtx.Set<Statistic>().FirstOrDefaultAsync(s => s.Key == key, Xunit.TestContext.Current.CancellationToken);
+            stat.ShouldBeNull($"hourly key '{key}' should have been cleaned up");
+        }
+
+        var rolledUp = await readCtx.Set<Statistic>().FirstOrDefaultAsync(s => s.Key == "stats:succeeded", Xunit.TestContext.Current.CancellationToken);
+        rolledUp.ShouldNotBeNull();
+        rolledUp.Value.ShouldBe(100);
+
+        var bogusSuffix = await readCtx.Set<Statistic>().FirstOrDefaultAsync(s => s.Key == "addon:foo:not-a-date", Xunit.TestContext.Current.CancellationToken);
+        bogusSuffix.ShouldNotBeNull();
+        bogusSuffix.Value.ShouldBe(9);
     }
 
     [TimedFact]
