@@ -4,7 +4,7 @@
 
 Warp provides three patterns — Messages (pub/sub), Jobs (orchestrated background work), and Requests (in-memory mediator) — through a unified pipeline. It uses the transactional outbox pattern: jobs are committed atomically with business data in the same DbContext. No separate message broker required.
 
-Ships as NuGet packages: Moberg.Warp.Core, Moberg.Warp.Worker, Moberg.Warp.UI. Supports PostgreSQL and SQL Server.
+Ships as NuGet packages: Moberg.Warp.Core, Moberg.Warp.Worker, Moberg.Warp.UI, and Moberg.Warp.Http (optional). Supports PostgreSQL and SQL Server.
 
 ---
 
@@ -14,6 +14,7 @@ Ships as NuGet packages: Moberg.Warp.Core, Moberg.Warp.Worker, Moberg.Warp.UI. S
 dotnet add package Moberg.Warp.Core    # Publishing (required)
 dotnet add package Moberg.Warp.Worker  # Worker service (if processing jobs)
 dotnet add package Moberg.Warp.UI      # Dashboard (optional)
+dotnet add package Moberg.Warp.Http    # HTTP exposure for IRequest<T> / IStreamRequest<T> (optional)
 ```
 
 ---
@@ -902,6 +903,180 @@ options.Authorization = new LocalRequestsOnlyAuthorizationFilter();
 - Optional count-based cleanup: `MaxExpirableJobCount` deletes oldest by ExpireAt when threshold exceeded
 - Statistics survive job deletion (persistent counters)
 - Recurring job logs: last 100 per recurring job retained
+
+---
+
+## HTTP Endpoints (Moberg.Warp.Http)
+
+Optional package that exposes `IRequest<TResponse>` and `IStreamRequest<TResponse>` handlers as ASP.NET Minimal API endpoints. Source-generated dispatch (no per-request reflection); independent of `Moberg.Warp.UI`. Handler binding is delegated to ASP.NET Minimal API — full support for `IParsable<T>`, `TryParse`, query arrays, route constraints, etc.
+
+`IJob` and `IMessage` cannot be HTTP-exposed (compile-time error `WHTTP001`). The pattern for "submit a job via HTTP" is a thin `IRequest<Guid>` wrapper that calls `IPublisher.Enqueue`.
+
+### Setup
+
+```bash
+dotnet add package Moberg.Warp.Http
+```
+
+```csharp
+builder.Services.AddWarpHttp();
+app.MapWarpHttp();
+```
+
+### Defining endpoints — attribute on the handler class
+
+```csharp
+using Microsoft.AspNetCore.Mvc;          // [FromRoute], [FromQuery], [FromHeader], [FromBody]
+using Warp.Core.Handlers;
+using Warp.Http;
+
+// Request type — public contract.
+public sealed record GetOrder([FromRoute] Guid Id) : IRequest<OrderDto>;
+
+// Handler class — carries the [WarpHttp...] attribute.
+[WarpHttpGet("/orders/{id}")]
+public sealed class GetOrderHandler : IRequestHandler<GetOrder, OrderDto>
+{
+    public Task<OrderDto> HandleAsync(GetOrder request, CancellationToken ct) { ... }
+}
+```
+
+### Verb attributes
+
+```csharp
+[WarpHttpGet("/path")]      // GET
+[WarpHttpPost("/path")]     // POST
+[WarpHttpPut("/path")]      // PUT
+[WarpHttpPatch("/path")]    // PATCH
+[WarpHttpDelete("/path")]   // DELETE
+```
+
+### Response semantics
+
+| Handler kind                  | Status | Body                                        |
+|-------------------------------|--------|---------------------------------------------|
+| `IRequest<TResponse>` non-Unit | 200    | JSON of `TResponse`                         |
+| `IRequest<Unit>`              | 204    | empty                                       |
+| `IStreamRequest<TResponse>`   | 200    | `text/event-stream` (one `data:` per item)  |
+
+### Binding shapes
+
+- **Whole-body** — body verb + no per-property attributes → ASP.NET binds whole `TRequest` from JSON body. Natural shape for plain POST DTOs.
+- **AsParameters** — non-body verb (or no body part) → ASP.NET decomposes `TRequest` per `[FromRoute]` / `[FromQuery]` / `[FromHeader]` attributes via `[AsParameters]`. Records and classes both work; route-token names auto-bind on unattributed members.
+- **Mixed** — request type has both `[FromBody]` and other source attributes → generator emits explicit lambda parameters per source and constructs `TRequest`. Use **classes with property setters** for mixed-binding cases (records' positional ctor attributes don't reach properties for `[AsParameters]`).
+
+### Submit a job via HTTP
+
+```csharp
+public sealed record EnqueueReport(Guid TenantId) : IRequest<Guid>;
+
+[WarpHttpPost("/reports/generate")]
+public sealed class EnqueueReportHandler(IPublisher publisher)
+    : IRequestHandler<EnqueueReport, Guid>
+{
+    public async Task<Guid> HandleAsync(EnqueueReport req, CancellationToken ct)
+    {
+        var jobId = await publisher.Enqueue(new GenerateReportJob(req.TenantId));
+        await publisher.SaveChangesAsync(ct);
+        return jobId;
+    }
+}
+```
+
+### Streaming (SSE)
+
+```csharp
+public sealed record OrderEventFeed([FromQuery] Guid TenantId) : IStreamRequest<OrderEvent>;
+
+[WarpHttpGet("/orders/feed")]
+public sealed class OrderEventFeedHandler : IStreamRequestHandler<OrderEventFeed, OrderEvent>
+{
+    public async IAsyncEnumerable<OrderEvent> HandleAsync(
+        OrderEventFeed request,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        await foreach (var evt in _events.Subscribe(request.TenantId, ct))
+            yield return evt;
+    }
+}
+```
+
+`HttpContext.RequestAborted` is plumbed to the handler — client disconnect cancels the enumeration.
+
+### Auth
+
+`[Authorize]` and `[AllowAnonymous]` on the handler class surface as ASP.NET endpoint metadata, composing with group-level `RequireAuthorization()`:
+
+```csharp
+[Authorize(Policy = "OrdersWrite")]
+[WarpHttpPost("/orders")]
+public sealed class CreateOrderHandler : IRequestHandler<CreateOrder, OrderDto> { ... }
+
+// Override per endpoint:
+[AllowAnonymous]
+[WarpHttpGet("/api/health")]
+public sealed class HealthCheckHandler : IRequestHandler<HealthCheck, HealthStatus> { ... }
+```
+
+### Named groups
+
+```csharp
+[WarpHttpPost("/orders", Group = "public")]
+public sealed class CreateOrderPublicHandler : IRequestHandler<CreateOrder, OrderDto> { ... }
+
+[WarpHttpPost("/admin/users", Group = "admin")]
+public sealed class CreateAdminUserHandler : IRequestHandler<CreateAdminUser, Guid> { ... }
+```
+
+```csharp
+app.MapWarpHttp();                                       // null-group descriptors
+app.MapGroup("/api/public").RequireAuthorization("publicPolicy").MapWarpHttp("public");
+app.MapGroup("/internal/admin").RequireAuthorization("adminPolicy").MapWarpHttp("admin");
+```
+
+`MapWarpHttp(group)` matches strictly. Double-call on the same builder + group throws `InvalidOperationException` at startup.
+
+### Multi-attribute (versioning aliases)
+
+```csharp
+[WarpHttpPost("/v1/orders", Name = "CreateOrderV1")]
+[WarpHttpPost("/v2/orders", Name = "CreateOrderV2")]
+public sealed class CreateOrderHandler : IRequestHandler<CreateOrder, OrderDto> { ... }
+```
+
+`AllowMultiple = true` on `WarpHttpAttribute`; multi-attribute requires `Name` on each (`WHTTP002` if missing — ASP.NET requires unique route names).
+
+### IHttpResponseShape
+
+Response types implement `IHttpResponseShape` to override status / set headers / set Location:
+
+```csharp
+public sealed record CreatedOrder(Guid Id) : IHttpResponseShape
+{
+    public void Apply(HttpContext ctx)
+    {
+        ctx.Response.StatusCode = StatusCodes.Status201Created;
+        ctx.Response.Headers.Location = $"/orders/{Id}";
+    }
+}
+```
+
+Apply runs after handler return, before body serialization. Only fires for `IRequest<TResponse>` non-Unit responses (not for `IRequest<Unit>` 204; not for streams).
+
+### Diagnostics
+
+| ID         | Severity | Condition |
+|------------|----------|-----------|
+| `WHTTP001` | Error    | Handler tagged with `[WarpHttp...]` either doesn't implement `IRequestHandler<,>` / `IStreamRequestHandler<,>`, or its request type implements `IJob` / `IMessage`. |
+| `WHTTP002` | Error    | Handler has multiple `[WarpHttp...]` attributes but at least one is missing `Name = "..."`. |
+
+### Pipeline behaviors
+
+The HTTP path runs `IPipelineBehavior<TRequest, TResponse>` — same chain as in-memory `IMediator.Send`. Auth, validation, logging behaviors apply for free. `RetryPipelineBehavior` (constraint `IJob`) and `MutexPipelineBehavior` (`is not IJob` runtime check) self-scope to the worker path and never run on HTTP.
+
+### OpenAPI / Swagger
+
+Endpoint metadata is populated automatically: `.Accepts<TRequest>("application/json")` on body verbs, `.Produces<TResponse>(200)` (or `.Produces(204)` for Unit), `.WithName(...)` from the attribute's Name, `.WithTags(...)` from the route's first segment. Swashbuckle / NSwag / `Microsoft.AspNetCore.OpenApi` discover them transparently.
 
 ---
 

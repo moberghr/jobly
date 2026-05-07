@@ -58,5 +58,8 @@ Implemented as `IRequest<TResponse>` with `IMediator.Send()`. Supports `IPipelin
 ### ~~Stream Requests~~ ✅
 Implemented as `IStreamRequest<TResponse>` extending `IRequest<IAsyncEnumerable<TResponse>>`. Preserves the unified type hierarchy — `IPipelineBehavior` applies at request level. `IStreamPipelineBehavior<TRequest, TResponse>` wraps enumeration. Source generator provides zero-allocation dispatch.
 
+### ~~HTTP Endpoint Exposure~~ ✅
+Implemented as the optional `Moberg.Warp.Http` package. `[WarpHttpGet/Post/Put/Patch/Delete("/route")]` on a handler class exposes its `IRequest<T>` / `IStreamRequest<T>` request type as an ASP.NET Minimal API endpoint. Source-generated dispatch; binding delegated to ASP.NET Minimal API (full `IParsable<T>` / `TryParse` / route constraints / query arrays). `IJob` and `IMessage` rejected at compile time (`WHTTP001`); use a thin `IRequest<Guid>` wrapper that calls `IPublisher.Enqueue` for "submit a job via HTTP". Independent of `Moberg.Warp.UI`.
+
 ### Runtime Schema Migration Helper
 Optional `MigrateWarpSchemaAsync()` for users who don't use EF migrations. Diffs the EF model against the database at runtime, generates and executes only Warp table DDL. Respects naming conventions. Lower priority — EF migrations cover most users.

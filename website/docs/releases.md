@@ -4,6 +4,23 @@ sidebar_position: 6
 
 # Releases
 
+## Unreleased
+
+### New: Moberg.Warp.Http
+
+Optional package that exposes Warp `IRequest<TResponse>` and `IStreamRequest<TResponse>` handlers as ASP.NET Minimal API endpoints. Annotate the **handler class** with `[WarpHttpGet/Post/Put/Patch/Delete("/route")]`, call `services.AddWarpHttp()` + `app.MapWarpHttp()`, and the endpoint is live. Source-generated dispatch (no per-request reflection); independent of `Moberg.Warp.UI`.
+
+- Binding handled by ASP.NET Minimal API — full support for `IParsable<T>`, `TryParse`, query arrays, route constraints (`{id:guid}`, `{year:int}`), `[AsParameters]`, etc. Use the standard `Microsoft.AspNetCore.Mvc.From*` attributes on request properties.
+- `IJob` and `IMessage` cannot be HTTP-exposed (compile-time `WHTTP001`). The recommended pattern is a thin `IRequest<Guid>` wrapper whose handler calls `IPublisher.Enqueue` — explicit semantics, no framework magic.
+- `IStreamRequest<T>` becomes a `text/event-stream` endpoint; `HttpContext.RequestAborted` cancellation propagates to the handler's enumerator.
+- Multi-attribute support for versioning aliases (each attribute requires `Name = "..."`).
+- Named groups via `Group = "..."` + `MapWarpHttp("group")` for selective registration on `app.MapGroup(...)` builders.
+- `[Authorize]` / `[AllowAnonymous]` on the handler class surface as standard ASP.NET endpoint metadata; group-level `RequireAuthorization()` composes naturally.
+- Optional `IHttpResponseShape` interface on response types lets domain DTOs override status / headers / Location without coupling handlers to ASP.NET.
+- Diagnostics: `WHTTP001` (invalid handler / IJob+IMessage rejection), `WHTTP002` (multi-attribute requires Name).
+
+Full docs at [features/http](features/http).
+
 ## 0.11.0
 
 *2026-05-06*

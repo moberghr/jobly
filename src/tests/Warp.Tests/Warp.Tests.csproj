@@ -10,6 +10,10 @@
 
 		<UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
 
+		<!-- Persist source-generator output to obj/GeneratedFiles/ for inspection. -->
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)GeneratedFiles</CompilerGeneratedFilesOutputPath>
+
 		<!-- Suppress xUnit v3 CancellationToken advisory warnings (bulk fix is a separate task) -->
 		<NoWarn>$(NoWarn);xUnit1051;CA1816;MA0040</NoWarn>
 	</PropertyGroup>
@@ -29,7 +33,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.5" />
+		<PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.5" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.10.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.5" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.5" />
 		<PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.1.0" />
@@ -51,11 +56,16 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\core\Warp.Core\Warp.Core.csproj" />
+		<ProjectReference Include="..\..\core\Warp.Http\Warp.Http.csproj" />
 		<ProjectReference Include="..\..\core\providers\Warp.Provider.PostgreSql\Warp.Provider.PostgreSql.csproj" />
 		<ProjectReference Include="..\..\core\providers\Warp.Provider.SqlServer\Warp.Provider.SqlServer.csproj" />
 		<ProjectReference Include="..\..\core\Warp.Worker\Warp.Worker.csproj" />
 		<ProjectReference Include="..\..\core\Warp.UI\Warp.UI.csproj" />
 		<ProjectReference Include="..\..\core\Warp.SourceGenerator\Warp.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+		<!-- Single reference: OutputItemType=Analyzer makes it run as a source generator at compile
+		     time; default ReferenceOutputAssembly=true keeps the assembly bindable so the test
+		     project can instantiate WarpHttpGenerator directly via Roslyn (see GeneratorTestHarness). -->
+		<ProjectReference Include="..\..\core\Warp.Http.SourceGenerator\Warp.Http.SourceGenerator.csproj" OutputItemType="Analyzer" />
 		<ProjectReference Include="..\Warp.Tests.SourceGenerator\Warp.Tests.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 	</ItemGroup>
 

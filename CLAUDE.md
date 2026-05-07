@@ -13,7 +13,7 @@ Warp is a distributed job processing and message queue library for .NET 10. Four
 
 **Optional DB push**: `opt.UseDatabasePush()` on the builder replaces polling wake-up with push notifications (Postgres LISTEN/NOTIFY, SQL Server Service Broker) for the dispatcher, `MessageRouter`, and `Orchestrator`. Worker fetch push requires `UseDispatcher = true` — individual-worker mode has a thundering-herd problem and is left on polling. See §2.9 and the DB Push section in `README.md`.
 
-Ships as NuGet packages: `Warp.Core` (provider-agnostic), `Warp.Provider.PostgreSql` (PG-specific), `Warp.Provider.SqlServer` (SQL Server-specific), `Warp.Worker` (worker runtime), `Warp.UI` (dashboard). Users install the provider package that matches their database and call `opt.UsePostgreSql()` or `opt.UseSqlServer()` inside the `AddWarp` / `AddWarpWorker` lambda.
+Ships as NuGet packages: `Warp.Core` (provider-agnostic), `Warp.Provider.PostgreSql` (PG-specific), `Warp.Provider.SqlServer` (SQL Server-specific), `Warp.Worker` (worker runtime), `Warp.UI` (dashboard), `Warp.Http` (optional — HTTP exposure for `IRequest<T>` / `IStreamRequest<T>` handlers). Users install the provider package that matches their database and call `opt.UsePostgreSql()` or `opt.UseSqlServer()` inside the `AddWarp` / `AddWarpWorker` lambda.
 
 ## Build & Test Commands
 
@@ -204,6 +204,7 @@ Default: no auth (open access).
 - **Warp.Core** — Entities (Job, RecurringJob, RecurringJobLog, JobLog, Server, Worker, ServerTask, ServerLog), handlers, JobDispatcher (cached reflection), Publisher, BatchPublisher, logging (JobLogContext/JobLoggerProvider). Services: `JobQueryService`, `JobCommandService`, `JobGroupQueryService`, `RecurringJobService`, `DashboardStatsService`.
 - **Warp.Worker** — WarpWorkerService (pure executor), WarpDispatcher/WarpDispatcherWorker (batch-fetch mode), worker groups. Server-task services driven by `ServerTaskHost<TContext>` (all implement `IServerTask`): `Heartbeat`, `CounterAggregator`, `ServerCleanup`, `StaleJobRecovery`, `ExpirationCleanup`, `RecurringJobScheduler`, `ScheduledJobActivation`, `MessageRouter`, `Orchestrator`. Push → wake plumbing: `ServerTaskSignals<TContext>`.
 - **Warp.UI** — Minimal API endpoints + embedded SPA served at `/warp`. Auth middleware (`IWarpAuthorizationFilter`, `IWarpCredentialValidator`, built-in cookie login). Typed `config.ts` for window globals.
+- **Warp.Http** (optional) — Exposes `IRequest<T>` / `IStreamRequest<T>` handlers as ASP.NET Minimal API endpoints. Annotate the **handler class** with `[WarpHttpGet/Post/Put/Patch/Delete("/route")]`; source generator (`Warp.Http.SourceGenerator`) emits a `RequestDelegate` per endpoint. Binding delegated to ASP.NET Minimal API — full `[FromRoute]`/`[FromQuery]`/`[FromHeader]`/`[FromBody]`/`[AsParameters]` support. `IJob` / `IMessage` rejected at compile time (`WHTTP001`); use a thin `IRequest<Guid>` wrapper that calls `IPublisher.Enqueue` for "submit a job via HTTP". Independent of `Warp.UI`.
 - **Static analyzers** — StyleCop, Roslynator, SonarAnalyzer, Meziantou.
 
 ### Frontend (Vite + React 18 + TypeScript)

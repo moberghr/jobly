@@ -1,0 +1,137 @@
+using System.Collections.Concurrent;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Warp.Core.Handlers;
+using Warp.Http.Discovery;
+
+namespace Warp.Http;
+
+public static class EndpointRouteBuilderExtensions
+{
+    /// <summary>
+    /// Registers all <see cref="HttpEndpointDescriptor"/> entries in the global
+    /// <see cref="WarpGeneratedHttpRegistry"/> whose <see cref="HttpEndpointDescriptor.Group"/>
+    /// strictly equals <paramref name="group"/> (null matches null).
+    /// Throws <see cref="InvalidOperationException"/> if called twice with the same
+    /// <paramref name="group"/> on the same <paramref name="endpoints"/> instance.
+    /// </summary>
+    public static IEndpointRouteBuilder MapWarpHttp(this IEndpointRouteBuilder endpoints, string? group = null)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+
+        var marker = MarkerStorage.GetMarker(endpoints);
+        var key = group ?? string.Empty;
+        if (!marker.TryAdd(key, true))
+        {
+            throw new InvalidOperationException(
+                $"MapWarpHttp(group: {(group is null ? "null" : "\"" + group + "\"")}) was already called on this endpoint route builder. " +
+                "Each (builder, group) pair may be mapped only once.");
+        }
+
+        foreach (var descriptor in WarpGeneratedHttpRegistry.Snapshot())
+        {
+            if (!string.Equals(descriptor.Group, group, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            // The descriptor's HandlerDelegate is the source-generated Minimal API delegate —
+            // ASP.NET binds its parameters (route / query / header / body) before invoking
+            // our dispatch trampoline.
+            var builder = endpoints.MapMethods(descriptor.Route, [descriptor.Method], descriptor.HandlerDelegate);
+            ApplyMetadata(builder, descriptor);
+        }
+
+        return endpoints;
+    }
+
+    private static void ApplyMetadata(RouteHandlerBuilder builder, HttpEndpointDescriptor descriptor)
+    {
+        if (!string.IsNullOrEmpty(descriptor.Name))
+        {
+            builder.WithName(descriptor.Name!);
+        }
+
+        var firstSegment = ExtractFirstRouteSegment(descriptor.Route);
+        if (!string.IsNullOrEmpty(firstSegment))
+        {
+            builder.WithTags(firstSegment);
+        }
+
+        if (IsBodyVerb(descriptor.Method))
+        {
+            builder.Accepts(descriptor.RequestType, "application/json");
+        }
+
+        if (descriptor.ResponseType == typeof(Unit))
+        {
+            builder.Produces(StatusCodes.Status204NoContent);
+        }
+        else
+        {
+            builder.Produces(StatusCodes.Status200OK, descriptor.ResponseType, "application/json");
+        }
+
+        // Surface [Authorize] / [AllowAnonymous] declared on the handler class as standard
+        // ASP.NET endpoint metadata so group-level RequireAuthorization() composes naturally.
+        var authzAttrs = descriptor.HandlerType.GetCustomAttributes<AuthorizeAttribute>(inherit: false);
+        foreach (var attr in authzAttrs)
+        {
+            builder.WithMetadata(attr);
+        }
+
+        var anonAttr = descriptor.HandlerType.GetCustomAttribute<AllowAnonymousAttribute>(inherit: false);
+        if (anonAttr is not null)
+        {
+            builder.WithMetadata(anonAttr);
+        }
+    }
+
+    private static bool IsBodyVerb(string method)
+    {
+        return string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(method, "PUT", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(method, "PATCH", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? ExtractFirstRouteSegment(string route)
+    {
+        if (string.IsNullOrEmpty(route))
+        {
+            return null;
+        }
+
+        var trimmed = route.TrimStart('/');
+        var slash = trimmed.IndexOf('/', StringComparison.Ordinal);
+        var first = slash < 0 ? trimmed : trimmed.Substring(0, slash);
+
+        // Skip placeholder segments like "{id}".
+        if (first.StartsWith('{'))
+        {
+            return null;
+        }
+
+        return string.IsNullOrEmpty(first) ? null : first;
+    }
+
+    private static class MarkerStorage
+    {
+#pragma warning disable IDE0028 // ConditionalWeakTable<,> doesn't support collection-expression init
+        private static readonly ConditionalWeakTable<IEndpointRouteBuilder, ConcurrentDictionary<string, bool>> _markers = new();
+#pragma warning restore IDE0028
+
+        public static ConcurrentDictionary<string, bool> GetMarker(IEndpointRouteBuilder endpoints)
+        {
+            return _markers.GetValue(endpoints, CreateMarker);
+        }
+
+        private static ConcurrentDictionary<string, bool> CreateMarker(IEndpointRouteBuilder builder)
+        {
+            return new ConcurrentDictionary<string, bool>(StringComparer.Ordinal);
+        }
+    }
+}
