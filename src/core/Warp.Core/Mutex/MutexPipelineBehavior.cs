@@ -58,18 +58,14 @@ public class MutexPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
         }
     }
 
-    private JobOutcome BuildRequeueOutcome(string key)
-    {
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-
-        return new JobOutcome
+    private JobOutcome BuildRequeueOutcome(string key) =>
+        new()
         {
-            State = JobOutcome.RescheduledState(now, now),
-            ScheduleTime = now,
+            State = State.Enqueued,
+            ScheduleTime = _timeProvider.GetUtcNow().UtcDateTime,
             ClearHandlerType = true,
             LogMessage = $"Requeued — mutex '{key}' held by another job",
         };
-    }
 
     private static JobOutcome BuildSkipOutcome(string key) =>
         new()
