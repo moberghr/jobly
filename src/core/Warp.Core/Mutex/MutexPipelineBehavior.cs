@@ -8,11 +8,13 @@ public class MutexPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
 {
     private readonly IJobContext _jobContext;
     private readonly IWarpLockProvider _lockProvider;
+    private readonly TimeProvider _timeProvider;
 
-    public MutexPipelineBehavior(IJobContext jobContext, IWarpLockProvider lockProvider)
+    public MutexPipelineBehavior(IJobContext jobContext, IWarpLockProvider lockProvider, TimeProvider timeProvider)
     {
         _jobContext = jobContext;
         _lockProvider = lockProvider;
+        _timeProvider = timeProvider;
     }
 
     public async Task<TResponse> HandleAsync(
@@ -38,11 +40,10 @@ public class MutexPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
 
         if (handle == null)
         {
-            _jobContext.Outcome = new JobOutcome
-            {
-                State = State.Deleted,
-                LogMessage = $"Cancelled — mutex '{meta.ConcurrencyKey}' held by another job",
-            };
+            var mode = meta.Mode ?? MutexMode.Skip;
+            _jobContext.Outcome = mode == MutexMode.Wait
+                ? BuildRequeueOutcome(meta.ConcurrencyKey)
+                : BuildSkipOutcome(meta.ConcurrencyKey);
 
             return default!;
         }
@@ -56,4 +57,24 @@ public class MutexPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
             await handle.DisposeAsync();
         }
     }
+
+    private JobOutcome BuildRequeueOutcome(string key)
+    {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        return new JobOutcome
+        {
+            State = JobOutcome.RescheduledState(now, now),
+            ScheduleTime = now,
+            ClearHandlerType = true,
+            LogMessage = $"Requeued — mutex '{key}' held by another job",
+        };
+    }
+
+    private static JobOutcome BuildSkipOutcome(string key) =>
+        new()
+        {
+            State = State.Deleted,
+            LogMessage = $"Cancelled — mutex '{key}' held by another job",
+        };
 }

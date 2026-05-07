@@ -44,6 +44,13 @@ public static class MetadataConvert
             return (T)(object)Convert.ToDouble(value);
         }
 
+        // Enum / Nullable<Enum> ← long (NativeObjectConverter returns long for integer JSON numbers)
+        var enumType = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
+        if (enumType.IsEnum)
+        {
+            return (T)Enum.ToObject(enumType, value);
+        }
+
         // List<object> → T[] conversion (NativeObjectConverter returns List<object> for arrays)
         if (typeof(T).IsArray && value is System.Collections.IList list)
         {
