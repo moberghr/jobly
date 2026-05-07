@@ -15,6 +15,8 @@ public interface IDashboardStatsService
 
     Task<List<CounterModel>> GetCounters();
 
+    Task<List<CounterHistoryPoint>> GetCountersHistory(int hours = 24);
+
     Task<List<ServerModel>> GetServers();
 
     Task<int> GetServerCount();
@@ -388,23 +390,75 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
 
     /// <summary>
     /// Hourly bucket keys (e.g. <c>stats:succeeded:2026-05-07-10</c>) are internal accounting for
-    /// the historical chart, not user-facing counters. The Counters page only shows rolled-up
-    /// keys; the chart endpoint (<c>GetStatsHistory</c>) reads the hourly rows separately.
+    /// the historical chart, not user-facing counters. The Counters page table only shows
+    /// rolled-up keys; the Counters chart consumes the hourly rows via <see cref="GetCountersHistory"/>.
     /// </summary>
-    private static bool IsHourlyKey(string key)
+    private static bool IsHourlyKey(string key) => TryParseHourlyKey(key, out _, out _);
+
+    private static bool TryParseHourlyKey(string key, out string baseKey, out DateTime hour)
     {
+        baseKey = string.Empty;
+        hour = default;
+
         var lastColon = key.LastIndexOf(':');
         if (lastColon < 0)
         {
             return false;
         }
 
-        return DateTime.TryParseExact(
+        if (!DateTime.TryParseExact(
             key.AsSpan(lastColon + 1),
             "yyyy-MM-dd-HH",
             CultureInfo.InvariantCulture,
-            DateTimeStyles.None,
-            out _);
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+            out hour))
+        {
+            return false;
+        }
+
+        baseKey = key[..lastColon];
+
+        return true;
+    }
+
+    public async Task<List<CounterHistoryPoint>> GetCountersHistory(int hours = 24)
+    {
+        // All hourly buckets within the window, merged from Statistic + pending Counter rows so
+        // a freshly-written counter row shows up immediately even if the aggregator hasn't run.
+        var since = _timeProvider.GetUtcNow().UtcDateTime.AddHours(-hours);
+
+        var aggregated = await _context.Set<Statistic>()
+            .Where(x => EF.Functions.Like(x.Key, "%:%"))
+            .Select(x => new { x.Key, x.Value })
+            .ToListAsync();
+
+        var pending = await _context.Set<Counter>()
+            .Where(x => EF.Functions.Like(x.Key, "%:%"))
+            .GroupBy(x => x.Key)
+            .Select(g => new { Key = g.Key, Value = (long)g.Sum(c => c.Value) })
+            .ToListAsync();
+
+        var merged = aggregated.Concat(pending)
+            .GroupBy(x => x.Key, StringComparer.Ordinal)
+            .Select(g => new { Key = g.Key, Value = g.Sum(x => x.Value) });
+
+        var points = new List<CounterHistoryPoint>();
+        foreach (var row in merged)
+        {
+            if (!TryParseHourlyKey(row.Key, out var baseKey, out var hour) || hour < since)
+            {
+                continue;
+            }
+
+            points.Add(new CounterHistoryPoint
+            {
+                Hour = hour,
+                Key = baseKey,
+                Value = row.Value,
+            });
+        }
+
+        return [.. points.OrderBy(p => p.Hour).ThenBy(p => p.Key, StringComparer.Ordinal)];
     }
 
     /// <summary>

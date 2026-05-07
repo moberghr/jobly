@@ -122,6 +122,8 @@ public static class WarpEndpoints
 
         apiGroup.MapGet("stats/counters", async ([FromServices] IDashboardStatsService statsService) => await statsService.GetCounters());
 
+        apiGroup.MapGet("stats/counters/history", async ([FromServices] IDashboardStatsService statsService, [FromQuery] int? hours) => await statsService.GetCountersHistory(hours ?? 24));
+
         apiGroup.MapGet("servers", async ([FromServices] IDashboardStatsService statsService) => await statsService.GetServers());
 
         apiGroup.MapGet("servers/{serverId}", async ([FromServices] IDashboardStatsService statsService, Guid serverId) =>

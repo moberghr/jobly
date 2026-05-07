@@ -248,6 +248,26 @@ export function getCountersDemo() {
   ];
 }
 
+export function getCountersHistoryDemo(hours: number) {
+  const now = new Date(NOW);
+  now.setMinutes(0, 0, 0);
+  const points: { hour: string; key: string; value: number }[] = [];
+
+  for (let i = hours - 1; i >= 0; i--) {
+    const hourDate = new Date(now.getTime() - i * 3600000);
+    const h = hourDate.getHours();
+    const business = h >= 9 && h <= 17;
+    const base = business ? 800 + seeded(i + 10) * 500 : 50 + seeded(i + 40) * 150;
+
+    points.push({ hour: hourDate.toISOString(), key: 'stats:succeeded', value: Math.round(base) });
+    points.push({ hour: hourDate.toISOString(), key: 'stats:failed', value: Math.round(base * (0.01 + seeded(i + 50) * 0.04)) });
+    points.push({ hour: hourDate.toISOString(), key: 'stats:deleted', value: Math.round(base * 0.005) });
+    points.push({ hour: hourDate.toISOString(), key: 'stats:requeued', value: Math.round(base * (0.005 + seeded(i + 60) * 0.02)) });
+  }
+
+  return points;
+}
+
 // ============================================================
 // Realtime chart seed (60 seconds of pre-populated data)
 // ============================================================
