@@ -4,7 +4,9 @@ sidebar_position: 6
 
 # Releases
 
-## Unreleased
+## 0.12.0
+
+*2026-05-07*
 
 ### New: Moberg.Warp.Http
 
@@ -19,7 +21,11 @@ Optional package that exposes Warp `IRequest<TResponse>` and `IStreamRequest<TRe
 - Optional `IHttpResponseShape` interface on response types lets domain DTOs override status / headers / Location without coupling handlers to ASP.NET.
 - Diagnostics: `WHTTP001` (invalid handler / IJob+IMessage rejection), `WHTTP002` (multi-attribute requires Name).
 
-Full docs at [features/http](features/http).
+Full docs at [features/http](features/http). Shipped in [#154](https://github.com/moberghr/warp/pull/154).
+
+### Test Suite Improvements
+
+- **HTTP request-isolation suite** — five concurrency tests bombard the in-memory test app with 200 parallel requests (50 for streaming) and assert per-request DI scope (N requests → N distinct `ScopeProbe` constructions), no `AsyncLocal<T>` bleed between handlers, no request-payload crossover, pipeline behaviors observe per-request inputs, and concurrent `IStreamRequest` endpoints emit only their own block of items.
 
 ## 0.11.0
 

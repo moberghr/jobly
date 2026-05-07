@@ -5,6 +5,7 @@ A distributed job processing, message queue, and in-memory mediator library for 
 [![NuGet](https://img.shields.io/nuget/v/Moberg.Warp.Core?label=Warp.Core)](https://www.nuget.org/packages/Moberg.Warp.Core)
 [![NuGet](https://img.shields.io/nuget/v/Moberg.Warp.Worker?label=Warp.Worker)](https://www.nuget.org/packages/Moberg.Warp.Worker)
 [![NuGet](https://img.shields.io/nuget/v/Moberg.Warp.UI?label=Warp.UI)](https://www.nuget.org/packages/Moberg.Warp.UI)
+[![NuGet](https://img.shields.io/nuget/v/Moberg.Warp.Http?label=Warp.Http)](https://www.nuget.org/packages/Moberg.Warp.Http)
 [![Docs](https://img.shields.io/badge/docs-moberghr.github.io%2Fwarp-blue)](https://moberghr.github.io/warp/)
 
 ## Features
