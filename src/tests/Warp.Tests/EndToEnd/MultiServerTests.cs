@@ -402,7 +402,19 @@ public abstract class MultiServerTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenPausedServer_WithTwoServers_ThenOtherServerProcessesJobs()
     {
-        await using var server1 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+        // server1 has its auto-heartbeat disabled so we can drive the PauseStateHolder flip
+        // manually — see PauseIntegrationTests.PauseServer_JobsStayEnqueued for the rationale.
+        // Without this, server1's workers can have iterations in-flight (already past their
+        // pause check, sitting in the SQL fetch) when the holder flips, claim the freshly-
+        // published rows, and break the test's premise. server2 runs with the default config
+        // because it's the one we expect to do the work.
+        await using var server1 = await WarpTestServer.StartAsync(
+            Fixture,
+            cfg =>
+            {
+                Configure3Workers(cfg);
+                cfg.HealthCheckInterval = null;
+            });
         await using var server2 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
 
         // Get server1's worker group and pause it
@@ -413,8 +425,20 @@ public abstract class MultiServerTestsBase : IntegrationTestBase
             .FirstAsync(Xunit.TestContext.Current.CancellationToken);
 
         var svc = server1.CreateServerCommandService();
+
+        // Pause via API (DB row update), then run Heartbeat once on server1 so its in-memory
+        // PauseStateHolder catches up. After this, every server1 worker iteration that begins
+        // from now on will see paused=true and skip the fetch.
         await svc.PauseServer(server1.ServerId);
-        await server1.WaitForPauseState(server1GroupId, expectedPaused: true);
+        await server1.RunHeartbeatOnceAsync(Xunit.TestContext.Current.CancellationToken);
+        server1.PauseState.IsPaused(server1GroupId).ShouldBeTrue();
+
+        // Drain any server1 worker iterations that were already mid-fetch when the holder
+        // flipped — without this slack they could still claim a freshly-published row from
+        // their already-running SQL query. One PollingInterval (100ms test config) plus slack
+        // guarantees every such iteration finishes against the empty queue, loops back, and
+        // sees paused=true on its next check.
+        await Task.Delay(500, Xunit.TestContext.Current.CancellationToken);
 
         // Enqueue jobs while server1 is paused
         var publisher = server2.CreatePublisher();
@@ -456,8 +480,9 @@ public abstract class MultiServerTestsBase : IntegrationTestBase
             x => server2WorkerIds.Contains(x),
             "All jobs should have been processed by server2's workers while server1 was paused");
 
-        // Resume server1
+        // Resume server1 (manual heartbeat to flip the holder back, since auto-heartbeat is off)
         await svc.ResumeServer(server1.ServerId);
-        await server1.WaitForPauseState(server1GroupId, expectedPaused: false);
+        await server1.RunHeartbeatOnceAsync(Xunit.TestContext.Current.CancellationToken);
+        server1.PauseState.IsPaused(server1GroupId).ShouldBeFalse();
     }
 }

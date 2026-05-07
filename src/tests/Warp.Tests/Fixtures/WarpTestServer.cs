@@ -158,13 +158,22 @@ public class WarpTestServer : IAsyncDisposable
             {
                 services.AddDbContext<TestContext>(options =>
                 {
+                    // Bound every SQL command at 5 seconds in tests. Default ADO.NET command
+                    // timeout is 30s — long enough that one hung connection (e.g. attention-sent
+                    // state from a cancelled-mid-flight prior request) causes a cascading 10s
+                    // [TimedFact] failure with no diagnostic, because the test gives up before
+                    // the underlying command does. Capping at 5s makes the bad command fail with
+                    // a timeout exception that shows up in logs and lets ServerTaskLoop's catch
+                    // handler retry on a fresh connection. Long-running provider-native commands
+                    // (Service Broker WAITFOR / LISTEN) set CommandTimeout explicitly on the
+                    // SqlCommand / NpgsqlCommand and are unaffected by this default.
                     if (isPostgres)
                     {
-                        options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention();
+                        options.UseNpgsql(connectionString, npg => npg.CommandTimeout(5)).UseSnakeCaseNamingConvention();
                     }
                     else
                     {
-                        options.UseSqlServer(connectionString);
+                        options.UseSqlServer(connectionString, sql => sql.CommandTimeout(5));
                     }
                 });
 
