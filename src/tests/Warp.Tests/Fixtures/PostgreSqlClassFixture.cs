@@ -20,20 +20,28 @@ public class PostgreSqlClassFixture : IAsyncLifetime, IDatabaseFixture
 
     public async ValueTask InitializeAsync()
     {
+        TestLifecycleTrace.Record("PostgreSqlClassFixture.InitializeAsync starting");
         var databaseName = $"warp_t_{Guid.NewGuid():N}";
+
+        TestLifecycleTrace.Record("SharedPostgreSqlContainer.CreateDatabaseAsync starting");
         _connectionString = await SharedPostgreSqlContainer.CreateDatabaseAsync(
             databaseName,
             Xunit.TestContext.Current.CancellationToken);
+        TestLifecycleTrace.Record("SharedPostgreSqlContainer.CreateDatabaseAsync returned");
 
+        TestLifecycleTrace.Record("EnsureCreatedAsync starting");
         await using var context = CreateContext();
         await context.Database.EnsureCreatedAsync(Xunit.TestContext.Current.CancellationToken);
+        TestLifecycleTrace.Record("EnsureCreatedAsync returned");
 
+        TestLifecycleTrace.Record("Respawner.CreateAsync starting");
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(Xunit.TestContext.Current.CancellationToken);
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
         });
+        TestLifecycleTrace.Record("Respawner.CreateAsync returned");
     }
 
     public async Task ResetAsync()

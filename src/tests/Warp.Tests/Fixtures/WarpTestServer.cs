@@ -127,10 +127,14 @@ public class WarpTestServer : IAsyncDisposable
         Action<WarpWorkerBuilder<TestContext>>? configure,
         Action<IServiceCollection>? configureServices)
     {
+        TestLifecycleTrace.Record("WarpTestServer.StartAsync starting");
+
+        TestLifecycleTrace.Record("Fixture.CreateContext (probe) starting");
         var tempCtx = fixture.CreateContext();
         var baseConnectionString = tempCtx.Database.GetConnectionString()!;
         var isPostgres = tempCtx.Database.ProviderName?.Contains("Npgsql", StringComparison.Ordinal) == true;
         await tempCtx.DisposeAsync();
+        TestLifecycleTrace.Record("Fixture.CreateContext (probe) returned");
 
         // For SQL Server only: give each test-server instance its own ADO.NET connection pool by
         // appending a unique Application Name (which Microsoft.Data.SqlClient includes in the pool
@@ -143,6 +147,7 @@ public class WarpTestServer : IAsyncDisposable
             ? baseConnectionString
             : $"{baseConnectionString};Application Name=warp-test-{Guid.NewGuid():N}";
 
+        TestLifecycleTrace.Record("Host.Build starting");
         var host = Host.CreateDefaultBuilder()
             .ConfigureLogging(logging =>
             {
@@ -237,11 +242,13 @@ public class WarpTestServer : IAsyncDisposable
                 configureServices?.Invoke(services);
             })
             .Build();
+        TestLifecycleTrace.Record("Host.Build returned");
 
         var serverId = host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<WarpWorkerConfiguration>>().Value.ServerId;
         ServerLifecycleTrace.Record(serverId, "IHost.StartAsync starting");
         await host.StartAsync(Xunit.TestContext.Current.CancellationToken);
         ServerLifecycleTrace.Record(serverId, "IHost.StartAsync returned");
+        TestLifecycleTrace.Record($"WarpTestServer.StartAsync returned (server={serverId})");
 
         return new WarpTestServer(host, fixture);
     }
