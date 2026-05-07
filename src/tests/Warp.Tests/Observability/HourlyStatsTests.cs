@@ -235,6 +235,11 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         ctx.Set<Counter>().Add(new Counter { Key = "stats:succeeded", Value = 2 });
         ctx.Set<Counter>().Add(new Counter { Key = "stats:requeued", Value = 4 });
         ctx.Set<Counter>().Add(new Counter { Key = "addon:custom-metric", Value = 17 });
+
+        // Hourly-bucket rows (internal accounting for the chart) — must be hidden from the page.
+        ctx.Set<Statistic>().Add(new Statistic { Key = "stats:succeeded:2026-05-07-10", Value = 50 });
+        ctx.Set<Counter>().Add(new Counter { Key = "stats:failed:2026-05-07-11", Value = 2 });
+
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act

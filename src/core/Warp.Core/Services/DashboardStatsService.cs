@@ -378,11 +378,33 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             .ToListAsync();
 
         var merged = aggregated.Concat(pending)
+            .Where(x => !IsHourlyKey(x.Key))
             .GroupBy(x => x.Key, StringComparer.Ordinal)
             .Select(g => new CounterModel { Key = g.Key, Value = g.Sum(x => x.Value) })
             .OrderBy(x => x.Key, StringComparer.Ordinal);
 
         return [.. merged];
+    }
+
+    /// <summary>
+    /// Hourly bucket keys (e.g. <c>stats:succeeded:2026-05-07-10</c>) are internal accounting for
+    /// the historical chart, not user-facing counters. The Counters page only shows rolled-up
+    /// keys; the chart endpoint (<c>GetStatsHistory</c>) reads the hourly rows separately.
+    /// </summary>
+    private static bool IsHourlyKey(string key)
+    {
+        var lastColon = key.LastIndexOf(':');
+        if (lastColon < 0)
+        {
+            return false;
+        }
+
+        return DateTime.TryParseExact(
+            key.AsSpan(lastColon + 1),
+            "yyyy-MM-dd-HH",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out _);
     }
 
     /// <summary>
