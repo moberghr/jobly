@@ -4,24 +4,187 @@ sidebar_position: 6
 
 # Releases
 
-## Unreleased
+## 0.12.0 {#v0-12-0}
+
+*2026-05-07*
 
 ### New: Moberg.Warp.Http
 
-Optional package that exposes Warp `IRequest<TResponse>` and `IStreamRequest<TResponse>` handlers as ASP.NET Minimal API endpoints. Annotate the **handler class** with `[WarpHttpGet/Post/Put/Patch/Delete("/route")]`, call `services.AddWarpHttp()` + `app.MapWarpHttp()`, and the endpoint is live. Source-generated dispatch (no per-request reflection); independent of `Moberg.Warp.UI`.
+Optional package that exposes Warp `IRequest<TResponse>` and `IStreamRequest<TResponse>` handlers as ASP.NET Minimal API endpoints. Annotate the **handler class**, call `services.AddWarpHttp()` + `app.MapWarpHttp()`, and the endpoint is live. Source-generated dispatch (no per-request reflection); independent of `Moberg.Warp.UI`.
 
-- Binding handled by ASP.NET Minimal API — full support for `IParsable<T>`, `TryParse`, query arrays, route constraints (`{id:guid}`, `{year:int}`), `[AsParameters]`, etc. Use the standard `Microsoft.AspNetCore.Mvc.From*` attributes on request properties.
-- `IJob` and `IMessage` cannot be HTTP-exposed (compile-time `WHTTP001`). The recommended pattern is a thin `IRequest<Guid>` wrapper whose handler calls `IPublisher.Enqueue` — explicit semantics, no framework magic.
-- `IStreamRequest<T>` becomes a `text/event-stream` endpoint; `HttpContext.RequestAborted` cancellation propagates to the handler's enumerator.
-- Multi-attribute support for versioning aliases (each attribute requires `Name = "..."`).
-- Named groups via `Group = "..."` + `MapWarpHttp("group")` for selective registration on `app.MapGroup(...)` builders.
-- `[Authorize]` / `[AllowAnonymous]` on the handler class surface as standard ASP.NET endpoint metadata; group-level `RequireAuthorization()` composes naturally.
-- Optional `IHttpResponseShape` interface on response types lets domain DTOs override status / headers / Location without coupling handlers to ASP.NET.
-- Diagnostics: `WHTTP001` (invalid handler / IJob+IMessage rejection), `WHTTP002` (multi-attribute requires Name).
+#### Quick start
 
-Full docs at [features/http](features/http).
+Install `Moberg.Warp.Http` next to `Moberg.Warp.Core`, then tag handlers:
 
-## 0.11.0
+```csharp
+using Microsoft.AspNetCore.Mvc;          // [FromRoute], [FromQuery], [FromHeader], [FromBody]
+using Warp.Core.Handlers;
+using Warp.Http;
+
+public sealed record GetOrder([FromRoute] Guid Id) : IRequest<OrderDto>;
+
+[WarpHttpGet("/orders/{id}")]
+public sealed class GetOrderHandler : IRequestHandler<GetOrder, OrderDto>
+{
+    public Task<OrderDto> HandleAsync(GetOrder request, CancellationToken ct) =>
+        Task.FromResult(new OrderDto(request.Id, "pending"));
+}
+```
+
+Wire it up in `Program.cs` — independent of `Warp.UI`, composes with anything you already have:
+
+```csharp
+builder.Services.AddWarpHttp();
+
+var app = builder.Build();
+app.MapWarpHttp();      // null-group handlers
+app.Run();
+```
+
+`GET /orders/{id}` is now live. The handler runs through the same `IPipelineBehavior<TRequest, TResponse>` pipeline as `IMediator.Send` — anything you've registered for cross-cutting concerns (auth, logging, validation, telemetry) applies automatically.
+
+#### Binding leans entirely on ASP.NET Minimal API
+
+No custom parser. `IParsable<T>`, `TryParse`, query arrays, nullable types, route constraints, content negotiation — all of it works because the source generator emits a Minimal API delegate that hands `TRequest` to ASP.NET:
+
+```csharp
+public sealed record ListOrders(
+    [FromQuery] int Page,
+    [FromQuery] int PageSize,
+    [FromQuery] string[] Tags,                 // ?Tags=a&Tags=b → string[]
+    [FromHeader(Name = "X-Trace-Id")] string TraceId)
+    : IRequest<ListOrdersResponse>;
+
+[WarpHttpGet("/orders")]
+public sealed class ListOrdersHandler : IRequestHandler<ListOrders, ListOrdersResponse> { ... }
+```
+
+```csharp
+public sealed record GetOrderTyped([FromRoute] Guid Id) : IRequest<OrderDto>;
+
+[WarpHttpGet("/orders/{id:guid}")]                 // route constraint rejects non-GUIDs at routing time
+public sealed class GetOrderTypedHandler : IRequestHandler<GetOrderTyped, OrderDto> { ... }
+```
+
+For mixed route + body shapes, declare a class with `[FromRoute]` / `[FromBody]` properties:
+
+```csharp
+public sealed class SubmitOrder : IRequest<OrderDto>
+{
+    [FromRoute(Name = "tenantId")] public Guid TenantId { get; set; }
+    [FromBody]                     public SubmitOrderBody Body { get; set; } = new(string.Empty);
+}
+
+[WarpHttpPost("/orders/{tenantId}/submit")]
+public sealed class SubmitOrderHandler : IRequestHandler<SubmitOrder, OrderDto> { ... }
+```
+
+A whole-body POST DTO without per-property attributes also just works — ASP.NET binds `TRequest` from the JSON body directly.
+
+#### Streaming becomes Server-Sent Events
+
+`IStreamRequest<T>` handlers turn into `text/event-stream` endpoints. `HttpContext.RequestAborted` propagates to the handler's enumerator, so a client disconnect ends the loop:
+
+```csharp
+public sealed record OrderFeed([FromQuery] int Count) : IStreamRequest<OrderEvent>;
+
+[WarpHttpGet("/orders/feed")]
+public sealed class OrderFeedHandler : IStreamRequestHandler<OrderFeed, OrderEvent>
+{
+    public async IAsyncEnumerable<OrderEvent> HandleAsync(
+        OrderFeed request,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        for (var i = 0; i < request.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            yield return await NextEventAsync(ct);
+        }
+    }
+}
+```
+
+Each `yield return` becomes one `data: {...}\n\n` SSE frame.
+
+#### "Submit a job via HTTP"
+
+`IJob` and `IMessage` cannot be HTTP-exposed directly — the source generator rejects them at compile time with `WHTTP001`. The recommended pattern is a thin `IRequest<Guid>` wrapper whose handler calls `IPublisher.Enqueue`. Explicit, debuggable, no framework magic:
+
+```csharp
+public sealed record EnqueueReport(Guid TenantId) : IRequest<Guid>;
+
+[WarpHttpPost("/reports/generate")]
+public sealed class EnqueueReportHandler(IPublisher publisher)
+    : IRequestHandler<EnqueueReport, Guid>
+{
+    public async Task<Guid> HandleAsync(EnqueueReport req, CancellationToken ct)
+    {
+        var jobId = await publisher.Enqueue(new GenerateReportJob(req.TenantId));
+        await publisher.SaveChangesAsync(ct);
+        return jobId;                              // returns 200 with the job id JSON
+    }
+}
+```
+
+#### Auth, status codes, groups
+
+`[Authorize]` / `[AllowAnonymous]` on the handler class surface as endpoint metadata, so group-level `RequireAuthorization(...)` composes naturally:
+
+```csharp
+[Authorize(Policy = "OrdersWrite")]
+[WarpHttpPost("/orders/cancel")]
+public sealed class CancelOrderHandler : IRequestHandler<CancelOrder, Unit> { ... }
+```
+
+```csharp
+app.MapGroup("/api/public")
+   .RequireAuthorization("publicPolicy")
+   .MapWarpHttp("public");                        // only handlers with Group = "public"
+```
+
+Customize the response shape (status code, `Location` header) by implementing `IHttpResponseShape` on the response type — keeps the handler signature clean and the framework coupling localized:
+
+```csharp
+public sealed record CreatedOrder(Guid Id) : IHttpResponseShape
+{
+    public void Apply(HttpContext ctx)
+    {
+        ctx.Response.StatusCode = StatusCodes.Status201Created;
+        ctx.Response.Headers.Location = $"/orders/{Id}";
+    }
+}
+```
+
+Multi-attribute is supported for versioning aliases (each attribute needs `Name = "..."`):
+
+```csharp
+[WarpHttpPost("/v1/orders", Name = "CreateOrderV1")]
+[WarpHttpPost("/v2/orders", Name = "CreateOrderV2")]
+public sealed class CreateOrderHandler : IRequestHandler<CreateOrder, OrderDto> { ... }
+```
+
+#### Compile-time diagnostics
+
+| Code      | Trigger                                                            |
+|-----------|---------------------------------------------------------------------|
+| `WHTTP001` | Handler is invalid (request type implements `IJob` / `IMessage`, or handler doesn't implement a recognized request/stream interface). |
+| `WHTTP002` | Multi-attribute on a single handler without `Name = "..."` on every attribute. |
+
+#### Response semantics
+
+| Handler kind            | Status | Body                                       |
+|-------------------------|--------|--------------------------------------------|
+| `IRequest<TResponse>`   | 200    | JSON of `TResponse`                        |
+| `IRequest<Unit>`        | 204    | empty                                      |
+| `IStreamRequest<T>`     | 200    | `text/event-stream` (one `data:` per item) |
+
+Full docs at [features/http](features/http). Shipped in [#154](https://github.com/moberghr/warp/pull/154).
+
+### Test Suite Improvements
+
+- **HTTP request-isolation suite** — five concurrency tests bombard the in-memory test app with 200 parallel requests (50 for streaming) and assert per-request DI scope (N requests → N distinct `ScopeProbe` constructions), no `AsyncLocal<T>` bleed between handlers, no request-payload crossover, pipeline behaviors observe per-request inputs, and concurrent `IStreamRequest` endpoints emit only their own block of items.
+
+## 0.11.0 {#v0-11-0}
 
 *2026-05-06*
 
@@ -56,7 +219,7 @@ Stability release. No breaking API changes. Several latent product bugs surfaced
 
 ---
 
-## 0.10.0
+## 0.10.0 {#v0-10-0}
 
 *2026-04-27*
 
@@ -126,7 +289,7 @@ Breaking release because of both the rename and the removal of reflection-based 
 
 ---
 
-## 0.9.1
+## 0.9.1 {#v0-9-1}
 
 *2026-04-21*
 
@@ -141,7 +304,7 @@ Breaking release because of both the rename and the removal of reflection-based 
 
 ---
 
-## 0.9.0
+## 0.9.0 {#v0-9-0}
 
 *2026-04-21*
 
@@ -193,7 +356,7 @@ Breaking release because of the provider package split and the DI lambda API.
 
 ---
 
-## 0.8.0
+## 0.8.0 {#v0-8-0}
 
 *2026-04-19*
 
@@ -229,7 +392,7 @@ Breaking release because of the provider package split and the DI lambda API.
 
 ---
 
-## 0.7.0
+## 0.7.0 {#v0-7-0}
 
 *2026-04-17*
 
@@ -276,7 +439,7 @@ This is a large release with several breaking changes. Plan the upgrade accordin
 
 ---
 
-## 0.6.1
+## 0.6.1 {#v0-6-1}
 
 *2026-04-13*
 
@@ -290,7 +453,7 @@ This is a large release with several breaking changes. Plan the upgrade accordin
 
 ---
 
-## 0.6.0
+## 0.6.0 {#v0-6-0}
 
 *2026-04-12*
 
@@ -327,7 +490,7 @@ This release adds a new nullable `ParentSpanId` column to the Job table. Run an 
 
 ---
 
-## 0.5.0
+## 0.5.0 {#v0-5-0}
 
 *2026-04-09*
 
@@ -355,7 +518,7 @@ This release adds a new nullable `ParentSpanId` column to the Job table. Run an 
 
 ---
 
-## 0.4.0
+## 0.4.0 {#v0-4-0}
 
 *2026-04-08*
 
@@ -369,7 +532,7 @@ This release adds a new nullable `ParentSpanId` column to the Job table. Run an 
 
 ---
 
-## 0.3.0
+## 0.3.0 {#v0-3-0}
 
 *2026-04-07*
 
