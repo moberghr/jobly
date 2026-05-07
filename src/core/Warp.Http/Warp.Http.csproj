@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<PackageId>Moberg.Warp.Http</PackageId>
+		<Description>HTTP exposure for Warp IRequest&lt;T&gt; and IStreamRequest&lt;T&gt; handlers via attribute-based source generation.</Description>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Warp.Core\Warp.Core.csproj" />
+		<ProjectReference Include="..\Warp.Http.SourceGenerator\Warp.Http.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+	</ItemGroup>
+
+	<!-- Embed the source generator DLL into the NuGet package as a Roslyn analyzer.
+	     Without this, NuGet consumers of Moberg.Warp.Http get the runtime library but not
+	     the [WarpHttp...] discovery / dispatch generation. -->
+	<ItemGroup>
+		<None Include="..\Warp.Http.SourceGenerator\bin\$(Configuration)\netstandard2.0\Warp.Http.SourceGenerator.dll"
+		      Pack="true" PackagePath="analyzers/dotnet/cs/" Visible="false" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Warp.Tests" />
+	</ItemGroup>
+
+</Project>

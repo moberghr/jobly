@@ -18,6 +18,7 @@ dotnet add package Moberg.Warp.Core                  # Publisher + mediator
 dotnet add package Moberg.Warp.Provider.PostgreSql   # PostgreSQL provider (or SqlServer)
 dotnet add package Moberg.Warp.Worker                # Worker service
 dotnet add package Moberg.Warp.UI                    # Dashboard
+dotnet add package Moberg.Warp.Http                  # HTTP exposure for IRequest/IStreamRequest (optional)
 ```
 
 ## Setup

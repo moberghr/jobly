@@ -47,6 +47,7 @@ Warp ships as a small set of NuGet packages — pick the provider package that m
 | `Moberg.Warp.Provider.PostgreSql` | PostgreSQL provider (row-lock SQL, LISTEN/NOTIFY, locks)  |
 | `Moberg.Warp.Provider.SqlServer`  | SQL Server provider (row-lock SQL, Service Broker, locks) |
 | `Moberg.Warp.UI`                  | Dashboard UI (optional)                                   |
+| `Moberg.Warp.Http`                | Expose `IRequest<T>` / `IStreamRequest<T>` over HTTP (optional) |
 
 You only add the provider package for your database; Warp.Core no longer has a hard dependency on either EF provider.
 
@@ -403,6 +404,83 @@ SET    current_state = 7  -- State.Scheduled
 WHERE  current_state = 1  -- State.Enqueued
   AND  schedule_time > now();
 ```
+
+## HTTP Exposure (Warp.Http)
+
+`Moberg.Warp.Http` is an optional package that exposes Warp `IRequest<TResponse>` and `IStreamRequest<TResponse>` handlers as ASP.NET Minimal API endpoints — annotate the **handler class**, run `MapWarpHttp()`, you have an HTTP endpoint. Source-generated dispatch (no per-request reflection); independent of `Warp.UI`. Full docs at [features/http](https://moberghr.github.io/warp/docs/features/http).
+
+`IJob` and `IMessage` cannot be HTTP-exposed — write a thin `IRequest<Guid>` wrapper that calls `IPublisher.Enqueue` if you need "submit a job via HTTP".
+
+```csharp
+using Microsoft.AspNetCore.Mvc;          // [FromRoute], [FromQuery], [FromHeader], [FromBody]
+using Warp.Core.Handlers;
+using Warp.Http;
+
+// 1. Define request as a public contract; tag the HANDLER with the HTTP method + route.
+public sealed record GetOrder([FromRoute] Guid Id) : IRequest<OrderDto>;
+
+[WarpHttpGet("/orders/{id}")]
+public sealed class GetOrderHandler : IRequestHandler<GetOrder, OrderDto>
+{
+    public Task<OrderDto> HandleAsync(GetOrder request, CancellationToken ct) { ... }
+}
+
+// 2. Streaming — IStreamRequest<T> becomes a text/event-stream endpoint.
+public sealed record OrderFeed([FromQuery] int Count) : IStreamRequest<OrderEvent>;
+
+[WarpHttpGet("/orders/feed")]
+public sealed class OrderFeedHandler : IStreamRequestHandler<OrderFeed, OrderEvent> { ... }
+
+// 3. "Submit a job via HTTP" — IRequest<Guid> wrapper around IPublisher.Enqueue.
+public sealed record EnqueueReport(Guid TenantId) : IRequest<Guid>;
+
+[WarpHttpPost("/reports/generate")]
+public sealed class EnqueueReportHandler(IPublisher publisher) : IRequestHandler<EnqueueReport, Guid>
+{
+    public async Task<Guid> HandleAsync(EnqueueReport req, CancellationToken ct)
+    {
+        var jobId = await publisher.Enqueue(new GenerateReportJob(req.TenantId));
+        await publisher.SaveChangesAsync(ct);
+        return jobId;
+    }
+}
+
+// 4. Auth via standard ASP.NET attributes on the handler — surfaced as endpoint metadata.
+public sealed record CancelOrder(Guid Id) : IRequest<Unit>;
+
+[Authorize(Policy = "OrdersWrite")]
+[WarpHttpPost("/orders/cancel")]
+public sealed class CancelOrderHandler : IRequestHandler<CancelOrder, Unit> { ... }
+
+// 5. Custom status / Location via IHttpResponseShape on the response type.
+public sealed record CreatedOrder(Guid Id) : IHttpResponseShape
+{
+    public void Apply(HttpContext ctx)
+    {
+        ctx.Response.StatusCode = StatusCodes.Status201Created;
+        ctx.Response.Headers.Location = $"/orders/{Id}";
+    }
+}
+
+// 6. Registration.
+builder.Services.AddWarpHttp();
+app.MapWarpHttp();                                              // null-group handlers
+app.MapGroup("/api/public").RequireAuthorization("publicPolicy").MapWarpHttp("public");
+```
+
+**Binding** — handled by ASP.NET Minimal API. Use the standard `Microsoft.AspNetCore.Mvc` attributes: `[FromRoute]`, `[FromQuery]`, `[FromHeader]`, `[FromBody]`. ASP.NET handles `IParsable<T>`, `TryParse`, query arrays, content negotiation, etc. The whole-body POST DTO case (no per-property attributes) just works — ASP.NET binds `TRequest` from the JSON body directly.
+
+**Response semantics**
+
+| Handler kind            | Status | Body                                       |
+|-------------------------|--------|--------------------------------------------|
+| `IRequest<TResponse>`   | 200    | JSON of `TResponse`                        |
+| `IRequest<Unit>`        | 204    | empty                                      |
+| `IStreamRequest<T>`     | 200    | `text/event-stream` (one `data:` per item) |
+
+**Named groups** — `[WarpHttpPost("/x", Group = "public")]` on the handler, `app.MapWarpHttp("public")` to register strictly-matching descriptors. Calling `MapWarpHttp(group)` twice on the same builder with the same group throws.
+
+**Multi-attribute** — `AllowMultiple = true` on `WarpHttpAttribute`; multiple attributes require `Name = "..."` on each (`WHTTP002`). Useful for versioning aliases like `[WarpHttpPost("/v1/orders", Name="V1"), WarpHttpPost("/v2/orders", Name="V2")]`.
 
 ## How It Works
 

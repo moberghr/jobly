@@ -7,6 +7,7 @@ using Warp.Core.Handlers;
 using Warp.Core.Helper;
 using Warp.Core.Mutex;
 using Warp.Core.Retry;
+using Warp.Http;
 using Warp.Provider.PostgreSql;
 using Warp.Test.Shared;
 using Warp.UI;
@@ -21,6 +22,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddServices(builder.Configuration);
+builder.Services.AddWarpHttp();
 
 builder.Services.AddDataProtection();
 builder.Services.AddScoped<IWarpCredentialValidator, DemoCredentialValidator>();
@@ -72,6 +74,7 @@ app.UseCors();
 app.UseAuthorization();
 app.UseWarpUI(options => options.UseBuiltInLogin<DemoCredentialValidator>());
 app.MapControllers();
+app.MapWarpHttp();
 
 // Seed endpoint — creates a realistic demo workload
 var seedQueues = new[] { "a-critical", "b-default", "c-low" };

@@ -2,7 +2,7 @@
 
 > Distributed job processing, message queue, and in-memory mediator library for .NET 10. Three patterns, one unified pipeline, a real-time dashboard.
 
-Warp ships as three NuGet packages: Moberg.Warp.Core (publishing), Moberg.Warp.Worker (processing), and Moberg.Warp.UI (dashboard). Supports PostgreSQL and SQL Server. Uses the transactional outbox pattern — jobs are committed atomically with your business data.
+Warp ships as four NuGet packages: Moberg.Warp.Core (publishing), Moberg.Warp.Worker (processing), Moberg.Warp.UI (dashboard), and Moberg.Warp.Http (optional — exposes IRequest<T> / IStreamRequest<T> handlers as ASP.NET endpoints). Supports PostgreSQL and SQL Server. Uses the transactional outbox pattern — jobs are committed atomically with your business data.
 
 ## Docs
 
@@ -21,6 +21,7 @@ Warp ships as three NuGet packages: Moberg.Warp.Core (publishing), Moberg.Warp.W
 - [Configuration](https://moberghr.github.io/warp/docs/operations/configuration): Worker, polling, retention, dispatcher mode, worker groups, schema, naming conventions
 - [Crash Recovery](https://moberghr.github.io/warp/docs/operations/crash-recovery): Sliding invisibility timeout, keep-alive, stale job recovery
 - [Dashboard Auth](https://moberghr.github.io/warp/docs/operations/dashboard-auth): IWarpAuthorizationFilter, built-in login, cookie auth
+- [HTTP Endpoints](https://moberghr.github.io/warp/docs/features/http): Expose IRequest<T> / IStreamRequest<T> handlers as ASP.NET endpoints via [WarpHttp...] on handler classes
 
 ## Optional
 
