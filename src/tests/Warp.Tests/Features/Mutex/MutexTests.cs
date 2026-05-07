@@ -316,6 +316,17 @@ public abstract class MutexTestsBase : IAsyncLifetime
         log.ShouldNotBeNull();
         log.Message.ShouldContain("mutex");
         log.Message.ShouldContain("payment:wait");
+
+        // Counter row written for the requeue — surfaces in the dashboard's Requeued metric.
+        var requeuedCounter = await readCtx.Set<Counter>()
+            .Where(x => x.Key == "stats:requeued")
+            .SumAsync(x => x.Value, CancellationToken.None);
+        requeuedCounter.ShouldBe(1);
+
+        var hourlyCounter = await readCtx.Set<Counter>()
+            .Where(x => x.Key.StartsWith("stats:requeued:"))
+            .SumAsync(x => x.Value, CancellationToken.None);
+        hourlyCounter.ShouldBe(1);
     }
 
     [TimedFact]

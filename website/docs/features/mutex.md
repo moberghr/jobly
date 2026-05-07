@@ -6,6 +6,20 @@ sidebar_position: 4
 
 Mutexes prevent duplicate processing — only one job per key can be processing at a time. If a worker picks up a job whose mutex is already held, the job is either cancelled or requeued depending on the configured `MutexMode`.
 
+## Guarantees and limits
+
+What Mutex **does** guarantee:
+
+- **Mutual exclusion per key** — at most one job per key in `Processing` state at any moment, across all workers and servers (enforced by `IWarpLockProvider`).
+- **Zero overhead** for jobs that don't set a key — the pipeline behavior short-circuits before touching the lock provider.
+
+What Mutex **does not** guarantee:
+
+- **No execution order across jobs sharing a key.** Neither mode preserves submission order. In `Skip` mode the loser is dropped, so order is moot. In `Wait` mode multiple workers race on the requeue write, so the order in which queued jobs eventually run can drift from submission order under contention. For light, bursty traffic the requeue timestamps usually keep things roughly in order, but this is best-effort and **not part of the contract**.
+- **No fairness or starvation prevention.** A constantly re-arriving stream of jobs for the same key can starve a long-blocked one indefinitely (whichever job a worker happens to pick wins).
+
+If you need strict FIFO per key, Mutex isn't the right primitive — that requires fetch-time filtering, which Warp doesn't currently expose.
+
 ## Setup
 
 Mutex is an opt-in addon. Register it inside the `AddWarpWorker` lambda:
@@ -68,12 +82,6 @@ public class HandleTelegramUpdate : IJob
     public int UserId { get; set; }
 }
 ```
-
-### Ordering caveat
-
-`Wait` provides **mutual exclusion only** — at most one job per key runs at a time. It does **not** guarantee strict FIFO across requeued jobs. Multiple workers race on the requeue write, so under sustained contention the order in which queued jobs eventually run can drift from their original submission order. For Telegram-bot-style traffic where contention is shallow (a single user firing a few messages), the requeue timestamps usually preserve order in practice, but this is best-effort and not part of the contract.
-
-If you need strict FIFO per key, this isn't the right primitive.
 
 ## How It Works
 

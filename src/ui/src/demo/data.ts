@@ -202,6 +202,7 @@ export function getDashboardStats(): DashboardStatistics {
     totalSucceeded: base + added,
     totalFailed: 47 + addedFailed,
     totalDeleted: 62,
+    totalRequeued: 18,
     totalCreated: 15847 + added + addedFailed,
     batches: 34,
     databaseConnection: 'PostgreSQL',
@@ -235,6 +236,7 @@ export function getStatsHistoryPoints(hours: number): StatsHistoryPoint[] {
       hour: hourDate.toISOString(),
       succeeded: Math.round(base),
       failed: Math.round(base * (0.01 + seeded(i + 50) * 0.04)),
+      requeued: Math.round(base * (0.005 + seeded(i + 60) * 0.02)),
     };
   });
 }

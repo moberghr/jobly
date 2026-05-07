@@ -84,6 +84,11 @@ public sealed class ExpirationCleanup<TContext> : IServerTask
                         && x.Key.CompareTo($"stats:failed:{oldHourPrefix}") < 0)
             .ExecuteDeleteAsync(ct);
 
+        await _context.Set<Statistic>()
+            .Where(x => x.Key.StartsWith("stats:requeued:")
+                        && x.Key.CompareTo($"stats:requeued:{oldHourPrefix}") < 0)
+            .ExecuteDeleteAsync(ct);
+
         var serverTasks = await _context.Set<ServerTask>()
             .Select(x => new { x.Id, x.IntervalSeconds })
             .ToListAsync(ct);

@@ -211,6 +211,7 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         ctx.Set<Statistic>().Add(new Statistic { Key = "stats:succeeded", Value = 42 });
         ctx.Set<Statistic>().Add(new Statistic { Key = "stats:failed", Value = 7 });
         ctx.Set<Statistic>().Add(new Statistic { Key = "stats:deleted", Value = 3 });
+        ctx.Set<Statistic>().Add(new Statistic { Key = "stats:requeued", Value = 11 });
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
@@ -221,5 +222,6 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         status.TotalSucceeded.ShouldBe(42);
         status.TotalFailed.ShouldBe(7);
         status.TotalDeleted.ShouldBe(3);
+        status.TotalRequeued.ShouldBe(11);
     }
 }
