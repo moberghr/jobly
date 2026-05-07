@@ -27,21 +27,29 @@ public class SqlServerClassFixture : IAsyncLifetime, IDatabaseFixture
 
     public async ValueTask InitializeAsync()
     {
+        TestLifecycleTrace.Record("SqlServerClassFixture.InitializeAsync starting");
         var databaseName = $"warp_t_{Guid.NewGuid():N}";
+
+        TestLifecycleTrace.Record("SharedSqlServerContainer.CreateDatabaseAsync starting");
         _connectionString = await SharedSqlServerContainer.CreateDatabaseAsync(
             databaseName,
             EnableServiceBroker,
             Xunit.TestContext.Current.CancellationToken);
+        TestLifecycleTrace.Record("SharedSqlServerContainer.CreateDatabaseAsync returned");
 
+        TestLifecycleTrace.Record("EnsureCreatedAsync starting");
         await using var context = CreateContext();
         await context.Database.EnsureCreatedAsync(Xunit.TestContext.Current.CancellationToken);
+        TestLifecycleTrace.Record("EnsureCreatedAsync returned");
 
+        TestLifecycleTrace.Record("Respawner.CreateAsync starting");
         await using var conn = new SqlConnection(_connectionString);
         await conn.OpenAsync(Xunit.TestContext.Current.CancellationToken);
         _respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.SqlServer,
         });
+        TestLifecycleTrace.Record("Respawner.CreateAsync returned");
     }
 
     public async Task ResetAsync()
