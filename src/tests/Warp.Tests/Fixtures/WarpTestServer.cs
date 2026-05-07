@@ -221,7 +221,7 @@ public class WarpTestServer : IAsyncDisposable
 
                     config.AddRetry(o =>
                     {
-                        o.MaxRetries = 3;
+                        o.MaxRetries = 1;
                         o.Delays = [1];
                     });
                     config.AddMutex();
