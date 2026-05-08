@@ -241,7 +241,11 @@ public class MediatorSpanTests
     {
         using var harness = new ActivityListenerHarness();
         using var meterRecorder = new MeterRecorder("warp.mediator.duration");
-        using var counterRecorder = new UpDownRecorder("warp.mediator.in_flight");
+
+        // Filter to this test's request type — the in_flight UpDownCounter is process-wide
+        // and other parallel tests using a different request type would otherwise contaminate
+        // the running sum.
+        using var counterRecorder = new UpDownRecorder("warp.mediator.in_flight", "request_type", "CountStream");
         var mediator = BuildMediator(s => s.AddTransient<IStreamRequestHandler<CountStream, int>, CountStreamHandler>());
 
         await foreach (var item in mediator.CreateStream(new CountStream { Count = 100 }))
@@ -278,7 +282,8 @@ public class MediatorSpanTests
     [TimedFact]
     public async Task Send_InFlightCounter_IncrementsOnEntryDecrementsOnExit()
     {
-        using var counterRecorder = new UpDownRecorder("warp.mediator.in_flight");
+        // Filter to this test's request type — see CreateStream_EarlyBreak for rationale.
+        using var counterRecorder = new UpDownRecorder("warp.mediator.in_flight", "request_type", "MedSpanEcho");
         var mediator = BuildMediator(s => s.AddTransient<IRequestHandler<MedSpanEcho, string>, EchoHandler>());
 
         await mediator.Send(new MedSpanEcho { Value = "x" });
@@ -329,13 +334,22 @@ public class MediatorSpanTests
     private sealed class UpDownRecorder : IDisposable
     {
         private readonly MeterListener _listener = new();
+        private readonly string? _filterTagKey;
+        private readonly string? _filterTagValue;
         private long _sum;
         private long _positive;
         private long _negative;
         private readonly Lock _lock = new();
 
-        public UpDownRecorder(string instrumentName)
+        // `MeterListener` captures measurements process-wide. When NoDb tests run in parallel
+        // and another test increments/decrements `warp.mediator.in_flight` for a different
+        // request type, the unfiltered sum becomes nondeterministic. The optional tag filter
+        // lets callers scope the recorder to a specific request type (e.g. "CountStream"),
+        // so this test's accumulator only sees its own measurements.
+        public UpDownRecorder(string instrumentName, string? filterTagKey = null, string? filterTagValue = null)
         {
+            _filterTagKey = filterTagKey;
+            _filterTagValue = filterTagValue;
             _listener.InstrumentPublished = (instrument, mli) =>
             {
                 if (string.Equals(instrument.Meter.Name, WarpTelemetry.ServiceName, StringComparison.Ordinal)
@@ -344,8 +358,27 @@ public class MediatorSpanTests
                     mli.EnableMeasurementEvents(instrument);
                 }
             };
-            _listener.SetMeasurementEventCallback<long>((_, value, _, _) =>
+            _listener.SetMeasurementEventCallback<long>((_, value, tags, _) =>
             {
+                if (_filterTagKey != null)
+                {
+                    var matched = false;
+                    foreach (var t in tags)
+                    {
+                        if (string.Equals(t.Key, _filterTagKey, StringComparison.Ordinal)
+                            && string.Equals(t.Value?.ToString(), _filterTagValue, StringComparison.Ordinal))
+                        {
+                            matched = true;
+                            break;
+                        }
+                    }
+
+                    if (!matched)
+                    {
+                        return;
+                    }
+                }
+
                 lock (_lock)
                 {
                     _sum += value;

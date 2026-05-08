@@ -93,6 +93,41 @@ public class WarpTestServer : IAsyncDisposable
     }
 
     /// <summary>
+    /// Synchronously runs the Orchestrator task once — finalizes parents whose children have
+    /// all reached terminal state, activates continuations, fails children of deleted parents.
+    /// Use after a state change that should trigger orchestration (e.g. a job reaching Failed)
+    /// when the test config has disabled the auto Orchestrator (<c>OrchestrationInterval = null</c>),
+    /// so that "did/didn't activate the continuation" is decided by an explicit tick rather than
+    /// a wall-clock <c>Task.Delay</c>. Bypasses the <see cref="ServerTaskHost{TContext}"/>
+    /// distributed-lock guard — only safe when no auto-orchestrator is running concurrently.
+    /// </summary>
+    public async Task<string?> RunOrchestratorOnceAsync(CancellationToken ct = default)
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var orchestrator = scope.ServiceProvider
+            .GetServices<Warp.Worker.Services.IServerTask>()
+            .OfType<Warp.Worker.Services.Orchestrator<TestContext>>()
+            .Single();
+        return await orchestrator.ExecuteAsync(ct);
+    }
+
+    /// <summary>
+    /// Synchronously runs the MessageRouter task once — discovers handlers for any
+    /// <c>Kind=Message</c> rows in <see cref="State.Enqueued"/> and creates child handler jobs.
+    /// Use when the test config has disabled the auto MessageRouter so message routing is
+    /// driven by explicit ticks. Bypasses the host lock guard — only safe with the auto loop off.
+    /// </summary>
+    public async Task<string?> RunMessageRouterOnceAsync(CancellationToken ct = default)
+    {
+        await using var scope = _host.Services.CreateAsyncScope();
+        var router = scope.ServiceProvider
+            .GetServices<Warp.Worker.Services.IServerTask>()
+            .OfType<Warp.Worker.Services.MessageRouter<TestContext>>()
+            .Single();
+        return await router.ExecuteAsync(ct);
+    }
+
+    /// <summary>
     /// Polls until the PauseStateHolder reflects the expected paused/resumed state for a group.
     /// Use instead of Task.Delay after calling pause/resume APIs.
     /// </summary>

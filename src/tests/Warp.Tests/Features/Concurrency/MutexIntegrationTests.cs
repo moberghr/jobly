@@ -21,17 +21,22 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenTwoJobsWithSameMutex_WhenProcessed_ThenSecondIsCancelled()
     {
-        await using var server = await WarpTestServer.StartAsync(Fixture);
+        var barrier = new BarrierSignal();
+
+        await using var server = await WarpTestServer.StartAsync(Fixture, cfg => cfg.Services.AddSingleton(barrier));
         var publisher = server.CreatePublisher();
 
-        // Enqueue a slow job that holds the mutex
-        var job1Id = await publisher.Enqueue(new CancellableRequest(), new JobParameters().WithMutex("test-mutex"));
+        // Enqueue a barrier-blocked job that holds the mutex while inside its handler
+        var job1Id = await publisher.Enqueue(new BarrierRequest(), new JobParameters().WithMutex("test-mutex"));
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Wait for it to start processing
-        await server.WaitForJobState(job1Id, State.Processing);
+        // Wait for the handler to *enter* — MutexPipelineBehavior calls next() only after
+        // TryAcquireAsync succeeds, so this signal proves the lock is held. Removes the race
+        // window that a `WaitForJobState(Processing)` check has, where State=Processing is
+        // committed *before* the pipeline runs.
+        await barrier.Running.WaitAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Enqueue a second job with the same mutex
+        // Enqueue a second job with the same mutex — must short-circuit to Deleted
         var publisher2 = server.CreatePublisher();
         var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("test-mutex"));
         await publisher2.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
@@ -42,15 +47,13 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
         var logs = await server.GetJobLogs(job2Id);
         logs.ShouldContain(l => l.EventType == "Deleted" && l.Message.Contains("Cancelled", StringComparison.Ordinal));
 
-        // Job1 should still be processing (it's the slow one)
+        // Job1 still in handler (held by barrier)
         var job1 = await server.GetJob(job1Id);
         job1.CurrentState.ShouldBe(State.Processing);
 
-        // Cancel the slow job and wait for it to fully terminate before the server disposes,
-        // so dispose isn't blocked by the in-flight handler.
-        var cmd = server.CreateCommandService();
-        await cmd.DeleteJob(job1Id);
-        await server.WaitForJobState(job1Id, State.Deleted, timeout: TimeSpan.FromSeconds(5));
+        // Release the barrier and let job1 complete naturally before disposal
+        barrier.CanFinish.Release();
+        await server.WaitForCompletion();
     }
 
     [TimedFact(20_000)]

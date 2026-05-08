@@ -165,13 +165,18 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
+        var beforeScheduler = DateTime.UtcNow;
         await Warp.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
-        // Assert — NextExecution should be updated to a future time
+        // Assert — NextExecution is computed from the scheduler's `now` via cron.GetNextOccurrence,
+        // which returns a strictly-future occurrence relative to that `now`. Compare against the
+        // time captured before invoking the scheduler — comparing against a fresh DateTime.UtcNow
+        // flakes when the scheduler runs just before a cron minute boundary (e.g. scheduler at
+        // 15:55:59.99x → NextExecution = 15:56:00.000 < fresh UtcNow at 15:56:00.0329).
         var readCtx = _fixture.CreateContext();
         var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "next-exec-test", Xunit.TestContext.Current.CancellationToken);
         rj.NextExecution.ShouldNotBeNull();
-        rj.NextExecution.Value.ShouldBeGreaterThan(DateTime.UtcNow);
+        rj.NextExecution.Value.ShouldBeGreaterThan(beforeScheduler);
     }
 
     [TimedFact]
@@ -308,13 +313,16 @@ public abstract class RecurringJobEdgeCaseTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
+        var beforeScheduler = DateTime.UtcNow;
         await Warp.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
-        // Assert
+        // Assert — compare against the pre-scheduler timestamp, not a fresh DateTime.UtcNow:
+        // cron `* * * * *` produces minute-boundary times, so a scheduler invocation at
+        // 15:55:59.99x computes NextExecution = 15:56:00.000, which is < UtcNow at assertion.
         var readCtx = _fixture.CreateContext();
         var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "disabled-next-exec-test", Xunit.TestContext.Current.CancellationToken);
         rj.NextExecution.ShouldNotBeNull();
-        rj.NextExecution.Value.ShouldBeGreaterThan(DateTime.UtcNow);
+        rj.NextExecution.Value.ShouldBeGreaterThan(beforeScheduler);
     }
 
     [TimedFact]

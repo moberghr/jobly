@@ -15,4 +15,14 @@ public interface IDatabaseExceptionClassifier
     /// violation (PG SQLSTATE 23505, SQL Server error 2627/2601).
     /// </summary>
     bool IsUniqueConstraintViolation(DbUpdateException ex);
+
+    /// <summary>
+    /// True if the given exception (anywhere in its <see cref="Exception.InnerException"/> chain)
+    /// is a transient deadlock or serialization conflict that the caller can resolve by retrying
+    /// the transaction: SQL Server error 1205 (deadlock victim), PG SQLSTATE 40P01
+    /// (deadlock_detected) or 40001 (serialization_failure). Walks the chain because EF Core
+    /// wraps provider exceptions in <see cref="DbUpdateException"/> for SaveChanges-paths but
+    /// not for <c>BeginTransactionAsync</c> / <c>CommitAsync</c>.
+    /// </summary>
+    bool IsTransientDeadlock(Exception ex);
 }

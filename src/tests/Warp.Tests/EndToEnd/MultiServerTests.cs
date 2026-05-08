@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Warp.Core;
 using Warp.Core.Concurrency;
@@ -26,129 +27,129 @@ public abstract class MultiServerTestsBase : IntegrationTestBase
         => config.WorkerCount = 3;
 
     [TimedFact]
-    public async Task GivenManyJobs_WithTwoServers_ThenEachJobProcessedExactlyOnce()
+    public async Task GivenTwoBarrierJobs_WithTwoServers_ThenClaimedExactlyOnceAcrossServers()
     {
-        await using var server1 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
-        await using var server2 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+        // Deterministic cross-server claim test: 2 jobs, 2 servers × 3 workers each (6 workers
+        // total competing). The barrier handler signals on entry and blocks; once two Running
+        // signals fire, two distinct workers (across the two servers) hold the two jobs in
+        // Processing state. A third Running signal would prove duplicate cross-server claim.
+        // Per-job assertions then confirm exactly one Processing log row per job — duplicate
+        // claim by both servers would produce two.
+        var barrier = new BarrierSignal();
+        Action<WarpWorkerBuilder<TestContext>> withBarrier = cfg =>
+        {
+            Configure3Workers(cfg);
+            cfg.Services.AddSingleton(barrier);
+        };
+
+        await using var server1 = await WarpTestServer.StartAsync(Fixture, withBarrier);
+        await using var server2 = await WarpTestServer.StartAsync(Fixture, withBarrier);
 
         var publisher = server1.CreatePublisher();
-        var jobIds = new List<Guid>();
-        for (var i = 0; i < 50; i++)
-        {
-            jobIds.Add(await publisher.Enqueue(new CounterRequest()));
-        }
-
+        var job1Id = await publisher.Enqueue(new BarrierRequest());
+        var job2Id = await publisher.Enqueue(new BarrierRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await server1.WaitForCompletion();
+        // Both handlers must enter — proves both jobs claimed across the 6-worker pool
+        await barrier.Running.WaitAsync(Xunit.TestContext.Current.CancellationToken);
+        await barrier.Running.WaitAsync(Xunit.TestContext.Current.CancellationToken);
+
+        // No third worker can enter — only two jobs exist. Wait long enough for either server's
+        // next polling cycle (PollingInterval = 100ms in test config) to surface a duplicate
+        // cross-server claim if one were possible.
+        var spuriousEntry = await barrier.Running.WaitAsync(TimeSpan.FromMilliseconds(300), Xunit.TestContext.Current.CancellationToken);
+        spuriousEntry.ShouldBeFalse("Only two workers should be in the handler; a third entry indicates duplicate cross-server claim");
 
         var ctx = Fixture.CreateContext();
-
-        // All 50 jobs should be completed
-        var completedCount = await ctx.Set<Job>()
-            .Where(x => jobIds.Contains(x.Id))
-            .Where(x => x.CurrentState == State.Completed)
-            .CountAsync(Xunit.TestContext.Current.CancellationToken);
-        completedCount.ShouldBe(50);
-
-        // No stuck jobs
-        var activeCount = await ctx.Set<Job>()
-            .Where(x => jobIds.Contains(x.Id))
-            .Where(x => x.CurrentState == State.Enqueued
-                || x.CurrentState == State.Processing
-                || x.CurrentState == State.Awaiting)
-            .CountAsync(Xunit.TestContext.Current.CancellationToken);
-        activeCount.ShouldBe(0);
-
-        // Each job processed exactly once — one Processing log and one Completed log per job
-        foreach (var jobId in jobIds)
+        foreach (var jobId in new[] { job1Id, job2Id })
         {
-            var processingLogs = await ctx.Set<JobLog>()
-                .Where(x => x.JobId == jobId)
-                .Where(x => x.EventType == "Processing")
-                .CountAsync(Xunit.TestContext.Current.CancellationToken);
-            processingLogs.ShouldBe(1, $"Job {jobId} should have exactly one Processing log");
+            var job = await ctx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
+            job.CurrentState.ShouldBe(State.Processing);
+            job.CurrentWorkerId.ShouldNotBeNull();
 
-            var completedLogs = await ctx.Set<JobLog>()
-                .Where(x => x.JobId == jobId)
-                .Where(x => x.EventType == "Completed")
-                .CountAsync(Xunit.TestContext.Current.CancellationToken);
+            var processingLogs = await ctx.Set<JobLog>()
+                .CountAsync(l => l.JobId == jobId && l.EventType == "Processing", Xunit.TestContext.Current.CancellationToken);
+            processingLogs.ShouldBe(1, $"Job {jobId} should have exactly one Processing log");
+        }
+
+        // Two distinct workers hold the jobs (no single-worker double-claim)
+        var workerIds = await ctx.Set<Job>()
+            .Where(j => j.Id == job1Id || j.Id == job2Id)
+            .Select(j => j.CurrentWorkerId)
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
+        workerIds.Distinct().Count().ShouldBe(2, "Two jobs must be processed by two distinct workers");
+
+        barrier.CanFinish.Release(2);
+        await server1.WaitForCompletion();
+
+        var readCtx = Fixture.CreateContext();
+        foreach (var jobId in new[] { job1Id, job2Id })
+        {
+            var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
+            job.CurrentState.ShouldBe(State.Completed);
+
+            var completedLogs = await readCtx.Set<JobLog>()
+                .CountAsync(l => l.JobId == jobId && l.EventType == "Completed", Xunit.TestContext.Current.CancellationToken);
             completedLogs.ShouldBe(1, $"Job {jobId} should have exactly one Completed log");
         }
     }
 
     [TimedFact]
-    public async Task GivenMessages_WithTwoServers_ThenEachRoutedExactlyOnce()
+    public async Task GivenMessage_WithTwoServers_ThenRoutedExactlyOnceUnderLockProtectedRouting()
     {
+        // Cross-server message-routing contract: with two servers' auto-routers competing for
+        // the `warp:message-routing` distributed lock, a published message routes to exactly
+        // one set of handler jobs. Production correctness here comes entirely from the lock —
+        // the per-row `FOR NO KEY UPDATE SKIP LOCKED` releases its lock as soon as the SELECT
+        // returns, so without the distributed lock, both routers would see the same Enqueued
+        // row and create duplicate children. A single message is enough: every additional
+        // message just multiplies the same lock-protected operation. WaitForCompletion proves
+        // the routing + handler-execution + finalization cycle ran cleanly across both servers.
         await using var server1 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
         await using var server2 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
 
         var publisher = server1.CreatePublisher();
-        var messageIds = new List<Guid>();
-        for (var i = 0; i < 10; i++)
-        {
-            messageIds.Add(await publisher.Publish(new SingleHandlerMessage()));
-        }
-
+        var messageId = await publisher.Publish(new SingleHandlerMessage());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await server1.WaitForCompletion();
 
         var ctx = Fixture.CreateContext();
 
-        // Each message should be completed
-        foreach (var messageId in messageIds)
-        {
-            var message = await ctx.Set<Job>()
-                .Where(x => x.Id == messageId)
-                .FirstAsync(Xunit.TestContext.Current.CancellationToken);
-            message.CurrentState.ShouldBe(State.Completed);
-            message.Kind.ShouldBe(JobKind.Message);
+        // Exactly one child handler job — a broken lock would let both routers create one each.
+        var childCount = await ctx.Set<Job>()
+            .Where(x => x.ParentJobId == messageId && x.Kind == JobKind.Job)
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
+        childCount.ShouldBe(1, $"Message {messageId} must have exactly 1 child");
 
-            // Each message should have exactly 1 child job (SingleHandlerMessage has 1 handler)
-            // If message routing ran twice, there would be 2 children
-            var childCount = await ctx.Set<Job>()
-                .Where(x => x.ParentJobId == messageId)
-                .Where(x => x.Kind == JobKind.Job)
-                .CountAsync(Xunit.TestContext.Current.CancellationToken);
-            childCount.ShouldBe(1, $"Message {messageId} should have exactly 1 child job (not double-routed)");
-        }
+        var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
+        message.CurrentState.ShouldBe(State.Completed);
+        message.Kind.ShouldBe(JobKind.Message);
     }
 
     [TimedFact]
-    public async Task GivenMultiHandlerMessage_WithTwoServers_ThenCorrectChildCount()
+    public async Task GivenMultiHandlerMessage_WithTwoServers_ThenChildCountIsExactlyHandlerCount()
     {
+        // Multi-handler version of the lock-protected routing test. MultiRequest declares two
+        // handler types; a correctly-serialized router produces exactly two child handler jobs.
+        // A double-route would produce four.
         await using var server1 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
         await using var server2 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
 
         var publisher = server1.CreatePublisher();
-        var messageIds = new List<Guid>();
-        for (var i = 0; i < 5; i++)
-        {
-            messageIds.Add(await publisher.Publish(new MultiRequest()));
-        }
-
+        var messageId = await publisher.Publish(new MultiRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await server1.WaitForCompletion();
 
         var ctx = Fixture.CreateContext();
+        var childCount = await ctx.Set<Job>()
+            .Where(x => x.ParentJobId == messageId && x.Kind == JobKind.Job)
+            .CountAsync(Xunit.TestContext.Current.CancellationToken);
+        childCount.ShouldBe(2, $"MultiRequest must have exactly 2 children");
 
-        foreach (var messageId in messageIds)
-        {
-            var message = await ctx.Set<Job>()
-                .Where(x => x.Id == messageId)
-                .FirstAsync(Xunit.TestContext.Current.CancellationToken);
-            message.CurrentState.ShouldBe(State.Completed);
-
-            // MultiRequest has 2 handlers (MultiHandlerA + MultiHandlerB)
-            // If routing ran twice, there would be 4 children
-            var childCount = await ctx.Set<Job>()
-                .Where(x => x.ParentJobId == messageId)
-                .Where(x => x.Kind == JobKind.Job)
-                .CountAsync(Xunit.TestContext.Current.CancellationToken);
-            childCount.ShouldBe(2, $"Message {messageId} should have exactly 2 children (not double-routed)");
-        }
+        var message = await ctx.Set<Job>().FirstAsync(j => j.Id == messageId, Xunit.TestContext.Current.CancellationToken);
+        message.CurrentState.ShouldBe(State.Completed);
     }
 
     // Multi-server batch + continuation (20+3 jobs across 2 servers) — waits on distributed
@@ -250,37 +251,46 @@ public abstract class MultiServerTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenMutexJobs_WithTwoServers_ThenMutexEnforcedAcrossServers()
     {
-        await using var server1 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
-        await using var server2 = await WarpTestServer.StartAsync(Fixture, Configure3Workers);
+        // Use BarrierRequest so we can wait for job1's handler to *enter* — that proves
+        // MutexPipelineBehavior.TryAcquireAsync already succeeded (the pipeline calls next()
+        // only after a successful acquire). Without this, WaitForJobState(Processing) returns
+        // before the pipeline runs (state is committed by the worker before pipeline behaviors
+        // execute), and publishing job2 in that window races job1's mutex acquisition.
+        var barrier = new BarrierSignal();
+        Action<WarpWorkerBuilder<TestContext>> withBarrier = cfg =>
+        {
+            Configure3Workers(cfg);
+            cfg.Services.AddSingleton(barrier);
+        };
 
-        // Enqueue a slow job that holds the mutex — published via server1
+        await using var server1 = await WarpTestServer.StartAsync(Fixture, withBarrier);
+        await using var server2 = await WarpTestServer.StartAsync(Fixture, withBarrier);
+
+        // Job1 published via server1, holds the mutex while blocked at the barrier
         var publisher1 = server1.CreatePublisher();
-        var job1Id = await publisher1.Enqueue(new CancellableRequest(), new JobParameters().WithMutex("multi-server-mutex"));
+        var job1Id = await publisher1.Enqueue(new BarrierRequest(), new JobParameters().WithMutex("multi-server-mutex"));
         await publisher1.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Wait for it to start processing
-        await server1.WaitForJobState(job1Id, State.Processing);
+        // Wait for job1's handler to enter — lock is now provably held
+        await barrier.Running.WaitAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Enqueue a second job with the same mutex — published via server2
+        // Publish job2 via server2 with the same mutex — must short-circuit to Deleted
         var publisher2 = server2.CreatePublisher();
         var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("multi-server-mutex"));
         await publisher2.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Job2 should be deleted due to mutex (regardless of which server picks it up).
         await server1.WaitForJobState(job2Id, State.Deleted);
 
-        // Verify the mutex violation was logged
         var logs = await server1.GetJobLogs(job2Id);
         logs.ShouldContain(x => x.EventType == "Deleted" && x.Message.Contains("mutex"));
 
-        // Job1 should still be processing
+        // Job1 still in handler (held by barrier)
         var job1 = await server1.GetJob(job1Id);
         job1.CurrentState.ShouldBe(State.Processing);
 
-        // Cancel the slow job and wait for it to be deleted so it doesn't leak into subsequent tests
-        var cmd = server1.CreateCommandService();
-        await cmd.DeleteJob(job1Id);
-        await server1.WaitForJobState(job1Id, State.Deleted, timeout: TimeSpan.FromSeconds(5));
+        // Release barrier and let job1 complete naturally before disposal
+        barrier.CanFinish.Release();
+        await server1.WaitForCompletion();
     }
 
     // Multi-server complex workload (50+ jobs: simple + messages + failing + retries +

@@ -106,9 +106,22 @@ public class WarpWorkerConfiguration : WarpConfiguration
     /// </summary>
     public TimeSpan? RecurringJobSchedulerInterval { get; set; } = TimeSpan.FromSeconds(15);
 
-    public TimeSpan OrchestrationInterval { get; set; } = TimeSpan.FromSeconds(10);
+    /// <summary>
+    /// How often the <see cref="Services.Orchestrator{TContext}"/> task runs to finalize
+    /// parents whose children all reached terminal state, activate continuations, and fail
+    /// children of deleted parents. Set to <c>null</c> to disable the periodic auto-loop —
+    /// orchestration is then driven entirely by <c>JobFinalized</c> push signals plus any
+    /// explicit ticks (e.g. <c>WarpTestServer.RunOrchestratorOnceAsync</c> in tests).
+    /// </summary>
+    public TimeSpan? OrchestrationInterval { get; set; } = TimeSpan.FromSeconds(10);
 
-    public TimeSpan MessageRoutingInterval { get; set; } = TimeSpan.FromSeconds(1);
+    /// <summary>
+    /// How often the <see cref="Services.MessageRouter{TContext}"/> task runs to discover
+    /// handlers for newly-enqueued <c>Kind=Message</c> rows. Set to <c>null</c> to disable
+    /// the periodic auto-loop — routing is then driven entirely by <c>MessageEnqueued</c>
+    /// push signals plus any explicit ticks.
+    /// </summary>
+    public TimeSpan? MessageRoutingInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     /// <summary>
     /// How often the scheduled-job activation task checks for rows in <see cref="Core.Enums.State.Scheduled"/>

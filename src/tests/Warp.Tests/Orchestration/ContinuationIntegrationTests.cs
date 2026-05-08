@@ -3,6 +3,8 @@ using Shouldly;
 using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
+using Warp.Core.Helper;
+using Warp.Core.Retry;
 using Warp.Tests.Fixtures;
 using Warp.Tests.TestData.Handlers;
 
@@ -40,18 +42,31 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenParentJobThatFails_WhenDefaultOnlyOnSucceeded_ThenChildStaysAwaiting()
     {
-        await using var server = await WarpTestServer.StartAsync(Fixture);
+        // Disable the auto-orchestrator so we control exactly when orchestration runs. With the
+        // 100ms auto-tick the test would have to Task.Delay long enough to "be sure" the
+        // continuation didn't activate; instead we run the orchestrator a deterministic number
+        // of times via RunOrchestratorOnceAsync and assert state after each tick.
+        await using var server = await WarpTestServer.StartAsync(Fixture, cfg => cfg.OrchestrationInterval = null);
         var publisher = server.CreatePublisher();
-        var parentId = await publisher.Enqueue(new ThrowExceptionRequest());
+
+        // WarpTestServer registers AddRetry(MaxRetries=3, Delays=[1]). Without disabling retry
+        // for this parent, ThrowExceptionRequest goes through 3 retry rounds (~4-6s of
+        // back-and-forth Scheduled/Processing) before reaching Failed — racing the test's
+        // wait. The test's contract is "parent fails → child stays Awaiting"; bypassing retry
+        // on the parent is the right semantic match.
+        var parentId = await publisher.Enqueue(new ThrowExceptionRequest(), new JobParameters().WithRetry(0));
         var childId = await publisher.Enqueue(new UnitRequest(), parentId);
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Wait for parent to fail
-        await server.WaitForJobState(parentId, State.Failed, timeout: TimeSpan.FromSeconds(8));
+        await server.WaitForJobState(parentId, State.Failed);
 
-        // Give orchestration a few ticks (100ms interval in the test server) to confirm the
-        // child is not activated. 500ms covers ~5 passes without stalling the test for 2s.
-        await Task.Delay(500, Xunit.TestContext.Current.CancellationToken);
+        // Drive orchestration deterministically. A buggy implementation that incorrectly
+        // activates the child despite OnlyOnSucceeded would do so on the first orchestration
+        // pass. Run a few times to also catch a "fires only after N ticks" regression.
+        await server.RunOrchestratorOnceAsync(Xunit.TestContext.Current.CancellationToken);
+        await server.RunOrchestratorOnceAsync(Xunit.TestContext.Current.CancellationToken);
+        await server.RunOrchestratorOnceAsync(Xunit.TestContext.Current.CancellationToken);
 
         var ctx = Fixture.CreateContext();
 
@@ -72,8 +87,13 @@ public abstract class ContinuationIntegrationTestsBase : IntegrationTestBase
         await using var server = await WarpTestServer.StartAsync(Fixture);
         var batchPublisher = server.CreateBatchPublisher();
 
+        // Disable retry on the failing batch job — without this, AddRetry's MaxRetries=3 +
+        // 1s delay forces ~4-6s of retries before the batch member reaches Failed, racing
+        // the 10s budget. The test's contract is "OnAnyFinishedState activates continuation
+        // when batch fails", which doesn't depend on retry behavior.
+        var noRetryMetadata = new JobParameters().WithRetry(0).Metadata;
         var batchJobs = new List<ThrowExceptionRequest> { new() };
-        var batchId = await batchPublisher.StartNew(batchJobs, options: ContinuationOptions.OnAnyFinishedState);
+        var batchId = await batchPublisher.StartNew(batchJobs, options: ContinuationOptions.OnAnyFinishedState, metadata: noRetryMetadata);
 
         var continuationJobs = new List<UnitRequest> { new() };
         var continuationBatchId = await batchPublisher.ContinueBatchWith(continuationJobs, batchId);

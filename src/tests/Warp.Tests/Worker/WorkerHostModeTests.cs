@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Shouldly;
+using Warp.Core.Data;
 using Warp.Core.Data.Entities;
 using Warp.Core.Notifications;
 using Warp.Tests.Fixtures;
@@ -133,7 +134,17 @@ public abstract class WorkerHostModeTestsBase : IAsyncLifetime
             state,
             TestTasks.NullSignals,
             new DispatcherRegistry(),
-            NullLoggerFactory.Instance);
+            NullLoggerFactory.Instance,
+            NullExceptionClassifier.Instance);
+    }
+
+    private sealed class NullExceptionClassifier : IDatabaseExceptionClassifier
+    {
+        public static readonly NullExceptionClassifier Instance = new();
+
+        public bool IsUniqueConstraintViolation(DbUpdateException ex) => false;
+
+        public bool IsTransientDeadlock(Exception ex) => false;
     }
 
     private WarpSingleWorkerHost<TestContext> CreateSingleWorkerHost(bool useDispatcher, ServerRegistrationState state)

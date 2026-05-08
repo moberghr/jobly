@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Warp.Core.Data;
 using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
 
@@ -29,10 +30,18 @@ internal readonly record struct PendingCompletion(
 internal sealed class CompletionBatch<TContext>
     where TContext : DbContext
 {
+    // Transient-deadlock retry budget for the whole batch flush. Three attempts with a short
+    // exponential backoff is enough to clear a SQL Server 1205 / PG 40P01 storm in practice
+    // without masking real defects (a deadlock that survives 3 retries indicates a structural
+    // issue worth surfacing). 50ms × 2^attempt = 50ms / 100ms / 200ms backoff schedule.
+    private const int MaxDeadlockRetries = 3;
+    private const int DeadlockRetryBaseDelayMs = 50;
+
     private readonly List<PendingCompletion> _buffer;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
+    private readonly IDatabaseExceptionClassifier _exceptionClassifier;
     private readonly int _batchSize;
     private readonly TimeSpan _flushInterval;
     private DateTimeOffset? _firstEntryTimestamp;
@@ -41,12 +50,14 @@ internal sealed class CompletionBatch<TContext>
         IServiceScopeFactory scopeFactory,
         TimeProvider timeProvider,
         ILogger logger,
+        IDatabaseExceptionClassifier exceptionClassifier,
         int batchSize,
         TimeSpan flushInterval)
     {
         _scopeFactory = scopeFactory;
         _timeProvider = timeProvider;
         _logger = logger;
+        _exceptionClassifier = exceptionClassifier;
         _batchSize = batchSize <= 0 ? 1 : batchSize;
         _flushInterval = flushInterval;
         _buffer = new List<PendingCompletion>(_batchSize);
@@ -103,46 +114,69 @@ internal sealed class CompletionBatch<TContext>
             return;
         }
 
-        try
+        // Retry-on-deadlock outer loop: SQL Server 1205 / PG 40P01 are transient (the deadlock
+        // monitor picked us as victim; the surviving transaction commits). Retry the whole batch
+        // before falling through to the split-on-failure path so we don't fragment the batch
+        // unnecessarily on a contention spike.
+        var attempt = 0;
+        while (true)
         {
-            using var scope = _scopeFactory.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<TContext>();
-
-            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-
-            for (var i = start; i < start + count; i++)
+            try
             {
-                var entry = entries[i];
-                context.Entry(entry.Job).State = EntityState.Modified;
+                using var scope = _scopeFactory.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<TContext>();
 
-                if (entry.Counters.Count > 0)
+                await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+
+                for (var i = start; i < start + count; i++)
                 {
-                    context.Set<Counter>().AddRange(entry.Counters);
+                    var entry = entries[i];
+                    context.Entry(entry.Job).State = EntityState.Modified;
+
+                    if (entry.Counters.Count > 0)
+                    {
+                        context.Set<Counter>().AddRange(entry.Counters);
+                    }
+
+                    if (entry.Logs.Count > 0)
+                    {
+                        context.Set<JobLog>().AddRange(entry.Logs);
+                    }
                 }
 
-                if (entry.Logs.Count > 0)
-                {
-                    context.Set<JobLog>().AddRange(entry.Logs);
-                }
-            }
+                await context.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
 
-            await context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex)
-        {
-            if (count == 1)
-            {
-                _logger.LogError(
-                    ex,
-                    "Dropping poison completion for job {jobId}; StaleJobRecovery will recover the underlying Processing row",
-                    entries[start].Job.Id);
                 return;
             }
+            catch (Exception ex) when (attempt < MaxDeadlockRetries && _exceptionClassifier.IsTransientDeadlock(ex))
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Completion flush hit a transient deadlock (attempt {attempt}/{max}); retrying after backoff",
+                    attempt + 1,
+                    MaxDeadlockRetries);
 
-            var mid = count / 2;
-            await FlushRangeAsync(entries, start, mid, cancellationToken);
-            await FlushRangeAsync(entries, start + mid, count - mid, cancellationToken);
+                await Task.Delay(TimeSpan.FromMilliseconds(DeadlockRetryBaseDelayMs * (1 << attempt)), cancellationToken);
+                attempt++;
+            }
+            catch (DbUpdateException ex)
+            {
+                if (count == 1)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Dropping poison completion for job {jobId}; StaleJobRecovery will recover the underlying Processing row",
+                        entries[start].Job.Id);
+                    return;
+                }
+
+                var mid = count / 2;
+                await FlushRangeAsync(entries, start, mid, cancellationToken);
+                await FlushRangeAsync(entries, start + mid, count - mid, cancellationToken);
+
+                return;
+            }
         }
     }
 }
