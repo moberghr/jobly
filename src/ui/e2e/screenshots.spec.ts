@@ -22,6 +22,7 @@ const pages = [
   { name: '13-worker-detail', path: `/workers/${DEMO_IDS.worker1}` },
   { name: '14-recurring-detail', path: '/recurring/1' },
   { name: '15-server-detail', path: `/servers/${DEMO_IDS.server1}` },
+  { name: '17-counters', path: '/counters', fullPage: true },
 ];
 
 for (const pg of pages) {

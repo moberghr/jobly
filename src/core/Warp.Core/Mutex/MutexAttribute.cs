@@ -9,4 +9,6 @@ public sealed class MutexAttribute : Attribute
     }
 
     public string Key { get; }
+
+    public MutexMode Mode { get; init; } = MutexMode.Skip;
 }

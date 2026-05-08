@@ -216,6 +216,14 @@ public abstract class RetryTestsBase : IAsyncLifetime
 
         failedStat.ShouldBe(0);
 
+        // …but stats:requeued SHOULD be incremented (retry shares the same counter as Mutex Wait).
+        var requeuedStat = await _fixture.CreateContext().Set<Statistic>()
+            .Where(x => x.Key == "stats:requeued")
+            .Select(x => x.Value)
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
+
+        requeuedStat.ShouldBe(1);
+
         // Verify job was requeued (not failed)
         var readCtx = _fixture.CreateContext();
         var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);

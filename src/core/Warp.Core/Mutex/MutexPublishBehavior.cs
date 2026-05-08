@@ -18,6 +18,7 @@ public class MutexPublishBehavior<T> : IPublishPipelineBehavior<T>
             if (attr != null)
             {
                 meta.ConcurrencyKey = attr.Key;
+                meta.Mode = attr.Mode;
             }
         }
 

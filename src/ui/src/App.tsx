@@ -9,6 +9,7 @@ import RecurringPage from '@/pages/recurring/RecurringPage';
 import RecurringDetailPage from '@/pages/recurring/RecurringDetailPage';
 import ServersPage from '@/pages/servers/ServersPage';
 import ServerDetailPage from '@/pages/servers/ServerDetailPage';
+import CountersPage from '@/pages/counters/CountersPage';
 import WorkerDetailPage from '@/pages/workers/WorkerDetailPage';
 import TracePage from '@/pages/trace/TracePage';
 import DetailPage from '@/pages/detail/DetailPage';
@@ -80,6 +81,7 @@ function App() {
           <Route path="/workers/:id" element={<WorkerDetailPage />} />
           <Route path="/servers/:id" element={<ServerDetailPage />} />
           <Route path="/servers" element={<ServersPage />} />
+          <Route path="/counters" element={<CountersPage />} />
 
           {/* Extension pages */}
           {extensionPages.map((page) => (
