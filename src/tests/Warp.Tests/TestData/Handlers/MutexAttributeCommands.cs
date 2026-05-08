@@ -1,5 +1,5 @@
+using Warp.Core.Concurrency;
 using Warp.Core.Handlers;
-using Warp.Core.Mutex;
 
 namespace Warp.Tests.TestData.Handlers;
 
@@ -22,5 +22,5 @@ public class MutexWaitAttributeCommand : IJobHandler<MutexWaitAttributeRequest>
     }
 }
 
-[Mutex("static-wait-key", Mode = MutexMode.Wait)]
+[Mutex("static-wait-key", Mode = ConcurrencyMode.Wait)]
 public class MutexWaitAttributeRequest : IJob;

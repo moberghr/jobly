@@ -155,20 +155,28 @@ await jobCommandService.DeleteJob(jobId);
 
 If the job is processing, this sets `CancellationMode = Graceful` instead of immediately changing state. The worker detects it and cancels the handler's `CancellationToken`. See [Job Cancellation](/docs/features/cancellation) for the full flow.
 
-## Mutex
+## Concurrency control (Mutex + Semaphore)
 
-Only one job per mutex key can be processing at a time. Requires `opt.AddMutex()` inside `AddWarpWorker`:
+Cap the number of concurrent jobs per key. Requires `opt.AddConcurrency()` inside `AddWarpWorker`. Use `[Mutex]` (`WithMutex`) for at-most-one, `[Semaphore]` (`WithSemaphore`) for at-most-N:
 
 ```csharp
+// At most one CallPaymentApi for this customer at a time
 await publisher.Enqueue(new ProcessPayment { CustomerId = 123 },
     new JobParameters().WithMutex("payment:123"));
+
+// At most 5 concurrent calls to the payment API across all jobs
+await publisher.Enqueue(new CallPaymentApi(),
+    new JobParameters().WithSemaphore("payment-api", limit: 5));
 ```
 
-Or use the `[Mutex]` attribute on the job class for static keys:
+Or use attributes on the job class for static keys:
 
 ```csharp
 [Mutex("payment-processing")]
 public class ProcessPayment : IJob { ... }
+
+[Semaphore("payment-api", limit: 5)]
+public class CallPaymentApi : IJob { ... }
 ```
 
-See [Mutex](/docs/features/mutex) for details.
+See [Concurrency control](/docs/features/mutex) for details.

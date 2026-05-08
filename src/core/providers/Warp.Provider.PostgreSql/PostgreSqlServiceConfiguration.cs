@@ -33,6 +33,9 @@ public static class PostgreSqlServiceConfiguration
         builder.Services.TryAddSingleton<IWarpLockProvider>(sp =>
             new PostgresLockProvider(ResolveConnectionString<TContext>(sp)));
 
+        builder.Services.TryAddSingleton<IWarpSemaphoreProvider>(sp =>
+            new PostgresSemaphoreProvider(ResolveConnectionString<TContext>(sp)));
+
         return builder;
     }
 

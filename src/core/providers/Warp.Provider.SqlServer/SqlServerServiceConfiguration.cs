@@ -33,6 +33,9 @@ public static class SqlServerServiceConfiguration
         builder.Services.TryAddSingleton<IWarpLockProvider>(sp =>
             new SqlServerLockProvider(ResolveConnectionString<TContext>(sp)));
 
+        builder.Services.TryAddSingleton<IWarpSemaphoreProvider>(sp =>
+            new SqlServerSemaphoreProvider(ResolveConnectionString<TContext>(sp)));
+
         return builder;
     }
 

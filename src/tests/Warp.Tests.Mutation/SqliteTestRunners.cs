@@ -6,7 +6,7 @@ using Warp.Tests.Mutation.Fixtures;
 using Warp.Tests.Admin;
 using Warp.Tests.Core;
 using Warp.Tests.Features.Cancellation;
-using Warp.Tests.Features.Mutex;
+using Warp.Tests.Features.Concurrency;
 using Warp.Tests.Features.Retry;
 using Warp.Tests.Messaging;
 using Warp.Tests.Observability;

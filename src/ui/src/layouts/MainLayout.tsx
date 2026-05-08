@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import axios from 'axios';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useDashboardStore } from '@/stores/dashboard';
 import { usePolling } from '@/hooks/usePolling';
@@ -14,9 +16,11 @@ import {
   LogOut,
   Puzzle,
   Gauge,
+  KeyRound,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { config } from '@/config';
+import * as api from '@/api';
 import type { DashboardStatistics } from '@/types';
 import type { ExtensionManifest } from '@/extensions/types';
 
@@ -29,6 +33,8 @@ const builtInNavItems = [
   { to: '/servers', label: 'Servers', icon: Server },
   { to: '/counters', label: 'Counters', icon: Gauge },
 ];
+
+const concurrencyNavItem = { to: '/concurrency', label: 'Concurrency', icon: KeyRound };
 
 function resolveIcon(name?: string): React.ComponentType<{ className?: string }> {
   if (!name) {
@@ -50,8 +56,31 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
+  const [concurrencyAvailable, setConcurrencyAvailable] = useState(false);
 
   usePolling(fetchStats, 1000);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .listConcurrencyLimits()
+      .then(() => {
+        if (!cancelled) setConcurrencyAvailable(true);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        if (axios.isAxiosError(e) && e.response?.status === 404) {
+          setConcurrencyAvailable(false);
+        } else {
+          // Non-404 errors (network, 500): keep hidden, don't surface noise.
+          setConcurrencyAvailable(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isJobsSection = location.pathname.startsWith('/jobs');
   const isBatchesSection = location.pathname.startsWith('/batches');
@@ -66,6 +95,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
           <nav className="flex gap-1">
             {[
               ...builtInNavItems,
+              ...(concurrencyAvailable ? [concurrencyNavItem] : []),
               ...extensions.flatMap((ext) =>
                 ext.pages.map((page) => ({
                   to: page.path,

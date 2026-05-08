@@ -64,9 +64,9 @@ Jitter is applied to `ScheduleTime` so rescheduled jobs don't all hit the downst
 
 Circuit Breaker short-circuits before Retry. If the circuit is open when a job would have retried, the job is rescheduled — but Retry's `RetriedTimes` counter is NOT incremented (the handler didn't run, so there was nothing to retry). The retry budget is preserved for when the circuit closes and the downstream is reachable again.
 
-## Interaction with Mutex
+## Interaction with concurrency control
 
-Circuit Breaker runs inside the handler pipeline after Mutex. A mutex conflict short-circuits the job to `Deleted` before the circuit is consulted — mutex-rejected jobs don't count toward the failure threshold.
+Circuit Breaker runs inside the handler pipeline after the concurrency behavior (Mutex / Semaphore). A full slot short-circuits the job to `Deleted` (Skip mode) or `Enqueued` (Wait mode) before the circuit is consulted — concurrency-rejected jobs don't count toward the failure threshold.
 
 ## Configuration Options
 

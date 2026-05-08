@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Warp.Core;
+using Warp.Core.Concurrency;
 using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
 using Warp.Core.Handlers;
 using Warp.Core.Helper;
-using Warp.Core.Mutex;
 using Warp.Core.Retry;
 using Warp.Http;
 using Warp.Provider.PostgreSql;
@@ -49,7 +49,7 @@ builder.Services.AddWarpWorker<TestContext>(options =>
     options.UseDispatcher = false;
 
     options.AddRetry(o => o.MaxRetries = 3);
-    options.AddMutex();
+    options.AddConcurrency();
 
     // Second worker group — different queues and polling
     options.AddWorkerGroup(group =>

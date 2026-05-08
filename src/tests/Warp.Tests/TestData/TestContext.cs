@@ -26,5 +26,6 @@ public class TestContext : DbContext
         // TestContext is constructed directly by fixtures without going through DI,
         // so we must explicitly include the addon entity here.
         ServiceConfiguration.AddCircuitBreakerStateEntity(modelBuilder, _schema);
+        ServiceConfiguration.AddConcurrencyLimitEntity(modelBuilder, _schema);
     }
 }

@@ -59,18 +59,18 @@ builder.Services.AddWarpWorker<AppDbContext>(opt =>
 
 Per-job override via `[Retry]` attribute on handler or job class, or per-enqueue via metadata. See [Jobs](/docs/patterns/jobs#retries).
 
-## Mutex Configuration
+## Concurrency Configuration
 
-Enable mutex (concurrency control) via `opt.AddMutex()` inside the `AddWarpWorker` lambda:
+Enable concurrency control (Mutex + Semaphore) via `opt.AddConcurrency()` inside the `AddWarpWorker` lambda:
 
 ```csharp
 builder.Services.AddWarpWorker<AppDbContext>(opt =>
 {
-    opt.AddMutex();
+    opt.AddConcurrency();
 });
 ```
 
-No options — just register and use `.WithMutex("key")` or `[Mutex("key")]` at publish time. See [Mutex](/docs/features/mutex) for details.
+No options — just register and use `.WithMutex("key")` / `[Mutex("key")]` for at-most-one, or `.WithSemaphore("key", N)` / `[Semaphore("key", N)]` for at-most-N concurrent jobs at publish time. See [Concurrency control](/docs/features/mutex) for details.
 
 ## Circuit Breaker Configuration
 
