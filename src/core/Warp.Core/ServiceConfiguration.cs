@@ -391,4 +391,17 @@ public static class ServiceConfiguration
 
         state.Metadata.SetSchema(schema);
     }
+
+    public static void AddConcurrencyLimitEntity(ModelBuilder modelBuilder, string? schema)
+    {
+        var limit = modelBuilder.Entity<ConcurrencyLimit>();
+
+        limit.Property(p => p.Name).HasMaxLength(200).IsRequired();
+        limit.HasKey(p => p.Name);
+
+        limit.Property(p => p.Limit);
+        limit.Property(p => p.UpdatedAt);
+
+        limit.Metadata.SetSchema(schema);
+    }
 }

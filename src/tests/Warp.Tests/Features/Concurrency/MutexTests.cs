@@ -5,18 +5,18 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Shouldly;
 using Warp.Core;
+using Warp.Core.Concurrency;
 using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
 using Warp.Core.Handlers;
 using Warp.Core.Handlers.Generated;
 using Warp.Core.Helper;
-using Warp.Core.Mutex;
 using Warp.Tests.Fixtures;
 using Warp.Tests.TestData.Handlers;
 using Warp.Worker;
 
-namespace Warp.Tests.Features.Mutex;
+namespace Warp.Tests.Features.Concurrency;
 
 [GenerateDatabaseTests]
 public abstract class MutexTestsBase : IAsyncLifetime
@@ -33,7 +33,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
     private static readonly Guid ServerId = Guid.NewGuid();
     private static readonly string[] DefaultQueues = ["default"];
 
-    private static string SerializeMutexMetadata(string key, MutexMode? mode = null)
+    private static string SerializeMutexMetadata(string key, ConcurrencyMode? mode = null)
     {
         var dict = new Dictionary<string, object> { ["ConcurrencyKey"] = key };
         if (mode != null)
@@ -42,6 +42,15 @@ public abstract class MutexTestsBase : IAsyncLifetime
         }
 
         return JsonSerializer.Serialize(dict);
+    }
+
+    [TimedFact]
+    public Task MutexAttribute_EmptyKey_ThrowsAtConstruction()
+    {
+        Should.Throw<ArgumentException>(() => new MutexAttribute(string.Empty));
+        Should.Throw<ArgumentNullException>(() => new MutexAttribute(null!));
+
+        return Task.CompletedTask;
     }
 
     [TimedFact]
@@ -78,8 +87,8 @@ public abstract class MutexTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Pre-hold the lock (simulating job1 is being processed by another worker)
-        var lockProvider = new FakeLockProvider();
-        var heldHandle = lockProvider.HoldLock("warp:mutex:payment:123");
+        var lockProvider = new FakeSemaphoreProvider();
+        var heldHandle = lockProvider.HoldSlot("warp:concurrency:payment:123");
 
         // Act: worker processes job2 — should fail to acquire lock
         var worker = CreateWorker(lockProvider);
@@ -99,8 +108,9 @@ public abstract class MutexTestsBase : IAsyncLifetime
             .Where(x => x.EventType == "Deleted")
             .FirstOrDefaultAsync(CancellationToken.None);
         log.ShouldNotBeNull();
-        log.Message.ShouldContain("mutex");
+        log.Message.ShouldContain("Cancelled");
         log.Message.ShouldContain("payment:123");
+        log.Message.ShouldContain("1 slots");
     }
 
     [TimedFact]
@@ -239,8 +249,8 @@ public abstract class MutexTestsBase : IAsyncLifetime
         });
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var lockProvider = new FakeLockProvider();
-        var heldHandle = lockProvider.HoldLock("warp:mutex:payment:789");
+        var lockProvider = new FakeSemaphoreProvider();
+        var heldHandle = lockProvider.HoldSlot("warp:concurrency:payment:789");
 
         // Act
         var worker = CreateWorker(lockProvider);
@@ -278,7 +288,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
             Queue = "default",
             Type = typeof(UnitRequest).AssemblyQualifiedName,
             Message = "{}",
-            Metadata = SerializeMutexMetadata("payment:wait", MutexMode.Wait),
+            Metadata = SerializeMutexMetadata("payment:wait", ConcurrencyMode.Wait),
         });
         ctx.Set<Job>().Add(new Job
         {
@@ -290,12 +300,12 @@ public abstract class MutexTestsBase : IAsyncLifetime
             Queue = "default",
             Type = typeof(UnitRequest).AssemblyQualifiedName,
             Message = "{}",
-            Metadata = SerializeMutexMetadata("payment:wait", MutexMode.Wait),
+            Metadata = SerializeMutexMetadata("payment:wait", ConcurrencyMode.Wait),
         });
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var lockProvider = new FakeLockProvider();
-        var heldHandle = lockProvider.HoldLock("warp:mutex:payment:wait");
+        var lockProvider = new FakeSemaphoreProvider();
+        var heldHandle = lockProvider.HoldSlot("warp:concurrency:payment:wait");
 
         // Act
         var worker = CreateWorker(lockProvider);
@@ -314,8 +324,9 @@ public abstract class MutexTestsBase : IAsyncLifetime
             .Where(x => x.EventType == "Requeued")
             .FirstOrDefaultAsync(CancellationToken.None);
         log.ShouldNotBeNull();
-        log.Message.ShouldContain("mutex");
+        log.Message.ShouldContain("Requeued");
         log.Message.ShouldContain("payment:wait");
+        log.Message.ShouldContain("1 slots");
 
         // Counter row written for the requeue — surfaces in the dashboard's Requeued metric.
         var requeuedCounter = await readCtx.Set<Counter>()
@@ -345,7 +356,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
             Queue = "default",
             Type = typeof(UnitRequest).AssemblyQualifiedName,
             Message = "{}",
-            Metadata = SerializeMutexMetadata("payment:free-wait", MutexMode.Wait),
+            Metadata = SerializeMutexMetadata("payment:free-wait", ConcurrencyMode.Wait),
         });
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
@@ -370,8 +381,8 @@ public abstract class MutexTestsBase : IAsyncLifetime
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
-        services.AddSingleton<IWarpLockProvider>(new FakeLockProvider());
-        new Warp.Core.WarpBuilder<TestContext>(services).AddMutex();
+        services.AddSingleton<IWarpSemaphoreProvider>(new FakeSemaphoreProvider());
+        new Warp.Core.WarpBuilder<TestContext>(services).AddConcurrency();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IOptions<WarpConfiguration>>(new OptionsWrapper<WarpConfiguration>(new WarpConfiguration()));
 
@@ -406,8 +417,8 @@ public abstract class MutexTestsBase : IAsyncLifetime
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
-        services.AddSingleton<IWarpLockProvider>(new FakeLockProvider());
-        new Warp.Core.WarpBuilder<TestContext>(services).AddMutex();
+        services.AddSingleton<IWarpSemaphoreProvider>(new FakeSemaphoreProvider());
+        new Warp.Core.WarpBuilder<TestContext>(services).AddConcurrency();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IOptions<WarpConfiguration>>(new OptionsWrapper<WarpConfiguration>(new WarpConfiguration()));
 
@@ -433,17 +444,89 @@ public abstract class MutexTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
-    public async Task MutexAttribute_WaitMode_PropagatesToMetadata()
+    public async Task MutexAttribute_PopulatesLimitOneInMetadata()
     {
-        // Arrange: MutexWaitAttributeRequest has [Mutex("static-wait-key", Mode = MutexMode.Wait)]
+        // Arrange
         var services = new ServiceCollection();
         services.AddWarpMediator();
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
-        services.AddSingleton<IWarpLockProvider>(new FakeLockProvider());
-        new Warp.Core.WarpBuilder<TestContext>(services).AddMutex();
+        services.AddSingleton<IWarpSemaphoreProvider>(new FakeSemaphoreProvider());
+        new Warp.Core.WarpBuilder<TestContext>(services).AddConcurrency();
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IOptions<WarpConfiguration>>(new OptionsWrapper<WarpConfiguration>(new WarpConfiguration()));
+
+        var provider = services.BuildServiceProvider();
+        await using var scope = provider.CreateAsyncScope();
+        var publisherCtx = scope.ServiceProvider.GetRequiredService<TestContext>();
+        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider);
+
+        // Act
+        var jobId = await publisher.Enqueue(new MutexAttributeRequest());
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        // Assert: metadata should carry Limit = 1
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>()
+            .Where(x => x.Id == jobId)
+            .FirstAsync(CancellationToken.None);
+
+        var metadata = JsonSerializer.Deserialize<Dictionary<string, object>>(job.Metadata!);
+        metadata.ShouldNotBeNull();
+        metadata.ShouldContainKey("Limit");
+        ((JsonElement)metadata["Limit"]).GetInt32().ShouldBe(1);
+    }
+
+    [TimedFact]
+    public async Task WithMutex_PopulatesLimitOneInMetadata()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddWarpMediator();
+        services.AddLogging();
+        services.AddScoped<TestContext>(_ => _fixture.CreateContext());
+        services.AddScoped<JobContext>();
+        services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
+        services.AddSingleton<IWarpSemaphoreProvider>(new FakeSemaphoreProvider());
+        new Warp.Core.WarpBuilder<TestContext>(services).AddConcurrency();
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IOptions<WarpConfiguration>>(new OptionsWrapper<WarpConfiguration>(new WarpConfiguration()));
+
+        var provider = services.BuildServiceProvider();
+        await using var scope = provider.CreateAsyncScope();
+        var publisherCtx = scope.ServiceProvider.GetRequiredService<TestContext>();
+        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider);
+
+        // Act
+        var jobId = await publisher.Enqueue(new UnitRequest(), new JobParameters().WithMutex("limit-one-key"));
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        // Assert: metadata should carry Limit = 1
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>()
+            .Where(x => x.Id == jobId)
+            .FirstAsync(CancellationToken.None);
+
+        var metadata = JsonSerializer.Deserialize<Dictionary<string, object>>(job.Metadata!);
+        metadata.ShouldNotBeNull();
+        metadata.ShouldContainKey("Limit");
+        ((JsonElement)metadata["Limit"]).GetInt32().ShouldBe(1);
+    }
+
+    [TimedFact]
+    public async Task MutexAttribute_WaitMode_PropagatesToMetadata()
+    {
+        // Arrange: MutexWaitAttributeRequest has [Mutex("static-wait-key", Mode = ConcurrencyMode.Wait)]
+        var services = new ServiceCollection();
+        services.AddWarpMediator();
+        services.AddLogging();
+        services.AddScoped<TestContext>(_ => _fixture.CreateContext());
+        services.AddScoped<JobContext>();
+        services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
+        services.AddSingleton<IWarpSemaphoreProvider>(new FakeSemaphoreProvider());
+        new Warp.Core.WarpBuilder<TestContext>(services).AddConcurrency();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IOptions<WarpConfiguration>>(new OptionsWrapper<WarpConfiguration>(new WarpConfiguration()));
 
@@ -467,21 +550,21 @@ public abstract class MutexTestsBase : IAsyncLifetime
         metadata.ShouldContainKey("ConcurrencyKey");
         metadata["ConcurrencyKey"].ToString().ShouldBe("static-wait-key");
         metadata.ShouldContainKey("Mode");
-        ((JsonElement)metadata["Mode"]).GetInt32().ShouldBe((int)MutexMode.Wait);
+        ((JsonElement)metadata["Mode"]).GetInt32().ShouldBe((int)ConcurrencyMode.Wait);
     }
 
-    private WarpWorkerService<TestContext> CreateWorker(FakeLockProvider? lockProvider = null)
+    private WarpWorkerService<TestContext> CreateWorker(FakeSemaphoreProvider? lockProvider = null)
     {
-        lockProvider ??= new FakeLockProvider();
+        lockProvider ??= new FakeSemaphoreProvider();
         var services = new ServiceCollection();
         services.AddWarpMediator();
         services.AddLogging();
         services.AddScoped<TestContext>(_ => _fixture.CreateContext());
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
-        services.AddSingleton<IWarpLockProvider>(lockProvider);
+        services.AddSingleton<IWarpSemaphoreProvider>(lockProvider);
         services.AddSingleton(TimeProvider.System);
-        new Warp.Core.WarpBuilder<TestContext>(services).AddMutex();
+        new Warp.Core.WarpBuilder<TestContext>(services).AddConcurrency();
 
         var workerConfig = new OptionsWrapper<WarpWorkerConfiguration>(new WarpWorkerConfiguration
         {

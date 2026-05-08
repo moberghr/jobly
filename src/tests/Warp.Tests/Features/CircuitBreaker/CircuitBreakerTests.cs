@@ -7,12 +7,12 @@ using Microsoft.Extensions.Options;
 using Shouldly;
 using Warp.Core;
 using Warp.Core.CircuitBreaker;
+using Warp.Core.Concurrency;
 using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
 using Warp.Core.Handlers;
 using Warp.Core.Handlers.Generated;
-using Warp.Core.Mutex;
 using Warp.Core.Retry;
 using Warp.Tests.Fixtures;
 using Warp.Tests.TestData.Handlers;
@@ -328,8 +328,8 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         });
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var lockProvider = new FakeLockProvider();
-        var heldHandle = lockProvider.HoldLock("warp:mutex:static-key");
+        var lockProvider = new FakeSemaphoreProvider();
+        var heldHandle = lockProvider.HoldSlot("warp:concurrency:static-key");
 
         var worker = CreateWorker(lockProvider: lockProvider);
         await worker.GetAndProcessJob(CancellationToken.None);
@@ -583,7 +583,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         TimeSpan? duration = null,
         TimeSpan? resetJitter = null,
         int? retryMaxRetries = null,
-        FakeLockProvider? lockProvider = null)
+        FakeSemaphoreProvider? lockProvider = null)
     {
         var services = new ServiceCollection();
         services.AddWarpMediator();
@@ -613,8 +613,8 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
 
         if (lockProvider != null)
         {
-            services.AddSingleton<IWarpLockProvider>(lockProvider);
-            new Warp.Core.WarpBuilder<TestContext>(services).AddMutex();
+            services.AddSingleton<IWarpSemaphoreProvider>(lockProvider);
+            new Warp.Core.WarpBuilder<TestContext>(services).AddConcurrency();
         }
 
         var workerConfig = new OptionsWrapper<WarpWorkerConfiguration>(new WarpWorkerConfiguration

@@ -1,14 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
+using Warp.Core.Concurrency;
 using Warp.Core.Data.Entities;
 using Warp.Core.Enums;
 using Warp.Core.Helper;
-using Warp.Core.Mutex;
 using Warp.Tests.Fixtures;
 using Warp.Tests.TestData.Handlers;
 
-namespace Warp.Tests.Features.Mutex;
+namespace Warp.Tests.Features.Concurrency;
 
 [GenerateDatabaseTests]
 public abstract class MutexIntegrationTestsBase : IntegrationTestBase
@@ -45,7 +45,7 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
 
         // Verify job2 was cancelled due to mutex
         var logs = await server.GetJobLogs(job2Id);
-        logs.ShouldContain(l => l.EventType == "Deleted" && l.Message.Contains("mutex"));
+        logs.ShouldContain(l => l.EventType == "Deleted" && l.Message.Contains("Cancelled", StringComparison.Ordinal));
 
         // Job1 still in handler (held by barrier)
         var job1 = await server.GetJob(job1Id);
@@ -63,14 +63,14 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
         var publisher = server.CreatePublisher();
 
         // Enqueue a slow job that holds the mutex
-        var job1Id = await publisher.Enqueue(new CancellableRequest(), new JobParameters().WithMutex("test-wait", MutexMode.Wait));
+        var job1Id = await publisher.Enqueue(new CancellableRequest(), new JobParameters().WithMutex("test-wait", ConcurrencyMode.Wait));
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         await server.WaitForJobState(job1Id, State.Processing);
 
         // Second job, same key, Wait mode — should be requeued, not deleted
         var publisher2 = server.CreatePublisher();
-        var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("test-wait", MutexMode.Wait));
+        var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("test-wait", ConcurrencyMode.Wait));
         await publisher2.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Job2 should bounce off the mutex at least once and stay alive
@@ -90,8 +90,9 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
         var requeuedLog = (await server.GetJobLogs(job2Id))
             .FirstOrDefault(x => string.Equals(x.EventType, "Requeued", StringComparison.Ordinal));
         requeuedLog.ShouldNotBeNull();
-        requeuedLog.Message.ShouldContain("mutex");
+        requeuedLog.Message.ShouldContain("Requeued");
         requeuedLog.Message.ShouldContain("test-wait");
+        requeuedLog.Message.ShouldContain("1 slots");
     }
 
     [TimedFact(60_000)]
@@ -113,7 +114,7 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
         {
             var id = await publisher.Enqueue(
                 new ConcurrencyTrackerRequest { Key = key },
-                new JobParameters().WithMutex(key, MutexMode.Wait));
+                new JobParameters().WithMutex(key, ConcurrencyMode.Wait));
             jobIds.Add(id);
         }
 
@@ -155,7 +156,7 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
             {
                 var id = await publisher.Enqueue(
                     new ConcurrencyTrackerRequest { Key = key },
-                    new JobParameters().WithMutex(key, MutexMode.Wait));
+                    new JobParameters().WithMutex(key, ConcurrencyMode.Wait));
                 jobIds.Add(id);
             }
         }

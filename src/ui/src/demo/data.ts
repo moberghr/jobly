@@ -17,6 +17,7 @@ import type {
   StatsHistoryPoint,
   TypeCountModel,
   PagedList,
+  ConcurrencyLimitInfo,
 } from '@/types';
 import type { RealtimePoint } from '@/stores/dashboard';
 
@@ -267,6 +268,16 @@ export function getCountersHistoryDemo(hours: number) {
 
   return points;
 }
+
+// ============================================================
+// Concurrency limits
+// ============================================================
+
+export const demoConcurrencyLimits: ConcurrencyLimitInfo[] = [
+  { name: 'payment-api', limit: 5, updatedAt: ago(60 * 30) },
+  { name: 'report-generation', limit: 3, updatedAt: ago(60 * 60 * 6) },
+  { name: 'email-throttle', limit: 10, updatedAt: ago(60 * 60 * 24 * 2) },
+];
 
 // ============================================================
 // Realtime chart seed (60 seconds of pre-populated data)

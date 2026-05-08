@@ -238,24 +238,24 @@ public class WarpTelemetryTests
     }
 
     [TimedFact]
-    public void StartMutexActivity_NoListener_ReturnsNull()
+    public void StartConcurrencyActivity_NoListener_ReturnsNull()
     {
-        var activity = WarpTelemetry.StartMutexActivity();
+        var activity = WarpTelemetry.StartConcurrencyActivity();
 
         activity.ShouldBeNull();
     }
 
     [TimedFact]
-    public void StartMutexActivity_WithListener_ReturnsInternalSpan()
+    public void StartConcurrencyActivity_WithListener_ReturnsInternalSpan()
     {
         using var harness = new ActivityListenerHarness();
 
-        using (var activity = WarpTelemetry.StartMutexActivity())
+        using (var activity = WarpTelemetry.StartConcurrencyActivity())
         {
             activity.ShouldNotBeNull();
         }
 
-        var captured = harness.FirstByName("warp.mutex_acquire");
+        var captured = harness.FirstByName("warp.concurrency_acquire");
         captured.ShouldNotBeNull();
         captured.Kind.ShouldBe(ActivityKind.Internal);
     }

@@ -40,9 +40,10 @@ public static class WarpTelemetryAttributes
     public const string WarpTaskLockHeld = "warp.task.lock_held";
     public const string WarpTaskMessage = "warp.task.message";
 
-    public const string WarpMutexKey = "warp.mutex.key";
-    public const string WarpMutexAcquired = "warp.mutex.acquired";
-    public const string WarpMutexHeldByOtherEvent = "warp.mutex.held_by_other";
+    public const string WarpConcurrencyKey = "warp.concurrency.key";
+    public const string WarpConcurrencyLimit = "warp.concurrency.limit";
+    public const string WarpConcurrencyAcquired = "warp.concurrency.acquired";
+    public const string WarpConcurrencyHeldByOtherEvent = "warp.concurrency.held_by_other";
 
     /// <summary>
     /// Metadata dictionary keys read by the worker to enrich consumer-span tags. Mirrors property

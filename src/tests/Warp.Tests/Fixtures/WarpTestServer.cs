@@ -4,11 +4,11 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Warp.Core;
 using Warp.Core.CircuitBreaker;
+using Warp.Core.Concurrency;
 using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
 using Warp.Core.Handlers;
-using Warp.Core.Mutex;
 using Warp.Core.NoRestart;
 using Warp.Core.Retry;
 using Warp.Core.Services;
@@ -273,7 +273,7 @@ public class WarpTestServer : IAsyncDisposable
                         o.MaxRetries = 1;
                         o.Delays = [1];
                     });
-                    config.AddMutex();
+                    config.AddConcurrency();
                     config.AddNoRestart();
                     config.AddCircuitBreaker(o =>
                     {

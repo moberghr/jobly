@@ -264,3 +264,9 @@ export interface CounterHistoryPoint {
   key: string;
   value: number;
 }
+
+export interface ConcurrencyLimitInfo {
+  name: string;
+  limit: number;
+  updatedAt: string;
+}

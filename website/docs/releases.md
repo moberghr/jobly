@@ -26,7 +26,7 @@ The worker emits a Client-kind `receive <queue>` span around post-fetch / pre-ha
 
 `IMediator.Send(TRequest)` and `IMediator.CreateStream(TRequest)` emit Internal-kind `process <RequestType>` spans wrapping the full pipeline + handler (or pipeline + stream enumeration). The stream activity lives across the entire `await foreach` and closes via `try/finally` even on early break or exception.
 
-`MutexPipelineBehavior` emits a child `warp.mutex_acquire` Internal-kind span around the lock attempt with `warp.mutex.key` and `warp.mutex.acquired` tags.
+`ConcurrencyPipelineBehavior` (the unified Mutex+Semaphore behavior) emits a child `warp.concurrency_acquire` Internal-kind span around the acquire attempt with `warp.concurrency.key`, `warp.concurrency.limit`, and `warp.concurrency.acquired` tags.
 
 Each `ServerTaskLoop` iteration (Heartbeat, Orchestrator, MessageRouter, RecurringJobScheduler, …) emits a `warp.server_task <Name>` Internal-kind span tagged with `warp.task.lock_held` and `warp.task.message`.
 

@@ -165,10 +165,11 @@ public static class WarpTelemetry
     }
 
     /// <summary>
-    /// Starts an Internal-kind span around a mutex acquire attempt. Span name "warp.mutex_acquire".
-    /// Caller stamps warp.mutex.key and warp.mutex.acquired before disposing.
+    /// Starts an Internal-kind span around a concurrency-control acquire attempt (Mutex or
+    /// Semaphore). Span name "warp.concurrency_acquire". Caller stamps warp.concurrency.key,
+    /// warp.concurrency.limit, and warp.concurrency.acquired before disposing.
     /// </summary>
-    public static Activity? StartMutexActivity() => ActivitySource.StartActivity("warp.mutex_acquire", ActivityKind.Internal);
+    public static Activity? StartConcurrencyActivity() => ActivitySource.StartActivity("warp.concurrency_acquire", ActivityKind.Internal);
 
     /// <summary>
     /// Bound the length of a string used as an OTel span status description. Activity status

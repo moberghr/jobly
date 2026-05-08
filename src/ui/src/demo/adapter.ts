@@ -1,5 +1,9 @@
 import type { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import * as data from './data';
+import type { ConcurrencyLimitInfo } from '@/types';
+
+// Mutable copy so demo upsert/delete feel real across the session.
+const concurrencyLimits: ConcurrencyLimitInfo[] = [...data.demoConcurrencyLimits];
 
 export function createDemoAdapter(isLoginMode: boolean) {
   let loginActive = isLoginMode;
@@ -25,6 +29,12 @@ export function createDemoAdapter(isLoginMode: boolean) {
       });
     }
 
+    // Concurrency limits: handle CRUD against the local mutable list.
+    const concurrencyResult = routeConcurrency(method, url, config);
+    if (concurrencyResult !== undefined) {
+      return concurrencyResult;
+    }
+
     // All POST/DELETE routes return success
     if (method === 'post') {
       if (url.includes('/bulk/')) {
@@ -36,10 +46,93 @@ export function createDemoAdapter(isLoginMode: boolean) {
     if (method === 'delete') {
       return resolve({}, config);
     }
+    if (method === 'put') {
+      return resolve({}, config);
+    }
 
     // GET routes — return mock data
     return resolve(routeGet(url, params), config);
   };
+}
+
+function routeConcurrency(
+  method: string,
+  url: string,
+  config: InternalAxiosRequestConfig,
+): Promise<AxiosResponse> | undefined {
+  if (!url.startsWith('/concurrency')) {
+    return undefined;
+  }
+
+  const nameMatch = url.match(/^\/concurrency\/([^/?]+)/);
+  const name = nameMatch ? decodeURIComponent(nameMatch[1]) : null;
+
+  if (method === 'get' && name === null) {
+    return resolve([...concurrencyLimits].sort((a, b) => a.name.localeCompare(b.name)), config);
+  }
+  if (method === 'get' && name !== null) {
+    const found = concurrencyLimits.find((x) => x.name === name);
+
+    return resolve(found ?? null, config);
+  }
+  if ((method === 'put' || method === 'post') && name !== null) {
+    const body = parseBody(config.data) as { limit?: number } | null;
+    const limit = Number(body?.limit ?? 1);
+    const now = new Date().toISOString();
+    const existing = concurrencyLimits.find((x) => x.name === name);
+    if (existing) {
+      existing.limit = limit;
+      existing.updatedAt = now;
+
+      return resolve({ ...existing }, config);
+    }
+    const created: ConcurrencyLimitInfo = { name, limit, updatedAt: now };
+    concurrencyLimits.push(created);
+
+    return resolve({ ...created }, config);
+  }
+  if (method === 'post' && name === null) {
+    const body = parseBody(config.data) as { name?: string; limit?: number } | null;
+    const newName = String(body?.name ?? '');
+    const limit = Number(body?.limit ?? 1);
+    const now = new Date().toISOString();
+    const existing = concurrencyLimits.find((x) => x.name === newName);
+    if (existing) {
+      existing.limit = limit;
+      existing.updatedAt = now;
+
+      return resolve({ ...existing }, config);
+    }
+    const created: ConcurrencyLimitInfo = { name: newName, limit, updatedAt: now };
+    concurrencyLimits.push(created);
+
+    return resolve({ ...created }, config);
+  }
+  if (method === 'delete' && name !== null) {
+    const idx = concurrencyLimits.findIndex((x) => x.name === name);
+    if (idx >= 0) {
+      concurrencyLimits.splice(idx, 1);
+    }
+
+    return resolve({}, config);
+  }
+
+  return undefined;
+}
+
+function parseBody(raw: unknown): unknown {
+  if (raw == null) {
+    return null;
+  }
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  return raw;
 }
 
 function resolve(

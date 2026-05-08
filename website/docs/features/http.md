@@ -313,7 +313,7 @@ public sealed class LoggingBehavior<TRequest, TResponse>(ILogger<LoggingBehavior
 
 This logs every `IRequest<T>` whether dispatched in-memory or via HTTP.
 
-`RetryPipelineBehavior` (constraint `where TRequest : IJob`) and `MutexPipelineBehavior` (`is not IJob` runtime check) self-scope to the worker path and never run on HTTP — appropriately, since blocking the HTTP request thread for retry delays would be a bug.
+`RetryPipelineBehavior` (constraint `where TRequest : IJob`) and `ConcurrencyPipelineBehavior` (`is not IJob` runtime check) self-scope to the worker path and never run on HTTP — appropriately, since blocking the HTTP request thread for retry delays would be a bug.
 
 ## Diagnostics
 

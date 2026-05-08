@@ -1,0 +1,107 @@
+using Microsoft.EntityFrameworkCore;
+using Warp.Core.Data.Entities;
+
+namespace Warp.Core.Concurrency;
+
+public class ConcurrencyLimitManager<TContext> : IConcurrencyLimitManager
+    where TContext : DbContext
+{
+    private const int MaxNameLength = 200;
+
+    private readonly TContext _context;
+    private readonly TimeProvider _timeProvider;
+
+    public ConcurrencyLimitManager(TContext context, TimeProvider timeProvider)
+    {
+        _context = context;
+        _timeProvider = timeProvider;
+    }
+
+    public async Task AddOrUpdateLimit(string name, int limit, CancellationToken ct = default)
+    {
+        ValidateName(name);
+        if (limit < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit), limit, "Limit must be at least 1.");
+        }
+
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        var existing = await _context.Set<ConcurrencyLimit>()
+            .Where(x => x.Name == name)
+            .FirstOrDefaultAsync(ct);
+
+        if (existing != null)
+        {
+            existing.Limit = limit;
+            existing.UpdatedAt = now;
+        }
+        else
+        {
+            await _context.Set<ConcurrencyLimit>().AddAsync(
+                new ConcurrencyLimit
+                {
+                    Name = name,
+                    Limit = limit,
+                    UpdatedAt = now,
+                },
+                ct);
+        }
+
+        await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task<bool> RemoveLimit(string name, CancellationToken ct = default)
+    {
+        ValidateName(name);
+
+        var existing = await _context.Set<ConcurrencyLimit>()
+            .Where(x => x.Name == name)
+            .FirstOrDefaultAsync(ct);
+
+        if (existing == null)
+        {
+            return false;
+        }
+
+        _context.Set<ConcurrencyLimit>().Remove(existing);
+        await _context.SaveChangesAsync(ct);
+
+        return true;
+    }
+
+    public async Task<ConcurrencyLimitInfo?> GetLimit(string name, CancellationToken ct = default)
+    {
+        ValidateName(name);
+
+        return await _context.Set<ConcurrencyLimit>()
+            .AsNoTracking()
+            .Where(x => x.Name == name)
+            .Select(x =>
+                new ConcurrencyLimitInfo(x.Name, x.Limit, x.UpdatedAt))
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<ConcurrencyLimitInfo>> ListLimits(CancellationToken ct = default)
+    {
+        return await _context.Set<ConcurrencyLimit>()
+            .AsNoTracking()
+            .OrderBy(x => x.Name)
+            .Select(x =>
+                new ConcurrencyLimitInfo(x.Name, x.Limit, x.UpdatedAt))
+            .ToListAsync(ct);
+    }
+
+    private static void ValidateName(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            throw new ArgumentException("Name must be non-empty.", nameof(name));
+        }
+
+        if (name.Length > MaxNameLength)
+        {
+            throw new ArgumentException($"Name must be at most {MaxNameLength} characters.", nameof(name));
+        }
+    }
+}

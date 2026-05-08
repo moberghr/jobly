@@ -23,6 +23,7 @@ const pages = [
   { name: '14-recurring-detail', path: '/recurring/1' },
   { name: '15-server-detail', path: `/servers/${DEMO_IDS.server1}` },
   { name: '17-counters', path: '/counters', fullPage: true },
+  { name: '18-concurrency-limits', path: '/concurrency', fullPage: true },
 ];
 
 for (const pg of pages) {

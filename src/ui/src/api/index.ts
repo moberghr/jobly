@@ -1,5 +1,5 @@
 import api from './client';
-import type { DashboardStatistics, JobModel, JobGroupModel, JobGroupDetailModel, RecurringJobModel, RecurringJobDetailModel, RecurringJobHistoryModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint, CounterModel, CounterHistoryPoint, TypeCountModel, WorkerDetailModel, WorkerJobLogModel, TraceJobModel, UnifiedJobDetailModel } from '@/types';
+import type { DashboardStatistics, JobModel, JobGroupModel, JobGroupDetailModel, RecurringJobModel, RecurringJobDetailModel, RecurringJobHistoryModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint, CounterModel, CounterHistoryPoint, ConcurrencyLimitInfo, TypeCountModel, WorkerDetailModel, WorkerJobLogModel, TraceJobModel, UnifiedJobDetailModel } from '@/types';
 import type { ExtensionManifest } from '@/extensions/types';
 
 // Dashboard
@@ -137,6 +137,19 @@ export const getCounters = () =>
 
 export const getCountersHistory = (hours = 24) =>
   api.get<CounterHistoryPoint[]>('/stats/counters/history', { params: { hours } }).then(r => r.data);
+
+// Concurrency limits
+export const listConcurrencyLimits = () =>
+  api.get<ConcurrencyLimitInfo[]>('/concurrency').then(r => r.data);
+
+export const getConcurrencyLimit = (name: string) =>
+  api.get<ConcurrencyLimitInfo | null>(`/concurrency/${encodeURIComponent(name)}`).then(r => r.data);
+
+export const upsertConcurrencyLimit = (name: string, limit: number) =>
+  api.put<ConcurrencyLimitInfo>(`/concurrency/${encodeURIComponent(name)}`, { limit }).then(r => r.data);
+
+export const deleteConcurrencyLimit = (name: string) =>
+  api.delete(`/concurrency/${encodeURIComponent(name)}`).then(() => undefined);
 
 // Extensions
 export const getExtensions = () =>

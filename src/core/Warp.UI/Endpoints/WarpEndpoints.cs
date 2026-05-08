@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Warp.Core;
+using Warp.Core.Concurrency;
 using Warp.Core.Enums;
 using Warp.Core.Models;
 using Warp.Core.Services;
@@ -124,6 +125,88 @@ public static class WarpEndpoints
 
         apiGroup.MapGet("stats/counters/history", async ([FromServices] IDashboardStatsService statsService, [FromQuery] int? hours) => await statsService.GetCountersHistory(hours ?? 24));
 
+        apiGroup.MapGet("concurrency", async ([FromServices] IConcurrencyLimitManager? mgr, CancellationToken ct) =>
+        {
+            if (mgr is null)
+            {
+                return Results.NotFound();
+            }
+
+            var list = await mgr.ListLimits(ct);
+
+            return Results.Ok(list);
+        });
+
+        apiGroup.MapGet("concurrency/{name}", async ([FromServices] IConcurrencyLimitManager? mgr, string name, CancellationToken ct) =>
+        {
+            if (mgr is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return Results.BadRequest();
+            }
+
+            var info = await mgr.GetLimit(name, ct);
+
+            return info is null ? Results.NotFound() : Results.Ok(info);
+        });
+
+        apiGroup.MapPost("concurrency", async ([FromServices] IConcurrencyLimitManager? mgr, [FromBody] UpsertConcurrencyLimitRequest body, CancellationToken ct) =>
+        {
+            if (mgr is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (body is null || string.IsNullOrWhiteSpace(body.Name) || body.Limit < 1)
+            {
+                return Results.BadRequest();
+            }
+
+            await mgr.AddOrUpdateLimit(body.Name, body.Limit, ct);
+            var info = await mgr.GetLimit(body.Name, ct);
+
+            return Results.Ok(info);
+        });
+
+        apiGroup.MapPut("concurrency/{name}", async ([FromServices] IConcurrencyLimitManager? mgr, string name, [FromBody] UpdateConcurrencyLimitRequest body, CancellationToken ct) =>
+        {
+            if (mgr is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (string.IsNullOrWhiteSpace(name) || body is null || body.Limit < 1)
+            {
+                return Results.BadRequest();
+            }
+
+            await mgr.AddOrUpdateLimit(name, body.Limit, ct);
+            var info = await mgr.GetLimit(name, ct);
+
+            return Results.Ok(info);
+        });
+
+        apiGroup.MapDelete("concurrency/{name}", async ([FromServices] IConcurrencyLimitManager? mgr, string name, CancellationToken ct) =>
+        {
+            if (mgr is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return Results.BadRequest();
+            }
+
+            var removed = await mgr.RemoveLimit(name, ct);
+
+            return removed ? Results.Ok() : Results.NotFound();
+        });
+
         apiGroup.MapGet("servers", async ([FromServices] IDashboardStatsService statsService) => await statsService.GetServers());
 
         apiGroup.MapGet("servers/{serverId}", async ([FromServices] IDashboardStatsService statsService, Guid serverId) =>
@@ -190,3 +273,7 @@ public static class WarpEndpoints
         }
     }
 }
+
+public sealed record UpsertConcurrencyLimitRequest(string Name, int Limit);
+
+public sealed record UpdateConcurrencyLimitRequest(int Limit);
