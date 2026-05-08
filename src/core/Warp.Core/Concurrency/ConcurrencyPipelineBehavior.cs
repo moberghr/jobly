@@ -1,5 +1,6 @@
 using Warp.Core.Enums;
 using Warp.Core.Handlers;
+using Warp.Core.Logging;
 
 namespace Warp.Core.Concurrency;
 
@@ -41,11 +42,25 @@ public class ConcurrencyPipelineBehavior<TRequest, TResponse> : IPipelineBehavio
 
         var adminLimit = await _limitResolver.GetLimit(meta.ConcurrencyKey, cancellationToken);
         var effectiveLimit = adminLimit ?? meta.Limit ?? 1;
-        var handle = await _semaphoreProvider.TryAcquireAsync(
-            $"warp:concurrency:{meta.ConcurrencyKey}",
-            effectiveLimit,
-            TimeSpan.Zero,
-            cancellationToken);
+
+        IAsyncDisposable? handle;
+        using (var concurrencySpan = WarpTelemetry.StartConcurrencyActivity())
+        {
+            concurrencySpan?.SetTag(WarpTelemetryAttributes.WarpConcurrencyKey, meta.ConcurrencyKey);
+            concurrencySpan?.SetTag(WarpTelemetryAttributes.WarpConcurrencyLimit, effectiveLimit);
+
+            handle = await _semaphoreProvider.TryAcquireAsync(
+                $"warp:concurrency:{meta.ConcurrencyKey}",
+                effectiveLimit,
+                TimeSpan.Zero,
+                cancellationToken);
+
+            concurrencySpan?.SetTag(WarpTelemetryAttributes.WarpConcurrencyAcquired, handle != null);
+            if (handle == null)
+            {
+                concurrencySpan?.AddEvent(new System.Diagnostics.ActivityEvent(WarpTelemetryAttributes.WarpConcurrencyHeldByOtherEvent));
+            }
+        }
 
         if (handle == null)
         {

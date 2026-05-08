@@ -4,6 +4,53 @@ sidebar_position: 6
 
 # Releases
 
+## Unreleased — OpenTelemetry coverage broadening
+
+### Breaking: consumer span renamed `Warp.Execute` → `process <queue>`
+
+The job-execution span emitted on `WarpTelemetry.ActivitySource = "Warp"` is now named `process <queue>` per OTel messaging-spans convention (e.g. `process default`, `process critical`). The legacy `Warp.Execute` name no longer appears.
+
+**If you matched on the literal `Warp.Execute` span name** (in exporter rules, alerting queries, dashboard filters), update those matchers. Prefer the OTel-native filter `messaging.operation.name = process` — that's stable across renames and matches every queue.
+
+### Behavioural change: `Activity.Current` inside handlers without a listener
+
+Previously, the worker's consumer activity was always allocated and `Activity.Current` was non-null inside every handler — even in deployments that never wired up `tracerBuilder.AddSource("Warp")`. This was a per-job allocation tax with no observable benefit for non-OTel users.
+
+Now, when no `ActivityListener` is attached for the Warp source, the worker skips the allocation and `Activity.Current` is `null` inside the handler. Handlers that read `Activity.Current` to extract trace context (e.g. to forward to a downstream HTTP call) must either attach a listener (`tracerBuilder.AddSource("Warp")`), tolerate null, or use `JobExecutionContext.Current.TraceId` — which carries the job's trace id regardless of listener state.
+
+### Adds: producer + receive + mediator + server-task spans
+
+`Publisher.Enqueue` / `Publish` / `Schedule` and `BatchPublisher.StartNew` now emit a Producer-kind `send <queue>` activity per publish. Critically, `Job.ParentSpanId` still references the *caller's* span (the HTTP request, parent handler) — the producer span is a sibling event marker on the caller's trace, not the consumer's parent. Tests pin this invariant.
+
+The worker emits a Client-kind `receive <queue>` span around post-fetch / pre-handler bookkeeping (mark ownership, log "Processing", commit). Receive precedes the consumer span and is a sibling under the caller's trace.
+
+`IMediator.Send(TRequest)` and `IMediator.CreateStream(TRequest)` emit Internal-kind `process <RequestType>` spans wrapping the full pipeline + handler (or pipeline + stream enumeration). The stream activity lives across the entire `await foreach` and closes via `try/finally` even on early break or exception.
+
+`ConcurrencyPipelineBehavior` (the unified Mutex+Semaphore behavior) emits a child `warp.concurrency_acquire` Internal-kind span around the acquire attempt with `warp.concurrency.key`, `warp.concurrency.limit`, and `warp.concurrency.acquired` tags.
+
+Each `ServerTaskLoop` iteration (Heartbeat, Orchestrator, MessageRouter, RecurringJobScheduler, …) emits a `warp.server_task <Name>` Internal-kind span tagged with `warp.task.lock_held` and `warp.task.message`.
+
+### Adds: `messaging.operation.type` and `messaging.message.conversation_id` on consumer span
+
+OTel messaging conventions split the operation verb into `messaging.operation.name` (free-form, was already set) and `messaging.operation.type` (low-cardinality, now set alongside). The consumer also gains `messaging.message.conversation_id = job.TraceId`, `error.type` on failure, `warp.job.attempt`, `warp.worker.id`, and `messaging.batch.message_count` for batch jobs.
+
+### Adds: mediator metrics
+
+Two new instruments on `WarpTelemetry.Meter = "Warp"`:
+
+- `warp.mediator.duration` — Histogram, ms, tags `kind` (`request`/`stream`), `request_type`, `status` (`succeeded`/`failed`/`cancelled`).
+- `warp.mediator.in_flight` — UpDownCounter, tags `kind`, `request_type`.
+
+### Wiring (no change)
+
+```csharp
+services.AddOpenTelemetry()
+    .WithTracing(t => t.AddSource("Warp"))
+    .WithMetrics(m => m.AddMeter("Warp"));
+```
+
+Single source + single meter, both named `"Warp"`.
+
 ## 0.12.0
 
 *2026-05-07*

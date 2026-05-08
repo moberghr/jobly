@@ -106,7 +106,14 @@ public class BatchPublisher<TContext> : IBatchPublisher
                     .FirstOrDefaultAsync();
         }
 
-        if (traceId == null && Activity.Current?.TraceId is { } batchActivityTrace)
+        // Snapshot caller's trace context before opening the producer span — the children's
+        // ParentSpanId must be the caller's span, not the one-tick producer span.
+        var callerTraceId = Activity.Current?.TraceId;
+        var callerSpanId = Activity.Current?.SpanId;
+
+        using var producerSpan = WarpTelemetry.StartProducerActivity(batchJob.Queue, WarpTelemetryAttributes.OperationSend);
+
+        if (traceId == null && callerTraceId is { } batchActivityTrace)
         {
             traceId = new Guid(batchActivityTrace.ToHexString());
         }
@@ -115,12 +122,21 @@ public class BatchPublisher<TContext> : IBatchPublisher
         batchJob.SpawnedByJobId = spawnedBy;
 
         string? parentSpanId = null;
-        if (Activity.Current?.SpanId is { } batchSpanId && batchSpanId != default)
+        if (callerSpanId is { } batchSpanId && batchSpanId != default)
         {
             parentSpanId = batchSpanId.ToHexString();
         }
 
         batchJob.ParentSpanId = parentSpanId;
+
+        if (producerSpan != null)
+        {
+            producerSpan.SetTag(WarpTelemetryAttributes.MessagingMessageId, batchJob.Id.ToString());
+            producerSpan.SetTag(WarpTelemetryAttributes.MessagingConversationId, batchJob.TraceId.ToString());
+            producerSpan.SetTag(WarpTelemetryAttributes.MessagingBatchMessageCount, batchChildJobs.Count);
+            producerSpan.SetTag(WarpTelemetryAttributes.WarpJobKind, JobKind.Batch.ToString());
+            producerSpan.SetTag(WarpTelemetryAttributes.WarpJobType, WarpTelemetry.GetShortTypeName(batchJob.Type));
+        }
 
         foreach (var childJob in batchChildJobs)
         {
