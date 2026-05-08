@@ -86,15 +86,24 @@ public class Publisher<TContext> : IPublisher
         where T : class, IMessage
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var resolvedQueue = queue ?? "default";
 
         var publishCtx = await RunPublishPipeline(message, seed: null, CancellationToken.None);
+
+        // Snapshot caller's trace context before opening the producer span. While the producer
+        // span is open, Activity.Current is the producer; reading these afterwards would parent
+        // the consumer to the one-tick producer span instead of to the actual caller.
+        var callerTraceId = Activity.Current?.TraceId;
+        var callerSpanId = Activity.Current?.SpanId;
+
+        using var producerSpan = WarpTelemetry.StartProducerActivity(resolvedQueue, WarpTelemetryAttributes.OperationSend);
 
         var msg = new Job
         {
             Kind = JobKind.Message,
             Type = message.GetType().AssemblyQualifiedName!,
             Message = JsonSerializer.Serialize(message),
-            Queue = queue ?? "default",
+            Queue = resolvedQueue,
             CreateTime = now,
             ScheduleTime = now,
             CurrentState = State.Enqueued,
@@ -109,7 +118,7 @@ public class Publisher<TContext> : IPublisher
             msg.TraceId = executionContext.TraceId;
             msg.SpawnedByJobId = executionContext.JobId;
         }
-        else if (Activity.Current?.TraceId is { } msgActivityTrace)
+        else if (callerTraceId is { } msgActivityTrace)
         {
             msg.TraceId = new Guid(msgActivityTrace.ToHexString());
         }
@@ -118,9 +127,17 @@ public class Publisher<TContext> : IPublisher
             msg.TraceId = msg.Id;
         }
 
-        if (Activity.Current?.SpanId is { } msgSpanId && msgSpanId != default)
+        if (callerSpanId is { } msgSpanId && msgSpanId != default)
         {
             msg.ParentSpanId = msgSpanId.ToHexString();
+        }
+
+        if (producerSpan != null)
+        {
+            producerSpan.SetTag(WarpTelemetryAttributes.MessagingMessageId, msg.Id.ToString());
+            producerSpan.SetTag(WarpTelemetryAttributes.MessagingConversationId, msg.TraceId.ToString());
+            producerSpan.SetTag(WarpTelemetryAttributes.WarpJobKind, JobKind.Message.ToString());
+            producerSpan.SetTag(WarpTelemetryAttributes.WarpJobType, WarpTelemetry.GetShortTypeName(msg.Type));
         }
 
         WarpTelemetry.JobsEnqueued.Add(1, new KeyValuePair<string, object?>("queue", msg.Queue), new KeyValuePair<string, object?>("kind", "message"));
@@ -188,6 +205,13 @@ public class Publisher<TContext> : IPublisher
             now,
             metadata: SerializeMetadata(publishCtx.Metadata));
 
+        // Snapshot caller's trace context before opening the producer span. The consumer's
+        // ParentSpanId must be the caller's span, not the one-tick producer span we open below.
+        var callerTraceId = Activity.Current?.TraceId;
+        var callerSpanId = Activity.Current?.SpanId;
+
+        using var producerSpan = WarpTelemetry.StartProducerActivity(newJob.Queue, WarpTelemetryAttributes.OperationSend);
+
         // Automatic trace propagation: execution context > parent's trace > self
         var executionContext = JobExecutionContext.Current;
         if (executionContext != null)
@@ -207,7 +231,7 @@ public class Publisher<TContext> : IPublisher
                     .FirstOrDefaultAsync()
                 ?? newJob.Id;
         }
-        else if (Activity.Current?.TraceId is { } jobActivityTrace)
+        else if (callerTraceId is { } jobActivityTrace)
         {
             newJob.TraceId = new Guid(jobActivityTrace.ToHexString());
         }
@@ -216,9 +240,18 @@ public class Publisher<TContext> : IPublisher
             newJob.TraceId = newJob.Id; // Root of a new trace
         }
 
-        if (Activity.Current?.SpanId is { } jobSpanId && jobSpanId != default)
+        if (callerSpanId is { } jobSpanId && jobSpanId != default)
         {
             newJob.ParentSpanId = jobSpanId.ToHexString();
+        }
+
+        if (producerSpan != null)
+        {
+            producerSpan.SetTag(WarpTelemetryAttributes.MessagingMessageId, newJob.Id.ToString());
+            producerSpan.SetTag(WarpTelemetryAttributes.MessagingConversationId, newJob.TraceId.ToString());
+            producerSpan.SetTag(WarpTelemetryAttributes.WarpJobKind, JobKind.Job.ToString());
+            producerSpan.SetTag(WarpTelemetryAttributes.WarpJobType, WarpTelemetry.GetShortTypeName(newJob.Type));
+            producerSpan.SetTag(WarpTelemetryAttributes.WarpJobScheduled, scheduleTime != null);
         }
 
         WarpTelemetry.JobsEnqueued.Add(1, new KeyValuePair<string, object?>("queue", newJob.Queue), new KeyValuePair<string, object?>("kind", "job"));

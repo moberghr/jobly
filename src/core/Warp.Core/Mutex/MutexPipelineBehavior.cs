@@ -1,5 +1,6 @@
 using Warp.Core.Enums;
 using Warp.Core.Handlers;
+using Warp.Core.Logging;
 
 namespace Warp.Core.Mutex;
 
@@ -31,10 +32,22 @@ public class MutexPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
             return await next(request, cancellationToken);
         }
 
-        var handle = await _lockProvider.TryAcquireAsync(
-            $"warp:mutex:{meta.ConcurrencyKey}",
-            TimeSpan.Zero,
-            cancellationToken);
+        IAsyncDisposable? handle;
+        using (var mutexSpan = WarpTelemetry.StartMutexActivity())
+        {
+            mutexSpan?.SetTag(WarpTelemetryAttributes.WarpMutexKey, meta.ConcurrencyKey);
+
+            handle = await _lockProvider.TryAcquireAsync(
+                $"warp:mutex:{meta.ConcurrencyKey}",
+                TimeSpan.Zero,
+                cancellationToken);
+
+            mutexSpan?.SetTag(WarpTelemetryAttributes.WarpMutexAcquired, handle != null);
+            if (handle == null)
+            {
+                mutexSpan?.AddEvent(new System.Diagnostics.ActivityEvent(WarpTelemetryAttributes.WarpMutexHeldByOtherEvent));
+            }
+        }
 
         if (handle == null)
         {
