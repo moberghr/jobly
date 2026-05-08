@@ -578,6 +578,12 @@ public class WarpDispatcherWorker<TContext> : BackgroundService
             counters.Add(new Counter { Key = "stats:deleted", Value = 1 });
             counters.Add(new Counter { Key = $"stats:deleted:{hourSuffix}", Value = 1 });
         }
+        else if (state == State.Enqueued || state == State.Scheduled)
+        {
+            // Covers retry backoff and Mutex Wait — anything that puts the job back on the queue.
+            counters.Add(new Counter { Key = "stats:requeued", Value = 1 });
+            counters.Add(new Counter { Key = $"stats:requeued:{hourSuffix}", Value = 1 });
+        }
 
         var logMessage = outcome?.LogMessage
             ?? (error != null ? error.Message : $"Job {job.Id} completed");

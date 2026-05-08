@@ -432,6 +432,6 @@ var activeJobs = await _context.Set<Job>()
 - **§8.3** `ContinuationOptions` is generalized to all job kinds — any job with children can control child activation on failure.
 - **§8.4** `RequeueJob` resets `ScheduleTime` to now. Requeued jobs always execute immediately.
 - **§8.5** Cancellation uses `CancellationMode` enum, not immediate state change. Worker monitors and cancels handler token.
-- **§8.6** Mutex is an opt-in addon (`opt.AddMutex()` on the builder). `MutexPipelineBehavior` uses distributed lock via `IWarpLockProvider`. Set key via `.WithMutex("key")` or `[Mutex("key")]` attribute. Concurrency key stored in metadata.
+- **§8.6** Mutex is an opt-in addon (`opt.AddMutex()` on the builder). `MutexPipelineBehavior` uses distributed lock via `IWarpLockProvider`. Set key via `.WithMutex("key")` or `[Mutex("key")]` attribute. Concurrency key stored in metadata. Two policies via `MutexMode`: `Skip` (default — duplicate is short-circuited to `Deleted`) and `Wait` (duplicate is requeued with `ScheduleTime = now`, audit log shows `Requeued`). `Wait` provides mutual exclusion only — order across requeued jobs is best-effort (workers race on the requeue write), so it's not strict FIFO. Use via `.WithMutex("key", MutexMode.Wait)` or `[Mutex("key", Mode = MutexMode.Wait)]`.
 - **§8.7** `RecurringJobScheduler` creates jobs, `AddOrUpdateRecurringJob` only registers/updates definitions.
 - **§8.8** Source generator (`Warp.SourceGenerator`) for zero-allocation mediator and worker dispatch.

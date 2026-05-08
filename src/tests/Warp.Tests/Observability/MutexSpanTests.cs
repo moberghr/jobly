@@ -41,7 +41,7 @@ public class MutexSpanTests
         var jobContext = new JobContext { JobId = Guid.NewGuid(), TraceId = Guid.NewGuid() };
         jobContext.Metadata["ConcurrencyKey"] = "user-42";
         var lockProvider = new FakeLockProvider { ShouldAcquire = true };
-        var behavior = new MutexPipelineBehavior<TestJob, Unit>(jobContext, lockProvider);
+        var behavior = new MutexPipelineBehavior<TestJob, Unit>(jobContext, lockProvider, TimeProvider.System);
 
         await behavior.HandleAsync(new TestJob(), (req, ct) => Task.FromResult(Unit.Value), CancellationToken.None);
 
@@ -59,7 +59,7 @@ public class MutexSpanTests
         var jobContext = new JobContext { JobId = Guid.NewGuid(), TraceId = Guid.NewGuid() };
         jobContext.Metadata["ConcurrencyKey"] = "user-99";
         var lockProvider = new FakeLockProvider { ShouldAcquire = false };
-        var behavior = new MutexPipelineBehavior<TestJob, Unit>(jobContext, lockProvider);
+        var behavior = new MutexPipelineBehavior<TestJob, Unit>(jobContext, lockProvider, TimeProvider.System);
         var nextCalled = false;
 
         await behavior.HandleAsync(
@@ -87,7 +87,7 @@ public class MutexSpanTests
         using var harness = new ActivityListenerHarness();
         var jobContext = new JobContext { JobId = Guid.NewGuid(), TraceId = Guid.NewGuid() };
         var lockProvider = new FakeLockProvider();
-        var behavior = new MutexPipelineBehavior<TestJobNoMutex, Unit>(jobContext, lockProvider);
+        var behavior = new MutexPipelineBehavior<TestJobNoMutex, Unit>(jobContext, lockProvider, TimeProvider.System);
 
         await behavior.HandleAsync(new TestJobNoMutex(), (req, ct) => Task.FromResult(Unit.Value), CancellationToken.None);
 
@@ -109,7 +109,7 @@ public class MutexSpanTests
         var jobContext = new JobContext { JobId = Guid.NewGuid(), TraceId = Guid.NewGuid() };
         jobContext.Metadata["ConcurrencyKey"] = "user-99";
         var lockProvider = new ThrowingLockProvider();
-        var behavior = new MutexPipelineBehavior<TestJob, Unit>(jobContext, lockProvider);
+        var behavior = new MutexPipelineBehavior<TestJob, Unit>(jobContext, lockProvider, TimeProvider.System);
 
         await Should.ThrowAsync<InvalidOperationException>(() =>
             behavior.HandleAsync(new TestJob(), (req, ct) => Task.FromResult(Unit.Value), CancellationToken.None));
@@ -132,7 +132,7 @@ public class MutexSpanTests
         var jobContext = new JobContext { JobId = Guid.NewGuid(), TraceId = Guid.NewGuid() };
         jobContext.Metadata["ConcurrencyKey"] = "should-be-ignored";
         var lockProvider = new FakeLockProvider();
-        var behavior = new MutexPipelineBehavior<NotAJobRequest, Unit>(jobContext, lockProvider);
+        var behavior = new MutexPipelineBehavior<NotAJobRequest, Unit>(jobContext, lockProvider, TimeProvider.System);
         var nextCalled = false;
 
         await behavior.HandleAsync(

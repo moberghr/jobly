@@ -33,9 +33,15 @@ public abstract class MutexTestsBase : IAsyncLifetime
     private static readonly Guid ServerId = Guid.NewGuid();
     private static readonly string[] DefaultQueues = ["default"];
 
-    private static string SerializeMutexMetadata(string key)
+    private static string SerializeMutexMetadata(string key, MutexMode? mode = null)
     {
-        return JsonSerializer.Serialize(new Dictionary<string, object> { ["ConcurrencyKey"] = key });
+        var dict = new Dictionary<string, object> { ["ConcurrencyKey"] = key };
+        if (mode != null)
+        {
+            dict["Mode"] = (int)mode.Value;
+        }
+
+        return JsonSerializer.Serialize(dict);
     }
 
     [TimedFact]
@@ -256,6 +262,105 @@ public abstract class MutexTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
+    public async Task MutexHeld_WaitMode_SecondJobRequeued()
+    {
+        // Arrange: two jobs with same concurrency key in Wait mode, first already processing
+        var ctx = _fixture.CreateContext();
+        var job1Id = Guid.NewGuid();
+        var job2Id = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = job1Id,
+            Kind = JobKind.Job,
+            CurrentState = State.Processing,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow.AddMinutes(-1),
+            Queue = "default",
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = "{}",
+            Metadata = SerializeMutexMetadata("payment:wait", MutexMode.Wait),
+        });
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = job2Id,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow.AddMinutes(-1),
+            Queue = "default",
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = "{}",
+            Metadata = SerializeMutexMetadata("payment:wait", MutexMode.Wait),
+        });
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        var lockProvider = new FakeLockProvider();
+        var heldHandle = lockProvider.HoldLock("warp:mutex:payment:wait");
+
+        // Act
+        var worker = CreateWorker(lockProvider);
+        await worker.GetAndProcessJob(CancellationToken.None);
+        await heldHandle.DisposeAsync();
+
+        // Assert: job2 should be back in Enqueued, ExpireAt unset, Requeued log entry written
+        var readCtx = _fixture.CreateContext();
+        var job2 = await readCtx.Set<Job>().FindAsync([job2Id], CancellationToken.None);
+        job2.ShouldNotBeNull();
+        job2.CurrentState.ShouldBe(State.Enqueued);
+        job2.ExpireAt.ShouldBeNull();
+
+        var log = await readCtx.Set<JobLog>()
+            .Where(x => x.JobId == job2Id)
+            .Where(x => x.EventType == "Requeued")
+            .FirstOrDefaultAsync(CancellationToken.None);
+        log.ShouldNotBeNull();
+        log.Message.ShouldContain("mutex");
+        log.Message.ShouldContain("payment:wait");
+
+        // Counter row written for the requeue — surfaces in the dashboard's Requeued metric.
+        var requeuedCounter = await readCtx.Set<Counter>()
+            .Where(x => x.Key == "stats:requeued")
+            .SumAsync(x => x.Value, CancellationToken.None);
+        requeuedCounter.ShouldBe(1);
+
+        var hourlyCounter = await readCtx.Set<Counter>()
+            .Where(x => x.Key.StartsWith("stats:requeued:"))
+            .SumAsync(x => x.Value, CancellationToken.None);
+        hourlyCounter.ShouldBe(1);
+    }
+
+    [TimedFact]
+    public async Task MutexFree_WaitMode_JobProcessesNormally()
+    {
+        // Arrange: job with Wait mode, no other holder
+        var ctx = _fixture.CreateContext();
+        var jobId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = jobId,
+            Kind = JobKind.Job,
+            CurrentState = State.Enqueued,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow.AddMinutes(-1),
+            Queue = "default",
+            Type = typeof(UnitRequest).AssemblyQualifiedName,
+            Message = "{}",
+            Metadata = SerializeMutexMetadata("payment:free-wait", MutexMode.Wait),
+        });
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        // Act
+        var worker = CreateWorker();
+        await worker.GetAndProcessJob(CancellationToken.None);
+
+        // Assert: job should complete normally
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FindAsync([jobId], Xunit.TestContext.Current.CancellationToken);
+        job.ShouldNotBeNull();
+        job.CurrentState.ShouldBe(State.Completed);
+    }
+
+    [TimedFact]
     public async Task MutexAttribute_SetsKeyAtPublishTime()
     {
         // Arrange: MutexAttributeRequest has [Mutex("static-key")] on the job class
@@ -327,6 +432,44 @@ public abstract class MutexTestsBase : IAsyncLifetime
         metadata["ConcurrencyKey"].ToString().ShouldBe("dynamic-key");
     }
 
+    [TimedFact]
+    public async Task MutexAttribute_WaitMode_PropagatesToMetadata()
+    {
+        // Arrange: MutexWaitAttributeRequest has [Mutex("static-wait-key", Mode = MutexMode.Wait)]
+        var services = new ServiceCollection();
+        services.AddWarpMediator();
+        services.AddLogging();
+        services.AddScoped<TestContext>(_ => _fixture.CreateContext());
+        services.AddScoped<JobContext>();
+        services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
+        services.AddSingleton<IWarpLockProvider>(new FakeLockProvider());
+        new Warp.Core.WarpBuilder<TestContext>(services).AddMutex();
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IOptions<WarpConfiguration>>(new OptionsWrapper<WarpConfiguration>(new WarpConfiguration()));
+
+        var provider = services.BuildServiceProvider();
+        await using var scope = provider.CreateAsyncScope();
+        var publisherCtx = scope.ServiceProvider.GetRequiredService<TestContext>();
+        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider);
+
+        // Act
+        var jobId = await publisher.Enqueue(new MutexWaitAttributeRequest());
+        await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        // Assert: metadata should carry both ConcurrencyKey and Mode = Wait
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>()
+            .Where(x => x.Id == jobId)
+            .FirstAsync(CancellationToken.None);
+
+        var metadata = JsonSerializer.Deserialize<Dictionary<string, object>>(job.Metadata!);
+        metadata.ShouldNotBeNull();
+        metadata.ShouldContainKey("ConcurrencyKey");
+        metadata["ConcurrencyKey"].ToString().ShouldBe("static-wait-key");
+        metadata.ShouldContainKey("Mode");
+        ((JsonElement)metadata["Mode"]).GetInt32().ShouldBe((int)MutexMode.Wait);
+    }
+
     private WarpWorkerService<TestContext> CreateWorker(FakeLockProvider? lockProvider = null)
     {
         lockProvider ??= new FakeLockProvider();
@@ -337,6 +480,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
         services.AddSingleton<IWarpLockProvider>(lockProvider);
+        services.AddSingleton(TimeProvider.System);
         new Warp.Core.WarpBuilder<TestContext>(services).AddMutex();
 
         var workerConfig = new OptionsWrapper<WarpWorkerConfiguration>(new WarpWorkerConfiguration

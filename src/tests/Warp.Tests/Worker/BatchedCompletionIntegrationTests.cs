@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Shouldly;
 using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
@@ -130,64 +132,73 @@ public abstract class BatchedCompletionIntegrationTestsBase : IntegrationTestBas
     [TimedFact(timeout: 60_000)]
     public async Task GivenShutdown_WhenServerStops_ThenPendingCompletionsAreFlushed()
     {
-        // Arrange — isolated queue with a long flush interval so completions stay buffered
-        // until StopAsync drains them.
+        // Arrange — single-worker, isolated queue, with a barrier handler queued behind 4 short
+        // ones. The single worker pulls them from the dispatcher channel back-to-back: short
+        // jobs 1..4 each call _batch.Add and TryRead returns true for the next one — so the inner
+        // loop never exits and the idle-drain at WarpDispatcherWorker line 107 does NOT run.
+        // When the worker enters the barrier handler it parks inside ProcessJob, leaving 4
+        // PendingCompletion entries sitting in _batch. With a short HostOptions.ShutdownTimeout,
+        // base.StopAsync returns before the parked handler completes; the worker's StopAsync
+        // override then runs _batch.FlushAsync() — that is the load-bearing path under test.
+        // The 5th (barrier) job stays in Processing and would be recovered by StaleJobRecovery
+        // in production; that's the realistic outcome of a shutdown mid-handler.
         const string isolatedQueue = "batch-shutdown-flush";
-        var server = await WarpTestServer.StartAsync(Fixture, config =>
-        {
-            config.UseDispatcher = true;
-            config.WorkerCount = 2;
-            config.Queues = [isolatedQueue];
-            config.CompletionBatchSize = 50;
-            config.CompletionFlushInterval = TimeSpan.FromSeconds(30);
-        });
+        var barrier = new BarrierSignal();
+        var server = await WarpTestServer.StartAsync(
+            Fixture,
+            config =>
+            {
+                config.UseDispatcher = true;
+                config.WorkerCount = 1;
+                config.Queues = [isolatedQueue];
+                config.CompletionBatchSize = 50;
+                config.CompletionFlushInterval = TimeSpan.FromSeconds(30);
+            },
+            services =>
+            {
+                services.AddSingleton(barrier);
+                services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromMilliseconds(500));
+            });
 
         try
         {
             var publisher = server.CreatePublisher();
-            for (var i = 0; i < 5; i++)
+            for (var i = 0; i < 4; i++)
             {
                 await publisher.Enqueue(new UnitRequest(), queue: isolatedQueue);
             }
 
+            await publisher.Enqueue(new BarrierRequest(), queue: isolatedQueue);
             await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-            // Wait until all 5 jobs have been picked up by a worker (CurrentWorkerId set by
-            // MarkWorkerOwnership at handler entry). This avoids a race: WaitForJobsToLeaveEnqueued
-            // alone returns as soon as the dispatcher's batch claim commits Processing, but before
-            // the in-memory channel delivery + worker pickup completes. If we disposed in that
-            // window, the dispatcher's UnclaimUndelivered would roll the undelivered jobs back to
-            // Enqueued — defeating the test's premise that pending completions get flushed.
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
-            while (DateTime.UtcNow < deadline)
-            {
-                var pollCtx = Fixture.CreateContext();
-                var pickedUp = await pollCtx.Set<Job>()
-                    .CountAsync(
-                        j => j.Queue == isolatedQueue && j.CurrentWorkerId != null,
-                        Xunit.TestContext.Current.CancellationToken);
-                if (pickedUp == 5)
-                {
-                    break;
-                }
-
-                await Task.Delay(100, Xunit.TestContext.Current.CancellationToken);
-            }
+            // Wait for the barrier handler to enter. Single-worker FIFO guarantees the 4 short
+            // jobs ran first and each added to _batch. No idle-drain has fired because the inner
+            // TryRead loop is now parked inside ProcessJob(barrier).
+            await barrier.Running.WaitAsync(Xunit.TestContext.Current.CancellationToken);
         }
         finally
         {
-            // StopAsync override should drain the buffered completions.
+            // StopAsync override is the only path that can persist the 4 buffered completions —
+            // the parked handler prevents idle-drain from running.
             await server.DisposeAsync();
+
+            // Release the orphaned handler so its task doesn't keep waiting after the host is
+            // gone. The post-handler code may observe disposed scopes, but nothing awaits it.
+            barrier.CanFinish.Release();
         }
 
-        // Assert — after shutdown, all jobs must be persisted as Completed.
+        // Assert — the 4 short jobs must reach Completed via the shutdown-flush path. The 5th
+        // (barrier) is the in-flight orphan; it stays Processing because its handler was still
+        // parked when shutdown returned. StaleJobRecovery would clean it up in production.
         var ctx = Fixture.CreateContext();
         var jobs = await ctx.Set<Job>()
             .Where(j => j.Queue == isolatedQueue)
+            .OrderBy(j => j.CreateTime)
             .AsNoTracking()
             .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         jobs.Count.ShouldBe(5);
-        jobs.ShouldAllBe(j => j.CurrentState == State.Completed);
+        jobs.Take(4).ShouldAllBe(j => j.CurrentState == State.Completed);
+        jobs[4].CurrentState.ShouldBe(State.Processing);
     }
 
     [TimedFact(timeout: 60_000)]

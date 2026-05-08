@@ -253,3 +253,14 @@ export interface StatsHistoryPoint {
   succeeded: number;
   failed: number;
 }
+
+export interface CounterModel {
+  key: string;
+  value: number;
+}
+
+export interface CounterHistoryPoint {
+  hour: string;
+  key: string;
+  value: number;
+}

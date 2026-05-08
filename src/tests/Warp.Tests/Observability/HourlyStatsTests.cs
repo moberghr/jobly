@@ -222,4 +222,96 @@ public abstract class HourlyStatsTestsBase : IAsyncLifetime
         status.TotalFailed.ShouldBe(7);
         status.TotalDeleted.ShouldBe(3);
     }
+
+    [TimedFact]
+    public async Task GetCounters_MergesStatisticsAndPendingCounters()
+    {
+        // Arrange — Statistic table has aggregated values, Counter table has pending writes for
+        // the same key. The merged view must sum them.
+        var ctx = _fixture.CreateContext();
+        ctx.Set<Statistic>().Add(new Statistic { Key = "stats:succeeded", Value = 100 });
+        ctx.Set<Statistic>().Add(new Statistic { Key = "stats:failed", Value = 5 });
+        ctx.Set<Counter>().Add(new Counter { Key = "stats:succeeded", Value = 3 });
+        ctx.Set<Counter>().Add(new Counter { Key = "stats:succeeded", Value = 2 });
+        ctx.Set<Counter>().Add(new Counter { Key = "stats:requeued", Value = 4 });
+        ctx.Set<Counter>().Add(new Counter { Key = "addon:custom-metric", Value = 17 });
+
+        // Hourly-bucket rows (internal accounting for the chart) — must be hidden from the page.
+        ctx.Set<Statistic>().Add(new Statistic { Key = "stats:succeeded:2026-05-07-10", Value = 50 });
+        ctx.Set<Counter>().Add(new Counter { Key = "stats:failed:2026-05-07-11", Value = 2 });
+
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        // Act
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var counters = await svc.GetCounters();
+
+        // Assert — merged + sorted alphabetically
+        counters.Count.ShouldBe(4);
+
+        var succeeded = counters.Single(x => string.Equals(x.Key, "stats:succeeded", StringComparison.Ordinal));
+        succeeded.Value.ShouldBe(105);
+
+        var failed = counters.Single(x => string.Equals(x.Key, "stats:failed", StringComparison.Ordinal));
+        failed.Value.ShouldBe(5);
+
+        var requeued = counters.Single(x => string.Equals(x.Key, "stats:requeued", StringComparison.Ordinal));
+        requeued.Value.ShouldBe(4);
+
+        // Addons can write arbitrary keys; they show up too.
+        var custom = counters.Single(x => string.Equals(x.Key, "addon:custom-metric", StringComparison.Ordinal));
+        custom.Value.ShouldBe(17);
+
+        // Sorted by key
+        counters.Select(x => x.Key).ShouldBe(["addon:custom-metric", "stats:failed", "stats:requeued", "stats:succeeded"]);
+    }
+
+    [TimedFact]
+    public async Task GetCountersHistory_ReturnsHourlyPointsForAllPrefixes()
+    {
+        // Arrange — insert hourly rows for built-ins + an addon-defined key, plus an out-of-window row.
+        var ctx = _fixture.CreateContext();
+        var now = DateTime.UtcNow;
+        var oneHourAgo = now.AddHours(-1).ToString("yyyy-MM-dd-HH");
+        var twoHoursAgo = now.AddHours(-2).ToString("yyyy-MM-dd-HH");
+        var outOfWindow = now.AddHours(-100).ToString("yyyy-MM-dd-HH");
+
+        ctx.Set<Statistic>().Add(new Statistic { Key = $"stats:succeeded:{twoHoursAgo}", Value = 10 });
+        ctx.Set<Statistic>().Add(new Statistic { Key = $"stats:succeeded:{oneHourAgo}", Value = 20 });
+        ctx.Set<Statistic>().Add(new Statistic { Key = $"stats:failed:{oneHourAgo}", Value = 3 });
+        ctx.Set<Statistic>().Add(new Statistic { Key = $"stats:requeued:{oneHourAgo}", Value = 1 });
+        ctx.Set<Statistic>().Add(new Statistic { Key = $"addon:custom-metric:{oneHourAgo}", Value = 7 });
+
+        // Pending Counter row for the same hour as a Statistic row — must merge.
+        ctx.Set<Counter>().Add(new Counter { Key = $"stats:succeeded:{oneHourAgo}", Value = 5 });
+
+        // Out-of-window — must be excluded.
+        ctx.Set<Statistic>().Add(new Statistic { Key = $"stats:succeeded:{outOfWindow}", Value = 999 });
+
+        // Rolled-up (non-hourly) — must be excluded; the chart endpoint only returns hourly rows.
+        ctx.Set<Statistic>().Add(new Statistic { Key = "stats:succeeded", Value = 9999 });
+
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        // Act
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var history = await svc.GetCountersHistory(24);
+
+        // Assert — out-of-window and rolled-up rows are excluded
+        history.Any(p => p.Value == 999).ShouldBeFalse("out-of-window row must not be returned");
+        history.Any(p => p.Value == 9999).ShouldBeFalse("rolled-up row must not be returned");
+
+        // Each hourly row surfaces with its base key (no date suffix) and merged value.
+        var succeededRecent = history.Single(p => string.Equals(p.Key, "stats:succeeded", StringComparison.Ordinal) && p.Value == 25);
+        succeededRecent.ShouldNotBeNull();
+
+        var succeededOlder = history.Single(p => string.Equals(p.Key, "stats:succeeded", StringComparison.Ordinal) && p.Value == 10);
+        succeededOlder.ShouldNotBeNull();
+
+        history.Any(p => string.Equals(p.Key, "stats:failed", StringComparison.Ordinal) && p.Value == 3).ShouldBeTrue();
+        history.Any(p => string.Equals(p.Key, "stats:requeued", StringComparison.Ordinal) && p.Value == 1).ShouldBeTrue();
+
+        // Addon-defined hourly metrics surface alongside built-ins.
+        history.Any(p => string.Equals(p.Key, "addon:custom-metric", StringComparison.Ordinal) && p.Value == 7).ShouldBeTrue();
+    }
 }

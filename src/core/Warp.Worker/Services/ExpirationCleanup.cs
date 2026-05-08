@@ -78,11 +78,26 @@ public sealed class ExpirationCleanup<TContext> : IServerTask
             .Where(x => expiredJobIds.Contains(x.Id))
             .ExecuteDeleteAsync(ct);
 
-        var oldHourPrefix = now.AddDays(-7).ToString("yyyy-MM-dd");
-        await _context.Set<Statistic>()
-            .Where(x => (x.Key.StartsWith("stats:succeeded:") || x.Key.StartsWith("stats:failed:"))
-                        && x.Key.CompareTo($"stats:failed:{oldHourPrefix}") < 0)
-            .ExecuteDeleteAsync(ct);
+        // Hourly bucket rows (any key ending in :yyyy-MM-dd-HH) older than 7 days. Generic so
+        // addon-defined hourly metrics get pruned with the same retention. Coarse SQL filter
+        // narrows to keys with at least one ':', then the in-memory parse rejects keys whose
+        // suffix isn't actually a date — so an addon writing :foo-bar-baz wouldn't be deleted.
+        var hourlyCutoff = now.AddDays(-7);
+        var candidateKeys = await _context.Set<Statistic>()
+            .Where(x => EF.Functions.Like(x.Key, "%:%"))
+            .Select(x => x.Key)
+            .ToListAsync(ct);
+
+        var staleKeys = candidateKeys
+            .Where(k => TryParseHourlySuffix(k, out var hour) && hour < hourlyCutoff)
+            .ToList();
+
+        if (staleKeys.Count > 0)
+        {
+            await _context.Set<Statistic>()
+                .Where(x => staleKeys.Contains(x.Key))
+                .ExecuteDeleteAsync(ct);
+        }
 
         var serverTasks = await _context.Set<ServerTask>()
             .Select(x => new { x.Id, x.IntervalSeconds })
@@ -102,6 +117,23 @@ public sealed class ExpirationCleanup<TContext> : IServerTask
             .ExecuteDeleteAsync(ct);
 
         return expiredJobIds.Count;
+    }
+
+    private static bool TryParseHourlySuffix(string key, out DateTime hour)
+    {
+        hour = default;
+        var lastColon = key.LastIndexOf(':');
+        if (lastColon < 0)
+        {
+            return false;
+        }
+
+        return DateTime.TryParseExact(
+            key.AsSpan(lastColon + 1),
+            "yyyy-MM-dd-HH",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None,
+            out hour);
     }
 
     internal async Task<int> RunCountBasedCleanupAsync(int maxCount, int batchSize, CancellationToken ct)
