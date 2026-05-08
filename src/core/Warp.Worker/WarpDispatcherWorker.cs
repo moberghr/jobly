@@ -156,27 +156,39 @@ public class WarpDispatcherWorker<TContext> : BackgroundService
     {
         PerfTrace.Begin();
 
-        // Operational observability — Dashboard/incident response needs to see "worker X holds job Y"
-        // while it runs. Single UPDATE (no SELECT, no change tracker). Scope disposes when the helper returns.
-        // CancellationToken.None: the claim already committed State=Processing, so aborting this
-        // UPDATE on shutdown would orphan the row without clearing the worker stamp. Fast UPDATE,
-        // uncancellable is cheap insurance.
-        await MarkWorkerOwnership(job, CancellationToken.None);
-        job.CurrentWorkerId = _workerId;
+        // OTel "receive" span — covers post-fetch / pre-handler bookkeeping (mark worker ownership).
+        // Closes before the consumer span opens, so receive and process are siblings under the
+        // caller's trace, not nested.
+        using (var receiveSpan = WarpTelemetry.StartReceiveActivity(job.Queue))
+        {
+            receiveSpan?.SetTag(WarpTelemetryAttributes.MessagingMessageId, job.Id.ToString());
+            receiveSpan?.SetTag(WarpTelemetryAttributes.WarpWorkerId, _workerId.ToString());
+
+            // Operational observability — Dashboard/incident response needs to see "worker X holds job Y"
+            // while it runs. Single UPDATE (no SELECT, no change tracker). Scope disposes when the helper returns.
+            // CancellationToken.None: the claim already committed State=Processing, so aborting this
+            // UPDATE on shutdown would orphan the row without clearing the worker stamp. Fast UPDATE,
+            // uncancellable is cheap insurance.
+            await MarkWorkerOwnership(job, CancellationToken.None);
+            job.CurrentWorkerId = _workerId;
+        }
 
         var logCollector = new JobLogCollector { JobId = job.Id, TimeProvider = _timeProvider, WorkerId = _workerId };
 
         using var jobCts = new CancellationTokenSource();
         var monitorTask = RunJobMonitor(job.Id, logCollector, jobCts, cancellationToken);
 
-        var activity = WarpTelemetry.StartJobActivity(job.TraceId ?? job.Id, job.ParentSpanId);
+        var activity = WarpTelemetry.StartJobActivity(job.TraceId ?? job.Id, job.ParentSpanId, job.Queue);
         var jobTypeName = WarpTelemetry.GetShortTypeName(job.Type);
-        activity.SetTag("messaging.system", "warp");
-        activity.SetTag("messaging.operation.name", "process");
-        activity.SetTag("messaging.destination.name", job.Queue);
-        activity.SetTag("messaging.message.id", job.Id.ToString());
-        activity.SetTag("warp.job.type", jobTypeName);
-        activity.SetTag("warp.job.kind", job.Kind.ToString());
+        activity?.SetTag(WarpTelemetryAttributes.MessagingMessageId, job.Id.ToString());
+        activity?.SetTag(WarpTelemetryAttributes.MessagingConversationId, (job.TraceId ?? job.Id).ToString());
+        activity?.SetTag(WarpTelemetryAttributes.WarpJobType, jobTypeName);
+        activity?.SetTag(WarpTelemetryAttributes.WarpJobKind, job.Kind.ToString());
+        activity?.SetTag(WarpTelemetryAttributes.WarpWorkerId, _workerId.ToString());
+
+        // Note: dispatcher fetches only Kind=Job rows (see PostgresWarpSqlQueries.cs /
+        // SqlServerWarpSqlQueries.cs); the messaging.batch.message_count tag belongs on the
+        // producer span emitted by BatchPublisher, not here.
         WarpTelemetry.JobsActive.Add(1, new KeyValuePair<string, object?>("queue", job.Queue));
         Stopwatch? handlerStopwatch = null;
         IServiceScope? handlerScope = null;
@@ -206,6 +218,25 @@ public class WarpDispatcherWorker<TContext> : BackgroundService
             jobContext.TraceId = job.TraceId ?? job.Id;
             jobContext.Metadata = MetadataSerializer.Deserialize(job.Metadata);
 
+            // Tag the consumer span with the retry attempt (1-based). Read directly from the
+            // metadata dict — Warp.Worker does not depend on Warp.Core.Retry. Numbers come
+            // back from MetadataSerializer.Deserialize as long.
+            if (jobContext.Metadata.TryGetValue(WarpTelemetryAttributes.RetryMetadataRetriedTimesKey, out var retriedTimesObj)
+                && retriedTimesObj is long retriedTimes)
+            {
+                activity?.SetTag(WarpTelemetryAttributes.WarpJobAttempt, retriedTimes + 1);
+            }
+            else
+            {
+                activity?.SetTag(WarpTelemetryAttributes.WarpJobAttempt, 1);
+            }
+
+            if (jobContext.Metadata.TryGetValue(WarpTelemetryAttributes.RetryMetadataMaxRetriesKey, out var maxRetriesObj)
+                && maxRetriesObj is long maxRetries)
+            {
+                activity?.SetTag(WarpTelemetryAttributes.WarpJobMaxAttempts, maxRetries + 1);
+            }
+
             handlerStopwatch = Stopwatch.StartNew();
             await ExecuteJob(job, handlerScope.ServiceProvider, jobCts.Token);
             handlerStopwatch.Stop();
@@ -232,17 +263,17 @@ public class WarpDispatcherWorker<TContext> : BackgroundService
             if (successOutcome != null)
             {
                 var outcomeStatus = successOutcome.State.ToString().ToLowerInvariant();
-                activity.SetTag("warp.job.status", outcomeStatus);
-                activity.SetTag("warp.job.duration_ms", durationMs);
-                activity.AddEvent(new ActivityEvent($"warp.job.{outcomeStatus}"));
+                activity?.SetTag(WarpTelemetryAttributes.WarpJobStatus, outcomeStatus);
+                activity?.SetTag(WarpTelemetryAttributes.WarpJobDurationMs, durationMs);
+                activity?.AddEvent(new ActivityEvent($"warp.job.{outcomeStatus}"));
                 WarpTelemetry.JobDuration.Record(durationMs, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", outcomeStatus));
                 WarpTelemetry.JobsCompleted.Add(1, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", outcomeStatus));
             }
             else
             {
-                activity.SetTag("warp.job.status", "succeeded");
-                activity.SetTag("warp.job.duration_ms", durationMs);
-                activity.AddEvent(new ActivityEvent("warp.job.completed", tags: new ActivityTagsCollection
+                activity?.SetTag(WarpTelemetryAttributes.WarpJobStatus, "succeeded");
+                activity?.SetTag(WarpTelemetryAttributes.WarpJobDurationMs, durationMs);
+                activity?.AddEvent(new ActivityEvent("warp.job.completed", tags: new ActivityTagsCollection
                 {
                     { "duration_ms", durationMs },
                 }));
@@ -288,8 +319,8 @@ public class WarpDispatcherWorker<TContext> : BackgroundService
             handlerScope = null;
 
             handlerStopwatch?.Stop();
-            activity.SetTag("warp.job.status", "cancelled");
-            activity.AddEvent(new ActivityEvent("warp.job.cancelled"));
+            activity?.SetTag(WarpTelemetryAttributes.WarpJobStatus, "cancelled");
+            activity?.AddEvent(new ActivityEvent("warp.job.cancelled"));
             WarpTelemetry.JobsCompleted.Add(1, new KeyValuePair<string, object?>("queue", job.Queue), new KeyValuePair<string, object?>("type", jobTypeName), new KeyValuePair<string, object?>("status", "cancelled"));
             JobLogContext.Current = null;
             JobExecutionContext.Current = null;
@@ -356,16 +387,17 @@ public class WarpDispatcherWorker<TContext> : BackgroundService
 
             var willRetry = job.CurrentState == State.Enqueued;
             var errorStatus = willRetry ? "retried" : "failed";
-            activity.SetStatus(ActivityStatusCode.Error, Truncate(e.Message, 256));
-            activity.SetTag("warp.job.status", errorStatus);
+            activity?.SetStatus(ActivityStatusCode.Error, WarpTelemetry.TruncateMessage(e.Message, 256));
+            activity?.SetTag(WarpTelemetryAttributes.WarpJobStatus, errorStatus);
+            activity?.SetTag(WarpTelemetryAttributes.ErrorType, e.GetType().FullName);
 
             if (willRetry)
             {
-                activity.AddEvent(new ActivityEvent("warp.job.retried"));
+                activity?.AddEvent(new ActivityEvent("warp.job.retried"));
             }
             else
             {
-                activity.AddEvent(new ActivityEvent("warp.job.failed", tags: new ActivityTagsCollection
+                activity?.AddEvent(new ActivityEvent("warp.job.failed", tags: new ActivityTagsCollection
                 {
                     { "exception.type", e.GetType().FullName },
                     { "exception.message", e.Message },
@@ -388,8 +420,8 @@ public class WarpDispatcherWorker<TContext> : BackgroundService
         {
             handlerScope?.Dispose();
             WarpTelemetry.JobsActive.Add(-1, new KeyValuePair<string, object?>("queue", job.Queue));
-            activity.Stop();
-            activity.Dispose();
+            activity?.Stop();
+            activity?.Dispose();
             JobLogContext.Current = null;
             JobExecutionContext.Current = null;
         }
@@ -605,10 +637,5 @@ public class WarpDispatcherWorker<TContext> : BackgroundService
         {
             yield return drained;
         }
-    }
-
-    private static string Truncate(string value, int maxLength)
-    {
-        return value.Length <= maxLength ? value : value[..maxLength];
     }
 }

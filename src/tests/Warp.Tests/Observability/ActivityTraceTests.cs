@@ -14,6 +14,7 @@ using Warp.Core.Handlers;
 using Warp.Core.Handlers.Generated;
 using Warp.Core.Logging;
 using Warp.Tests.Fixtures;
+using Warp.Tests.Helpers;
 using Warp.Tests.TestData.Handlers;
 using Warp.Worker;
 
@@ -27,7 +28,18 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
     private static readonly Guid WorkerId = Guid.NewGuid();
     private static readonly string[] DefaultQueues = ["default"];
 
-    protected ActivityTraceTestsBase(IDatabaseFixture fixture) => _fixture = fixture;
+    // Harness attached in the constructor — NOT in InitializeAsync — because AsyncLocal mutations
+    // made inside an async method don't propagate back to the caller in .NET, so a sentinel set
+    // in InitializeAsync would be lost by the time the test method runs. The constructor is
+    // synchronous, so its AsyncLocal write is captured into the ExecutionContext that the test
+    // method's first await flows into.
+    private readonly ActivityListenerHarness _harness;
+
+    protected ActivityTraceTestsBase(IDatabaseFixture fixture)
+    {
+        _fixture = fixture;
+        _harness = new ActivityListenerHarness();
+    }
 
     public async ValueTask InitializeAsync()
     {
@@ -51,7 +63,12 @@ public abstract class ActivityTraceTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        _harness.Dispose();
+
+        return ValueTask.CompletedTask;
+    }
 
     private (WarpWorkerService<TestContext> Worker, ActivityCapture Capture) CreateWorker()
     {

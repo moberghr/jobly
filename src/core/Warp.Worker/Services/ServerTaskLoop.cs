@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Warp.Core;
 using Warp.Core.Data.Entities;
+using Warp.Core.Logging;
 
 namespace Warp.Worker.Services;
 
@@ -181,17 +182,32 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
     private async Task<bool> RunOneIterationAsync(CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
+        using var taskSpan = WarpTelemetry.StartServerTaskActivity(_name);
+
+        // Default optimistically — we either acquired the lock (or no lock was needed) for any
+        // path that reaches the body. The catch block below treats lockHeld as true in the
+        // exception-from-task case (the lock was held while the task threw).
+        var lockHeld = true;
         try
         {
-            var message = await ExecuteInLockedScopeAsync(ct);
+            string? message;
+            (lockHeld, message) = await TryAcquireLockAndExecuteAsync(ct);
             var elapsed = sw.Elapsed.TotalMilliseconds;
+            taskSpan?.SetTag(WarpTelemetryAttributes.WarpTaskLockHeld, lockHeld);
+
+            if (!lockHeld)
+            {
+                return false;
+            }
 
             if (message == null)
             {
                 await TryUpdateServerTaskAsync("Skipped", null, elapsed);
+
                 return false;
             }
 
+            taskSpan?.SetTag(WarpTelemetryAttributes.WarpTaskMessage, message);
             await TryUpdateServerTaskAsync("Completed", message, elapsed);
             if (_logOnSuccess)
             {
@@ -202,11 +218,18 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
+            taskSpan?.SetTag(WarpTelemetryAttributes.WarpTaskLockHeld, lockHeld);
+
             return false;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Server task {Name} failed", _name);
+
+            // Exception type name only — messages can carry user data (CLAUDE.md §1.3).
+            taskSpan?.SetStatus(ActivityStatusCode.Error, WarpTelemetry.TruncateMessage(ex.Message, 256));
+            taskSpan?.SetTag(WarpTelemetryAttributes.ErrorType, ex.GetType().FullName);
+            taskSpan?.SetTag(WarpTelemetryAttributes.WarpTaskLockHeld, lockHeld);
             var elapsed = sw.Elapsed.TotalMilliseconds;
             await TryUpdateServerTaskAsync("Failed", ex.Message, elapsed);
             await TryWriteServerLogAsync("Failed", ex.Message, elapsed);
@@ -220,9 +243,19 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
     /// and no swallowed exceptions. Test-triggered runs never write ServerTask/ServerLog rows,
     /// so the dashboard history reflects only auto-scheduled runs.
     /// </summary>
-    internal Task<string?> RunOnceAsync(CancellationToken ct) => ExecuteInLockedScopeAsync(ct);
+    internal async Task<string?> RunOnceAsync(CancellationToken ct)
+    {
+        var (_, message) = await TryAcquireLockAndExecuteAsync(ct);
 
-    private async Task<string?> ExecuteInLockedScopeAsync(CancellationToken ct)
+        return message;
+    }
+
+    /// <summary>
+    /// Acquires the distributed lock (if <see cref="_lockKey"/> is set), runs the task in a
+    /// fresh scope, and returns both whether the lock was held and the task's result message.
+    /// When <c>_lockKey</c> is null, <c>LockHeld</c> is always <c>true</c> (no lock required).
+    /// </summary>
+    private async Task<(bool LockHeld, string? Message)> TryAcquireLockAndExecuteAsync(CancellationToken ct)
     {
         IAsyncDisposable? handle = null;
         if (_lockKey != null)
@@ -230,7 +263,7 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
             handle = await _lockProvider.TryAcquireAsync(_lockKey, TimeSpan.Zero, ct);
             if (handle == null)
             {
-                return null;
+                return (false, null);
             }
         }
 
@@ -241,7 +274,7 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
                 .GetServices<IServerTask>()
                 .First(x => x.GetType() == _taskType);
 
-            return await task.ExecuteAsync(ct);
+            return (true, await task.ExecuteAsync(ct));
         }
         finally
         {
