@@ -12,4 +12,17 @@ internal sealed class SqlServerExceptionClassifier : IDatabaseExceptionClassifie
     {
         return ex.InnerException is SqlException { Number: 2627 or 2601 };
     }
+
+    public bool IsTransientDeadlock(Exception ex)
+    {
+        for (var current = ex; current is not null; current = current.InnerException)
+        {
+            if (current is SqlException { Number: 1205 })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

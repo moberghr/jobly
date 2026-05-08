@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Warp.Core.Data;
 using Warp.Core.Notifications;
 using Warp.Worker.Services;
 
@@ -28,6 +29,7 @@ public class WarpDispatcherHost<TContext> : IHostedService
     private readonly ServerTaskSignals<TContext> _signals;
     private readonly DispatcherRegistry _dispatcherRegistry;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly IDatabaseExceptionClassifier _exceptionClassifier;
     private readonly List<BackgroundService> _workers = [];
 
     public WarpDispatcherHost(
@@ -39,7 +41,8 @@ public class WarpDispatcherHost<TContext> : IHostedService
         ServerRegistrationState state,
         ServerTaskSignals<TContext> signals,
         DispatcherRegistry dispatcherRegistry,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        IDatabaseExceptionClassifier exceptionClassifier)
     {
         _configuration = configuration.Value;
         _configurationOptions = configuration;
@@ -51,6 +54,7 @@ public class WarpDispatcherHost<TContext> : IHostedService
         _signals = signals;
         _dispatcherRegistry = dispatcherRegistry;
         _loggerFactory = loggerFactory;
+        _exceptionClassifier = exceptionClassifier;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -85,7 +89,8 @@ public class WarpDispatcherHost<TContext> : IHostedService
                     _configurationOptions,
                     _timeProvider,
                     _notificationTransport,
-                    _signals);
+                    _signals,
+                    _exceptionClassifier);
 
                 await worker.StartAsync(cancellationToken);
                 _workers.Add(worker);

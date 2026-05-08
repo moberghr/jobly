@@ -57,6 +57,7 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
 
         // Act
         var schedCtx = _fixture.CreateContext();
+        var beforeScheduler = DateTime.UtcNow;
         await Warp.Tests.Helpers.TestTasks.CreateRecurringJobScheduler(schedCtx, TimeProvider.System).ScheduleRecurringJobsAsync(CancellationToken.None);
 
         // Assert: the created job should have ScheduleTime <= now (ready for execution)
@@ -65,10 +66,13 @@ public abstract class RecurringJobBugTestsBase : IAsyncLifetime
         job.ShouldNotBeNull();
         job.ScheduleTime.ShouldBeLessThanOrEqualTo(DateTime.UtcNow, "Job should be ready for immediate execution");
 
-        // NextExecution should be updated to a future time
+        // NextExecution is computed from the scheduler's `now` via cron.GetNextOccurrence,
+        // which returns a strictly-future occurrence relative to that `now`. Compare against
+        // the time captured before invoking the scheduler — comparing against a fresh
+        // DateTime.UtcNow flakes when the scheduler runs just before a cron minute boundary.
         var updatedRecurring = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "schedule-now-test", Xunit.TestContext.Current.CancellationToken);
         updatedRecurring.NextExecution.ShouldNotBeNull();
-        updatedRecurring.NextExecution.Value.ShouldBeGreaterThan(DateTime.UtcNow, "NextExecution should be in the future");
+        updatedRecurring.NextExecution.Value.ShouldBeGreaterThan(beforeScheduler, "NextExecution should be after the scheduler ran");
     }
 
     [TimedFact]

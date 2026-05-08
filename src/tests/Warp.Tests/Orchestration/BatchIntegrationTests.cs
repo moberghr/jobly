@@ -3,6 +3,8 @@ using Shouldly;
 using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
+using Warp.Core.Helper;
+using Warp.Core.Retry;
 using Warp.Tests.Fixtures;
 using Warp.Tests.TestData.Handlers;
 
@@ -152,29 +154,49 @@ public abstract class BatchIntegrationTestsBase : IntegrationTestBase
     [TimedFact]
     public async Task GivenBatchWithOnlyOnSucceeded_WhenJobFails_ThenContinuationStaysAwaiting()
     {
-        await using var server = await WarpTestServer.StartAsync(Fixture);
+        // Disable the auto-orchestrator so the "did/didn't activate continuation" check is
+        // driven by explicit ticks rather than a wall-clock Task.Delay.
+        await using var server = await WarpTestServer.StartAsync(Fixture, cfg => cfg.OrchestrationInterval = null);
         var batchPublisher = server.CreateBatchPublisher();
 
-        // Batch with failing jobs, using default OnlyOnSucceeded
+        // Bypass retry on the failing batch members — the test contract is "OnlyOnSucceeded
+        // doesn't activate continuation when batch fails", which doesn't depend on retry.
+        // Without WithRetry(0), AddRetry(MaxRetries=3, Delays=[1]) drags the failure out
+        // ~4-6s and races the WaitForJobState wait.
+        var noRetry = new JobParameters().WithRetry(0).Metadata;
         var batchJobs = new List<ThrowExceptionRequest>
         {
             new(),
             new(),
         };
-        var batchId = await batchPublisher.StartNew(batchJobs, options: ContinuationOptions.OnlyOnSucceeded);
+        var batchId = await batchPublisher.StartNew(batchJobs, options: ContinuationOptions.OnlyOnSucceeded, metadata: noRetry);
 
         var continuationJobs = new List<UnitRequest> { new() };
         var continuationBatchId = await batchPublisher.ContinueBatchWith(continuationJobs, batchId);
 
         await batchPublisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Wait for batch to fail
-        await server.WaitForJobState(batchId, State.Failed, timeout: TimeSpan.FromSeconds(8));
+        // Wait for the batch *members* (Kind=Job) to reach Failed via worker processing —
+        // this is what workers do unconditionally. The batch itself (Kind=Batch) transitions
+        // to Failed only when the Orchestrator notices all members are terminal, so we drive
+        // that explicitly below.
+        var memberIds = await Fixture.CreateContext().Set<Job>()
+            .Where(j => j.ParentJobId == batchId && j.Kind == JobKind.Job)
+            .Select(j => j.Id)
+            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
+        memberIds.Count.ShouldBe(2);
+        foreach (var memberId in memberIds)
+        {
+            await server.WaitForJobState(memberId, State.Failed);
+        }
 
-        // Give orchestration a few ticks (100ms interval in the test server) to confirm the
-        // continuation is not activated. 500ms covers ~5 passes — more than enough to catch
-        // an erroneous activation without adding 2s to the test.
-        await Task.Delay(500, Xunit.TestContext.Current.CancellationToken);
+        // First orchestrator tick finalizes the batch (members all terminal → batch Failed).
+        await server.RunOrchestratorOnceAsync(Xunit.TestContext.Current.CancellationToken);
+
+        // Subsequent ticks would activate the continuation if the OnlyOnSucceeded gate were
+        // broken. Run a few more to also catch a "fires only after N ticks" regression.
+        await server.RunOrchestratorOnceAsync(Xunit.TestContext.Current.CancellationToken);
+        await server.RunOrchestratorOnceAsync(Xunit.TestContext.Current.CancellationToken);
 
         var ctx = Fixture.CreateContext();
 

@@ -15,6 +15,33 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
     {
     }
 
+    // Polls the JobLog table until at least <paramref name="expectedCount"/> "Log"-event rows
+    // exist for the given job, or throws TimeoutException. Replaces fixed Task.Delay(300) waits:
+    // under DB contention the monitor flush (LogFlushInterval = 100ms) can take longer than 300ms,
+    // and a fixed sleep either flakes (too short) or wastes time (too long). Polling lets the
+    // happy path return in tens of ms and surfaces a clear failure if logs never appear.
+    private async Task<List<JobLog>> WaitForHandlerLogs(Guid jobId, int expectedCount, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
+        while (DateTime.UtcNow < deadline)
+        {
+            var ctx = Fixture.CreateContext();
+            var logs = await ctx.Set<JobLog>()
+                .Where(x => x.JobId == jobId && x.EventType == "Log")
+                .OrderBy(x => x.Timestamp)
+                .ToListAsync(Xunit.TestContext.Current.CancellationToken);
+
+            if (logs.Count >= expectedCount)
+            {
+                return logs;
+            }
+
+            await Task.Delay(50, Xunit.TestContext.Current.CancellationToken);
+        }
+
+        throw new TimeoutException($"Job {jobId} did not accumulate {expectedCount} handler-log rows within {timeout ?? TimeSpan.FromSeconds(5)}");
+    }
+
     [TimedFact]
     public async Task GivenProcessingJob_WhenHandlerLogs_ThenLogsAppearInDbBeforeCompletion()
     {
@@ -25,18 +52,8 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
 
         await server.WaitForJobState(jobId, State.Processing);
 
-        // Wait for monitor to flush logs (ticks every 1s)
-        // WarpTestServer uses LogFlushInterval = 100ms, so 300ms is enough to see >= 2 flushes.
-        await Task.Delay(300, Xunit.TestContext.Current.CancellationToken);
-
         // Verify logs are in DB while job is still processing
-        var ctx = Fixture.CreateContext();
-        var handlerLogs = await ctx.Set<JobLog>()
-            .Where(x => x.JobId == jobId && x.EventType == "Log")
-            .OrderBy(x => x.Timestamp)
-            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
-
-        handlerLogs.Count.ShouldBeGreaterThanOrEqualTo(2);
+        var handlerLogs = await WaitForHandlerLogs(jobId, expectedCount: 2);
         handlerLogs.ShouldContain(l => l.Message.Contains("Step 1 started"));
         handlerLogs.ShouldContain(l => l.Message.Contains("Step 1 warning"));
 
@@ -60,14 +77,7 @@ public abstract class RealTimeLogIntegrationTestsBase : IntegrationTestBase
 
         await server.WaitForJobState(jobId, State.Processing);
 
-        // WarpTestServer uses LogFlushInterval = 100ms, so 300ms is enough to see >= 2 flushes.
-        await Task.Delay(300, Xunit.TestContext.Current.CancellationToken);
-
-        var ctx = Fixture.CreateContext();
-        var handlerLogs = await ctx.Set<JobLog>()
-            .Where(x => x.JobId == jobId && x.EventType == "Log")
-            .ToListAsync(Xunit.TestContext.Current.CancellationToken);
-
+        var handlerLogs = await WaitForHandlerLogs(jobId, expectedCount: 2);
         handlerLogs.ShouldContain(l => l.Level == "Information" && l.Message.Contains("Step 1 started"));
         handlerLogs.ShouldContain(l => l.Level == "Warning" && l.Message.Contains("Step 1 warning"));
 

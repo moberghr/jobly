@@ -20,6 +20,24 @@ public class BarrierCommand : IJobHandler<BarrierRequest>
     }
 }
 
+public class BarrierMessage : IMessage;
+
+public class BarrierMessageHandler : IMessageHandler<BarrierMessage>
+{
+    private readonly BarrierSignal _signal;
+
+    public BarrierMessageHandler(BarrierSignal signal)
+    {
+        _signal = signal;
+    }
+
+    public async Task HandleAsync(BarrierMessage message, CancellationToken cancellationToken)
+    {
+        _signal.Running.Release();
+        await _signal.CanFinish.WaitAsync(cancellationToken);
+    }
+}
+
 public class BarrierSignal
 {
     public SemaphoreSlim Running { get; } = new(0);

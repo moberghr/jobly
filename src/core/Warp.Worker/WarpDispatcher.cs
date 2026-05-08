@@ -163,25 +163,20 @@ public class WarpDispatcher<TContext> : BackgroundService
         }
 
         // The atomic claim already committed State=Processing for every row in `jobs`. Delivering
-        // them to the channel is a separate, interruptible phase: the JobLog SaveChangesAsync and
-        // each WriteAsync are await points where a shutdown-triggered cancellation can fire. If
-        // we don't recover, claimed-but-undelivered rows stay as Processing orphans until
-        // StaleJobRecovery finds them. The try/catch here restores undelivered rows back to
-        // Enqueued so shutdown leaves the DB in a clean state.
+        // them to the channel is a separate, interruptible phase: each WriteAsync is an await
+        // point where a shutdown-triggered cancellation can fire. If we don't recover,
+        // claimed-but-undelivered rows stay as Processing orphans until StaleJobRecovery finds
+        // them. The try/catch here restores undelivered rows back to Enqueued so shutdown leaves
+        // the DB in a clean state.
+        // The "Processing" JobLog is intentionally NOT written here — it's written by the
+        // receiving worker in MarkWorkerOwnership after channel delivery succeeds. Writing it
+        // here would leave orphan log rows for jobs whose channel-write got cancelled
+        // (the row reverts to Enqueued via UnclaimUndelivered, but a "Processing" log would
+        // remain). Writing it on the worker side keeps the JobLog accurate and lets us tag it
+        // with the specific WorkerId, matching single-worker-mode semantics.
         var delivered = 0;
         try
         {
-            context.Set<JobLog>().AddRange(jobs.Select(job => new JobLog
-            {
-                JobId = job.Id,
-                EventType = "Processing",
-                Timestamp = now,
-                Level = "Information",
-                Message = $"The job {job.Id} is being processed",
-            }));
-
-            await context.SaveChangesAsync(ct);
-
             foreach (var job in jobs)
             {
                 await _jobChannel.Writer.WriteAsync(job, ct);
