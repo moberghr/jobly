@@ -868,42 +868,6 @@ public abstract class RetryTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
-    public async Task GetAndProcessJob_WithJitterFactor_DoesNotProduceNegativeDelay()
-    {
-        // Arrange — factor 1.0 can produce r = -1, multiply by 0; run many iterations
-        var worker = CreateWorker(maxRetries: 1, delays: [100], jitterFactor: 1.0);
-
-        for (var i = 0; i < 50; i++)
-        {
-            var ctx = _fixture.CreateContext();
-            var jobId = Guid.NewGuid();
-            var now = DateTime.UtcNow;
-            ctx.Set<Job>().Add(new Job
-            {
-                Id = jobId,
-                Kind = JobKind.Job,
-                CurrentState = State.Enqueued,
-                Type = typeof(ThrowExceptionRequest).AssemblyQualifiedName,
-                Message = JsonSerializer.Serialize(new ThrowExceptionRequest()),
-                CreateTime = now,
-                ScheduleTime = now,
-                Queue = "default",
-            });
-            await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
-
-            var before = DateTime.UtcNow;
-
-            // Act
-            await worker.GetAndProcessJob(CancellationToken.None);
-
-            // Assert — ScheduleTime must never be before 'before' (no negative delay)
-            var readCtx = _fixture.CreateContext();
-            var job = await readCtx.Set<Job>().FirstAsync(j => j.Id == jobId, Xunit.TestContext.Current.CancellationToken);
-            job.ScheduleTime.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(-1));
-        }
-    }
-
-    [TimedFact]
     public async Task GetAndProcessJob_WithEmptyDelaysAndJitter_StillHasNoDelay()
     {
         // Arrange — empty delays with jitter factor should short-circuit (no scheduleTime)

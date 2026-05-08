@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Warp.Core;
+using Warp.Core.Data;
 using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
@@ -45,7 +46,8 @@ public class WarpDispatcherWorker<TContext> : BackgroundService
         IOptions<WarpWorkerConfiguration> configuration,
         TimeProvider timeProvider,
         IWarpNotificationTransport notificationTransport,
-        ServerTaskSignals<TContext> signals)
+        ServerTaskSignals<TContext> signals,
+        IDatabaseExceptionClassifier exceptionClassifier)
     {
         _workerId = workerId;
         _jobReader = jobReader;
@@ -59,6 +61,7 @@ public class WarpDispatcherWorker<TContext> : BackgroundService
             scopeFactory,
             timeProvider,
             logger,
+            exceptionClassifier,
             _configuration.CompletionBatchSize,
             _configuration.CompletionFlushInterval);
     }
@@ -442,6 +445,23 @@ public class WarpDispatcherWorker<TContext> : BackgroundService
                     .SetProperty(p => p.CurrentWorkerId, _workerId)
                     .SetProperty(p => p.HandlerType, handlerTypeToSet),
                 cancellationToken);
+
+        // The "Processing" JobLog is written here, not in WarpDispatcher.FetchAndDistribute.
+        // Writing it dispatcher-side would orphan log rows for jobs whose channel-write got
+        // cancelled at shutdown (UnclaimUndelivered reverts the row to Enqueued, but the log
+        // entry would remain). Writing it on receipt by the actual worker keeps the audit
+        // trail truthful and lets us tag the entry with the specific WorkerId, matching
+        // single-worker-mode semantics.
+        context.Set<JobLog>().Add(new JobLog
+        {
+            JobId = job.Id,
+            EventType = "Processing",
+            Timestamp = _timeProvider.GetUtcNow().UtcDateTime,
+            Level = "Information",
+            Message = $"The job {job.Id} is being processed",
+            WorkerId = _workerId,
+        });
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task ExecuteJob(Job job, IServiceProvider provider, CancellationToken cancellationToken)
