@@ -40,6 +40,34 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
         public bool IsTransientDeadlock(Exception ex) => false;
     }
 
+    private sealed class AlwaysTransientClassifier : IDatabaseExceptionClassifier
+    {
+        public int CallCount { get; private set; }
+
+        public bool IsUniqueConstraintViolation(DbUpdateException ex) => false;
+
+        public bool IsTransientDeadlock(Exception ex)
+        {
+            CallCount++;
+
+            return true;
+        }
+    }
+
+    private sealed class OnceTransientClassifier : IDatabaseExceptionClassifier
+    {
+        public int CallCount { get; private set; }
+
+        public bool IsUniqueConstraintViolation(DbUpdateException ex) => false;
+
+        public bool IsTransientDeadlock(Exception ex)
+        {
+            CallCount++;
+
+            return CallCount == 1;
+        }
+    }
+
     private async Task<Job> InsertProcessingJob()
     {
         var ctx = _fixture.CreateContext();
@@ -289,6 +317,90 @@ public abstract class CompletionBatchTestsBase : IAsyncLifetime
         committed.ShouldBe(4);
 
         (await ctx.Set<Job>().AnyAsync(x => x.Id == phantom.Id, Xunit.TestContext.Current.CancellationToken)).ShouldBeFalse();
+
+        batch.Count.ShouldBe(0);
+    }
+
+    [TimedFact]
+    public async Task FlushAsync_WhenClassifierReportsTransient_RetriesUntilBudgetExhaustedThenSplitsOnFailure()
+    {
+        // A classifier that always reports "transient deadlock" forces the retry loop to spin
+        // through its full budget (3 attempts, 50/100/200 ms backoff) before falling through
+        // to the existing split-on-failure path. Setup mirrors WithPoisonEntry: one real job
+        // and one phantom. After the budget exhausts, split-on-failure isolates the phantom
+        // and commits the good entry.
+        var classifier = new AlwaysTransientClassifier();
+        var scopeFactory = CreateScopeFactory();
+        var batch = new CompletionBatch<TestContext>(scopeFactory, _time, NullLogger.Instance, classifier, batchSize: 10, flushInterval: TimeSpan.FromSeconds(10));
+
+        var realJob = await InsertProcessingJob();
+        batch.Add(MakeEntry(realJob));
+
+        var phantomJob = new Job
+        {
+            Id = Guid.NewGuid(),
+            Kind = JobKind.Job,
+            CurrentState = State.Completed,
+            Type = "test",
+            Message = "{}",
+            CreateTime = _time.GetUtcNow().UtcDateTime,
+            ScheduleTime = _time.GetUtcNow().UtcDateTime,
+            Queue = "default",
+        };
+        batch.Add(new PendingCompletion(phantomJob, [], []));
+
+        // Act
+        await batch.FlushAsync();
+
+        // Assert — at least one full budget exhaustion (3 calls in the initial pass; more
+        // during the recursive phantom split). Lower-bound rather than exact so the
+        // assertion stays stable across implementation tweaks to the split recursion.
+        classifier.CallCount.ShouldBeGreaterThanOrEqualTo(3);
+
+        var ctx = _fixture.CreateContext();
+        (await ctx.Set<Job>().FirstAsync(x => x.Id == realJob.Id, Xunit.TestContext.Current.CancellationToken))
+            .CurrentState.ShouldBe(State.Completed);
+        (await ctx.Set<Job>().AnyAsync(x => x.Id == phantomJob.Id, Xunit.TestContext.Current.CancellationToken))
+            .ShouldBeFalse();
+
+        batch.Count.ShouldBe(0);
+    }
+
+    [TimedFact]
+    public async Task FlushAsync_WhenClassifierStopsReportingTransient_ExitsRetryAndSplitsOnFailure()
+    {
+        // The classifier is consulted on every throw, not once. When the first throw is
+        // reported transient but the next throw is reported non-transient, the retry loop
+        // exits immediately and falls through to split-on-failure. Phantom-alone setup so
+        // the assertion is "poison dropped, classifier called exactly twice" — no recursive
+        // split to distort the call count.
+        var classifier = new OnceTransientClassifier();
+        var scopeFactory = CreateScopeFactory();
+        var batch = new CompletionBatch<TestContext>(scopeFactory, _time, NullLogger.Instance, classifier, batchSize: 10, flushInterval: TimeSpan.FromSeconds(10));
+
+        var phantomJob = new Job
+        {
+            Id = Guid.NewGuid(),
+            Kind = JobKind.Job,
+            CurrentState = State.Completed,
+            Type = "test",
+            Message = "{}",
+            CreateTime = _time.GetUtcNow().UtcDateTime,
+            ScheduleTime = _time.GetUtcNow().UtcDateTime,
+            Queue = "default",
+        };
+        batch.Add(new PendingCompletion(phantomJob, [], []));
+
+        // Act
+        await batch.FlushAsync();
+
+        // Assert — first throw reported transient (retry), second throw reported
+        // non-transient (drop into the DbUpdateException catch → log + drop poison).
+        classifier.CallCount.ShouldBe(2);
+
+        var ctx = _fixture.CreateContext();
+        (await ctx.Set<Job>().AnyAsync(x => x.Id == phantomJob.Id, Xunit.TestContext.Current.CancellationToken))
+            .ShouldBeFalse();
 
         batch.Count.ShouldBe(0);
     }
