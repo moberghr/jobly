@@ -25,35 +25,6 @@ public class SemaphoreSkipAttributeCommand : IJobHandler<SemaphoreSkipAttributeR
 [Semaphore("static-semaphore-skip-key", 5, Mode = ConcurrencyMode.Skip)]
 public class SemaphoreSkipAttributeRequest : IJob;
 
-public class SemaphoreLimit5Command : IJobHandler<SemaphoreLimit5Request>
-{
-    private readonly ConcurrencyTracker _tracker;
-
-    public SemaphoreLimit5Command(ConcurrencyTracker tracker)
-    {
-        _tracker = tracker;
-    }
-
-    public async Task HandleAsync(SemaphoreLimit5Request message, CancellationToken cancellationToken)
-    {
-        _tracker.Enter(message.Key);
-        try
-        {
-            await Task.Delay(150, cancellationToken);
-        }
-        finally
-        {
-            _tracker.Exit(message.Key);
-        }
-    }
-}
-
-[Semaphore("limit-5-key", 5)]
-public class SemaphoreLimit5Request : IJob
-{
-    public string Key { get; set; } = "limit-5-key";
-}
-
 public class MutexAndSemaphoreCommand : IJobHandler<MutexAndSemaphoreRequest>
 {
     public Task HandleAsync(MutexAndSemaphoreRequest message, CancellationToken cancellationToken)

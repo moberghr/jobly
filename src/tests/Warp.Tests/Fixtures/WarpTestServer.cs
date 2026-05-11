@@ -209,6 +209,10 @@ public class WarpTestServer : IAsyncDisposable
                     // SqlCommand / NpgsqlCommand and are unaffected by this default.
                     if (isPostgres)
                     {
+                        // The fixture's connection string carries MaxPoolSize so this
+                        // per-server EF data source has a bounded pool, keeping the
+                        // aggregate connection count under the testcontainer's
+                        // max_connections under parallel test-class load.
                         options.UseNpgsql(connectionString, npg => npg.CommandTimeout(5)).UseSnakeCaseNamingConvention();
                     }
                     else

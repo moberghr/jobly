@@ -24,10 +24,21 @@ public class PostgreSqlClassFixture : IAsyncLifetime, IDatabaseFixture
         var databaseName = $"warp_t_{Guid.NewGuid():N}";
 
         TestLifecycleTrace.Record("SharedPostgreSqlContainer.CreateDatabaseAsync starting");
-        _connectionString = await SharedPostgreSqlContainer.CreateDatabaseAsync(
+        var rawConnectionString = await SharedPostgreSqlContainer.CreateDatabaseAsync(
             databaseName,
             Xunit.TestContext.Current.CancellationToken);
         TestLifecycleTrace.Record("SharedPostgreSqlContainer.CreateDatabaseAsync returned");
+
+        // Bake MaxPoolSize into the per-fixture connection string. EF builds an independent
+        // NpgsqlDataSource per options instance (fixture's CreateContext, WarpTestServer's
+        // worker registration, etc.) and each gets its own pool. Without a per-pool cap the
+        // aggregate easily exceeds the testcontainer's max_connections (500) under parallel
+        // test-class load — a small cap (50) keeps every pool bounded so even 4 parallel
+        // classes × 2 pools × 50 stays well under the cap.
+        _connectionString = new NpgsqlConnectionStringBuilder(rawConnectionString)
+        {
+            MaxPoolSize = 50,
+        }.ConnectionString;
 
         TestLifecycleTrace.Record("EnsureCreatedAsync starting");
         await using var context = CreateContext();

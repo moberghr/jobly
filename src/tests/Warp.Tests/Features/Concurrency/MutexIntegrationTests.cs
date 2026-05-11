@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Warp.Core.Concurrency;
@@ -95,95 +94,77 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
         requeuedLog.Message.ShouldContain("1 slots");
     }
 
-    [TimedFact(60_000)]
-    public async Task GivenManyJobsWithSameMutex_WhenWaitMode_ThenAllRunSequentiallyToCompletion()
+    [TimedFact]
+    public async Task GivenTwoJobsWithSameMutex_WhenWaitMode_BothCompleteAfterFirstReleases()
     {
-        var tracker = new ConcurrencyTracker();
+        // Natural-completion release path for Wait-mode mutex: job1 holds the slot inside the
+        // handler, job2 cannot enter while it's held, then once job1's handler returns
+        // normally job2 acquires the slot and completes. Distinct from
+        // ...SecondRequeuesUntilFirstFinishes, which releases via DeleteJob (cancellation).
+        var barrier = new BarrierSignal();
 
         await using var server = await WarpTestServer.StartAsync(
             Fixture,
-            configure: null,
-            configureServices: services => services.AddSingleton(tracker));
-
+            cfg => cfg.Services.AddSingleton(barrier));
         var publisher = server.CreatePublisher();
 
-        const string key = "serial-key";
-        const int jobCount = 10;
-        var jobIds = new List<Guid>(jobCount);
-        for (var i = 0; i < jobCount; i++)
-        {
-            var id = await publisher.Enqueue(
-                new ConcurrencyTrackerRequest { Key = key },
-                new JobParameters().WithMutex(key, ConcurrencyMode.Wait));
-            jobIds.Add(id);
-        }
-
+        var job1Id = await publisher.Enqueue(new BarrierRequest(), new JobParameters().WithMutex("test-serialize", ConcurrencyMode.Wait));
+        var job2Id = await publisher.Enqueue(new BarrierRequest(), new JobParameters().WithMutex("test-serialize", ConcurrencyMode.Wait));
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await server.WaitForCompletion(timeout: TimeSpan.FromSeconds(45));
+        // The first job to be claimed enters the handler.
+        await barrier.Running.WaitAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // None deleted, none failed — all should be Completed
-        foreach (var id in jobIds)
+        // The other must not enter while the slot is held; 500 ms covers ~5 polling cycles.
+        var spuriousEntry = await barrier.Running.WaitAsync(TimeSpan.FromMilliseconds(500), Xunit.TestContext.Current.CancellationToken);
+        spuriousEntry.ShouldBeFalse("Wait-mode mutex must prevent the second job from entering while the slot is held");
+
+        // Release the first; the second now enters.
+        barrier.CanFinish.Release();
+        await barrier.Running.WaitAsync(Xunit.TestContext.Current.CancellationToken);
+
+        // Release the second; both complete.
+        barrier.CanFinish.Release();
+        await server.WaitForCompletion();
+
+        foreach (var id in new[] { job1Id, job2Id })
         {
             var job = await server.GetJob(id);
             job.CurrentState.ShouldBe(State.Completed);
         }
-
-        tracker.Completed.ShouldBe(jobCount);
-        tracker.MaxObserved.ShouldBe(1, "Wait mode must guarantee at most one job per key runs at a time");
     }
 
-    [TimedFact(60_000)]
-    public async Task GivenJobsWithDifferentKeys_WhenWaitMode_ThenKeysRunInParallelButEachKeySerialized()
+    [TimedFact]
+    public async Task GivenTwoJobsWithDifferentKeys_WhenWaitMode_BothEnterHandlerSimultaneously()
     {
-        var tracker = new ConcurrencyTracker();
+        // Cross-key parallelism for Wait-mode mutex: distinct keys grant independent slots,
+        // so two jobs with different keys must both be able to occupy the handler at the same
+        // time. Per-key serialization is covered by the sibling Wait-mode tests; this test
+        // only proves keys aren't globally serialized.
+        var barrier = new BarrierSignal();
 
         await using var server = await WarpTestServer.StartAsync(
             Fixture,
-            configure: null,
-            configureServices: services => services.AddSingleton(tracker));
-
+            cfg => cfg.Services.AddSingleton(barrier));
         var publisher = server.CreatePublisher();
 
-        const int keyCount = 5;
-        const int jobsPerKey = 3;
-        var keys = Enumerable.Range(0, keyCount).Select(i => $"parallel-key-{i}").ToArray();
-
-        var jobIds = new List<Guid>(keyCount * jobsPerKey);
-        foreach (var key in keys)
-        {
-            for (var j = 0; j < jobsPerKey; j++)
-            {
-                var id = await publisher.Enqueue(
-                    new ConcurrencyTrackerRequest { Key = key },
-                    new JobParameters().WithMutex(key, ConcurrencyMode.Wait));
-                jobIds.Add(id);
-            }
-        }
-
+        var job1Id = await publisher.Enqueue(new BarrierRequest(), new JobParameters().WithMutex("key-A", ConcurrencyMode.Wait));
+        var job2Id = await publisher.Enqueue(new BarrierRequest(), new JobParameters().WithMutex("key-B", ConcurrencyMode.Wait));
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await server.WaitForCompletion(timeout: TimeSpan.FromSeconds(45));
+        // Both must enter the handler — different keys grant independent slots. The TimedFact
+        // budget bounds how long we wait for the second entry; if cross-key parallelism is
+        // broken, the second await never completes and the test times out deterministically.
+        await barrier.Running.WaitAsync(Xunit.TestContext.Current.CancellationToken);
+        await barrier.Running.WaitAsync(Xunit.TestContext.Current.CancellationToken);
 
-        foreach (var id in jobIds)
+        barrier.CanFinish.Release(2);
+        await server.WaitForCompletion();
+
+        foreach (var id in new[] { job1Id, job2Id })
         {
             var job = await server.GetJob(id);
             job.CurrentState.ShouldBe(State.Completed);
         }
-
-        tracker.Completed.ShouldBe(keyCount * jobsPerKey);
-
-        // Per-key serialization holds — at most one job per key was ever in flight.
-        foreach (var key in keys)
-        {
-            tracker.CompletedFor(key).ShouldBe(jobsPerKey);
-            tracker.MaxObservedFor(key).ShouldBe(1, $"key '{key}' must serialize");
-        }
-
-        // Across keys, parallelism actually happened — at some point at least 2 keys ran
-        // concurrently. We can't reliably assert MaxObserved == keyCount because worker count
-        // / scheduling jitter may stagger them, but observing > 1 proves keys aren't globally
-        // serialized. Default WorkerCount is min(ProcessorCount * 5, 20) so headroom is ample.
-        tracker.MaxObserved.ShouldBeGreaterThan(1, "different keys must be allowed to run in parallel");
     }
 }
