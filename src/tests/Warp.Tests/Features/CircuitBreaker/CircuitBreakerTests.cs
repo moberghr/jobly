@@ -348,26 +348,30 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         state.OpenUntil.ShouldBeNull();
     }
 
-    // Probabilistic: this test exercises the DbUpdateException fallback path by firing 10
-    // concurrent RecordFailureAsync calls with no pre-existing row. At least one task is
-    // overwhelmingly likely to hit the PK-collision branch, but this can't be enforced
-    // deterministically without test-only hooks inside the store. The final-count invariant
-    // (== 10) holds regardless of whether the race fired or calls fully serialized — so the
-    // fallback branch's correctness is validated in practice, not strictly guaranteed by
-    // assertion. If this becomes flaky under heavy parallelism, move to a hook-based test.
+    // Two-task end-state invariant: both concurrent RecordFailureAsync calls against an
+    // empty key must be counted, regardless of which serialized path the race resolved
+    // through (Step1-UPDATE 0 / Step2-INSERT win-or-collide / Step3-fallback UPDATE).
+    // Barrier(2) pins the two callers to enter the method together so the race is real
+    // rather than emergent across a pool of unsynced tasks. Whether the fallback branch
+    // fires on this run is not asserted — that branch is naturally exercised at scale and
+    // can be unit-tested deterministically via a forced DbUpdateException seam if needed.
     [TimedFact]
-    public async Task RecordFailure_ConcurrentFirstFailures_AllCounted()
+    public async Task RecordFailure_TwoConcurrentFirstFailures_BothCounted()
     {
         var key = "race-" + Guid.NewGuid().ToString("N");
         var scopeFactory = CreateStoreScopeFactory();
         var now = DateTime.UtcNow;
 
-        var tasks = Enumerable.Range(0, 10).Select(_ =>
+        using var barrier = new Barrier(2);
+        var tasks = Enumerable.Range(0, 2).Select(_ => Task.Run(async () =>
         {
-            var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory, Warp.Tests.Helpers.TestTasks.ClassifierFor(_fixture.CreateContext()));
-
-            return store.RecordFailureAsync(key, threshold: 100, duration: TimeSpan.FromMinutes(1), now, CancellationToken.None);
-        }).ToArray();
+            var store = new CircuitBreakerStore<TestContext>(
+                _fixture.CreateContext(),
+                scopeFactory,
+                Warp.Tests.Helpers.TestTasks.ClassifierFor(_fixture.CreateContext()));
+            barrier.SignalAndWait();
+            await store.RecordFailureAsync(key, threshold: 100, duration: TimeSpan.FromMinutes(1), now, CancellationToken.None);
+        })).ToArray();
 
         await Task.WhenAll(tasks);
 
@@ -376,7 +380,7 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
             .Where(x => x.GroupKey == key)
             .FirstOrDefaultAsync(CancellationToken.None);
         state.ShouldNotBeNull();
-        state.FailureCount.ShouldBe(10);
+        state.FailureCount.ShouldBe(2);
         state.OpenUntil.ShouldBeNull();
     }
 
@@ -478,13 +482,15 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
-    public async Task TryBeginProbeAsync_ConcurrentCallsAfterExpiry_OnlyOneWins()
+    public async Task TryBeginProbeAsync_TwoConcurrentCallsAfterExpiry_OnlyOneWins()
     {
-        // Regression for PR #126 review F2: when OpenUntil lapses, all workers polling
+        // Regression for PR #126 review F2: when OpenUntil lapses, workers polling
         // simultaneously observe an expired circuit and all execute the handler concurrently —
         // the exact thundering herd a circuit breaker is meant to prevent. The fix is a
         // half-open probe gate: exactly one worker atomically transitions Open → HalfOpen and
-        // probes the downstream; the others observe HalfOpen and reschedule.
+        // every other caller observes HalfOpen and returns false. Barrier(2) guarantees both
+        // callers enter the UPDATE simultaneously; per-row locking in PG/SQL Server then
+        // serializes them, and exactly one's affected-rows count is 1.
         var key = "probe-race-" + Guid.NewGuid().ToString("N");
         var now = DateTime.UtcNow;
         var ctx = _fixture.CreateContext();
@@ -499,12 +505,16 @@ public abstract class CircuitBreakerTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         var scopeFactory = CreateStoreScopeFactory();
-        var tasks = Enumerable.Range(0, 10).Select(_ =>
+        using var barrier = new Barrier(2);
+        var tasks = Enumerable.Range(0, 2).Select(_ => Task.Run(async () =>
         {
-            var store = new CircuitBreakerStore<TestContext>(_fixture.CreateContext(), scopeFactory, Warp.Tests.Helpers.TestTasks.ClassifierFor(_fixture.CreateContext()));
-
-            return store.TryBeginProbeAsync(key, now, CancellationToken.None);
-        }).ToArray();
+            var store = new CircuitBreakerStore<TestContext>(
+                _fixture.CreateContext(),
+                scopeFactory,
+                Warp.Tests.Helpers.TestTasks.ClassifierFor(_fixture.CreateContext()));
+            barrier.SignalAndWait();
+            return await store.TryBeginProbeAsync(key, now, CancellationToken.None);
+        })).ToArray();
 
         var results = await Task.WhenAll(tasks);
 
