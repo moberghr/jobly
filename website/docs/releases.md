@@ -4,7 +4,72 @@ sidebar_position: 6
 
 # Releases
 
-## Unreleased — OpenTelemetry coverage broadening
+## 0.13.0
+
+*2026-05-11*
+
+Concurrency-focused release: the Mutex addon generalizes into a unified Mutex + Semaphore primitive with a runtime-editable admin layer, OpenTelemetry coverage broadens to cover producer / receive / mediator / server-task spans, and `CompletionBatch` gets transient-deadlock retry. Mutex Wait mode is new. The OTel span rename and the addon namespace rename are both breaking.
+
+### Breaking: Mutex addon renamed to Concurrency
+
+The Mutex addon is generalized into a unified concurrency primitive that backs both `[Mutex]` (limit = 1) and the new `[Semaphore]` (limit > 1) over a single pipeline behavior and metadata contract. The rename is mechanical but breaking:
+
+- Namespace `Warp.Core.Mutex` → `Warp.Core.Concurrency`
+- `opt.AddMutex()` → `opt.AddConcurrency()`
+- `MutexMode` → `ConcurrencyMode`
+- `IMutexMetadata` → `IConcurrencyMetadata`
+- Distributed lock-key prefix `warp:mutex:` → `warp:concurrency:`
+
+`[Mutex("key")]` and `WithMutex("key", ...)` continue to work — they're now thin wrappers over the unified primitive with `limit = 1`. No database migration. The lock-key prefix flip means any in-flight locks held under the old prefix won't be observed by the new code at upgrade — locks are short-lived, but don't deploy a rolling restart mid-burst on the same hot key.
+
+### New: `[Semaphore("key", N)]` attribute
+
+The companion to `[Mutex]` for `limit > 1`. Same pipeline, same metadata interface, same admin layer — just exposes the limit. Default `Mode` is `Wait` (`[Mutex]` defaults to `Skip`).
+
+```csharp
+[Semaphore("sendgrid", 10)]
+public class SendEmail : IJob { }
+```
+
+Backend implementations differ — documented on [the semaphore feature page](features/semaphore):
+
+- **PostgreSQL** — N distinct named advisory locks (`warp:concurrency:k:0` … `warp:concurrency:k:{N-1}`) over `pg_try_advisory_lock`. Per-process slot cache with random start offset.
+- **SQL Server** — delegates to Medallion's `SqlDistributedSemaphore`.
+
+The two backends construct lock names differently at `limit = 1`, so `[Mutex("k")]` and `[Semaphore("k", N)]` against the same key are independent on PG but share the slot pool on SQL Server. **Pick one or the other per key** — mixing both attributes against the same key is a portability footgun. CLAUDE.md and the feature docs spell this out.
+
+### New: Mutex Wait mode
+
+`[Mutex]` now supports a `Mode` option. The existing default `Skip` short-circuits the duplicate to `Deleted`. The new `Wait` mode requeues the duplicate with `ScheduleTime = now` and writes a `Requeued` audit-log entry — mutual exclusion without dropping work.
+
+```csharp
+[Mutex("payment:123", Mode = ConcurrencyMode.Wait)]
+public class ChargeOrder : IJob { }
+```
+
+Or fluent: `new JobParameters().WithMutex("payment:123", ConcurrencyMode.Wait)`.
+
+Caveats are promoted to the top of [the mutex feature page](features/mutex):
+
+- **Best-effort order across requeued jobs**, not strict FIFO. The wait set is not a queue; on lock release, whichever requeued copy a worker fetches first wins.
+- **No fairness.** A hot publisher against the same key can starve a long-blocked job indefinitely. If you need ordering, build a job-per-stream chain instead of relying on Wait.
+
+### New: `IConcurrencyLimitManager` — runtime-editable limits
+
+Attribute and fluent limits are compile-time defaults. `IConcurrencyLimitManager.AddOrUpdateLimit("key", N)` lets you raise or lower a key's effective limit at runtime; the override is persisted on a new `ConcurrencyLimit` entity and takes precedence. Resolver precedence: `admin row > attribute > 1`.
+
+Surfaced as a new dashboard page at `/warp/concurrency` (visible only when `AddConcurrency` is registered — the SPA probes `/api/concurrency` and hides the nav entry on 404). Five REST endpoints: list / get / set / clear / clear-all.
+
+### New: `stats:requeued` counter + `/counters` dashboard page
+
+Both the new Mutex Wait outcome and the existing Retry behavior produce requeue events. A new `stats:requeued` (and `stats:requeued:{hour}` for the rolling 7-day window) counter row is emitted by `WarpWorkerService` / `WarpDispatcherWorker` for any `Enqueued`/`Scheduled` outcome — so retry rate now has visibility for free.
+
+These — and any addon-defined counter keys — surface on a new **Counters** dashboard page at `/warp/counters`. The page has two parts:
+
+- **Hourly history chart** — every counter whose key suffix parses as `yyyy-MM-dd-HH` becomes a series. 24h / 7d toggle, Chart.js legend toggle, fixed colors for built-ins (`succeeded` green / `failed` red / `deleted` gray / `requeued` amber), deterministic hash-derived colors for addon series.
+- **Rolled-up table** — non-hourly keys sorted lexicographically. Hourly variants are filtered out so the table stays readable.
+
+`ExpirationCleanup` now prunes any `Statistic` row whose key suffix parses as `yyyy-MM-dd-HH` and is older than 7 days — generalized from the prior per-prefix logic (which also had a latent bug where `stats:succeeded:*` rows were never actually cleaned because the `CompareTo` bound was anchored to `stats:failed:`). Addon-defined hourly metrics get the same retention treatment for free.
 
 ### Breaking: consumer span renamed `Warp.Execute` → `process <queue>`
 
@@ -50,6 +115,16 @@ services.AddOpenTelemetry()
 ```
 
 Single source + single meter, both named `"Warp"`.
+
+### Fix: production deadlock retry in `CompletionBatch.FlushRangeAsync`
+
+Under dispatcher mode (`UseDispatcher = true`) the completion batch occasionally hit a transient deadlock (SQL Server 1205, Postgres `40P01` / `40001`) on the parallel statistics + job-row update, which previously fell straight through to the existing split-on-failure path (slow, and lost the natural batch). Now `FlushRangeAsync` retries on transient deadlock with 50/100/200 ms exponential backoff before splitting.
+
+Detection lives on a new `IDatabaseExceptionClassifier.IsTransientDeadlock` with provider-specific implementations in `Warp.Provider.PostgreSql` and `Warp.Provider.SqlServer` — exposed as a stable extension point.
+
+### Fix: "Processing" log row no longer orphaned under dispatcher shutdown
+
+`WarpDispatcher.FetchAndDistribute` wrote the `Processing` `JobLog` row *before* delivering the job to a worker's channel. If the channel write got cancelled during host shutdown, the row was orphaned (no `Completed` / `Failed` / `Cancelled` follow-up) and the dashboard showed a job stuck mid-flight that never actually ran. Moved to `WarpDispatcherWorker.MarkWorkerOwnership`, which runs after the worker actually starts processing the job. The log row now also carries the actual `WorkerId`, matching single-worker mode.
 
 ## 0.12.0
 
