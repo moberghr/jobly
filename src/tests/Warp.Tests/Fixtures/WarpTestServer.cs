@@ -13,6 +13,7 @@ using Warp.Core.NoRestart;
 using Warp.Core.RateLimit;
 using Warp.Core.Retry;
 using Warp.Core.Services;
+using Warp.Core.Timeout;
 using Warp.Provider.PostgreSql;
 using Warp.Provider.SqlServer;
 using Warp.Tests.Fixtures;
@@ -287,6 +288,7 @@ public class WarpTestServer : IAsyncDisposable
                         o.Duration = TimeSpan.FromHours(1);
                         o.ResetJitter = TimeSpan.FromSeconds(1);
                     });
+                    config.AddTimeout();
                 });
 
                 configureServices?.Invoke(services);
