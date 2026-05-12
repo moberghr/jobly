@@ -270,3 +270,10 @@ export interface ConcurrencyLimitInfo {
   limit: number;
   updatedAt: string;
 }
+
+export interface RateLimitInfo {
+  name: string;
+  count: number;
+  windowSeconds: number;
+  updatedAt: string;
+}

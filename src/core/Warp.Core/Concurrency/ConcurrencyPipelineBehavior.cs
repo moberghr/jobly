@@ -41,7 +41,7 @@ public class ConcurrencyPipelineBehavior<TRequest, TResponse> : IPipelineBehavio
         }
 
         var adminLimit = await _limitResolver.GetLimit(meta.ConcurrencyKey, cancellationToken);
-        var effectiveLimit = adminLimit ?? meta.Limit ?? 1;
+        var effectiveLimit = adminLimit ?? meta.ConcurrencyLimit ?? 1;
 
         IAsyncDisposable? handle;
         using (var concurrencySpan = WarpTelemetry.StartConcurrencyActivity())
@@ -64,7 +64,7 @@ public class ConcurrencyPipelineBehavior<TRequest, TResponse> : IPipelineBehavio
 
         if (handle == null)
         {
-            var mode = meta.Mode ?? ConcurrencyMode.Skip;
+            var mode = meta.ConcurrencyMode ?? ConcurrencyMode.Skip;
             var now = _timeProvider.GetUtcNow().UtcDateTime;
             _jobContext.Outcome = mode == ConcurrencyMode.Wait
                 ? BuildRequeueOutcome(meta.ConcurrencyKey, effectiveLimit, now)

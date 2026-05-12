@@ -10,6 +10,7 @@ using Warp.Core.Entities;
 using Warp.Core.Enums;
 using Warp.Core.Handlers;
 using Warp.Core.NoRestart;
+using Warp.Core.RateLimit;
 using Warp.Core.Retry;
 using Warp.Core.Services;
 using Warp.Core.Timeout;
@@ -279,6 +280,7 @@ public class WarpTestServer : IAsyncDisposable
                         o.Delays = [1];
                     });
                     config.AddConcurrency();
+                    config.AddRateLimit();
                     config.AddNoRestart();
                     config.AddCircuitBreaker(o =>
                     {

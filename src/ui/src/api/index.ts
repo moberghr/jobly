@@ -1,5 +1,5 @@
 import api from './client';
-import type { DashboardStatistics, JobModel, JobGroupModel, JobGroupDetailModel, RecurringJobModel, RecurringJobDetailModel, RecurringJobHistoryModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint, CounterModel, CounterHistoryPoint, ConcurrencyLimitInfo, TypeCountModel, WorkerDetailModel, WorkerJobLogModel, TraceJobModel, UnifiedJobDetailModel } from '@/types';
+import type { DashboardStatistics, JobModel, JobGroupModel, JobGroupDetailModel, RecurringJobModel, RecurringJobDetailModel, RecurringJobHistoryModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint, CounterModel, CounterHistoryPoint, ConcurrencyLimitInfo, RateLimitInfo, TypeCountModel, WorkerDetailModel, WorkerJobLogModel, TraceJobModel, UnifiedJobDetailModel } from '@/types';
 import type { ExtensionManifest } from '@/extensions/types';
 
 // Dashboard
@@ -150,6 +150,19 @@ export const upsertConcurrencyLimit = (name: string, limit: number) =>
 
 export const deleteConcurrencyLimit = (name: string) =>
   api.delete(`/concurrency/${encodeURIComponent(name)}`).then(() => undefined);
+
+// Rate limits
+export const listRateLimits = () =>
+  api.get<RateLimitInfo[]>('/ratelimits').then(r => r.data);
+
+export const getRateLimit = (name: string) =>
+  api.get<RateLimitInfo | null>(`/ratelimits/${encodeURIComponent(name)}`).then(r => r.data);
+
+export const upsertRateLimit = (name: string, count: number, windowSeconds: number) =>
+  api.put<RateLimitInfo>(`/ratelimits/${encodeURIComponent(name)}`, { count, windowSeconds }).then(r => r.data);
+
+export const deleteRateLimit = (name: string) =>
+  api.delete(`/ratelimits/${encodeURIComponent(name)}`).then(() => undefined);
 
 // Extensions
 export const getExtensions = () =>
