@@ -48,6 +48,7 @@ public class WarpWorkerResilienceTests
             NullLogger<WarpWorker<TestContext>>.Instance,
             groupConfig,
             new PauseStateHolder(),
+            TimeProvider.System,
             Guid.NewGuid());
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
@@ -111,6 +112,7 @@ public class WarpWorkerResilienceTests
             NullLogger<WarpWorker<TestContext>>.Instance,
             groupConfig,
             new PauseStateHolder(),
+            TimeProvider.System,
             Guid.NewGuid());
 
         var start = DateTime.UtcNow;
