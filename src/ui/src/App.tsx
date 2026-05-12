@@ -18,6 +18,7 @@ import DetailPage from '@/pages/detail/DetailPage';
 import LoginPage from '@/pages/auth/LoginPage';
 import ExtensionPage from '@/extensions/ExtensionPage';
 import { setOnUnauthorized } from '@/api/client';
+import { useRealtimeStore } from '@/stores/realtime';
 import { loadExtensions } from '@/extensions/loader';
 import { extensionRuntime } from '@/extensions/runtime';
 import { config } from '@/config';
@@ -52,6 +53,10 @@ function App() {
     setNeedsLogin(false);
     // Now authenticated — load extensions
     initExtensions();
+    // Re-attempt realtime probe: a boot-time probe before login lands on a 401
+    // and settles the store into 'disabled', leaving the dashboard polling-only
+    // for the session. Re-probing here transitions disabled → connected.
+    void useRealtimeStore.getState().probeAndConnect();
   }, [initExtensions]);
 
   if (needsLogin) {

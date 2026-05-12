@@ -1,0 +1,117 @@
+import { create } from 'zustand';
+import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
+import { probeDashboardPush, getHubUrl, type RealtimeEvent } from '@/api/realtime';
+import { emit } from '@/lib/realtimeBus';
+import { useDashboardStore } from '@/stores/dashboard';
+import type { DashboardStatistics } from '@/types';
+
+export type RealtimeStatus = 'idle' | 'probing' | 'connecting' | 'connected' | 'reconnecting' | 'disabled';
+
+interface RealtimeStore {
+  status: RealtimeStatus;
+  lastEventAt: number | null;
+  connection: HubConnection | null;
+  probeAndConnect: () => Promise<void>;
+  disconnect: () => Promise<void>;
+}
+
+let bootInflight: Promise<void> | null = null;
+
+function bridgeEvent(connection: HubConnection, event: RealtimeEvent) {
+  // Each HubConnection is a fresh object — bind unconditionally. A module-level
+  // "already bridged" set was previously here as a guard, but that prevented
+  // re-binding after onclose → reconnect cycles (the new connection had no
+  // handlers). Each probeAndConnect builds exactly one new connection and is
+  // the only call site, so binding is always exactly-once per instance.
+  //
+  // Server pushes the current DashboardStatistics DTO as the first argument when
+  // available — see Warp.UI.DashboardPush.DashboardBroadcaster.TryFetchStatsAsync.
+  // Writing it straight to the dashboard store eliminates a GET /api/status per
+  // client per event. Pages that consume `useDashboardStore.stats` (navbar
+  // badges, DashboardPage cards) rerender automatically. Other surfaces (jobs
+  // lists, detail pages) still listen via the bus and refetch their own views.
+  connection.on(event, (payload?: DashboardStatistics) => {
+    if (payload && typeof payload === 'object' && 'totalSucceeded' in payload) {
+      useDashboardStore.setState({ stats: payload, error: null });
+    }
+    useRealtimeStore.setState({ lastEventAt: Date.now() });
+    emit(event);
+  });
+}
+
+export const useRealtimeStore = create<RealtimeStore>((set, get) => ({
+  status: 'idle',
+  lastEventAt: null,
+  connection: null,
+  probeAndConnect: async () => {
+    if (bootInflight) {
+      return bootInflight;
+    }
+
+    const current = get();
+    if (current.status === 'connected' || current.status === 'connecting') {
+      return;
+    }
+
+    bootInflight = (async () => {
+      set({ status: 'probing' });
+
+      const enabled = await probeDashboardPush();
+      if (!enabled) {
+        set({ status: 'disabled' });
+        return;
+      }
+
+      set({ status: 'connecting' });
+
+      const connection = new HubConnectionBuilder()
+        .withUrl(getHubUrl(), { withCredentials: true })
+        .withAutomaticReconnect()
+        .configureLogging(LogLevel.Warning)
+        .build();
+
+      connection.onreconnecting(() => set({ status: 'reconnecting' }));
+      connection.onreconnected(() => {
+        set({ status: 'connected', lastEventAt: Date.now() });
+        // Drain-on-reconnect: events missed while disconnected are surfaced once
+        // here so subscribed pages refetch. Equivalent to NotificationListenerTask's
+        // DrainSignals after a transport reconnect.
+        emit('JobFinalized');
+        emit('MessageEnqueued');
+      });
+      connection.onclose(() => set({ status: 'disabled', connection: null }));
+
+      // Wire the two event channels we care about. Idempotent — repeated calls to
+      // probeAndConnect (e.g. after login) reuse the existing bridge bindings.
+      bridgeEvent(connection, 'JobFinalized');
+      bridgeEvent(connection, 'MessageEnqueued');
+
+      try {
+        await connection.start();
+        set({ status: 'connected', connection, lastEventAt: Date.now() });
+        // Initial-connect drain: any jobs that finalized during probe + start were
+        // not delivered to this client (SignalR doesn't replay missed events).
+        // Subscribers refetch authoritative state from REST so the dashboard isn't
+        // stuck on the pre-connect snapshot until the 30 s safety-net interval.
+        // Equivalent to onreconnected's drain, but for the first attach too.
+        emit('JobFinalized');
+        emit('MessageEnqueued');
+      } catch {
+        set({ status: 'disabled', connection: null });
+      }
+    })();
+
+    try {
+      await bootInflight;
+    } finally {
+      bootInflight = null;
+    }
+  },
+  disconnect: async () => {
+    const { connection } = get();
+    if (connection && connection.state !== HubConnectionState.Disconnected) {
+      await connection.stop();
+    }
+    set({ status: 'idle', connection: null });
+  },
+}));

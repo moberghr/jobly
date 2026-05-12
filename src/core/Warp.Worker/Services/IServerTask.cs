@@ -1,23 +1,6 @@
+using Warp.Core.Events;
+
 namespace Warp.Worker.Services;
-
-/// <summary>
-/// Push-event channels a server task can subscribe to via <see cref="IServerTask.Signals"/>.
-/// Paired with producer methods on <see cref="ServerTaskSignals{TContext}"/>.
-/// </summary>
-public enum ServerTaskSignal
-{
-    /// <summary>
-    /// A job reached a terminal state — wake the task that finalises parents / activates
-    /// continuations (<see cref="Orchestrator{TContext}"/>).
-    /// </summary>
-    JobFinalized,
-
-    /// <summary>
-    /// A Kind=Message row was enqueued — wake the task that fans it out into per-handler
-    /// jobs (<see cref="MessageRouter{TContext}"/>).
-    /// </summary>
-    MessageEnqueued,
-}
 
 /// <summary>
 /// Contract for a background server task. A task is a plain DI-registered unit of work;

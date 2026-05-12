@@ -1,19 +1,20 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Warp.Worker.Services;
+namespace Warp.Core.Events;
 
 /// <summary>
-/// In-process push → wake plumbing for server tasks. Producers (workers, the notification
-/// listener, scheduled-job activation) call the named <c>SignalXxx</c> methods. Consumers
-/// — the <see cref="ServerTaskLoop{TContext}"/>s for <see cref="Orchestrator{TContext}"/>
-/// and <see cref="MessageRouter{TContext}"/> — subscribe at host construction and tear
-/// down on shutdown via the returned <see cref="IDisposable"/>.
+/// In-process push → wake plumbing. Producers (workers finalising a job, the notification
+/// listener receiving a remote push, scheduled-job activation) call the named
+/// <c>SignalXxx</c> methods. Consumers — server-task loops in <c>Warp.Worker</c> and the
+/// dashboard broadcaster in <c>Warp.UI</c> — subscribe at host construction and tear down
+/// on shutdown via the returned <see cref="IDisposable"/>.
 /// </summary>
 /// <remarks>
-/// A dedicated method per signal (instead of a keyed registry) matches how Warp's signal
-/// surface is actually used: a small, domain-fixed set that changes rarely. Adding a
-/// signal is a one-line addition here plus whatever task code needs it — no keys, no
-/// stringly typed channels.
+/// Lives in <c>Warp.Core</c> so that any downstream package (Worker, UI, future addons) can
+/// subscribe without taking a dependency on Worker. A dedicated method per signal (instead
+/// of a keyed registry) matches how Warp's signal surface is actually used: a small,
+/// domain-fixed set that changes rarely. Adding a signal is a one-line addition here plus
+/// whatever subscriber code needs it — no keys, no stringly typed channels.
 /// </remarks>
 public sealed class ServerTaskSignals<TContext>
     where TContext : DbContext
@@ -23,22 +24,23 @@ public sealed class ServerTaskSignals<TContext>
     private readonly Lock _gate = new();
 
     /// <summary>
-    /// Called by workers after finalising a job (or by the notification listener on a
-    /// <c>JobFinalized</c> push) — wakes the Orchestrator loop.
+    /// Called when a job reaches a terminal state — wakes all subscribers to
+    /// <see cref="ServerTaskSignal.JobFinalized"/>.
     /// </summary>
     public void SignalJobFinalized() => Fire(_jobFinalizedWakers);
 
     /// <summary>
-    /// Called by the notification listener on a <c>MessageEnqueued</c> push — wakes the
-    /// MessageRouter loop.
+    /// Called when a <c>Kind=Message</c> job is enqueued — wakes all subscribers to
+    /// <see cref="ServerTaskSignal.MessageEnqueued"/>.
     /// </summary>
     public void SignalMessageEnqueued() => Fire(_messageEnqueuedWakers);
 
     /// <summary>
     /// Subscribe <paramref name="wake"/> to the given channel. Dispose the returned handle to
-    /// unregister — leaking it would leak a closure across the host's lifetime.
+    /// unregister — leaking it would leak a closure across the host's lifetime. Disposal is
+    /// idempotent and thread-safe.
     /// </summary>
-    internal Subscription Subscribe(ServerTaskSignal channel, Action wake) => channel switch
+    public IDisposable Subscribe(ServerTaskSignal channel, Action wake) => channel switch
     {
         ServerTaskSignal.JobFinalized => Subscribe(_jobFinalizedWakers, wake),
         ServerTaskSignal.MessageEnqueued => Subscribe(_messageEnqueuedWakers, wake),
@@ -69,7 +71,7 @@ public sealed class ServerTaskSignals<TContext>
         }
     }
 
-    internal sealed class Subscription : IDisposable
+    private sealed class Subscription : IDisposable
     {
         private readonly List<Action> _list;
         private readonly Lock _gate;

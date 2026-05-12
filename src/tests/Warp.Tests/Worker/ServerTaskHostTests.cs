@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Shouldly;
 using Warp.Core;
+using Warp.Core.Events;
 using Warp.Worker;
 using Warp.Worker.Services;
 

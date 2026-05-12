@@ -3,6 +3,7 @@ import { Chart, LineController, LineElement, PointElement, LinearScale, Category
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { useRefreshKey } from '@/hooks/useRefreshKey';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import type { CounterModel, CounterHistoryPoint } from '@/types';
 import * as api from '@/api';
 
@@ -40,9 +41,9 @@ export default function CountersPage() {
 
   useEffect(() => {
     fetchAll();
-    const id = setInterval(fetchAll, 5000);
-    return () => clearInterval(id);
   }, [refreshKey, fetchAll]);
+
+  useRealtimeRefetch('JobFinalized', fetchAll);
 
   if (error) return <ErrorState message={error} />;
   if (!counters) return <LoadingState />;

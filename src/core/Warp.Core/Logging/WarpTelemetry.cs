@@ -45,6 +45,16 @@ public static class WarpTelemetry
         unit: "ms",
         description: "Duration of in-memory IRequest/IStreamRequest execution through IMediator");
 
+    public static readonly Counter<long> DashboardEventsBroadcast = Meter.CreateCounter<long>(
+        "warp.dashboard.events.broadcast",
+        unit: "{event}",
+        description: "Total dashboard-push events broadcast to connected clients (post-coalesce)");
+
+    public static readonly UpDownCounter<long> DashboardConnectionsActive = Meter.CreateUpDownCounter<long>(
+        "warp.dashboard.connections.active",
+        unit: "{connection}",
+        description: "Number of dashboard SignalR connections currently active");
+
     public static readonly UpDownCounter<long> MediatorInFlight = Meter.CreateUpDownCounter<long>(
         "warp.mediator.in_flight",
         unit: "{request}",

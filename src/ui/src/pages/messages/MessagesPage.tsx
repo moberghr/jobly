@@ -8,6 +8,7 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import { useRefreshKey } from '@/hooks/useRefreshKey';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import type { JobGroupModel, PagedList } from '@/types';
 import * as api from '@/api';
 
@@ -32,6 +33,8 @@ export default function MessagesPage() {
   }, [page, pageSize, state]);
 
   useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
+
+  useRealtimeRefetch(['MessageEnqueued', 'JobFinalized'], fetchData);
 
   if (error) return <ErrorState message={error} />;
   if (!data) return <LoadingState />;
