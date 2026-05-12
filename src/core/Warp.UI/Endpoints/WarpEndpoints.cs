@@ -6,6 +6,7 @@ using Warp.Core.Concurrency;
 using Warp.Core.Enums;
 using Warp.Core.Models;
 using Warp.Core.Services;
+using Warp.UI.DashboardPush;
 using Warp.UI.Extensions;
 using Warp.UI.UIMiddleware;
 
@@ -124,6 +125,9 @@ public static class WarpEndpoints
         apiGroup.MapGet("stats/counters", async ([FromServices] IDashboardStatsService statsService) => await statsService.GetCounters());
 
         apiGroup.MapGet("stats/counters/history", async ([FromServices] IDashboardStatsService statsService, [FromQuery] int? hours) => await statsService.GetCountersHistory(hours ?? 24));
+
+        apiGroup.MapGet("dashboard/push/probe", ([FromServices] IDashboardPushMarker? marker) =>
+            marker is null ? Results.NotFound() : Results.Ok(new { enabled = true }));
 
         apiGroup.MapGet("concurrency", async ([FromServices] IConcurrencyLimitManager? mgr, CancellationToken ct) =>
         {

@@ -511,13 +511,23 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             return null;
         }
 
-        var parts = connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries)
-            .Select(p => p.Trim())
-            .Where(p => p.Contains('=', StringComparison.Ordinal))
-            .ToDictionary(
-                p => p[..p.IndexOf('=', StringComparison.Ordinal)].Trim(),
-                p => p[(p.IndexOf('=', StringComparison.Ordinal) + 1)..].Trim(),
-                StringComparer.OrdinalIgnoreCase);
+        // A connection string can legally contain the same key twice — ADO.NET's
+        // SqlConnectionStringBuilder resolves this by taking the LAST value. Tests
+        // that scope per-server connection pools by appending `Application Name=...`
+        // to an already-configured base string produce this shape, and a naive
+        // ToDictionary throws on the duplicate. Fold via last-wins.
+        var parts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var raw in connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmed = raw.Trim();
+            var eq = trimmed.IndexOf('=', StringComparison.Ordinal);
+            if (eq <= 0)
+            {
+                continue;
+            }
+
+            parts[trimmed[..eq].Trim()] = trimmed[(eq + 1)..].Trim();
+        }
 
         var isPostgres = parts.ContainsKey("Host");
         var provider = isPostgres ? "PostgreSQL Server" : "SQL Server";

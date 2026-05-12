@@ -5,6 +5,7 @@ using Warp.Core.Data.Entities;
 using Warp.Core.Data.Queries;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
+using Warp.Core.Events;
 using Warp.Core.Handlers;
 using Warp.Core.Helper;
 using Warp.Core.Notifications;

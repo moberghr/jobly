@@ -9,6 +9,7 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import { useRefreshKey } from '@/hooks/useRefreshKey';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import type { JobModel, PagedList, TypeCountModel } from '@/types';
 import * as api from '@/api';
 
@@ -75,6 +76,11 @@ export default function JobListPage() {
     fetchData();
     fetchTypeCounts();
   }, [fetchData, fetchTypeCounts, refreshKey]);
+
+  useRealtimeRefetch('JobFinalized', useCallback(() => {
+    fetchData();
+    fetchTypeCounts();
+  }, [fetchData, fetchTypeCounts]));
 
   const handlePageSizeChange = (size: number) => {
     setPageSize(size);

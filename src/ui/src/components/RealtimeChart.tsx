@@ -131,6 +131,17 @@ export function RealtimeChart({ height = 200 }: { height?: number }) {
     }
   }, [realtimeData]);
 
+  // Tick rate sampling at 1Hz independent of event-driven stats refresh. The
+  // chart is a sampled time-series; gaps in event-driven fetches would create
+  // gaps in the line. Each tick reads totalSucceeded/totalFailed already in the
+  // store (refreshed via realtime events) and appends a normalized delta.
+  useEffect(() => {
+    const id = setInterval(() => {
+      useDashboardStore.getState().sampleRate();
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <div>
       <div className="flex gap-6 mb-2 text-sm">

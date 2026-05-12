@@ -11,6 +11,7 @@ using Warp.Http;
 using Warp.Provider.PostgreSql;
 using Warp.Test.Shared;
 using Warp.UI;
+using Warp.UI.DashboardPush;
 using Warp.UI.Extensions;
 using Warp.UI.Extensions.Retry;
 using Warp.UI.UIMiddleware;
@@ -46,10 +47,21 @@ builder.Services.AddWarpWorker<TestContext>(options =>
     options.HealthCheckInterval = TimeSpan.FromSeconds(10);
     options.HealthCheckTimeout = TimeSpan.FromSeconds(30);
     options.JobExpirationTimeout = TimeSpan.FromMinutes(30);
-    options.UseDispatcher = false;
+
+    // Dispatcher batch-fetches and distributes jobs to workers, and (combined with
+    // UseDatabasePush below) wakes instantly on JobEnqueued notifications instead of
+    // waiting for the next poll. Without this, idle workers exponentially back off to
+    // MaxPollingInterval (default 30s), so newly seeded jobs wait up to 30s for pickup.
+    options.UseDispatcher = true;
 
     options.AddRetry(o => o.MaxRetries = 3);
     options.AddConcurrency();
+
+    // Cross-server push backbone — also fans dashboard events from TestWorker to TestApp.
+    options.UseDatabasePush();
+
+    // Realtime dashboard push — replaces polling on the dashboard with SignalR push.
+    options.AddDashboardPush();
 
     // Second worker group — different queues and polling
     options.AddWorkerGroup(group =>

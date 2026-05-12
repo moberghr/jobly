@@ -34,6 +34,7 @@ A distributed job processing, message queue, and in-memory mediator library for 
 - **Dashboard** — React-based web UI with realtime graph, historical graph, dark mode, clickable metric cards, bulk actions, batch progress bars, worker detail page.
 - **TimeProvider** — All production code uses injectable `TimeProvider` for testability.
 - **DB Push (optional)** — Opt-in `opt.UseDatabasePush()` replaces polling wake-up with PostgreSQL `LISTEN`/`NOTIFY` or SQL Server Service Broker, cutting dispatcher pickup latency from ~500ms to <50ms without tight polling.
+- **Realtime Dashboard Push (optional)** — Opt-in `opt.AddDashboardPush()` adds a SignalR hub at `/warp/api/hub` so the dashboard refreshes on backend events instead of polling. Frontend probes once at boot and falls back to polling if the addon is not registered. Multi-server fanout reuses the same DB push backbone.
 
 ## Integration Guide
 
@@ -405,6 +406,41 @@ SET    current_state = 7  -- State.Scheduled
 WHERE  current_state = 1  -- State.Enqueued
   AND  schedule_time > now();
 ```
+
+### 12. Realtime Dashboard Push (optional)
+
+Replaces dashboard polling with server-pushed SignalR events. With this addon registered, every connected dashboard client receives a `JobFinalized` event whenever any job reaches a terminal state, and a `MessageEnqueued` event whenever a `Kind=Message` job is published.
+
+Each broadcast carries the current `DashboardStatistics` DTO as the payload — the server fetches it once per coalesce window and fans it out to all connected clients, eliminating per-client `GET /api/status` round-trips. Stats fetch is best-effort: if the service can't be resolved (or `GetWarpStatus()` throws) the event still fires without a payload, and the SPA's safety-net interval will refetch via REST. Per-view data (filtered job lists, job detail, logs) is **not** pushed in the payload — clients refetch those on event because they're per-viewer scoped (different filters, pages, job ids per client).
+
+```csharp
+builder.Services.AddWarp<AppDbContext>(opt =>
+{
+    opt.UseDatabasePush();      // recommended — see "Multi-server" below
+    opt.AddDashboardPush();     // registers hub + broadcaster
+});
+```
+
+Optional configuration (defaults shown):
+
+```csharp
+opt.AddDashboardPush(cfg =>
+{
+    // Collapse signal bursts (e.g., 50-job batch completion) into one broadcast.
+    // Set to TimeSpan.Zero to disable coalescing.
+    cfg.CoalesceWindow = TimeSpan.FromMilliseconds(100);
+});
+```
+
+**Hide-on-404 fallback**: the dashboard probes `GET /warp/api/dashboard/push/probe` once at boot. If `AddDashboardPush()` is not registered the endpoint returns 404 and the SPA keeps using its existing polling fallback (at the safety-net interval of 30 s — coarser than the previous 2–5 s, which is the intended cost of not opting in).
+
+**Auth**: hub negotiate hits `WarpUIMiddleware`'s existing path-based auth (the hub URL contains `/api/`, so unauthenticated requests get a 401). No parallel auth code path — the same `IWarpAuthorizationFilter` (or built-in cookie login) gates the hub.
+
+**Multi-server fanout**: when `opt.UseDatabasePush()` is also configured, an event on server A fans out to dashboard clients connected to every server. The DB-push transport already routes `JobFinalized` and `MessageEnqueued` notifications to all `NotificationListenerTask` instances; the dashboard broadcaster on each server picks them up via the same `ServerTaskSignals<TContext>` surface that wakes the orchestrator. Without `UseDatabasePush()`, push is single-server only: events from server B reach a client connected to server A only via the safety-net 30 s refetch.
+
+**Observability**: `warp.dashboard.events.broadcast` (counter, post-coalesce) and `warp.dashboard.connections.active` (up/down counter). No new alerts recommended for push — the polling fallback is the correctness floor.
+
+**Frontend dependency**: the dashboard adds `@microsoft/signalr` as a client dependency. No new server-side NuGet — SignalR ships with `Microsoft.AspNetCore.App`.
 
 ## HTTP Exposure (Warp.Http)
 

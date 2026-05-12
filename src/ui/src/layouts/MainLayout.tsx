@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useDashboardStore } from '@/stores/dashboard';
-import { usePolling } from '@/hooks/usePolling';
 import * as LucideIcons from 'lucide-react';
 import {
   LayoutDashboard,
@@ -19,6 +18,7 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
+import { useRealtimeStore } from '@/stores/realtime';
 import { config } from '@/config';
 import * as api from '@/api';
 import type { DashboardStatistics } from '@/types';
@@ -56,9 +56,24 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
+  const realtimeStatus = useRealtimeStore((s) => s.status);
   const [concurrencyAvailable, setConcurrencyAvailable] = useState(false);
 
-  usePolling(fetchStats, 1000);
+  // Initial fetch for first paint — after this, fresh stats arrive directly via
+  // the SignalR push payload on every JobFinalized / MessageEnqueued event (see
+  // bridgeEvent in stores/realtime.ts) and are written straight into the dashboard
+  // store. No event-driven REST refetch is needed for stats; the bus emit fired
+  // by the bridge still wakes other pages (jobs, counters, etc.) to refetch their
+  // own scoped views.
+  useEffect(() => { fetchStats(); }, [fetchStats]);
+
+  // Kick off the realtime probe + hub connection once the dashboard has
+  // mounted (and therefore subscribers like the bus listeners are already
+  // registered). Running this from main.tsx races React's useEffect timing
+  // and the post-connect drain emits to zero subscribers.
+  useEffect(() => {
+    void useRealtimeStore.getState().probeAndConnect();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,43 +145,44 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
                   <Icon className="h-4 w-4" />
                   {item.label}
                   {item.label === 'Jobs' && stats && stats.created > 0 && (
-                    <span className="ml-1 text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                    <span className="ml-1 text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
                       {stats.created}
                     </span>
                   )}
                   {item.label === 'Jobs' && stats && stats.failed > 0 && (
-                    <span className="text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
+                    <span className="text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
                       {stats.failed}
                     </span>
                   )}
                   {item.label === 'Messages' && stats && stats.messages > 0 && (
-                    <span className="ml-1 text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                    <span className="ml-1 text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
                       {stats.messages}
                     </span>
                   )}
                   {item.label === 'Messages' && stats && stats.messagesFailed > 0 && (
-                    <span className="text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
+                    <span className="text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
                       {stats.messagesFailed}
                     </span>
                   )}
                   {item.label === 'Batches' && stats && stats.batchesProcessing > 0 && (
-                    <span className="ml-1 text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                    <span className="ml-1 text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
                       {stats.batchesProcessing}
                     </span>
                   )}
                   {item.label === 'Batches' && stats && stats.batchesFailed > 0 && (
-                    <span className="text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
+                    <span className="text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
                       {stats.batchesFailed}
                     </span>
                   )}
                   {item.label === 'Servers' && stats && (
-                    <span className="ml-1 text-xs min-w-5 text-center px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{stats.servers}</span>
+                    <span className="ml-1 text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{stats.servers}</span>
                   )}
                 </Link>
               );
             })}
           </nav>
           <div className="flex-1" />
+          <RealtimeStatusIndicator status={realtimeStatus} />
           <button onClick={toggle} className="p-2 rounded-md hover:bg-accent text-muted-foreground">
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
@@ -205,12 +221,40 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
       {/* Footer */}
       <footer className="border-t bg-card px-6 py-3 text-xs text-muted-foreground flex items-center justify-between">
         <span>{stats?.databaseConnection ?? 'Warp Dashboard'}</span>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 tabular-nums">
           {stats && <span>Servers: {stats.servers} · Workers active</span>}
           <span>UTC: {new Date().toISOString().replace('T', ' ').substring(0, 19)}</span>
         </div>
       </footer>
     </div>
+  );
+}
+
+function RealtimeStatusIndicator({ status }: { status: ReturnType<typeof useRealtimeStore.getState>['status'] }) {
+  // 'disabled' indicator is hidden in production: when the addon is not registered
+  // we don't want to imply something is wrong — polling fallback is the supported
+  // path. Visible in dev to surface "did the probe actually succeed" while iterating.
+  if (status === 'disabled' && !import.meta.env.DEV) {
+    return null;
+  }
+  if (status === 'idle' || status === 'probing') {
+    return null;
+  }
+
+  const styles: Record<string, { dot: string; label: string; title: string }> = {
+    connected: { dot: 'bg-green-500', label: 'Live', title: 'Realtime push connected' },
+    connecting: { dot: 'bg-amber-500 animate-pulse', label: 'Connecting', title: 'Connecting realtime push…' },
+    reconnecting: { dot: 'bg-amber-500 animate-pulse', label: 'Reconnecting', title: 'Reconnecting realtime push…' },
+    disabled: { dot: 'bg-muted-foreground/40', label: 'Polling', title: 'Realtime push disabled; using polling fallback' },
+  };
+  const s = styles[status];
+  if (!s) return null;
+
+  return (
+    <span className="flex items-center justify-end gap-1.5 min-w-28 px-2 py-1 mr-1 text-xs text-muted-foreground" title={s.title}>
+      <span className={`h-2 w-2 rounded-full ${s.dot}`} />
+      <span>{s.label}</span>
+    </span>
   );
 }
 

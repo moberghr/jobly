@@ -8,7 +8,7 @@ import { FilteredJobsTable } from '@/components/FilteredJobsTable';
 import { RelativeTime } from '@/components/RelativeTime';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
-import { usePolling } from '@/hooks/usePolling';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import { State } from '@/types';
 import type { UnifiedJobDetailModel, JobLogModel } from '@/types';
 import * as api from '@/api';
@@ -61,16 +61,15 @@ export default function DetailPage() {
     if (id) api.getDetail(id).then(setJob).catch(() => setError('Unable to load details'));
   }, [id]);
 
-  const isProcessing = job?.currentState === State.Processing;
+  const refresh = useCallback(() => {
+    if (!id) return;
+    api.getDetail(id).then(setJob).catch(() => {});
+  }, [id]);
 
-  usePolling(
-    useCallback(() => {
-      if (id && isProcessing) {
-        api.getDetail(id).then(setJob).catch(() => {});
-      }
-    }, [id, isProcessing]),
-    3000
-  );
+  // Refetch on every JobFinalized — the event is broadcast-only (no per-job scope in v1),
+  // so we refetch even if the finalize is for an unrelated job. At normal dashboard usage
+  // (<10 detail pages open) this is cheap; per-job groups are a v2 optimization.
+  useRealtimeRefetch('JobFinalized', refresh);
 
   const handleCountsUpdate = useCallback((counts: Record<string, number>) => {
     setJobCounts(counts);
