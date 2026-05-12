@@ -78,7 +78,8 @@ builder.Services.AddWarpWorker<AppDbContext>(opt =>
 
     // Core addons live on the same builder
     opt.AddRetry(r => r.MaxRetries = 3);
-    opt.AddMutex();
+    opt.AddConcurrency();   // [Mutex] / [Semaphore]
+    opt.AddRateLimit();     // [RateLimit] (Fixed/Sliding windows)
 });
 
 // Scan assembly for IJobHandler<T> and IMessageHandler<T> implementations

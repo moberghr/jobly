@@ -5,6 +5,7 @@ using Warp.Core;
 using Warp.Core.Concurrency;
 using Warp.Core.Enums;
 using Warp.Core.Models;
+using Warp.Core.RateLimit;
 using Warp.Core.Services;
 using Warp.UI.DashboardPush;
 using Warp.UI.Extensions;
@@ -211,6 +212,99 @@ public static class WarpEndpoints
             return removed ? Results.Ok() : Results.NotFound();
         });
 
+        apiGroup.MapGet("ratelimits", async ([FromServices] IRateLimitManager? mgr, CancellationToken ct) =>
+        {
+            if (mgr is null)
+            {
+                return Results.NotFound();
+            }
+
+            var list = await mgr.ListLimits(ct);
+
+            return Results.Ok(list);
+        });
+
+        apiGroup.MapGet("ratelimits/{name}", async ([FromServices] IRateLimitManager? mgr, string name, CancellationToken ct) =>
+        {
+            if (mgr is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return Results.BadRequest();
+            }
+
+            var info = await mgr.GetLimit(name, ct);
+
+            return info is null ? Results.NotFound() : Results.Ok(info);
+        });
+
+        apiGroup.MapPost("ratelimits", async ([FromServices] IRateLimitManager? mgr, [FromBody] UpsertRateLimitRequest body, CancellationToken ct) =>
+        {
+            if (mgr is null)
+            {
+                return Results.NotFound();
+            }
+
+            // Validate at the endpoint so a too-long name returns 400 rather than bubbling
+            // ArgumentException from the manager as a 500. Length cap matches MaxNameLength
+            // in RateLimitManager.
+            if (body is null
+                || string.IsNullOrWhiteSpace(body.Name)
+                || body.Name.Length > 200
+                || body.Count < 1
+                || body.WindowSeconds < 1)
+            {
+                return Results.BadRequest();
+            }
+
+            await mgr.AddOrUpdateLimit(body.Name, body.Count, body.WindowSeconds, ct);
+            var info = await mgr.GetLimit(body.Name, ct);
+
+            return Results.Ok(info);
+        });
+
+        apiGroup.MapPut("ratelimits/{name}", async ([FromServices] IRateLimitManager? mgr, string name, [FromBody] UpdateRateLimitRequest body, CancellationToken ct) =>
+        {
+            if (mgr is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (string.IsNullOrWhiteSpace(name)
+                || name.Length > 200
+                || body is null
+                || body.Count < 1
+                || body.WindowSeconds < 1)
+            {
+                return Results.BadRequest();
+            }
+
+            await mgr.AddOrUpdateLimit(name, body.Count, body.WindowSeconds, ct);
+            var info = await mgr.GetLimit(name, ct);
+
+            return Results.Ok(info);
+        });
+
+        apiGroup.MapDelete("ratelimits/{name}", async ([FromServices] IRateLimitManager? mgr, string name, CancellationToken ct) =>
+        {
+            if (mgr is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return Results.BadRequest();
+            }
+
+            var removed = await mgr.RemoveLimit(name, ct);
+
+            return removed ? Results.Ok() : Results.NotFound();
+        });
+
         apiGroup.MapGet("servers", async ([FromServices] IDashboardStatsService statsService) => await statsService.GetServers());
 
         apiGroup.MapGet("servers/{serverId}", async ([FromServices] IDashboardStatsService statsService, Guid serverId) =>
@@ -281,3 +375,7 @@ public static class WarpEndpoints
 public sealed record UpsertConcurrencyLimitRequest(string Name, int Limit);
 
 public sealed record UpdateConcurrencyLimitRequest(int Limit);
+
+public sealed record UpsertRateLimitRequest(string Name, int Count, int WindowSeconds);
+
+public sealed record UpdateRateLimitRequest(int Count, int WindowSeconds);

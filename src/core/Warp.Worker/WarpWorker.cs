@@ -11,14 +11,16 @@ public class WarpWorker<TContext> : BackgroundService
     private readonly IWarpWorkerService _warpWorkerService;
     private readonly WorkerGroupConfiguration _groupConfiguration;
     private readonly PauseStateHolder _pauseStateHolder;
+    private readonly TimeProvider _timeProvider;
     private readonly Guid _workerGroupId;
 
-    public WarpWorker(IWarpWorkerService warpWorkerService, ILogger<WarpWorker<TContext>> logger, WorkerGroupConfiguration groupConfiguration, PauseStateHolder pauseStateHolder, Guid workerGroupId)
+    public WarpWorker(IWarpWorkerService warpWorkerService, ILogger<WarpWorker<TContext>> logger, WorkerGroupConfiguration groupConfiguration, PauseStateHolder pauseStateHolder, TimeProvider timeProvider, Guid workerGroupId)
     {
         _warpWorkerService = warpWorkerService;
         _logger = logger;
         _groupConfiguration = groupConfiguration;
         _pauseStateHolder = pauseStateHolder;
+        _timeProvider = timeProvider;
         _workerGroupId = workerGroupId;
     }
 
@@ -36,7 +38,7 @@ public class WarpWorker<TContext> : BackgroundService
                 if (_pauseStateHolder.IsPaused(_workerGroupId))
                 {
                     currentDelay = floor;
-                    await Task.Delay(floor, stoppingToken);
+                    await Task.Delay(floor, _timeProvider, stoppingToken);
                     continue;
                 }
 
@@ -48,7 +50,7 @@ public class WarpWorker<TContext> : BackgroundService
                 }
 
                 currentDelay = PollingBackoff.Next(currentDelay, floor, max, factor);
-                await Task.Delay(currentDelay, stoppingToken);
+                await Task.Delay(currentDelay, _timeProvider, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -60,7 +62,7 @@ public class WarpWorker<TContext> : BackgroundService
                 // first (row lock raced or concurrency token bumped). Not a handler failure —
                 // don't spam stack traces at Error level. Short delay, re-fetch.
                 _logger.LogDebug(ex, "Worker fetch hit optimistic concurrency; another worker won the row.");
-                await Task.Delay(floor, stoppingToken);
+                await Task.Delay(floor, _timeProvider, stoppingToken);
             }
             catch (Exception ex)
             {
@@ -68,7 +70,7 @@ public class WarpWorker<TContext> : BackgroundService
                 // the polling backoff. Sleep a short fixed interval and retry, keeping the
                 // service alive across DB hiccups or handler pipeline faults.
                 _logger.LogError(ex, "Worker fetch failed");
-                await Task.Delay(floor, stoppingToken);
+                await Task.Delay(floor, _timeProvider, stoppingToken);
             }
         }
 

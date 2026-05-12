@@ -83,6 +83,7 @@ public class WarpSingleWorkerHost<TContext> : IHostedService
                     _loggerFactory.CreateLogger<WarpWorker<TContext>>(),
                     registration.Config,
                     _pauseStateHolder,
+                    _timeProvider,
                     registration.GroupEntityId);
 
                 await worker.StartAsync(cancellationToken);

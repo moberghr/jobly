@@ -38,7 +38,7 @@ public abstract class MutexTestsBase : IAsyncLifetime
         var dict = new Dictionary<string, object> { ["ConcurrencyKey"] = key };
         if (mode != null)
         {
-            dict["Mode"] = (int)mode.Value;
+            dict["ConcurrencyMode"] = (int)mode.Value;
         }
 
         return JsonSerializer.Serialize(dict);
@@ -475,8 +475,8 @@ public abstract class MutexTestsBase : IAsyncLifetime
 
         var metadata = JsonSerializer.Deserialize<Dictionary<string, object>>(job.Metadata!);
         metadata.ShouldNotBeNull();
-        metadata.ShouldContainKey("Limit");
-        ((JsonElement)metadata["Limit"]).GetInt32().ShouldBe(1);
+        metadata.ShouldContainKey("ConcurrencyLimit");
+        ((JsonElement)metadata["ConcurrencyLimit"]).GetInt32().ShouldBe(1);
     }
 
     [TimedFact]
@@ -511,8 +511,8 @@ public abstract class MutexTestsBase : IAsyncLifetime
 
         var metadata = JsonSerializer.Deserialize<Dictionary<string, object>>(job.Metadata!);
         metadata.ShouldNotBeNull();
-        metadata.ShouldContainKey("Limit");
-        ((JsonElement)metadata["Limit"]).GetInt32().ShouldBe(1);
+        metadata.ShouldContainKey("ConcurrencyLimit");
+        ((JsonElement)metadata["ConcurrencyLimit"]).GetInt32().ShouldBe(1);
     }
 
     [TimedFact]
@@ -549,8 +549,8 @@ public abstract class MutexTestsBase : IAsyncLifetime
         metadata.ShouldNotBeNull();
         metadata.ShouldContainKey("ConcurrencyKey");
         metadata["ConcurrencyKey"].ToString().ShouldBe("static-wait-key");
-        metadata.ShouldContainKey("Mode");
-        ((JsonElement)metadata["Mode"]).GetInt32().ShouldBe((int)ConcurrencyMode.Wait);
+        metadata.ShouldContainKey("ConcurrencyMode");
+        ((JsonElement)metadata["ConcurrencyMode"]).GetInt32().ShouldBe((int)ConcurrencyMode.Wait);
     }
 
     private WarpWorkerService<TestContext> CreateWorker(FakeSemaphoreProvider? lockProvider = null)

@@ -47,17 +47,34 @@ public static class MetadataConvert
         // Enum / Nullable<Enum> ← long (NativeObjectConverter returns long for integer JSON numbers).
         // Defensive against non-integral values (e.g. a string mistakenly stored against an enum
         // key) — fall through to default rather than throwing from a metadata accessor.
-        var enumType = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
-        if (enumType.IsEnum)
+        var underlying = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
+        if (underlying.IsEnum)
         {
             try
             {
-                return (T)Enum.ToObject(enumType, value);
+                return (T)Enum.ToObject(underlying, value);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidCastException or OverflowException)
             {
                 return default;
             }
+        }
+
+        // DateTime / Nullable<DateTime> ← string (NativeObjectConverter returns string for ISO
+        // 8601 timestamps written by JsonSerializer.Serialize). Round-trip via DateTimeStyles
+        // RoundtripKind to preserve the original Kind (UTC).
+        if (underlying == typeof(DateTime) && value is string dateString)
+        {
+            if (DateTime.TryParse(
+                dateString,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.RoundtripKind,
+                out var dt))
+            {
+                return (T)(object)dt;
+            }
+
+            return default;
         }
 
         // List<object> → T[] conversion (NativeObjectConverter returns List<object> for arrays)

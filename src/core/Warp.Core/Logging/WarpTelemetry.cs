@@ -182,6 +182,14 @@ public static class WarpTelemetry
     public static Activity? StartConcurrencyActivity() => ActivitySource.StartActivity("warp.concurrency_acquire", ActivityKind.Internal);
 
     /// <summary>
+    /// Starts an Internal-kind span around a single rate-limit check. Span name
+    /// "warp.rate_limit_check". Caller stamps warp.rate_limit.key, warp.rate_limit.count,
+    /// warp.rate_limit.window_seconds, warp.rate_limit.style, and warp.rate_limit.outcome
+    /// (one of: acquired, skipped, throttled, lock_contention) before disposing.
+    /// </summary>
+    public static Activity? StartRateLimitActivity() => ActivitySource.StartActivity("warp.rate_limit_check", ActivityKind.Internal);
+
+    /// <summary>
     /// Bound the length of a string used as an OTel span status description. Activity status
     /// descriptions go to OTel exporters and tracing backends; arbitrarily-long exception
     /// messages would bloat span payloads and make UIs unreadable. 256 chars is the convention

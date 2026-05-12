@@ -16,6 +16,7 @@ import {
   Puzzle,
   Gauge,
   KeyRound,
+  Timer,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { useRealtimeStore } from '@/stores/realtime';
@@ -35,6 +36,7 @@ const builtInNavItems = [
 ];
 
 const concurrencyNavItem = { to: '/concurrency', label: 'Concurrency', icon: KeyRound };
+const rateLimitsNavItem = { to: '/ratelimits', label: 'Rate Limits', icon: Timer };
 
 function resolveIcon(name?: string): React.ComponentType<{ className?: string }> {
   if (!name) {
@@ -58,6 +60,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   const { theme, toggle } = useTheme();
   const realtimeStatus = useRealtimeStore((s) => s.status);
   const [concurrencyAvailable, setConcurrencyAvailable] = useState(false);
+  const [rateLimitsAvailable, setRateLimitsAvailable] = useState(false);
 
   // Initial fetch for first paint — after this, fresh stats arrive directly via
   // the SignalR push payload on every JobFinalized / MessageEnqueued event (see
@@ -92,6 +95,20 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
         }
       });
 
+    api
+      .listRateLimits()
+      .then(() => {
+        if (!cancelled) setRateLimitsAvailable(true);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        if (axios.isAxiosError(e) && e.response?.status === 404) {
+          setRateLimitsAvailable(false);
+        } else {
+          setRateLimitsAvailable(false);
+        }
+      });
+
     return () => {
       cancelled = true;
     };
@@ -111,6 +128,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
             {[
               ...builtInNavItems,
               ...(concurrencyAvailable ? [concurrencyNavItem] : []),
+              ...(rateLimitsAvailable ? [rateLimitsNavItem] : []),
               ...extensions.flatMap((ext) =>
                 ext.pages.map((page) => ({
                   to: page.path,

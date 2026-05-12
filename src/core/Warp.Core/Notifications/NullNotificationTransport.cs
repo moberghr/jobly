@@ -15,7 +15,7 @@ public sealed class NullNotificationTransport : IWarpNotificationTransport
     {
         // No-op listener: block forever (until cancelled). The notification listener hosted
         // service is only registered by opt.UseDatabasePush(), so this path normally isn't hit.
-        await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+        await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, ct);
         yield break;
     }
 }

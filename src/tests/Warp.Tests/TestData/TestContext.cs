@@ -27,5 +27,7 @@ public class TestContext : DbContext
         // so we must explicitly include the addon entity here.
         ServiceConfiguration.AddCircuitBreakerStateEntity(modelBuilder, _schema);
         ServiceConfiguration.AddConcurrencyLimitEntity(modelBuilder, _schema);
+        ServiceConfiguration.AddRateLimitBucketEntity(modelBuilder, _schema);
+        ServiceConfiguration.AddRateLimitOverrideEntity(modelBuilder, _schema);
     }
 }
