@@ -65,7 +65,10 @@ export interface JobLogModel {
   exception: string | null;
   durationMs: number | null;
   workerId: string | null;
+  name: string | null;
+  value: number | null;
 }
+
 
 export interface JobGroupModel {
   id: string;

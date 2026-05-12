@@ -369,3 +369,6 @@ tasks/todo.md
 
 # Stryker.NET mutation testing output
 **/StrykerOutput/
+
+# Claude scheduled-task lock file
+.claude/scheduled_tasks.lock
