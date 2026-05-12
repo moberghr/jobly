@@ -294,6 +294,8 @@ public static class ServiceConfiguration
         jobLog.Property(p => p.Exception);
         jobLog.Property(p => p.DurationMs);
         jobLog.Property(p => p.WorkerId);
+        jobLog.Property(p => p.Name).HasMaxLength(100);
+        jobLog.Property(p => p.Value);
 
         jobLog.HasIndex(p => p.JobId);
 

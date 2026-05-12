@@ -19,4 +19,8 @@ public class JobLog
     public double? DurationMs { get; set; }
 
     public Guid? WorkerId { get; set; }
+
+    public string? Name { get; set; }
+
+    public short? Value { get; set; }
 }

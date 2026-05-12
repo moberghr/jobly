@@ -228,6 +228,8 @@ public class JobQueryService<TContext> : IJobQueryService
                 Exception = x.Exception,
                 DurationMs = x.DurationMs,
                 WorkerId = x.WorkerId,
+                Name = x.Name,
+                Value = x.Value,
             })
             .ToListAsync();
 

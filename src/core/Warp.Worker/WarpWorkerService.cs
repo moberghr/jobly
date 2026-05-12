@@ -106,8 +106,9 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
         }
 
         var logCollector = new JobLogCollector { JobId = job.Id, TimeProvider = _timeProvider, WorkerId = _workerId };
+        var progressCollector = new JobProgressCollector { JobId = job.Id, TimeProvider = _timeProvider, WorkerId = _workerId };
         using var jobCts = new CancellationTokenSource();
-        var monitorTask = RunJobMonitor(job.Id, logCollector, jobCts, cancellationToken);
+        var monitorTask = RunJobMonitor(job.Id, logCollector, progressCollector, jobCts, cancellationToken);
 
         var activity = WarpTelemetry.StartJobActivity(job.TraceId ?? job.Id, job.ParentSpanId, job.Queue);
         var jobTypeName = WarpTelemetry.GetShortTypeName(job.Type);
@@ -150,6 +151,7 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
             jobContext.JobId = job.Id;
             jobContext.TraceId = job.TraceId ?? job.Id;
             jobContext.Metadata = MetadataSerializer.Deserialize(job.Metadata);
+            jobContext.ProgressCollector = progressCollector;
 
             // Tag the consumer span with the retry attempt (1-based). Read directly from the
             // metadata dict — Warp.Worker does not depend on Warp.Core.Retry. Numbers come
@@ -184,6 +186,7 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
             // Read metadata and outcome from handler scope before disposing
             job.Metadata = JsonSerializer.Serialize(jobContext.Metadata);
             var successOutcome = jobContext.Outcome;
+            jobContext.ProgressCollector = null;
             handlerScope.Dispose();
             handlerScope = null;
 
@@ -247,6 +250,8 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
                 await SaveJobLogs(workerContext, logCollector);
             }
 
+            await SaveProgressRows(workerContext, progressCollector);
+
             PerfTrace.Mark(PerfTrace.SaveCompleted);
             await workerContext.SaveChangesAsync(default);
 
@@ -290,6 +295,8 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
             {
                 await SaveJobLogs(workerContext, logCollector);
             }
+
+            await SaveProgressRows(workerContext, progressCollector);
 
             await workerContext.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
@@ -364,6 +371,8 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
                 await SaveJobLogs(workerContext, logCollector);
             }
 
+            await SaveProgressRows(workerContext, progressCollector);
+
             await workerContext.SaveChangesAsync(default);
             await endTransaction.CommitAsync(default);
         }
@@ -411,7 +420,7 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
         await JobDispatcher.ExecuteJobHandler(payload, messageType, jobHandlerType, provider, cancellationToken);
     }
 
-    private async Task RunJobMonitor(Guid jobId, JobLogCollector logCollector, CancellationTokenSource jobCts, CancellationToken stoppingToken)
+    private async Task RunJobMonitor(Guid jobId, JobLogCollector logCollector, JobProgressCollector progressCollector, CancellationTokenSource jobCts, CancellationToken stoppingToken)
     {
         var logFlushInterval = _configuration.LogFlushInterval;
         var cancellationCheckInterval = _configuration.CancellationCheckInterval;
@@ -435,9 +444,10 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
             try
             {
                 var pendingLogs = logCollector.Drain();
+                var pendingProgress = progressCollector.Drain();
                 var doCancellationCheck = timeSinceLastCheck >= cancellationCheckInterval;
 
-                if (pendingLogs.Count == 0 && !doCancellationCheck)
+                if (pendingLogs.Count == 0 && pendingProgress.Count == 0 && !doCancellationCheck)
                 {
                     continue;
                 }
@@ -458,10 +468,19 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
                     {
                         _logger.LogInformation("Job {jobId} cancellation requested ({mode}), cancelling handler", jobId, cancellationMode);
 
-                        // Flush any pending logs before cancelling — they were already drained from the queue
+                        // Flush any pending logs/progress before cancelling — they were already drained from the collectors
                         if (pendingLogs.Count > 0)
                         {
                             context.Set<JobLog>().AddRange(pendingLogs);
+                        }
+
+                        if (pendingProgress.Count > 0)
+                        {
+                            context.Set<JobLog>().AddRange(pendingProgress);
+                        }
+
+                        if (pendingLogs.Count > 0 || pendingProgress.Count > 0)
+                        {
                             await context.SaveChangesAsync(stoppingToken);
                         }
 
@@ -478,6 +497,15 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
                 if (pendingLogs.Count > 0)
                 {
                     context.Set<JobLog>().AddRange(pendingLogs);
+                }
+
+                if (pendingProgress.Count > 0)
+                {
+                    context.Set<JobLog>().AddRange(pendingProgress);
+                }
+
+                if (pendingLogs.Count > 0 || pendingProgress.Count > 0)
+                {
                     await context.SaveChangesAsync(stoppingToken);
                 }
             }
@@ -563,6 +591,17 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
     }
 
     private static async Task SaveJobLogs(TContext context, JobLogCollector collector)
+    {
+        var entries = collector.Drain();
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        await context.Set<JobLog>().AddRangeAsync(entries);
+    }
+
+    private static async Task SaveProgressRows(TContext context, JobProgressCollector collector)
     {
         var entries = collector.Drain();
         if (entries.Count == 0)

@@ -78,8 +78,18 @@ export default function DetailPage() {
   if (error) return <ErrorState message={error} />;
   if (!job) return <LoadingState />;
 
-  const systemEvents = job.logs.filter(l => l.eventType !== 'Log').reverse();
+  const systemEvents = job.logs.filter(l => l.eventType !== 'Log' && l.eventType !== 'Progress').reverse();
   const handlerLogs = job.logs.filter(l => l.eventType === 'Log');
+
+  // Reported progress: latest value per bar name. Progress rows are append-only with
+  // dedup-on-no-change, so the most recent entry per name is the current value.
+  const progressByName = new Map<string, number>();
+  for (const log of job.logs) {
+    if (log.eventType !== 'Progress' || log.value == null) continue;
+    const name = log.name ?? '';
+    progressByName.set(name, log.value);
+  }
+  const progressBars = Array.from(progressByName.entries());
 
   // Batch progress
   const totalJobs = Object.keys(jobCounts).length > 0
@@ -188,8 +198,35 @@ export default function DetailPage() {
           </div>
         </div>
 
-        {/* Right column: History + Logs */}
+        {/* Right column: Progress + History + Logs */}
         <div className="space-y-4">
+          {/* Reported progress (handler-supplied via IJobContext.ReportProgress) */}
+          {progressBars.length > 0 && (
+            <div data-warp-slot="detail.reportedProgress" data-warp-context={jobContext} key={`reported-progress-${job.id}`}>
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">Reported Progress</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {progressBars.map(([name, value]) => (
+                      <div key={name}>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-muted-foreground">{name === '' ? 'Progress' : name}</span>
+                          <span className="font-medium">{value}%</span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-500 transition-all"
+                            style={{ width: `${value}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {/* State History */}
           {systemEvents.length > 0 && (
             <div data-warp-slot="detail.history" data-warp-context={jobContext} key={`history-${job.id}`}>
