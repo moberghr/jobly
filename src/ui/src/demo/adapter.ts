@@ -370,6 +370,9 @@ function routeGet(url: string, params: Record<string, unknown>): unknown {
     if (id === data.IDS.message1) {
       return data.messageDetailUnified;
     }
+    if (id === data.IDS.processingJob) {
+      return data.jobDetailProcessing;
+    }
 
     return { ...data.jobDetailCompleted, id };
   }
