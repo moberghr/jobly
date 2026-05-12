@@ -52,7 +52,7 @@ public class ConcurrencySpanTests
         using var harness = new ActivityListenerHarness();
         var jobContext = new JobContext { JobId = Guid.NewGuid(), TraceId = Guid.NewGuid() };
         jobContext.Metadata["ConcurrencyKey"] = "user-42";
-        jobContext.Metadata["Limit"] = 5;
+        jobContext.Metadata["ConcurrencyLimit"] = 5;
         var semaphoreProvider = new FakeSemaphoreProvider();
         var behavior = new ConcurrencyPipelineBehavior<TestJob, Unit>(jobContext, semaphoreProvider, NoAdminResolver(), TimeProvider.System);
 
@@ -72,7 +72,7 @@ public class ConcurrencySpanTests
         using var harness = new ActivityListenerHarness();
         var jobContext = new JobContext { JobId = Guid.NewGuid(), TraceId = Guid.NewGuid() };
         jobContext.Metadata["ConcurrencyKey"] = "user-99";
-        jobContext.Metadata["Limit"] = 1;
+        jobContext.Metadata["ConcurrencyLimit"] = 1;
         var semaphoreProvider = new FakeSemaphoreProvider();
 
         // Pre-saturate the slot so the behavior sees it as held.
@@ -121,7 +121,7 @@ public class ConcurrencySpanTests
         using var harness = new ActivityListenerHarness();
         var jobContext = new JobContext { JobId = Guid.NewGuid(), TraceId = Guid.NewGuid() };
         jobContext.Metadata["ConcurrencyKey"] = "user-99";
-        jobContext.Metadata["Limit"] = 1;
+        jobContext.Metadata["ConcurrencyLimit"] = 1;
         var semaphoreProvider = new ThrowingSemaphoreProvider();
         var behavior = new ConcurrencyPipelineBehavior<TestJob, Unit>(jobContext, semaphoreProvider, NoAdminResolver(), TimeProvider.System);
 

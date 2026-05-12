@@ -21,14 +21,14 @@ public class ConcurrencyPublishBehavior<T> : IPublishPipelineBehavior<T>
             if (attrs.Mutex != null)
             {
                 meta.ConcurrencyKey = attrs.Mutex.Key;
-                meta.Limit = 1;
-                meta.Mode = attrs.Mutex.Mode;
+                meta.ConcurrencyLimit = 1;
+                meta.ConcurrencyMode = attrs.Mutex.Mode;
             }
             else if (attrs.Semaphore != null)
             {
                 meta.ConcurrencyKey = attrs.Semaphore.Key;
-                meta.Limit = attrs.Semaphore.Limit;
-                meta.Mode = attrs.Semaphore.Mode;
+                meta.ConcurrencyLimit = attrs.Semaphore.Limit;
+                meta.ConcurrencyMode = attrs.Semaphore.Mode;
             }
         }
 

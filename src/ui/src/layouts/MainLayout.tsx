@@ -17,6 +17,7 @@ import {
   Puzzle,
   Gauge,
   KeyRound,
+  Timer,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { config } from '@/config';
@@ -35,6 +36,7 @@ const builtInNavItems = [
 ];
 
 const concurrencyNavItem = { to: '/concurrency', label: 'Concurrency', icon: KeyRound };
+const rateLimitsNavItem = { to: '/ratelimits', label: 'Rate Limits', icon: Timer };
 
 function resolveIcon(name?: string): React.ComponentType<{ className?: string }> {
   if (!name) {
@@ -57,6 +59,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
   const [concurrencyAvailable, setConcurrencyAvailable] = useState(false);
+  const [rateLimitsAvailable, setRateLimitsAvailable] = useState(false);
 
   usePolling(fetchStats, 1000);
 
@@ -74,6 +77,20 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
         } else {
           // Non-404 errors (network, 500): keep hidden, don't surface noise.
           setConcurrencyAvailable(false);
+        }
+      });
+
+    api
+      .listRateLimits()
+      .then(() => {
+        if (!cancelled) setRateLimitsAvailable(true);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        if (axios.isAxiosError(e) && e.response?.status === 404) {
+          setRateLimitsAvailable(false);
+        } else {
+          setRateLimitsAvailable(false);
         }
       });
 
@@ -96,6 +113,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
             {[
               ...builtInNavItems,
               ...(concurrencyAvailable ? [concurrencyNavItem] : []),
+              ...(rateLimitsAvailable ? [rateLimitsNavItem] : []),
               ...extensions.flatMap((ext) =>
                 ext.pages.map((page) => ({
                   to: page.path,

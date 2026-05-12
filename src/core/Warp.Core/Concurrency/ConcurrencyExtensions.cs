@@ -9,8 +9,8 @@ public static class ConcurrencyExtensions
         parameters.Configure<IConcurrencyMetadata>(x =>
         {
             x.ConcurrencyKey = key;
-            x.Limit = 1;
-            x.Mode = mode;
+            x.ConcurrencyLimit = 1;
+            x.ConcurrencyMode = mode;
         });
 
         return parameters;
@@ -21,8 +21,8 @@ public static class ConcurrencyExtensions
         parameters.Configure<IConcurrencyMetadata>(x =>
         {
             x.ConcurrencyKey = key;
-            x.Limit = limit;
-            x.Mode = mode;
+            x.ConcurrencyLimit = limit;
+            x.ConcurrencyMode = mode;
         });
 
         return parameters;

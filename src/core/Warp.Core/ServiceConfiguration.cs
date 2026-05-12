@@ -404,4 +404,33 @@ public static class ServiceConfiguration
 
         limit.Metadata.SetSchema(schema);
     }
+
+    public static void AddRateLimitBucketEntity(ModelBuilder modelBuilder, string? schema)
+    {
+        var bucket = modelBuilder.Entity<RateLimitBucket>();
+
+        bucket.Property(p => p.Name).HasMaxLength(200).IsRequired();
+        bucket.HasKey(p => p.Name);
+
+        bucket.Property(p => p.WindowStartUtc);
+        bucket.Property(p => p.CurrentCount);
+        bucket.Property(p => p.TimestampsJson);
+        bucket.Property(p => p.UpdatedAt);
+
+        bucket.Metadata.SetSchema(schema);
+    }
+
+    public static void AddRateLimitOverrideEntity(ModelBuilder modelBuilder, string? schema)
+    {
+        var ovr = modelBuilder.Entity<RateLimitOverride>();
+
+        ovr.Property(p => p.Name).HasMaxLength(200).IsRequired();
+        ovr.HasKey(p => p.Name);
+
+        ovr.Property(p => p.Count);
+        ovr.Property(p => p.WindowSeconds);
+        ovr.Property(p => p.UpdatedAt);
+
+        ovr.Metadata.SetSchema(schema);
+    }
 }

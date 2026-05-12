@@ -18,6 +18,7 @@ import type {
   TypeCountModel,
   PagedList,
   ConcurrencyLimitInfo,
+  RateLimitInfo,
 } from '@/types';
 import type { RealtimePoint } from '@/stores/dashboard';
 
@@ -277,6 +278,15 @@ export const demoConcurrencyLimits: ConcurrencyLimitInfo[] = [
   { name: 'payment-api', limit: 5, updatedAt: ago(60 * 30) },
   { name: 'report-generation', limit: 3, updatedAt: ago(60 * 60 * 6) },
   { name: 'email-throttle', limit: 10, updatedAt: ago(60 * 60 * 24 * 2) },
+];
+
+// ============================================================
+// Rate limits
+// ============================================================
+
+export const demoRateLimits: RateLimitInfo[] = [
+  { name: 'external-api', count: 100, windowSeconds: 60, updatedAt: ago(60 * 15) },
+  { name: 'newsletter-send', count: 500, windowSeconds: 3600, updatedAt: ago(60 * 60 * 4) },
 ];
 
 // ============================================================
