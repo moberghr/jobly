@@ -71,10 +71,10 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
         metadata.ShouldNotBeNull();
         metadata.ShouldContainKey("ConcurrencyKey");
         metadata["ConcurrencyKey"].ToString().ShouldBe("static-semaphore-key");
-        metadata.ShouldContainKey("Limit");
-        ((JsonElement)metadata["Limit"]).GetInt32().ShouldBe(5);
-        metadata.ShouldContainKey("Mode");
-        ((JsonElement)metadata["Mode"]).GetInt32().ShouldBe((int)ConcurrencyMode.Wait);
+        metadata.ShouldContainKey("ConcurrencyLimit");
+        ((JsonElement)metadata["ConcurrencyLimit"]).GetInt32().ShouldBe(5);
+        metadata.ShouldContainKey("ConcurrencyMode");
+        ((JsonElement)metadata["ConcurrencyMode"]).GetInt32().ShouldBe((int)ConcurrencyMode.Wait);
     }
 
     [TimedFact]
@@ -101,10 +101,10 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
         metadata.ShouldNotBeNull();
         metadata.ShouldContainKey("ConcurrencyKey");
         metadata["ConcurrencyKey"].ToString().ShouldBe("static-semaphore-skip-key");
-        metadata.ShouldContainKey("Limit");
-        ((JsonElement)metadata["Limit"]).GetInt32().ShouldBe(5);
-        metadata.ShouldContainKey("Mode");
-        ((JsonElement)metadata["Mode"]).GetInt32().ShouldBe((int)ConcurrencyMode.Skip);
+        metadata.ShouldContainKey("ConcurrencyLimit");
+        ((JsonElement)metadata["ConcurrencyLimit"]).GetInt32().ShouldBe(5);
+        metadata.ShouldContainKey("ConcurrencyMode");
+        ((JsonElement)metadata["ConcurrencyMode"]).GetInt32().ShouldBe((int)ConcurrencyMode.Skip);
     }
 
     [TimedFact]
@@ -131,10 +131,10 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
         metadata.ShouldNotBeNull();
         metadata.ShouldContainKey("ConcurrencyKey");
         metadata["ConcurrencyKey"].ToString().ShouldBe("dynamic-semaphore-key");
-        metadata.ShouldContainKey("Limit");
-        ((JsonElement)metadata["Limit"]).GetInt32().ShouldBe(7);
-        metadata.ShouldContainKey("Mode");
-        ((JsonElement)metadata["Mode"]).GetInt32().ShouldBe((int)ConcurrencyMode.Wait);
+        metadata.ShouldContainKey("ConcurrencyLimit");
+        ((JsonElement)metadata["ConcurrencyLimit"]).GetInt32().ShouldBe(7);
+        metadata.ShouldContainKey("ConcurrencyMode");
+        ((JsonElement)metadata["ConcurrencyMode"]).GetInt32().ShouldBe((int)ConcurrencyMode.Wait);
     }
 
     [TimedFact]
@@ -161,10 +161,10 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
         metadata.ShouldNotBeNull();
         metadata.ShouldContainKey("ConcurrencyKey");
         metadata["ConcurrencyKey"].ToString().ShouldBe("dynamic-semaphore-skip");
-        metadata.ShouldContainKey("Limit");
-        ((JsonElement)metadata["Limit"]).GetInt32().ShouldBe(3);
-        metadata.ShouldContainKey("Mode");
-        ((JsonElement)metadata["Mode"]).GetInt32().ShouldBe((int)ConcurrencyMode.Skip);
+        metadata.ShouldContainKey("ConcurrencyLimit");
+        ((JsonElement)metadata["ConcurrencyLimit"]).GetInt32().ShouldBe(3);
+        metadata.ShouldContainKey("ConcurrencyMode");
+        ((JsonElement)metadata["ConcurrencyMode"]).GetInt32().ShouldBe((int)ConcurrencyMode.Skip);
     }
 
     [TimedFact]
@@ -316,10 +316,10 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
         metadata.ShouldNotBeNull();
         metadata.ShouldContainKey("ConcurrencyKey");
         metadata["ConcurrencyKey"].ToString().ShouldBe("dual-attribute-key");
-        metadata.ShouldContainKey("Limit");
-        ((JsonElement)metadata["Limit"]).GetInt32().ShouldBe(1);
-        metadata.ShouldContainKey("Mode");
-        ((JsonElement)metadata["Mode"]).GetInt32().ShouldBe((int)ConcurrencyMode.Skip);
+        metadata.ShouldContainKey("ConcurrencyLimit");
+        ((JsonElement)metadata["ConcurrencyLimit"]).GetInt32().ShouldBe(1);
+        metadata.ShouldContainKey("ConcurrencyMode");
+        ((JsonElement)metadata["ConcurrencyMode"]).GetInt32().ShouldBe((int)ConcurrencyMode.Skip);
     }
 
     [TimedFact]
@@ -602,7 +602,7 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
         var metaWithoutLimit = JsonSerializer.Serialize(new Dictionary<string, object>
         {
             ["ConcurrencyKey"] = "no-limit-field-key",
-            ["Mode"] = (int)ConcurrencyMode.Skip,
+            ["ConcurrencyMode"] = (int)ConcurrencyMode.Skip,
         });
         ctx.Set<Job>().Add(new Job
         {
@@ -715,8 +715,8 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
         var dict = new Dictionary<string, object>
         {
             ["ConcurrencyKey"] = key,
-            ["Limit"] = limit,
-            ["Mode"] = (int)mode,
+            ["ConcurrencyLimit"] = limit,
+            ["ConcurrencyMode"] = (int)mode,
         };
 
         return JsonSerializer.Serialize(dict);
