@@ -26,7 +26,7 @@ public class PostgresDatabasePushIntegrationTests : IAsyncLifetime, IClassFixtur
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [TimedFact(20_000)]
+    [TimedFact]
     public async Task JobEnqueued_WithDispatcherPlusPush_DispatcherPicksUpWithoutPolling()
     {
         // PollingInterval is deliberately long — if the job is picked up fast, it's because
@@ -52,7 +52,7 @@ public class PostgresDatabasePushIntegrationTests : IAsyncLifetime, IClassFixtur
         sw.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(2), "Push should wake the dispatcher in <2s even though PollingInterval=10s");
     }
 
-    [TimedFact(20_000)]
+    [TimedFact]
     public async Task MessageEnqueued_WithPush_MessageRoutingWakesImmediately()
     {
         await using var server = await WarpTestServer.StartAsync(
@@ -81,7 +81,7 @@ public class PostgresDatabasePushIntegrationTests : IAsyncLifetime, IClassFixtur
         sw.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(3), "Push should wake MessageRoutingTask AND the dispatcher within 3s even though both intervals are 10s");
     }
 
-    [TimedFact(20_000)]
+    [TimedFact]
     public async Task PushEnabled_WithoutDispatcher_WorksButPollsForJobs()
     {
         // UseDispatcher=false + push: the listener logs a warning, JobEnqueued notifications

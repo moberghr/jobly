@@ -20,7 +20,7 @@ public abstract class RetryAttemptTagTestsBase : IntegrationTestBase
     {
     }
 
-    [TimedFact(30_000)]
+    [TimedFact]
     public async Task GivenAlwaysFailingJob_WhenRetried_ThenConsumerSpansCarryIncrementingAttemptTag()
     {
         using var harness = new ActivityListenerHarness();
@@ -72,7 +72,7 @@ public abstract class RetryAttemptTagTestsBase : IntegrationTestBase
         }
     }
 
-    [TimedFact(30_000)]
+    [TimedFact]
     public async Task GivenJobWithMaxRetriesMetadata_WhenProcessed_ThenConsumerSpanCarriesMaxAttemptsTag()
     {
         using var harness = new ActivityListenerHarness();
