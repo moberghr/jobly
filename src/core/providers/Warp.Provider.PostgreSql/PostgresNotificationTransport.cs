@@ -16,7 +16,8 @@ namespace Warp.Provider.PostgreSql;
 /// </summary>
 public sealed class PostgresNotificationTransport : IWarpNotificationTransport
 {
-    private readonly string _connectionString;
+    private readonly NpgsqlDataSource? _dataSource;
+    private readonly string? _connectionString;
     private readonly string _channelName;
     private readonly ILogger<PostgresNotificationTransport>? _logger;
 
@@ -27,13 +28,23 @@ public sealed class PostgresNotificationTransport : IWarpNotificationTransport
         _logger = logger;
     }
 
+    // Data-source overload — preferred when callers register an NpgsqlDataSource (Aspire,
+    // Managed Identity, custom SSL/password providers): connections inherit the data
+    // source's auth and encryption configuration rather than being opened from a raw
+    // connection string that may be missing them.
+    public PostgresNotificationTransport(NpgsqlDataSource dataSource, WarpDatabasePushConfiguration options, ILogger<PostgresNotificationTransport>? logger = null)
+    {
+        _dataSource = dataSource;
+        _channelName = options.ChannelName;
+        _logger = logger;
+    }
+
     public async Task PublishAsync(NotificationKind kind, string? queue, CancellationToken ct)
     {
         try
         {
             var payload = Encode(kind, queue);
-            await using var conn = new NpgsqlConnection(_connectionString);
-            await conn.OpenAsync(ct);
+            await using var conn = await OpenConnectionAsync(ct);
             await using var cmd = new NpgsqlCommand("SELECT pg_notify(@channel, @payload)", conn);
             cmd.Parameters.AddWithValue("channel", _channelName);
             cmd.Parameters.AddWithValue("payload", payload);
@@ -56,8 +67,7 @@ public sealed class PostgresNotificationTransport : IWarpNotificationTransport
 
     public async IAsyncEnumerable<Notification> ListenAsync([EnumeratorCancellation] CancellationToken ct)
     {
-        await using var conn = new NpgsqlConnection(_connectionString);
-        await conn.OpenAsync(ct);
+        await using var conn = await OpenConnectionAsync(ct);
 
         // Channel name can't be parameterized — only identifiers, not strings. Quote-escape it.
         var listenSql = $"LISTEN \"{_channelName.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
@@ -94,6 +104,19 @@ public sealed class PostgresNotificationTransport : IWarpNotificationTransport
         {
             conn.Notification -= OnNotification;
         }
+    }
+
+    private async ValueTask<NpgsqlConnection> OpenConnectionAsync(CancellationToken ct)
+    {
+        if (_dataSource is not null)
+        {
+            return await _dataSource.OpenConnectionAsync(ct);
+        }
+
+        var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync(ct);
+
+        return conn;
     }
 
     // Payload grammar: "<kind>:<queue>?". Kind is one char: J=JobEnqueued, M=MessageEnqueued, F=JobFinalized.
