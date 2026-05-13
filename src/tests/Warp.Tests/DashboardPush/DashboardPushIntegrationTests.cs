@@ -45,7 +45,7 @@ public abstract class DashboardPushIntegrationTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [TimedFact(20_000)]
+    [TimedFact]
     public async Task JobFinalized_FiresHubBroadcast()
     {
         var fakeHub = new FakeHubContext();
@@ -77,7 +77,7 @@ public abstract class DashboardPushIntegrationTestsBase : IAsyncLifetime
         firstJobFinalized.Args[0].ShouldBeOfType<DashboardStatistics>();
     }
 
-    [TimedFact(20_000)]
+    [TimedFact]
     public async Task MessagePublished_WithDatabasePush_FiresMessageEnqueuedBroadcast()
     {
         // The MessageEnqueued signal is only fired by NotificationListenerTask (the
