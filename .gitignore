@@ -372,3 +372,8 @@ tasks/todo.md
 
 # Claude scheduled-task lock file
 .claude/scheduled_tasks.lock
+
+# MTK toolkit ephemerals
+.claude/.mtk-cache/
+.claude/references.index
+.mtk/
