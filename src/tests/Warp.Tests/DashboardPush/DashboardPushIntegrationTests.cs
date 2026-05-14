@@ -45,7 +45,7 @@ public abstract class DashboardPushIntegrationTestsBase : IAsyncLifetime
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [TimedFact(20_000)]
+    [TimedFact]
     public async Task JobFinalized_FiresHubBroadcast()
     {
         var fakeHub = new FakeHubContext();
@@ -65,7 +65,7 @@ public abstract class DashboardPushIntegrationTestsBase : IAsyncLifetime
 
         await server.WaitForJobState(jobId, State.Completed, TimeSpan.FromSeconds(5));
 
-        await WaitForBroadcast(fakeHub, "JobFinalized");
+        await fakeHub.WaitForMethodAsync("JobFinalized");
         fakeHub.CountOf("JobFinalized").ShouldBeGreaterThanOrEqualTo(1);
 
         // Wire-shape contract: every JobFinalized broadcast carries the current
@@ -77,7 +77,7 @@ public abstract class DashboardPushIntegrationTestsBase : IAsyncLifetime
         firstJobFinalized.Args[0].ShouldBeOfType<DashboardStatistics>();
     }
 
-    [TimedFact(20_000)]
+    [TimedFact]
     public async Task MessagePublished_WithDatabasePush_FiresMessageEnqueuedBroadcast()
     {
         // The MessageEnqueued signal is only fired by NotificationListenerTask (the
@@ -106,30 +106,12 @@ public abstract class DashboardPushIntegrationTestsBase : IAsyncLifetime
 
         await server.WaitForCompletion(TimeSpan.FromSeconds(5));
 
-        await WaitForBroadcast(fakeHub, "MessageEnqueued");
+        await fakeHub.WaitForMethodAsync("MessageEnqueued");
         fakeHub.CountOf("MessageEnqueued").ShouldBeGreaterThanOrEqualTo(1);
 
         // Wire-shape contract: MessageEnqueued broadcasts also carry the stats DTO.
         var firstMessageEnqueued = fakeHub.Broadcasts.First(x => string.Equals(x.Method, "MessageEnqueued", StringComparison.Ordinal));
         firstMessageEnqueued.Args.Length.ShouldBe(1);
         firstMessageEnqueued.Args[0].ShouldBeOfType<DashboardStatistics>();
-    }
-
-    private static async Task WaitForBroadcast(FakeHubContext hub, string method, TimeSpan? timeout = null)
-    {
-        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
-        while (DateTime.UtcNow < deadline)
-        {
-            if (hub.CountOf(method) > 0)
-            {
-                return;
-            }
-
-            await Task.Delay(50, XunitTestContext.Current.CancellationToken);
-        }
-
-        throw new TimeoutException(
-            $"FakeHubContext did not observe '{method}' broadcast within {(timeout ?? TimeSpan.FromSeconds(5)).TotalSeconds:0.#}s. " +
-            $"Observed methods: [{string.Join(", ", hub.Broadcasts.Select(x => x.Method))}]");
     }
 }

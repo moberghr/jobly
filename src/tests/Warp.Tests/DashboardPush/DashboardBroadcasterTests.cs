@@ -162,21 +162,7 @@ public class DashboardBroadcasterTests
             return harness;
         }
 
-        public async Task WaitForBroadcasts(int expected)
-        {
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-            while (DateTime.UtcNow < deadline)
-            {
-                if (Hub.Broadcasts.Count >= expected)
-                {
-                    return;
-                }
-
-                await Task.Delay(10, XunitTestContext.Current.CancellationToken);
-            }
-
-            throw new TimeoutException($"Expected at least {expected} broadcasts, observed {Hub.Broadcasts.Count}.");
-        }
+        public Task WaitForBroadcasts(int expected) => Hub.WaitForBroadcastsAsync(expected);
 
         public async Task StopAsync()
         {

@@ -31,11 +31,20 @@ public class SqlServerClassFixture : IAsyncLifetime, IDatabaseFixture
         var databaseName = $"warp_t_{Guid.NewGuid():N}";
 
         TestLifecycleTrace.Record("SharedSqlServerContainer.CreateDatabaseAsync starting");
-        _connectionString = await SharedSqlServerContainer.CreateDatabaseAsync(
+        var rawConnectionString = await SharedSqlServerContainer.CreateDatabaseAsync(
             databaseName,
             EnableServiceBroker,
             Xunit.TestContext.Current.CancellationToken);
         TestLifecycleTrace.Record("SharedSqlServerContainer.CreateDatabaseAsync returned");
+
+        // Cap MaxPoolSize per fixture for parity with PostgreSqlClassFixture — see that
+        // file's comment for rationale. SQL Server's default max_user_connections is
+        // 32,767 so this isn't a correctness gate the way it is for PG, but the symmetry
+        // keeps per-class connection budget bounded.
+        _connectionString = new SqlConnectionStringBuilder(rawConnectionString)
+        {
+            MaxPoolSize = 50,
+        }.ConnectionString;
 
         TestLifecycleTrace.Record("EnsureCreatedAsync starting");
         await using var context = CreateContext();
@@ -67,7 +76,18 @@ public class SqlServerClassFixture : IAsyncLifetime, IDatabaseFixture
             .Options);
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync()
+    {
+        // Mirror of PostgreSqlClassFixture.DisposeAsync. SQL Server's default max user
+        // connections is 32,767 so per-fixture leak doesn't cause "too many connections"
+        // failures the way PG's max_connections=500 does, but the latent leak still wastes
+        // sessions and may contribute to flakiness under contention. SET SINGLE_USER WITH
+        // ROLLBACK IMMEDIATE is the SQL Server analogue of PG's WITH (FORCE).
+        SqlConnection.ClearPool(new SqlConnection(_connectionString));
+
+        var databaseName = new SqlConnectionStringBuilder(_connectionString).InitialCatalog;
+        await SharedSqlServerContainer.DropDatabaseAsync(databaseName, CancellationToken.None);
+    }
 }
 
 /// <summary>

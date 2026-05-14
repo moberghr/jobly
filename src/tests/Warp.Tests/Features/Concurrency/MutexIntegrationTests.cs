@@ -55,37 +55,64 @@ public abstract class MutexIntegrationTestsBase : IntegrationTestBase
         await server.WaitForCompletion();
     }
 
-    [TimedFact(20_000)]
+    [TimedFact]
     public async Task GivenTwoJobsWithSameMutex_WhenWaitMode_ThenSecondRequeuesUntilFirstFinishes()
     {
-        await using var server = await WarpTestServer.StartAsync(Fixture);
+        // Cancellation-release path for Wait-mode mutex: job1 holds the slot inside the
+        // handler (pinned via BarrierSignal — deterministic, no WaitForJobState(Processing)
+        // race), job2 cannot enter while it's held, then DeleteJob cancels job1's handler
+        // (CancellationToken fires, CanFinish.WaitAsync throws OperationCanceledException,
+        // mutex releases), and job2 acquires the slot and completes. Distinct from
+        // ...BothCompleteAfterFirstReleases, which releases via natural handler completion.
+        var barrier = new BarrierSignal();
+
+        await using var server = await WarpTestServer.StartAsync(
+            Fixture,
+            cfg => cfg.Services.AddSingleton(barrier));
         var publisher = server.CreatePublisher();
 
-        // Enqueue a slow job that holds the mutex
-        var job1Id = await publisher.Enqueue(new CancellableRequest(), new JobParameters().WithMutex("test-wait", ConcurrencyMode.Wait));
+        // Enqueue job1 first so the test knows which job to cancel later — Wait-mode mutex
+        // does not serialize on enqueue order, so simultaneous enqueue would leave the
+        // "which one holds the slot" question ambiguous.
+        var job1Id = await publisher.Enqueue(new BarrierRequest(), new JobParameters().WithMutex("test-wait", ConcurrencyMode.Wait));
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        await server.WaitForJobState(job1Id, State.Processing);
+        // job1 enters the handler — the mutex slot is held.
+        await barrier.Running.WaitAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Second job, same key, Wait mode — should be requeued, not deleted
+        // Enqueue job2 with the same mutex key.
         var publisher2 = server.CreatePublisher();
-        var job2Id = await publisher2.Enqueue(new UnitRequest(), new JobParameters().WithMutex("test-wait", ConcurrencyMode.Wait));
+        var job2Id = await publisher2.Enqueue(new BarrierRequest(), new JobParameters().WithMutex("test-wait", ConcurrencyMode.Wait));
         await publisher2.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Job2 should bounce off the mutex at least once and stay alive
-        await server.WaitForJobLog(job2Id, "Requeued", timeout: TimeSpan.FromSeconds(5));
+        // job2 must NOT enter the handler while job1 holds the slot. 500 ms covers ~5
+        // polling cycles — every cycle the worker bounces off the mutex and writes a
+        // Requeued log row. If job2 entered within this window, Wait-mode mutex broke its
+        // serialization contract.
+        var spuriousEntry = await barrier.Running.WaitAsync(TimeSpan.FromMilliseconds(500), Xunit.TestContext.Current.CancellationToken);
+        spuriousEntry.ShouldBeFalse("Wait-mode mutex must prevent the second job from entering while the slot is held");
 
+        // Wait mode does not delete the bouncing job — it requeues. job2 must be alive.
         var job2BeforeRelease = await server.GetJob(job2Id);
         job2BeforeRelease.CurrentState.ShouldNotBe(State.Deleted);
         job2BeforeRelease.CurrentState.ShouldNotBe(State.Completed);
 
-        // Release job1 → job2 should now run to completion
+        // Cancel job1; its CancellationToken fires, the handler's CanFinish.WaitAsync
+        // throws OperationCanceledException, the mutex releases.
         var cmd = server.CreateCommandService();
         await cmd.DeleteJob(job1Id);
-        await server.WaitForJobState(job1Id, State.Deleted, timeout: TimeSpan.FromSeconds(5));
 
-        await server.WaitForJobState(job2Id, State.Completed, timeout: TimeSpan.FromSeconds(10));
+        // job2 now enters the handler — proves Wait mode eventually grants the slot.
+        await barrier.Running.WaitAsync(Xunit.TestContext.Current.CancellationToken);
 
+        // Release job2; it completes normally.
+        barrier.CanFinish.Release();
+        await server.WaitForJobState(job1Id, State.Deleted);
+        await server.WaitForJobState(job2Id, State.Completed);
+
+        // Audit-trail contract: every bounce leaves a Requeued log entry naming the mutex
+        // key and slot count. Queried after both jobs reach terminal states — by then any
+        // bounces that occurred are guaranteed to be committed.
         var requeuedLog = (await server.GetJobLogs(job2Id))
             .FirstOrDefault(x => string.Equals(x.EventType, "Requeued", StringComparison.Ordinal));
         requeuedLog.ShouldNotBeNull();

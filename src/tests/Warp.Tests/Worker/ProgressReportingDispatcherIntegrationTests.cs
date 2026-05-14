@@ -23,7 +23,7 @@ public abstract class ProgressReportingDispatcherIntegrationTestsBase : Integrat
         config.CompletionFlushInterval = TimeSpan.FromMilliseconds(50);
     }
 
-    [TimedFact(timeout: 30_000)]
+    [TimedFact]
     public async Task GivenDispatcherMode_WhenHandlerReportsProgress_ThenProgressRowsArePersistedViaBatchedCompletion()
     {
         await using var server = await WarpTestServer.StartAsync(Fixture, ConfigureDispatcher);

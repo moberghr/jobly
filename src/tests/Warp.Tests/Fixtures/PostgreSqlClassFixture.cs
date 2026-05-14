@@ -71,5 +71,22 @@ public class PostgreSqlClassFixture : IAsyncLifetime, IDatabaseFixture
             .Options);
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync()
+    {
+        // Two-step cleanup. Both are necessary:
+        //
+        // 1. ClearPool drains the legacy Npgsql connection-string-keyed pool used by the
+        //    fixture's own raw NpgsqlConnections (Respawner setup, ResetAsync). Without this,
+        //    those connectors sit idle in the pool, authenticated to a soon-to-be-dropped DB.
+        // 2. DropDatabaseAsync issues DROP DATABASE WITH (FORCE) on the admin connection,
+        //    which terminates any remaining server-side sessions and reclaims the warp_t_
+        //    name. This is what actually frees connections back to max_connections — EF's
+        //    per-options NpgsqlDataSource pools and any other client-side pool keyed on this
+        //    connection string still hold idle connectors after the class finishes, and the
+        //    server-side FORCE is the only way to close them deterministically.
+        NpgsqlConnection.ClearPool(new NpgsqlConnection(_connectionString));
+
+        var databaseName = new NpgsqlConnectionStringBuilder(_connectionString).Database!;
+        await SharedPostgreSqlContainer.DropDatabaseAsync(databaseName, CancellationToken.None);
+    }
 }
