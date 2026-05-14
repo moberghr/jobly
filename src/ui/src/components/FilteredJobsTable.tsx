@@ -9,6 +9,7 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { State } from '@/types';
 import type { JobModel, PagedList } from '@/types';
 import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
+import { JobsTableSkeleton } from '@/components/skeletons/JobsTableSkeleton';
 import * as api from '@/api';
 
 const stateItems = [
@@ -158,10 +159,12 @@ export function FilteredJobsTable({ title, fetchJobs, fetchCounts, onCountsUpdat
                 <Pagination page={page} pageCount={data.pageCount} onPageChange={setPage} />
               )}
             </>
-          ) : (
+          ) : data ? (
             <div className="text-sm text-muted-foreground py-4 text-center">
-              {data ? 'No jobs found' : 'Loading...'}
+              No jobs found
             </div>
+          ) : (
+            <JobsTableSkeleton rows={8} />
           )}
         </div>
       </div>

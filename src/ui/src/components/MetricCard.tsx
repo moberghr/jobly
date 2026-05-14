@@ -1,5 +1,6 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
+import { Sparkline } from '@/components/Sparkline';
 
 interface MetricCardProps {
   label: string;
@@ -7,16 +8,25 @@ interface MetricCardProps {
   icon?: React.ReactNode;
   color?: string;
   href?: string;
+  sparkline?: number[];
+  sparklineColor?: string;
+  subtitle?: string;
+  ariaLabel?: string;
 }
 
-export function MetricCard({ label, value, icon, color, href }: MetricCardProps) {
-  const navigate = useNavigate();
-
-  return (
-    <Card
-      className={href ? 'cursor-pointer hover:bg-accent/50 transition-colors' : ''}
-      onClick={href ? () => navigate(href) : undefined}
-    >
+export function MetricCard({
+  label,
+  value,
+  icon,
+  color,
+  href,
+  sparkline,
+  sparklineColor,
+  subtitle,
+  ariaLabel,
+}: MetricCardProps) {
+  const content = (
+    <Card className={href ? 'cursor-pointer hover:bg-accent/50 transition-colors' : ''}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div>
@@ -25,7 +35,24 @@ export function MetricCard({ label, value, icon, color, href }: MetricCardProps)
           </div>
           {icon && <div className="text-muted-foreground">{icon}</div>}
         </div>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+        )}
+        {sparkline !== undefined && (
+          <div className="mt-2">
+            <Sparkline data={sparkline} color={sparklineColor} height={32} />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
+
+  if (href) {
+    return (
+      <Link to={href} aria-label={ariaLabel ?? `${label}: ${value}`} className="block">
+        {content}
+      </Link>
+    );
+  }
+  return content;
 }

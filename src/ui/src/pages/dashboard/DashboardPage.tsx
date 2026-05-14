@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import { useDashboardStore } from '@/stores/dashboard';
 import { MetricCard } from '@/components/MetricCard';
 import { RealtimeChart } from '@/components/RealtimeChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton';
 import { getStatsHistory } from '@/api';
 import type { StatsHistoryPoint } from '@/types';
 import {
@@ -66,6 +67,33 @@ export default function DashboardPage() {
   const [history, setHistory] = useState<StatsHistoryPoint[]>([]);
   const [historyHours, setHistoryHours] = useState(24);
 
+  // Sparkline source: last 24h from getStatsHistory.
+  // TODO: no per-state historical endpoint exists for Enqueued/Processing/Scheduled/
+  // Messages/Batches — those cards render an empty 32px placeholder until a
+  // per-state series is added to the backend (or sampled from realtime store history).
+  const [sparkSource, setSparkSource] = useState<StatsHistoryPoint[]>([]);
+  useEffect(() => {
+    getStatsHistory(24).then(setSparkSource).catch(() => {});
+    const id = setInterval(() => {
+      getStatsHistory(24).then(setSparkSource).catch(() => {});
+    }, 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  const succeededSpark = useMemo(() => sparkSource.map(p => p.succeeded), [sparkSource]);
+  const failedSpark = useMemo(() => sparkSource.map(p => p.failed), [sparkSource]);
+  const totals = useMemo(() => {
+    const s = sparkSource.reduce((a, p) => a + p.succeeded, 0);
+    const f = sparkSource.reduce((a, p) => a + p.failed, 0);
+    const denom = s + f;
+    return {
+      succeeded: s,
+      failed: f,
+      failurePct: denom > 0 ? Math.round((f / denom) * 100) : null,
+      completedPct: denom > 0 ? Math.round((s / denom) * 100) : null,
+    };
+  }, [sparkSource]);
+
   useEffect(() => {
     getStatsHistory(historyHours).then(setHistory).catch(() => {});
     const id = setInterval(() => {
@@ -75,15 +103,7 @@ export default function DashboardPage() {
   }, [historyHours]);
 
   if (!stats) {
-    return (
-      <div>
-        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader className="h-4 w-4 animate-spin" />
-          <span>Connecting to Warp...</span>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
@@ -91,17 +111,83 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
       {/* Live counts */}
       <div className="grid grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <MetricCard label="Enqueued" value={stats.created} icon={<Briefcase className="h-5 w-5" />} href="/jobs/enqueued" />
-        <MetricCard label="Processing" value={stats.processing} icon={<Loader className="h-5 w-5" />} color={stats.processing > 0 ? "text-purple-600" : undefined} href="/jobs/processing" />
-        <MetricCard label="Scheduled" value={stats.scheduled} icon={<Clock className="h-5 w-5" />} href="/jobs/scheduled" />
-        <MetricCard label="Failed" value={stats.failed} icon={<XCircle className="h-5 w-5" />} color={stats.failed > 0 ? "text-red-600" : undefined} href="/jobs/failed" />
-        <MetricCard label="Messages" value={stats.messages} icon={<Mail className="h-5 w-5" />} href="/messages" />
-        <MetricCard label="Batches" value={stats.batchesProcessing} icon={<Layers className="h-5 w-5" />} href="/batches/processing" />
+        <MetricCard
+          label="Enqueued"
+          value={stats.created}
+          icon={<Briefcase className="h-5 w-5" />}
+          href="/jobs/enqueued"
+          // TODO: no per-state history endpoint — empty placeholder for layout stability.
+          sparkline={[]}
+        />
+        <MetricCard
+          label="Processing"
+          value={stats.processing}
+          icon={<Loader className="h-5 w-5" />}
+          color={stats.processing > 0 ? 'text-purple-600' : undefined}
+          href="/jobs/processing"
+          sparkline={[]}
+        />
+        <MetricCard
+          label="Scheduled"
+          value={stats.scheduled}
+          icon={<Clock className="h-5 w-5" />}
+          href="/jobs/scheduled"
+          sparkline={[]}
+        />
+        <MetricCard
+          label="Failed"
+          value={stats.failed}
+          icon={<XCircle className="h-5 w-5" />}
+          color={stats.failed > 0 ? 'text-red-600' : undefined}
+          href="/jobs/failed"
+          sparkline={failedSpark}
+          sparklineColor="#ef4444"
+          subtitle={totals.failurePct != null ? `${totals.failurePct}% failure rate (24h)` : undefined}
+        />
+        <MetricCard
+          label="Messages"
+          value={stats.messages}
+          icon={<Mail className="h-5 w-5" />}
+          href="/messages"
+          sparkline={[]}
+        />
+        <MetricCard
+          label="Batches"
+          value={stats.batchesProcessing}
+          icon={<Layers className="h-5 w-5" />}
+          href="/batches/processing"
+          sparkline={[]}
+        />
       </div>
+
+      {/* Completed-vs-Failed summary card */}
+      {totals.completedPct != null && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <MetricCard
+            label="Completed (24h)"
+            value={totals.succeeded}
+            icon={<Briefcase className="h-5 w-5" />}
+            href="/jobs/completed"
+            sparkline={succeededSpark}
+            sparklineColor="#22c55e"
+            subtitle={`${totals.completedPct}% of finished jobs`}
+          />
+          <MetricCard
+            label="Failed (24h)"
+            value={totals.failed}
+            icon={<XCircle className="h-5 w-5" />}
+            color={totals.failed > 0 ? 'text-red-600' : undefined}
+            href="/jobs/failed"
+            sparkline={failedSpark}
+            sparklineColor="#ef4444"
+            subtitle={`${totals.failurePct}% of finished jobs`}
+          />
+        </div>
+      )}
 
       {/* Realtime Graph */}
       <Card className="mb-8">
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Realtime — last 60 seconds</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Realtime</CardTitle></CardHeader>
         <CardContent>
           <RealtimeChart height={200} />
         </CardContent>
