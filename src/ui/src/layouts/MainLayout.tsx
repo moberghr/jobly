@@ -17,6 +17,7 @@ import {
   Puzzle,
   Gauge,
   KeyRound,
+  GitBranch,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { config } from '@/config';
@@ -35,6 +36,7 @@ const builtInNavItems = [
 ];
 
 const concurrencyNavItem = { to: '/concurrency', label: 'Concurrency', icon: KeyRound };
+const sagasNavItem = { to: '/sagas', label: 'Sagas', icon: GitBranch };
 
 function resolveIcon(name?: string): React.ComponentType<{ className?: string }> {
   if (!name) {
@@ -57,6 +59,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
   const [concurrencyAvailable, setConcurrencyAvailable] = useState(false);
+  const [sagasAvailable, setSagasAvailable] = useState(false);
 
   usePolling(fetchStats, 1000);
 
@@ -75,6 +78,15 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
           // Non-404 errors (network, 500): keep hidden, don't surface noise.
           setConcurrencyAvailable(false);
         }
+      });
+
+    api
+      .getSagaStats()
+      .then(() => {
+        if (!cancelled) setSagasAvailable(true);
+      })
+      .catch(() => {
+        if (!cancelled) setSagasAvailable(false);
       });
 
     return () => {
@@ -96,6 +108,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
             {[
               ...builtInNavItems,
               ...(concurrencyAvailable ? [concurrencyNavItem] : []),
+              ...(sagasAvailable ? [sagasNavItem] : []),
               ...extensions.flatMap((ext) =>
                 ext.pages.map((page) => ({
                   to: page.path,

@@ -11,6 +11,8 @@ import ServersPage from '@/pages/servers/ServersPage';
 import ServerDetailPage from '@/pages/servers/ServerDetailPage';
 import CountersPage from '@/pages/counters/CountersPage';
 import ConcurrencyLimitsPage from '@/pages/concurrency/ConcurrencyLimitsPage';
+import SagasListPage from '@/pages/sagas/SagasListPage';
+import SagaDetailPage from '@/pages/sagas/SagaDetailPage';
 import WorkerDetailPage from '@/pages/workers/WorkerDetailPage';
 import TracePage from '@/pages/trace/TracePage';
 import DetailPage from '@/pages/detail/DetailPage';
@@ -84,6 +86,8 @@ function App() {
           <Route path="/servers" element={<ServersPage />} />
           <Route path="/counters" element={<CountersPage />} />
           <Route path="/concurrency" element={<ConcurrencyLimitsPage />} />
+          <Route path="/sagas/:id" element={<SagaDetailPage />} />
+          <Route path="/sagas" element={<SagasListPage />} />
 
           {/* Extension pages */}
           {extensionPages.map((page) => (

@@ -404,4 +404,48 @@ public static class ServiceConfiguration
 
         limit.Metadata.SetSchema(schema);
     }
+
+    public static void AddSagaJobLinkEntity(ModelBuilder modelBuilder, string? schema)
+    {
+        var link = modelBuilder.Entity<SagaJobLink>();
+
+        link.HasKey(p => new { p.SagaId, p.JobId });
+        link.Property(p => p.CreatedAt);
+
+        // Activity-log ordering: range scan on SagaId + sort by CreatedAt.
+        link.HasIndex(p => new { p.SagaId, p.CreatedAt });
+
+        // Belt-and-braces FK to SagaState. The proxy/command-service path already removes links
+        // alongside the saga via the change tracker, but a DB-level cascade catches direct DB
+        // intervention or any future code path that doesn't go through the staged-RemoveRange
+        // pattern.
+        link.HasOne<SagaState>()
+            .WithMany()
+            .HasForeignKey(p => p.SagaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        link.Metadata.SetSchema(schema);
+    }
+
+    public static void AddSagaStateEntity(ModelBuilder modelBuilder, string? schema)
+    {
+        var sagaState = modelBuilder.Entity<SagaState>();
+
+        sagaState.Property(p => p.Id);
+        sagaState.HasKey(p => p.Id);
+
+        sagaState.Property(p => p.Type).HasMaxLength(400).IsRequired();
+        sagaState.Property(p => p.CorrelationKey).HasMaxLength(200).IsRequired();
+        sagaState.Property(p => p.StateJson).IsRequired();
+        sagaState.Property(p => p.CreatedAt);
+        sagaState.Property(p => p.UpdatedAt);
+
+        sagaState.Property(p => p.Version).IsConcurrencyToken();
+
+        // One live saga per (Type, CorrelationKey). Completion deletes the row, so re-use of
+        // the correlation key after completion is immediately legal — same pattern as Wolverine.
+        sagaState.HasIndex(p => new { p.Type, p.CorrelationKey }).IsUnique();
+
+        sagaState.Metadata.SetSchema(schema);
+    }
 }

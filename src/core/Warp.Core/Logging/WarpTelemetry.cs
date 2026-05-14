@@ -50,6 +50,21 @@ public static class WarpTelemetry
         unit: "{request}",
         description: "Number of in-memory mediator requests currently executing");
 
+    public static readonly Counter<long> SagasStarted = Meter.CreateCounter<long>(
+        "warp.sagas.started",
+        unit: "{saga}",
+        description: "Total saga instances created (a [StartsSaga] message arrived for a new correlation key)");
+
+    public static readonly Counter<long> SagasCompleted = Meter.CreateCounter<long>(
+        "warp.sagas.completed",
+        unit: "{saga}",
+        description: "Total saga instances marked completed and removed");
+
+    public static readonly Counter<long> SagasRequeued = Meter.CreateCounter<long>(
+        "warp.sagas.requeued",
+        unit: "{saga}",
+        description: "Total saga messages requeued due to mutex contention or optimistic-concurrency conflict. Reason tag: busy | version.");
+
     /// <summary>
     /// Starts the consumer activity for handler execution when an <see cref="ActivityListener"/>
     /// is attached to the Warp source. Returns null when no listener is registered — workers

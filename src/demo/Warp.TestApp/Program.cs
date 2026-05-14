@@ -7,6 +7,7 @@ using Warp.Core.Enums;
 using Warp.Core.Handlers;
 using Warp.Core.Helper;
 using Warp.Core.Retry;
+using Warp.Core.Sagas;
 using Warp.Http;
 using Warp.Provider.PostgreSql;
 using Warp.Test.Shared;
@@ -50,6 +51,7 @@ builder.Services.AddWarpWorker<TestContext>(options =>
 
     options.AddRetry(o => o.MaxRetries = 3);
     options.AddConcurrency();
+    options.AddSagas();
 
     // Second worker group — different queues and polling
     options.AddWorkerGroup(group =>
@@ -59,6 +61,7 @@ builder.Services.AddWarpWorker<TestContext>(options =>
         group.PollingInterval = TimeSpan.FromSeconds(5);
     });
 });
+builder.Services.AddSagaHandler<OrderSagaWorkflow>();
 
 var app = builder.Build();
 
@@ -380,6 +383,32 @@ app.MapPost("/seed/light-flow", async (IPublisher publisher, TestContext context
     await publisher.SaveChangesAsync();
     var traceId = await context.Set<Job>().Where(x => x.Id == id).Select(x => x.TraceId).FirstAsync();
     return Results.Ok(new { detail = $"/warp/detail/{id}", trace = $"/warp/trace/{traceId:N}" });
+});
+
+app.MapPost("/seed/sagas", async (IPublisher publisher) =>
+{
+    // Start three sagas and feed them in different orders to demo the dashboard:
+    //   ORD-S-001: ordered (OrderPlaced → PaymentCaptured → InventoryReserved) — completes
+    //   ORD-S-002: payment first, inventory later — completes via the same handler
+    //   ORD-S-003: OrderPlaced only — stays open, waiting for the timeout to compensate
+    await publisher.Publish(new OrderPlaced { OrderId = "ORD-S-001" });
+    await publisher.Publish(new PaymentCaptured { OrderId = "ORD-S-001" });
+    await publisher.Publish(new InventoryReserved { OrderId = "ORD-S-001" });
+
+    await publisher.Publish(new OrderPlaced { OrderId = "ORD-S-002" });
+    await publisher.Publish(new PaymentCaptured { OrderId = "ORD-S-002" });
+    await publisher.Publish(new InventoryReserved { OrderId = "ORD-S-002" });
+
+    await publisher.Publish(new OrderPlaced { OrderId = "ORD-S-003" });
+
+    await publisher.SaveChangesAsync();
+
+    return Results.Ok(new
+    {
+        sagas = "/warp/sagas",
+        completed = "ORD-S-001 + ORD-S-002",
+        pending = "ORD-S-003 (waiting for OrderTimeout)",
+    });
 });
 
 app.MapPost("/seed/mutex", async (IPublisher publisher) =>

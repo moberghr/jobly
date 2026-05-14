@@ -27,5 +27,7 @@ public class TestContext : DbContext
         // so we must explicitly include the addon entity here.
         ServiceConfiguration.AddCircuitBreakerStateEntity(modelBuilder, _schema);
         ServiceConfiguration.AddConcurrencyLimitEntity(modelBuilder, _schema);
+        ServiceConfiguration.AddSagaStateEntity(modelBuilder, _schema);
+        ServiceConfiguration.AddSagaJobLinkEntity(modelBuilder, _schema);
     }
 }

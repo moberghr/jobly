@@ -989,3 +989,36 @@ export const traceJobs: TraceJobModel[] = [
   { id: IDS.trNotifyCustomer, kind: 1, type: 'Acme.Notifications.NotifyCustomerRequest', handlerType: 'Acme.Notifications.NotifyCustomerHandler', currentState: State.Completed, parentJobId: IDS.trNotification, spawnedByJobId: null, createTime: ago(578) },
   { id: IDS.trCalculateTax, kind: 1, type: 'Acme.Billing.CalculateTaxRequest', handlerType: 'Acme.Billing.CalculateTaxHandler', currentState: State.Completed, parentJobId: null, spawnedByJobId: IDS.trProcessOrder, createTime: ago(598) },
 ];
+
+const sagaMin = (m: number) => new Date(Date.now() - m * 60 * 1000).toISOString();
+
+export const demoSagas = [
+  { id: '11111111-1111-1111-1111-111111111111', type: 'Acme.Orders.OrderSaga', correlationKey: 'O-1042', createdAt: sagaMin(8), updatedAt: sagaMin(2) },
+  { id: '22222222-2222-2222-2222-222222222222', type: 'Acme.Orders.OrderSaga', correlationKey: 'O-1041', createdAt: sagaMin(15), updatedAt: sagaMin(4) },
+  { id: '33333333-3333-3333-3333-333333333333', type: 'Acme.Billing.InvoiceSaga', correlationKey: 'inv-2026-05-1147', createdAt: sagaMin(35), updatedAt: sagaMin(10) },
+  { id: '44444444-4444-4444-4444-444444444444', type: 'Acme.Approvals.ApprovalSaga', correlationKey: 'doc-9923', createdAt: sagaMin(120), updatedAt: sagaMin(45) },
+  { id: '55555555-5555-5555-5555-555555555555', type: 'Acme.Orders.OrderSaga', correlationKey: 'O-1038', createdAt: sagaMin(720), updatedAt: sagaMin(700) },
+];
+
+export const demoSagaActivity = [
+  {
+    jobId: 'a0000000-0000-0000-0000-000000000001',
+    messageType: 'OrderPlaced',
+    jobState: 'Completed',
+    createTime: sagaMin(8),
+    logs: [
+      { id: 'l1', eventType: 'Created', timestamp: sagaMin(8), level: 'Information', message: 'Job created', exception: null, durationMs: null, workerId: null },
+      { id: 'l2', eventType: 'Completed', timestamp: sagaMin(8), level: 'Information', message: 'Job completed', exception: null, durationMs: 142, workerId: null },
+    ],
+  },
+  {
+    jobId: 'a0000000-0000-0000-0000-000000000002',
+    messageType: 'PaymentCaptured',
+    jobState: 'Completed',
+    createTime: sagaMin(2),
+    logs: [
+      { id: 'l3', eventType: 'Created', timestamp: sagaMin(2), level: 'Information', message: 'Job created', exception: null, durationMs: null, workerId: null },
+      { id: 'l4', eventType: 'Completed', timestamp: sagaMin(2), level: 'Information', message: 'Job completed', exception: null, durationMs: 67, workerId: null },
+    ],
+  },
+];
