@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -8,79 +8,52 @@ import { shortType, shortId } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
-import { useRefreshKey } from '@/hooks/useRefreshKey';
-import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
-import type { JobModel, PagedList, TypeCountModel } from '@/types';
-import * as api from '@/api';
-
-const stateEndpoints: Record<string, (page: number, pageSize: number) => Promise<PagedList<JobModel>>> = {
-  enqueued: api.getEnqueuedJobs,
-  processing: api.getProcessingJobs,
-  scheduled: api.getScheduledJobs,
-  completed: api.getCompletedJobs,
-  failed: api.getFailedJobs,
-  awaiting: api.getAwaitingJobs,
-  deleted: api.getDeletedJobs,
-};
+import {
+  useJobsList,
+  useFailedJobsByType,
+  useFailedJobTypes,
+  useRequeueJob,
+  useDeleteJob,
+  useBulkRequeueJobs,
+  useBulkDeleteJobs,
+  useRequeueFailedJobsByType,
+  useDeleteFailedJobsByType,
+} from '@/api/hooks/useJobs';
 
 export default function JobListPage() {
   const { state } = useParams<{ state: string }>();
-  const [data, setData] = useState<PagedList<JobModel> | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const resolvedState = state ?? 'enqueued';
+  const isFailed = resolvedState === 'failed';
+
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const refreshKey = useRefreshKey();
-
-  // Failed type filtering
-  const [typeCounts, setTypeCounts] = useState<TypeCountModel[]>([]);
   const [selectedType, setSelectedType] = useState<string | null>(null);
-
-  const isFailed = state === 'failed';
-
-  const fetchData = useCallback(async () => {
-    try {
-      if (isFailed && selectedType) {
-        const result = await api.getFailedJobsByType(selectedType, page, pageSize);
-        setData(result);
-      } else {
-        const fetcher = stateEndpoints[state ?? 'enqueued'];
-        if (!fetcher) return;
-        const result = await fetcher(page, pageSize);
-        setData(result);
-      }
-      setError(null);
-    } catch {
-      setError('Unable to load jobs');
-    }
-  }, [state, page, pageSize, isFailed, selectedType]);
-
-  const fetchTypeCounts = useCallback(async () => {
-    if (!isFailed) return;
-    try {
-      const counts = await api.getFailedJobTypes();
-      setTypeCounts(counts);
-    } catch {
-      // ignore
-    }
-  }, [isFailed]);
 
   useEffect(() => {
     setPage(0);
     setSelectedIds(new Set());
     setSelectedType(null);
-    setTypeCounts([]);
-  }, [state]);
+  }, [resolvedState]);
 
-  useEffect(() => {
-    fetchData();
-    fetchTypeCounts();
-  }, [fetchData, fetchTypeCounts, refreshKey]);
+  const jobsQuery = useJobsList(resolvedState, page, pageSize);
+  const filteredQuery = useFailedJobsByType(selectedType ?? '', page, pageSize, isFailed && !!selectedType);
+  const typeCountsQuery = useFailedJobTypes(isFailed);
 
-  useRealtimeRefetch('JobFinalized', useCallback(() => {
-    fetchData();
-    fetchTypeCounts();
-  }, [fetchData, fetchTypeCounts]));
+  const requeueJob = useRequeueJob();
+  const deleteJob = useDeleteJob();
+  const bulkRequeue = useBulkRequeueJobs();
+  const bulkDelete = useBulkDeleteJobs();
+  const requeueByType = useRequeueFailedJobsByType();
+  const deleteByType = useDeleteFailedJobsByType();
+
+  const activeQuery = isFailed && selectedType ? filteredQuery : jobsQuery;
+  const data = activeQuery.data;
+  const error = activeQuery.error;
+  const typeCounts = typeCountsQuery.data ?? [];
+
+  if (error) return <ErrorState message={(error as Error).message} />;
+  if (!data) return <LoadingState />;
 
   const handlePageSizeChange = (size: number) => {
     setPageSize(size);
@@ -88,10 +61,7 @@ export default function JobListPage() {
     setSelectedIds(new Set());
   };
 
-  if (error) return <ErrorState message={error} />;
-  if (!data) return <LoadingState />;
-
-  const title = (state ?? 'enqueued').charAt(0).toUpperCase() + (state ?? 'enqueued').slice(1);
+  const title = resolvedState.charAt(0).toUpperCase() + resolvedState.slice(1);
 
   return (
     <div>
@@ -127,31 +97,19 @@ export default function JobListPage() {
       {isFailed && selectedType && (
         <div className="flex items-center gap-3 mb-3 p-3 bg-muted rounded-md">
           <span className="text-sm font-medium">Filtered: {shortType(selectedType)}</span>
-          <Button variant="outline" size="sm" onClick={async () => {
-            await api.requeueFailedJobsByType(selectedType);
-            fetchData();
-            fetchTypeCounts();
-          }}>Requeue All</Button>
-          <Button variant="outline" size="sm" className="text-destructive" onClick={async () => {
-            await api.deleteFailedJobsByType(selectedType);
-            fetchData();
-            fetchTypeCounts();
-          }}>Delete All</Button>
+          <Button variant="outline" size="sm" onClick={() => requeueByType.mutate(selectedType)}>Requeue All</Button>
+          <Button variant="outline" size="sm" className="text-destructive" onClick={() => deleteByType.mutate(selectedType)}>Delete All</Button>
         </div>
       )}
 
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 mb-3 p-3 bg-muted rounded-md">
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
-          <Button variant="outline" size="sm" onClick={async () => {
-            await api.bulkRequeueJobs(Array.from(selectedIds));
-            setSelectedIds(new Set());
-            fetchData();
+          <Button variant="outline" size="sm" onClick={() => {
+            bulkRequeue.mutate(Array.from(selectedIds), { onSuccess: () => setSelectedIds(new Set()) });
           }}>Requeue</Button>
-          <Button variant="outline" size="sm" className="text-destructive" onClick={async () => {
-            await api.bulkDeleteJobs(Array.from(selectedIds));
-            setSelectedIds(new Set());
-            fetchData();
+          <Button variant="outline" size="sm" className="text-destructive" onClick={() => {
+            bulkDelete.mutate(Array.from(selectedIds), { onSuccess: () => setSelectedIds(new Set()) });
           }}>Delete</Button>
           <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Clear</Button>
         </div>
@@ -175,14 +133,14 @@ export default function JobListPage() {
               <TableHead>Type</TableHead>
               <TableHead>State</TableHead>
               <TableHead>Created</TableHead>
-              {state === 'scheduled' && <TableHead>Scheduled</TableHead>}
+              {resolvedState === 'scheduled' && <TableHead>Scheduled</TableHead>}
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={state === 'scheduled' ? 7 : 6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={resolvedState === 'scheduled' ? 7 : 6} className="text-center text-muted-foreground py-8">
                   No jobs found
                 </TableCell>
               </TableRow>
@@ -214,16 +172,16 @@ export default function JobListPage() {
                   <TableCell className="text-sm text-muted-foreground">
                     <RelativeTime date={job.createTime} />
                   </TableCell>
-                  {state === 'scheduled' && (
+                  {resolvedState === 'scheduled' && (
                     <TableCell className="text-sm text-muted-foreground">
                       <RelativeTime date={job.scheduleTime ?? job.createTime} />
                     </TableCell>
                   )}
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => { api.requeueJob(job.id).then(fetchData); }}>
+                    <Button variant="ghost" size="sm" onClick={() => requeueJob.mutate(job.id)}>
                       Requeue
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { api.deleteJob(job.id).then(fetchData); }}>
+                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteJob.mutate(job.id)}>
                       Delete
                     </Button>
                   </TableCell>

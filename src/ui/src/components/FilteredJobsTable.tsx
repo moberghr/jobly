@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -8,9 +9,8 @@ import { shortType, shortId } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { State } from '@/types';
 import type { JobModel, PagedList } from '@/types';
-import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import { JobsTableSkeleton } from '@/components/skeletons/JobsTableSkeleton';
-import * as api from '@/api';
+import { useRequeueJob } from '@/api/hooks/useJobs';
 
 const stateItems = [
   { key: 'awaiting', label: 'Awaiting', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' },
@@ -22,54 +22,52 @@ const stateItems = [
 
 interface FilteredJobsTableProps {
   title: string;
+  parentId: string;
+  parentKind: 'batch' | 'message';
   fetchJobs: (page: number, pageSize: number, state?: string) => Promise<PagedList<JobModel>>;
   fetchCounts: () => Promise<Record<string, number>>;
   onCountsUpdate?: (counts: Record<string, number>) => void;
 }
 
-export function FilteredJobsTable({ title, fetchJobs, fetchCounts, onCountsUpdate }: FilteredJobsTableProps) {
+export function FilteredJobsTable({ title, parentId, parentKind, fetchJobs, fetchCounts, onCountsUpdate }: FilteredJobsTableProps) {
   const [selectedState, setSelectedState] = useState<string | null>(null);
-  const [data, setData] = useState<PagedList<JobModel> | null>(null);
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  const [countsError, setCountsError] = useState(false);
   const [page, setPage] = useState(0);
-  const [refreshKey, setRefreshKey] = useState(0);
   const pageSize = 10;
-  const initializedRef = useRef(false);
-  const fetchJobsRef = useRef(fetchJobs);
-  fetchJobsRef.current = fetchJobs;
-  const fetchCountsRef = useRef(fetchCounts);
-  fetchCountsRef.current = fetchCounts;
-  const onCountsUpdateRef = useRef(onCountsUpdate);
-  onCountsUpdateRef.current = onCountsUpdate;
 
-  const updateCounts = useCallback(() => {
-    fetchCountsRef.current().then(c => {
-      setCounts(c);
-      setCountsError(false);
-      onCountsUpdateRef.current?.(c);
-      if (!initializedRef.current) {
-        initializedRef.current = true;
-        const best = stateItems.reduce((max, item) => (c[item.key] ?? 0) > (c[max.key] ?? 0) ? item : max, stateItems[0]);
-        setSelectedState(best.key);
-      }
-    }).catch(() => setCountsError(true));
-  }, []);
+  const countsQuery = useQuery({
+    queryKey: [parentKind, parentId, 'jobs', 'counts'],
+    queryFn: fetchCounts,
+  });
 
-  useEffect(() => { updateCounts(); }, [updateCounts]);
-  useRealtimeRefetch('JobFinalized', updateCounts);
+  const counts = countsQuery.data ?? {};
+  const countsError = countsQuery.isError;
 
-  const fetch = useCallback(async () => {
-    if (!selectedState) return;
-    try {
-      const result = await fetchJobsRef.current(page, pageSize, selectedState);
-      setData(result);
-    } catch {
-      // ignore
+  // Surface counts to parent and seed the initial state to the bucket with the most jobs.
+  useEffect(() => {
+    if (countsQuery.data) {
+      onCountsUpdate?.(countsQuery.data);
     }
-  }, [page, selectedState]);
+  }, [countsQuery.data, onCountsUpdate]);
 
-  useEffect(() => { fetch(); }, [fetch, refreshKey]);
+  useEffect(() => {
+    if (!countsQuery.data || selectedState !== null) {
+      return;
+    }
+    const best = stateItems.reduce(
+      (max, item) => (countsQuery.data[item.key] ?? 0) > (countsQuery.data[max.key] ?? 0) ? item : max,
+      stateItems[0],
+    );
+    setSelectedState(best.key);
+  }, [countsQuery.data, selectedState]);
+
+  const jobsQuery = useQuery({
+    queryKey: [parentKind, parentId, 'jobs', selectedState, page, pageSize],
+    queryFn: () => fetchJobs(page, pageSize, selectedState ?? undefined),
+    enabled: selectedState !== null,
+  });
+
+  const data = jobsQuery.data ?? null;
+  const requeueJob = useRequeueJob();
 
   return (
     <div>
@@ -94,7 +92,7 @@ export function FilteredJobsTable({ title, fetchJobs, fetchCounts, onCountsUpdat
                 key={item.label}
                 onClick={() => {
                   if (isActive) {
-                    setRefreshKey(k => k + 1);
+                    jobsQuery.refetch();
                   } else {
                     setSelectedState(item.key);
                     setPage(0);
@@ -145,7 +143,7 @@ export function FilteredJobsTable({ title, fetchJobs, fetchCounts, onCountsUpdat
                         <TableCell className="text-sm text-muted-foreground text-right"><RelativeTime date={job.createTime} /></TableCell>
                         <TableCell className="text-right">
                           {job.currentState === State.Failed && (
-                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={async () => { await api.requeueJob(job.id); setRefreshKey(k => k + 1); }}>
+                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => requeueJob.mutate(job.id)}>
                               Requeue
                             </Button>
                           )}

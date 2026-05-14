@@ -1,10 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ErrorState } from '@/components/PageState';
 import { DetailSkeleton } from '@/components/skeletons/DetailSkeleton';
-import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
-import type { UnifiedJobDetailModel } from '@/types';
-import * as api from '@/api';
+import { useJobDetail } from '@/api/hooks/useJobs';
 import { JobHeader } from './JobHeader';
 import { JobTimeline } from './JobTimeline';
 import { JobProgress } from './JobProgress';
@@ -14,29 +12,18 @@ import { RelatedJobsSection } from './RelatedJobsSection';
 
 export default function DetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [job, setJob] = useState<UnifiedJobDetailModel | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [jobCounts, setJobCounts] = useState<Record<string, number>>({});
 
-  useEffect(() => {
-    if (id) api.getDetail(id).then(setJob).catch(() => setError('Unable to load details'));
-  }, [id]);
-
-  const refresh = useCallback(() => {
-    if (!id) return;
-    api.getDetail(id).then(setJob).catch(() => {});
-  }, [id]);
-
-  // Refetch on every JobFinalized — broadcast-only event in v1.
-  useRealtimeRefetch('JobFinalized', refresh);
+  const query = useJobDetail(id);
 
   const handleCountsUpdate = useCallback((counts: Record<string, number>) => {
     setJobCounts(counts);
   }, []);
 
-  if (error) return <ErrorState message={error} />;
-  if (!job) return <DetailSkeleton />;
+  if (query.error) return <ErrorState message={(query.error as Error).message} />;
+  if (!query.data) return <DetailSkeleton />;
 
+  const job = query.data;
   const systemEvents = job.logs.filter(l => l.eventType !== 'Log' && l.eventType !== 'Progress').reverse();
   const handlerLogs = job.logs.filter(l => l.eventType === 'Log');
 

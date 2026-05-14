@@ -1,18 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
-import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { RelativeTime } from '@/components/RelativeTime';
-import { useRefreshKey } from '@/hooks/useRefreshKey';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import type { ConcurrencyLimitInfo } from '@/types';
-import * as api from '@/api';
 import { ConcurrencyLimitFormDialog } from '@/components/forms/ConcurrencyLimitFormDialog';
 import { ConfirmDialog } from '@/components/forms/ConfirmDialog';
 import type { ConcurrencyLimitFormValues } from '@/lib/schemas/concurrencyLimit';
+import {
+  useConcurrencyLimits,
+  useUpsertConcurrencyLimit,
+  useDeleteConcurrencyLimit,
+} from '@/api/hooks/useConcurrencyLimits';
 
 type EditState =
   | { mode: 'create' }
@@ -20,58 +21,21 @@ type EditState =
   | null;
 
 export default function ConcurrencyLimitsPage() {
-  const [limits, setLimits] = useState<ConcurrencyLimitInfo[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [unavailable, setUnavailable] = useState(false);
   const [editState, setEditState] = useState<EditState>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ name: string } | null>(null);
-  const refreshKey = useRefreshKey();
 
-  const fetchAll = useCallback(async () => {
-    try {
-      const result = await api.listConcurrencyLimits();
-      setLimits(result);
-      setError(null);
-      setUnavailable(false);
-    } catch (e) {
-      if (axios.isAxiosError(e) && e.response?.status === 404) {
-        setUnavailable(true);
-        setLimits([]);
-        setError(null);
+  const query = useConcurrencyLimits();
+  const upsert = useUpsertConcurrencyLimit();
+  const remove = useDeleteConcurrencyLimit();
 
-        return;
-      }
-      setError('Unable to load concurrency limits');
-    }
-  }, []);
+  const unavailable =
+    query.error !== null &&
+    query.error !== undefined &&
+    axios.isAxiosError(query.error) &&
+    query.error.response?.status === 404;
 
-  useEffect(() => {
-    fetchAll();
-    const id = setInterval(fetchAll, 5000);
-    return () => clearInterval(id);
-  }, [refreshKey, fetchAll]);
-
-  const handleSubmit = async (values: ConcurrencyLimitFormValues) => {
-    await api.upsertConcurrencyLimit(values.name, values.limit);
-    await fetchAll();
-  };
-
-  const handleDelete = async () => {
-    if (!confirmDelete) {
-      return;
-    }
-    try {
-      await api.deleteConcurrencyLimit(confirmDelete.name);
-      toast.success('Concurrency limit deleted');
-      setConfirmDelete(null);
-      await fetchAll();
-    } catch {
-      toast.error('Failed to delete limit');
-    }
-  };
-
-  if (error) return <ErrorState message={error} />;
-  if (!limits) return <LoadingState />;
+  if (query.error && !unavailable) return <ErrorState message={(query.error as Error).message} />;
+  if (!query.data && !unavailable) return <LoadingState />;
 
   if (unavailable) {
     return (
@@ -86,8 +50,19 @@ export default function ConcurrencyLimitsPage() {
     );
   }
 
+  const limits = query.data ?? [];
   const sorted = [...limits].sort((a, b) => a.name.localeCompare(b.name));
   const existingNames = new Set(limits.map((x) => x.name));
+
+  const handleSubmit = async (values: ConcurrencyLimitFormValues) => {
+    await upsert.mutateAsync({ name: values.name, limit: values.limit });
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    await remove.mutateAsync(confirmDelete.name);
+    setConfirmDelete(null);
+  };
 
   return (
     <div>

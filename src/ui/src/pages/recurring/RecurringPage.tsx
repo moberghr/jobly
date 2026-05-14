@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -6,31 +6,28 @@ import { Pagination } from '@/components/Pagination';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
-import { useRefreshKey } from '@/hooks/useRefreshKey';
-import type { RecurringJobModel, PagedList } from '@/types';
-import * as api from '@/api';
+import {
+  useRecurringList,
+  useEnableRecurringJob,
+  useDisableRecurringJob,
+  useTriggerRecurringJob,
+  useDeleteRecurringJob,
+} from '@/api/hooks/useRecurring';
 
 export default function RecurringPage() {
-  const [data, setData] = useState<PagedList<RecurringJobModel> | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
-  const refreshKey = useRefreshKey();
+  const query = useRecurringList(page, pageSize);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const result = await api.getRecurringJobs(page, pageSize);
-      setData(result);
-      setError(null);
-    } catch {
-      setError('Unable to load recurring jobs');
-    }
-  }, [page, pageSize]);
+  const enableJob = useEnableRecurringJob();
+  const disableJob = useDisableRecurringJob();
+  const triggerJob = useTriggerRecurringJob();
+  const deleteJob = useDeleteRecurringJob();
 
-  useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
+  if (query.error) return <ErrorState message={(query.error as Error).message} />;
+  if (!query.data) return <LoadingState />;
 
-  if (error) return <ErrorState message={error} />;
-  if (!data) return <LoadingState />;
+  const data = query.data;
 
   return (
     <div>
@@ -77,18 +74,18 @@ export default function RecurringPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     {rj.disabledAt ? (
-                      <Button variant="ghost" size="sm" onClick={() => { api.enableRecurringJob(rj.id).then(fetchData); }}>
+                      <Button variant="ghost" size="sm" onClick={() => enableJob.mutate(rj.id)}>
                         Enable
                       </Button>
                     ) : (
-                      <Button variant="ghost" size="sm" onClick={() => { api.disableRecurringJob(rj.id).then(fetchData); }}>
+                      <Button variant="ghost" size="sm" onClick={() => disableJob.mutate(rj.id)}>
                         Disable
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => { api.triggerRecurringJob(rj.id).then(fetchData); }}>
+                    <Button variant="ghost" size="sm" onClick={() => triggerJob.mutate(rj.id)}>
                       Trigger
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { api.deleteRecurringJob(rj.id).then(fetchData); }}>
+                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteJob.mutate(rj.id)}>
                       Remove
                     </Button>
                   </TableCell>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StateBadge } from '@/components/StateBadge';
@@ -7,37 +7,21 @@ import { shortType, shortId } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
-import { useRefreshKey } from '@/hooks/useRefreshKey';
-import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
-import type { JobGroupModel, PagedList } from '@/types';
-import * as api from '@/api';
+import { useMessagesList } from '@/api/hooks/useMessages';
 
 export default function MessagesPage() {
   const { state } = useParams<{ state?: string }>();
-  const [data, setData] = useState<PagedList<JobGroupModel> | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
-  const refreshKey = useRefreshKey();
 
   useEffect(() => { setPage(0); }, [state]);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const result = await api.getMessages(page, pageSize, state);
-      setData(result);
-      setError(null);
-    } catch {
-      setError('Unable to load messages');
-    }
-  }, [page, pageSize, state]);
+  const query = useMessagesList(state, page, pageSize);
 
-  useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
+  if (query.error) return <ErrorState message={(query.error as Error).message} />;
+  if (!query.data) return <LoadingState />;
 
-  useRealtimeRefetch(['MessageEnqueued', 'JobFinalized'], fetchData);
-
-  if (error) return <ErrorState message={error} />;
-  if (!data) return <LoadingState />;
+  const data = query.data;
 
   return (
     <div>

@@ -1,11 +1,9 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingState, ErrorState } from '@/components/PageState';
-import { useRefreshKey } from '@/hooks/useRefreshKey';
-import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
-import type { CounterModel, CounterHistoryPoint } from '@/types';
-import * as api from '@/api';
+import type { CounterHistoryPoint } from '@/types';
+import { useCounters, useCountersHistory } from '@/api/hooks/useCounters';
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, ChartTooltip, Legend);
 
@@ -28,25 +26,15 @@ function colorFor(key: string): string {
 }
 
 export default function CountersPage() {
-  const [counters, setCounters] = useState<CounterModel[] | null>(null);
-  const [history, setHistory] = useState<CounterHistoryPoint[] | null>(null);
   const [historyHours, setHistoryHours] = useState(24);
-  const [error, setError] = useState<string | null>(null);
-  const refreshKey = useRefreshKey();
+  const countersQuery = useCounters();
+  const historyQuery = useCountersHistory(historyHours);
 
-  const fetchAll = useCallback(() => {
-    api.getCounters().then(setCounters).catch(() => setError('Unable to load counters'));
-    api.getCountersHistory(historyHours).then(setHistory).catch(() => {});
-  }, [historyHours]);
+  if (countersQuery.error) return <ErrorState message={(countersQuery.error as Error).message} />;
+  if (!countersQuery.data) return <LoadingState />;
 
-  useEffect(() => {
-    fetchAll();
-  }, [refreshKey, fetchAll]);
-
-  useRealtimeRefetch('JobFinalized', fetchAll);
-
-  if (error) return <ErrorState message={error} />;
-  if (!counters) return <LoadingState />;
+  const counters = countersQuery.data;
+  const history = historyQuery.data ?? null;
 
   return (
     <div>

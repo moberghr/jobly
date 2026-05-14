@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -9,8 +10,17 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { shortId, formatBytes, serverStatusDotColor, isServerStale } from '@/utils/format';
 import { ChevronDown, ChevronRight, RefreshCw, Pause, Play } from 'lucide-react';
-import type { ServerModel, WorkerModel, ServerTaskSummary, ServerLogModel, PagedList } from '@/types';
-import * as api from '@/api';
+import type { WorkerModel, ServerTaskSummary } from '@/types';
+import {
+  useServerDetail,
+  useServerTasks,
+  useServerLogs,
+  usePauseServer,
+  useResumeServer,
+  usePauseWorkerGroup,
+  useResumeWorkerGroup,
+} from '@/api/hooks/useServers';
+import { queryScopes } from '@/lib/queryClient';
 
 const statusColors: Record<string, string> = {
   Completed: 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30',
@@ -20,31 +30,32 @@ const statusColors: Record<string, string> = {
 
 export default function ServerDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [server, setServer] = useState<ServerModel | null>(null);
-  const [tasks, setTasks] = useState<ServerTaskSummary[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const qc = useQueryClient();
 
-  const fetchData = useCallback(() => {
-    if (id) {
-      api.getServerById(id).then(setServer).catch(() => setError('Unable to load server'));
-      api.getServerTaskSummaries(id).then(setTasks).catch(() => {});
-    }
-  }, [id]);
+  const serverQuery = useServerDetail(id);
+  const tasksQuery = useServerTasks(id);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const pause = usePauseServer();
+  const resume = useResumeServer();
 
-  const handleTogglePause = async () => {
-    if (!server || !id) return;
-    if (server.pausedAt) {
-      await api.resumeServer(id);
-    } else {
-      await api.pauseServer(id);
-    }
-    fetchData();
+  const refetchAll = () => {
+    qc.invalidateQueries({ queryKey: queryScopes.servers });
   };
 
-  if (error) return <ErrorState message={error} />;
-  if (!server) return <LoadingState />;
+  if (serverQuery.error) return <ErrorState message={(serverQuery.error as Error).message} />;
+  if (!serverQuery.data) return <LoadingState />;
+
+  const server = serverQuery.data;
+  const tasks = tasksQuery.data ?? [];
+
+  const handleTogglePause = () => {
+    if (!id) return;
+    if (server.pausedAt) {
+      resume.mutate(id);
+    } else {
+      pause.mutate(id);
+    }
+  };
 
   return (
     <div>
@@ -53,7 +64,7 @@ export default function ServerDetailPage() {
         <h1 className="text-2xl font-bold">{server.serverName}</h1>
         {server.pausedAt && <Badge variant="outline" className="text-amber-600 border-amber-300">Paused</Badge>}
         {isServerStale(server.lastHeartbeatTime) && <Badge variant="outline" className="text-red-600 border-red-300">Inactive</Badge>}
-        <button onClick={fetchData} className="p-2 rounded-md hover:bg-accent text-muted-foreground" title="Refresh">
+        <button onClick={refetchAll} className="p-2 rounded-md hover:bg-accent text-muted-foreground" title="Refresh">
           <RefreshCw className="h-4 w-4" />
         </button>
         <Button variant="outline" size="sm" onClick={handleTogglePause} title={server.pausedAt ? 'Resume server' : 'Pause server'}>
@@ -107,7 +118,6 @@ export default function ServerDetailPage() {
                   activeCount={active}
                   groupId={groupId}
                   groupPausedAt={groupPausedAt}
-                  onTogglePause={fetchData}
                 />
               );
             })}
@@ -136,26 +146,26 @@ export default function ServerDetailPage() {
   );
 }
 
-function WorkerGroupSection({ queues, pollingMs, workers, activeCount, groupId, groupPausedAt, onTogglePause }: {
+function WorkerGroupSection({ queues, pollingMs, workers, activeCount, groupId, groupPausedAt }: {
   queues: string;
   pollingMs: number;
   workers: WorkerModel[];
   activeCount: number;
   groupId: string | null;
   groupPausedAt: string | null;
-  onTogglePause: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const pauseGroup = usePauseWorkerGroup();
+  const resumeGroup = useResumeWorkerGroup();
 
-  const handleToggleGroupPause = async (e: React.MouseEvent) => {
+  const handleToggleGroupPause = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!groupId) return;
     if (groupPausedAt) {
-      await api.resumeWorkerGroup(groupId);
+      resumeGroup.mutate(groupId);
     } else {
-      await api.pauseWorkerGroup(groupId);
+      pauseGroup.mutate(groupId);
     }
-    onTogglePause();
   };
 
   return (
@@ -234,20 +244,9 @@ function WorkerGroupSection({ queues, pollingMs, workers, activeCount, groupId, 
 
 function TaskSection({ serverId, task }: { serverId: string; task: ServerTaskSummary }) {
   const [expanded, setExpanded] = useState(false);
-  const [logs, setLogs] = useState<PagedList<ServerLogModel> | null>(null);
   const [page, setPage] = useState(0);
-
-  const fetchLogs = useCallback(async () => {
-    if (!expanded) return;
-    try {
-      const result = await api.getServerLogs(serverId, page, 10, task.taskName);
-      setLogs(result);
-    } catch {
-      // Non-critical
-    }
-  }, [serverId, task.taskName, page, expanded]);
-
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  const logsQuery = useServerLogs(serverId, page, 10, task.taskName, expanded);
+  const logs = logsQuery.data ?? null;
 
   return (
     <Card>

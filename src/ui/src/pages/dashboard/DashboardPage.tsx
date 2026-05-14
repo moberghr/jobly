@@ -5,7 +5,7 @@ import { MetricCard } from '@/components/MetricCard';
 import { RealtimeChart } from '@/components/RealtimeChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton';
-import { getStatsHistory } from '@/api';
+import { useStatsHistory } from '@/api/hooks/useDashboard';
 import type { StatsHistoryPoint } from '@/types';
 import {
   Briefcase,
@@ -64,21 +64,19 @@ export default function DashboardPage() {
   const { stats } = useDashboardStore();
 
   // Historical graph — hourly data
-  const [history, setHistory] = useState<StatsHistoryPoint[]>([]);
   const [historyHours, setHistoryHours] = useState(24);
+  const historyQuery = useStatsHistory(historyHours);
+  const history: StatsHistoryPoint[] = useMemo(() => historyQuery.data ?? [], [historyQuery.data]);
 
-  // Sparkline source: last 24h from getStatsHistory.
+  // Sparkline source: last 24h, served from cache when historyHours === 24.
   // TODO: no per-state historical endpoint exists for Enqueued/Processing/Scheduled/
   // Messages/Batches — those cards render an empty 32px placeholder until a
   // per-state series is added to the backend (or sampled from realtime store history).
-  const [sparkSource, setSparkSource] = useState<StatsHistoryPoint[]>([]);
-  useEffect(() => {
-    getStatsHistory(24).then(setSparkSource).catch(() => {});
-    const id = setInterval(() => {
-      getStatsHistory(24).then(setSparkSource).catch(() => {});
-    }, 60000);
-    return () => clearInterval(id);
-  }, []);
+  const sparkSourceQuery = useStatsHistory(24);
+  const sparkSource: StatsHistoryPoint[] = useMemo(
+    () => sparkSourceQuery.data ?? [],
+    [sparkSourceQuery.data],
+  );
 
   const succeededSpark = useMemo(() => sparkSource.map(p => p.succeeded), [sparkSource]);
   const failedSpark = useMemo(() => sparkSource.map(p => p.failed), [sparkSource]);
@@ -93,14 +91,6 @@ export default function DashboardPage() {
       completedPct: denom > 0 ? Math.round((s / denom) * 100) : null,
     };
   }, [sparkSource]);
-
-  useEffect(() => {
-    getStatsHistory(historyHours).then(setHistory).catch(() => {});
-    const id = setInterval(() => {
-      getStatsHistory(historyHours).then(setHistory).catch(() => {});
-    }, 60000);
-    return () => clearInterval(id);
-  }, [historyHours]);
 
   if (!stats) {
     return <DashboardSkeleton />;
@@ -205,7 +195,7 @@ export default function DashboardPage() {
               ].map(({ label, hours }) => (
                 <button
                   key={label}
-                  onClick={() => { setHistoryHours(hours); getStatsHistory(hours).then(setHistory).catch(() => {}); }}
+                  onClick={() => setHistoryHours(hours)}
                   className={`px-2 py-0.5 text-xs rounded-md transition-colors ${
                     historyHours === hours
                       ? 'bg-primary text-primary-foreground'

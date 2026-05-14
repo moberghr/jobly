@@ -8,13 +8,15 @@ interface RelatedJobsSectionProps {
 }
 
 export function RelatedJobsSection({ job, onCountsUpdate }: RelatedJobsSectionProps) {
+  const isBatch = job.kind === 3;
+
   const fetchJobs = (page: number, pageSize: number, state?: string): Promise<PagedList<JobModel>> =>
-    job.kind === 3
+    isBatch
       ? api.getBatchJobs(job.id, page, pageSize, state)
       : api.getMessageJobs(job.id, page, pageSize, state);
 
   const fetchCounts = () =>
-    job.kind === 3
+    isBatch
       ? api.getBatchJobCounts(job.id)
       : api.getMessageJobCounts(job.id);
 
@@ -23,6 +25,8 @@ export function RelatedJobsSection({ job, onCountsUpdate }: RelatedJobsSectionPr
       <FilteredJobsTable
         key={job.id}
         title="Jobs"
+        parentId={job.id}
+        parentKind={isBatch ? 'batch' : 'message'}
         fetchJobs={fetchJobs}
         fetchCounts={fetchCounts}
         onCountsUpdate={onCountsUpdate}

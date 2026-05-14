@@ -10,6 +10,7 @@ import TopLevelNav from '@/layouts/TopLevelNav';
 import { buildNavItems } from '@/layouts/navItems';
 import MobileDrawer from '@/layouts/MobileDrawer';
 import EntityStateSidebar, { type EntityKind } from '@/components/EntityStateSidebar';
+import { useRealtimeInvalidation } from '@/hooks/useRealtimeInvalidation';
 
 function detectEntity(pathname: string): EntityKind | null {
   if (pathname.startsWith('/jobs')) return 'jobs';
@@ -25,6 +26,8 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   const [concurrencyAvailable, setConcurrencyAvailable] = useState(false);
   const [rateLimitsAvailable, setRateLimitsAvailable] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useRealtimeInvalidation();
 
   // Initial fetch for first paint — after this, fresh stats arrive directly via
   // the SignalR push payload on every JobFinalized / MessageEnqueued event (see
