@@ -1,66 +1,30 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useDashboardStore } from '@/stores/dashboard';
-import * as LucideIcons from 'lucide-react';
-import {
-  LayoutDashboard,
-  Briefcase,
-  Mail,
-  Layers,
-  RefreshCw,
-  Server,
-  Moon,
-  Sun,
-  LogOut,
-  Puzzle,
-  Gauge,
-  KeyRound,
-  Timer,
-} from 'lucide-react';
-import { useTheme } from '@/hooks/useTheme';
 import { useRealtimeStore } from '@/stores/realtime';
-import { config } from '@/config';
 import * as api from '@/api';
-import type { DashboardStatistics } from '@/types';
 import type { ExtensionManifest } from '@/extensions/types';
+import Navbar from '@/layouts/Navbar';
+import TopLevelNav from '@/layouts/TopLevelNav';
+import { buildNavItems } from '@/layouts/navItems';
+import MobileDrawer from '@/layouts/MobileDrawer';
+import EntityStateSidebar, { type EntityKind } from '@/components/EntityStateSidebar';
 
-const builtInNavItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/jobs/enqueued', label: 'Jobs', icon: Briefcase },
-  { to: '/messages/enqueued', label: 'Messages', icon: Mail },
-  { to: '/batches/processing', label: 'Batches', icon: Layers },
-  { to: '/recurring', label: 'Recurring', icon: RefreshCw },
-  { to: '/servers', label: 'Servers', icon: Server },
-  { to: '/counters', label: 'Counters', icon: Gauge },
-];
+function detectEntity(pathname: string): EntityKind | null {
+  if (pathname.startsWith('/jobs')) return 'jobs';
+  if (pathname.startsWith('/batches')) return 'batches';
+  if (pathname.startsWith('/messages')) return 'messages';
 
-const concurrencyNavItem = { to: '/concurrency', label: 'Concurrency', icon: KeyRound };
-const rateLimitsNavItem = { to: '/ratelimits', label: 'Rate Limits', icon: Timer };
-
-function resolveIcon(name?: string): React.ComponentType<{ className?: string }> {
-  if (!name) {
-    return Puzzle;
-  }
-
-  // Convert kebab-case to PascalCase (e.g., "refresh-cw" → "RefreshCw")
-  const pascalCase = name
-    .split('-')
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-    .join('');
-  const icons = LucideIcons as Record<string, unknown>;
-
-  return (icons[pascalCase] as React.ComponentType<{ className?: string }>) ?? Puzzle;
+  return null;
 }
 
 export default function MainLayout({ extensions = [] }: { extensions?: ExtensionManifest[] }) {
   const { stats, error, fetchStats } = useDashboardStore();
   const location = useLocation();
-  const navigate = useNavigate();
-  const { theme, toggle } = useTheme();
-  const realtimeStatus = useRealtimeStore((s) => s.status);
   const [concurrencyAvailable, setConcurrencyAvailable] = useState(false);
   const [rateLimitsAvailable, setRateLimitsAvailable] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Initial fetch for first paint — after this, fresh stats arrive directly via
   // the SignalR push payload on every JobFinalized / MessageEnqueued event (see
@@ -68,7 +32,9 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   // store. No event-driven REST refetch is needed for stats; the bus emit fired
   // by the bridge still wakes other pages (jobs, counters, etc.) to refetch their
   // own scoped views.
-  useEffect(() => { fetchStats(); }, [fetchStats]);
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   // Kick off the realtime probe + hub connection once the dashboard has
   // mounted (and therefore subscribers like the bus listeners are already
@@ -114,277 +80,69 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
     };
   }, []);
 
-  const isJobsSection = location.pathname.startsWith('/jobs');
-  const isBatchesSection = location.pathname.startsWith('/batches');
-  const isMessagesSection = location.pathname.startsWith('/messages');
+  // Close drawer on route change.
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [location.pathname]);
+
+  const navItems = buildNavItems(extensions, concurrencyAvailable, rateLimitsAvailable);
+  const entity = detectEntity(location.pathname);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Top navbar */}
-      <header className="border-b bg-card">
-        <div className="flex h-14 items-center px-6">
-          <Link to="/" className="text-lg font-bold mr-8">Warp</Link>
-          <nav className="flex gap-1">
-            {[
-              ...builtInNavItems,
-              ...(concurrencyAvailable ? [concurrencyNavItem] : []),
-              ...(rateLimitsAvailable ? [rateLimitsNavItem] : []),
-              ...extensions.flatMap((ext) =>
-                ext.pages.map((page) => ({
-                  to: page.path,
-                  label: page.label,
-                  icon: resolveIcon(page.icon),
-                }))
-              ),
-            ].map((item) => {
-              const Icon = item.icon;
-              const matchPath = item.to.includes('/') && item.to !== '/'
-                ? '/' + item.to.split('/')[1]
-                : item.to;
-              const isActive = item.to === '/'
-                ? location.pathname === '/'
-                : location.pathname.startsWith(matchPath);
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  onClick={(e) => {
-                    if (isActive) {
-                      e.preventDefault();
-                      navigate(item.to, { replace: true, state: { refreshKey: Date.now() } });
-                    }
-                  }}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                  {item.label === 'Jobs' && stats && stats.created > 0 && (
-                    <span className="ml-1 text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                      {stats.created}
-                    </span>
-                  )}
-                  {item.label === 'Jobs' && stats && stats.failed > 0 && (
-                    <span className="text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
-                      {stats.failed}
-                    </span>
-                  )}
-                  {item.label === 'Messages' && stats && stats.messages > 0 && (
-                    <span className="ml-1 text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                      {stats.messages}
-                    </span>
-                  )}
-                  {item.label === 'Messages' && stats && stats.messagesFailed > 0 && (
-                    <span className="text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
-                      {stats.messagesFailed}
-                    </span>
-                  )}
-                  {item.label === 'Batches' && stats && stats.batchesProcessing > 0 && (
-                    <span className="ml-1 text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                      {stats.batchesProcessing}
-                    </span>
-                  )}
-                  {item.label === 'Batches' && stats && stats.batchesFailed > 0 && (
-                    <span className="text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 font-bold">
-                      {stats.batchesFailed}
-                    </span>
-                  )}
-                  {item.label === 'Servers' && stats && (
-                    <span className="ml-1 text-xs min-w-10 text-center tabular-nums px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{stats.servers}</span>
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
-          <div className="flex-1" />
-          <RealtimeStatusIndicator status={realtimeStatus} />
-          <button onClick={toggle} className="p-2 rounded-md hover:bg-accent text-muted-foreground">
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-          {config.hasBuiltInLogin && (
-            <button
-              onClick={async () => {
-                await fetch(`${config.apiPath}auth/logout`, { method: 'POST' });
-                window.location.reload();
-              }}
-              className="p-2 rounded-md hover:bg-accent text-muted-foreground ml-1"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      </header>
+      <Navbar
+        desktopNav={<TopLevelNav items={navItems} stats={stats} />}
+        onMenuClick={() => setDrawerOpen(true)}
+      />
 
       {error && (
-        <div className="bg-destructive/10 border-b border-destructive/20 px-6 py-2 text-sm text-destructive flex items-center gap-2">
+        <div
+          role="alert"
+          className="bg-destructive/10 border-b border-destructive/20 px-4 lg:px-6 py-2 text-sm text-destructive flex items-center gap-2"
+        >
           <span className="font-medium">Connection lost</span>
           <span className="text-destructive/70">— Unable to connect to Warp API. Retrying...</span>
         </div>
       )}
 
       <div className="flex flex-1">
-        {isJobsSection && <JobsSidebar stats={stats} />}
-        {isBatchesSection && <BatchesSidebar stats={stats} />}
-        {isMessagesSection && <MessagesSidebar stats={stats} />}
+        {entity && (
+          <aside className="hidden lg:block w-64 shrink-0 border-r bg-card min-h-[calc(100vh-3.5rem)] p-4">
+            <EntityStateSidebar entity={entity} stats={stats} />
+          </aside>
+        )}
 
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-4 lg:p-6 min-w-0">
           <Outlet />
         </main>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t bg-card px-6 py-3 text-xs text-muted-foreground flex items-center justify-between">
-        <span>{stats?.databaseConnection ?? 'Warp Dashboard'}</span>
-        <div className="flex items-center gap-4 tabular-nums">
-          {stats && <span>Servers: {stats.servers} · Workers active</span>}
+      <MobileDrawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <TopLevelNav
+          items={navItems}
+          stats={stats}
+          orientation="vertical"
+          showBadges={false}
+          onNavigate={() => setDrawerOpen(false)}
+        />
+        {entity && (
+          <div>
+            <EntityStateSidebar
+              entity={entity}
+              stats={stats}
+              onNavigate={() => setDrawerOpen(false)}
+            />
+          </div>
+        )}
+      </MobileDrawer>
+
+      <footer className="border-t bg-card px-4 lg:px-6 py-3 text-xs text-muted-foreground flex items-center justify-between gap-4">
+        <span className="truncate">{stats?.databaseConnection ?? 'Warp Dashboard'}</span>
+        <div className="flex items-center gap-4 tabular-nums shrink-0">
+          {stats && <span className="hidden sm:inline">Servers: {stats.servers} · Workers active</span>}
           <span>UTC: {new Date().toISOString().replace('T', ' ').substring(0, 19)}</span>
         </div>
       </footer>
     </div>
-  );
-}
-
-function RealtimeStatusIndicator({ status }: { status: ReturnType<typeof useRealtimeStore.getState>['status'] }) {
-  // 'disabled' indicator is hidden in production: when the addon is not registered
-  // we don't want to imply something is wrong — polling fallback is the supported
-  // path. Visible in dev to surface "did the probe actually succeed" while iterating.
-  if (status === 'disabled' && !import.meta.env.DEV) {
-    return null;
-  }
-  if (status === 'idle' || status === 'probing') {
-    return null;
-  }
-
-  const styles: Record<string, { dot: string; label: string; title: string }> = {
-    connected: { dot: 'bg-green-500', label: 'Live', title: 'Realtime push connected' },
-    connecting: { dot: 'bg-amber-500 animate-pulse', label: 'Connecting', title: 'Connecting realtime push…' },
-    reconnecting: { dot: 'bg-amber-500 animate-pulse', label: 'Reconnecting', title: 'Reconnecting realtime push…' },
-    disabled: { dot: 'bg-muted-foreground/40', label: 'Polling', title: 'Realtime push disabled; using polling fallback' },
-  };
-  const s = styles[status];
-  if (!s) return null;
-
-  return (
-    <span className="flex items-center justify-end gap-1.5 min-w-28 px-2 py-1 mr-1 text-xs text-muted-foreground" title={s.title}>
-      <span className={`h-2 w-2 rounded-full ${s.dot}`} />
-      <span>{s.label}</span>
-    </span>
-  );
-}
-
-function JobsSidebar({ stats }: { stats: DashboardStatistics | null }) {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  const sidebarItems = [
-    { to: '/jobs/enqueued', label: 'Enqueued', count: stats?.created ?? 0, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
-    { to: '/jobs/scheduled', label: 'Scheduled', count: stats?.scheduled ?? 0, color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' },
-    { to: '/jobs/processing', label: 'Processing', count: stats?.processing ?? 0, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
-    { to: '/jobs/completed', label: 'Completed', count: stats?.completed ?? 0, color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
-    { to: '/jobs/failed', label: 'Failed', count: stats?.failed ?? 0, color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
-    { to: '/jobs/awaiting', label: 'Awaiting', count: stats?.awaiting ?? 0, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' },
-    { to: '/jobs/deleted', label: 'Deleted', count: stats?.deleted ?? 0, color: 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300' },
-  ];
-
-  return (
-    <aside className="w-64 shrink-0 border-r bg-card min-h-[calc(100vh-3.5rem)] p-4">
-      <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Jobs</h3>
-      <nav className="space-y-1">
-        {sidebarItems.map((item) => {
-          const isActive = location.pathname === item.to;
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              onClick={(e) => {
-                if (isActive) {
-                  e.preventDefault();
-                  navigate(item.to, { replace: true, state: { refreshKey: Date.now() } });
-                }
-              }}
-              className={`flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
-                isActive
-                  ? 'bg-accent text-accent-foreground font-medium'
-                  : 'text-muted-foreground hover:bg-accent/50'
-              }`}
-            >
-              <span>{item.label}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                item.count > 0 ? item.color : 'text-muted-foreground/50'
-              }`}>
-                {item.count}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
-    </aside>
-  );
-}
-
-function SidebarNav({ title, items }: { title: string; items: { to: string; label: string; count: number; color: string }[] }) {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  return (
-    <aside className="w-64 shrink-0 border-r bg-card min-h-[calc(100vh-3.5rem)] p-4">
-      <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3">{title}</h3>
-      <nav className="space-y-1">
-        {items.map((item) => {
-          const isActive = location.pathname === item.to;
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              onClick={(e) => {
-                if (isActive) {
-                  e.preventDefault();
-                  navigate(item.to, { replace: true, state: { refreshKey: Date.now() } });
-                }
-              }}
-              className={`flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
-                isActive
-                  ? 'bg-accent text-accent-foreground font-medium'
-                  : 'text-muted-foreground hover:bg-accent/50'
-              }`}
-            >
-              <span>{item.label}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                item.count > 0 ? item.color : 'text-muted-foreground/50'
-              }`}>
-                {item.count}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
-    </aside>
-  );
-}
-
-function BatchesSidebar({ stats }: { stats: DashboardStatistics | null }) {
-  return (
-    <SidebarNav title="Batches" items={[
-      { to: '/batches/processing', label: 'Processing', count: stats?.batchesProcessing ?? 0, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
-      { to: '/batches/awaiting', label: 'Awaiting', count: stats?.batchesAwaiting ?? 0, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' },
-      { to: '/batches/completed', label: 'Completed', count: stats?.batchesCompleted ?? 0, color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
-      { to: '/batches/failed', label: 'Failed', count: stats?.batchesFailed ?? 0, color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
-      { to: '/batches/deleted', label: 'Deleted', count: stats?.batchesDeleted ?? 0, color: 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300' },
-    ]} />
-  );
-}
-
-function MessagesSidebar({ stats }: { stats: DashboardStatistics | null }) {
-  return (
-    <SidebarNav title="Messages" items={[
-      { to: '/messages/enqueued', label: 'Enqueued', count: stats?.messagesEnqueued ?? 0, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
-      { to: '/messages/processing', label: 'Processing', count: stats?.messagesProcessing ?? 0, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
-      { to: '/messages/completed', label: 'Completed', count: stats?.messagesCompleted ?? 0, color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
-      { to: '/messages/failed', label: 'Failed', count: stats?.messagesFailed ?? 0, color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
-    ]} />
   );
 }
