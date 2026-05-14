@@ -45,6 +45,16 @@ public static class WarpTelemetryAttributes
     public const string WarpConcurrencyAcquired = "warp.concurrency.acquired";
     public const string WarpConcurrencyHeldByOtherEvent = "warp.concurrency.held_by_other";
 
+    public const string WarpRateLimitKey = "warp.rate_limit.key";
+    public const string WarpRateLimitCount = "warp.rate_limit.count";
+    public const string WarpRateLimitWindowSeconds = "warp.rate_limit.window_seconds";
+    public const string WarpRateLimitStyle = "warp.rate_limit.style";
+    public const string WarpRateLimitOutcome = "warp.rate_limit.outcome";
+    public const string WarpRateLimitOutcomeAcquired = "acquired";
+    public const string WarpRateLimitOutcomeSkipped = "skipped";
+    public const string WarpRateLimitOutcomeThrottled = "throttled";
+    public const string WarpRateLimitOutcomeLockContention = "lock_contention";
+
     /// <summary>
     /// Metadata dictionary keys read by the worker to enrich consumer-span tags. Mirrors property
     /// names on Warp.Core.Retry.IRetryMetadata so the worker can set retry tags without taking a

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
+using Warp.UI.DashboardPush;
 using Warp.UI.Endpoints;
 using Warp.UI.Extensions;
 
@@ -30,6 +31,11 @@ public static class WarpUIBuilder
 
         app.UseMiddleware<WarpUIMiddleware>(options);
         app.MapWarpApiEndpoints(options, extensions);
+
+        if (app.Services.GetService<IDashboardPushMarker>() is not null)
+        {
+            app.MapHub<WarpDashboardHub>($"{options.RoutePrefix}/api/hub");
+        }
 
         return app;
     }

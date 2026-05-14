@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Warp.Core;
+using Warp.Core.Events;
 
 namespace Warp.Worker.Services;
 
@@ -23,7 +24,7 @@ public sealed class ServerTaskHost<TContext> : BackgroundService
     where TContext : DbContext
 {
     private readonly Dictionary<Type, ServerTaskLoop<TContext>> _loops = [];
-    private readonly List<ServerTaskSignals<TContext>.Subscription> _signalSubscriptions = [];
+    private readonly List<IDisposable> _signalSubscriptions = [];
 
     public ServerTaskHost(
         IServiceScopeFactory scopes,

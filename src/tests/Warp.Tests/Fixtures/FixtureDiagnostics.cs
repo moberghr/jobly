@@ -52,6 +52,59 @@ public static class FixtureDiagnostics
 
     private static async Task<string> DumpAsync(TestContext debugCtx, string header, CancellationToken ct)
     {
+        var sb = new StringBuilder();
+        sb.AppendLine(header);
+
+        // Trace events first — purely in-memory, so this section is available even when the
+        // fixture's connection pool is exhausted (the very failure mode that drove
+        // `PostgreSqlClassFixture.DisposeAsync` to drop databases). When DB queries below
+        // fail, the traces alone usually pin down where the test got stuck.
+        var testEvents = TestLifecycleTrace.Drain();
+        var lifecycleEvents = ServerLifecycleTrace.Drain();
+
+        sb.AppendLine();
+        sb.AppendLine($"Test lifecycle ({testEvents.Count} events):");
+        foreach (var grouped in testEvents.GroupBy(e => e.TestName))
+        {
+            sb.AppendLine($"  Test {grouped.Key}:");
+            foreach (var e in grouped.OrderBy(x => x.Timestamp))
+            {
+                sb.AppendLine($"    [{e.Timestamp:HH:mm:ss.fff}] {e.Event}");
+            }
+        }
+
+        sb.AppendLine();
+        sb.AppendLine($"Server lifecycle ({lifecycleEvents.Count} events):");
+        foreach (var grouped in lifecycleEvents.GroupBy(e => e.ServerId))
+        {
+            sb.AppendLine($"  Server {grouped.Key}:");
+            foreach (var e in grouped.OrderBy(x => x.Timestamp))
+            {
+                sb.AppendLine($"    [{e.Timestamp:HH:mm:ss.fff}] {e.Event}");
+            }
+        }
+
+        // DB-backed section — best effort. If the fixture's pool is exhausted (or any other
+        // connection-level failure), surface the error inline rather than throwing out of
+        // the dump entirely. The trace section above is still authoritative.
+        try
+        {
+            await AppendDbStateAsync(sb, debugCtx, ct);
+        }
+#pragma warning disable CA1031 // diagnostic dump must never throw
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            sb.AppendLine();
+            sb.AppendLine($"⚠ DB-backed diagnostic queries failed: {ex.GetType().Name}: {ex.Message}");
+            sb.AppendLine("Trace events above remain authoritative.");
+        }
+
+        return sb.ToString();
+    }
+
+    private static async Task AppendDbStateAsync(StringBuilder sb, TestContext debugCtx, CancellationToken ct)
+    {
         var stateHistogram = await debugCtx.Set<Job>()
             .AsNoTracking()
             .GroupBy(j => new { j.Type, j.CurrentState })
@@ -139,35 +192,7 @@ public static class FixtureDiagnostics
                 new { l.Timestamp, l.Status, l.Message, l.DurationMs, TaskName = l.ServerTask != null ? l.ServerTask.TaskName : null })
             .ToListAsync(ct);
 
-        var testEvents = TestLifecycleTrace.Drain();
-        var lifecycleEvents = ServerLifecycleTrace.Drain();
-
         var logsByJob = allLogs.GroupBy(l => l.JobId).ToDictionary(g => g.Key, g => g.ToList());
-
-        var sb = new StringBuilder();
-        sb.AppendLine(header);
-
-        sb.AppendLine();
-        sb.AppendLine($"Test lifecycle ({testEvents.Count} events):");
-        foreach (var grouped in testEvents.GroupBy(e => e.TestName))
-        {
-            sb.AppendLine($"  Test {grouped.Key}:");
-            foreach (var e in grouped.OrderBy(x => x.Timestamp))
-            {
-                sb.AppendLine($"    [{e.Timestamp:HH:mm:ss.fff}] {e.Event}");
-            }
-        }
-
-        sb.AppendLine();
-        sb.AppendLine($"Server lifecycle ({lifecycleEvents.Count} events):");
-        foreach (var grouped in lifecycleEvents.GroupBy(e => e.ServerId))
-        {
-            sb.AppendLine($"  Server {grouped.Key}:");
-            foreach (var e in grouped.OrderBy(x => x.Timestamp))
-            {
-                sb.AppendLine($"    [{e.Timestamp:HH:mm:ss.fff}] {e.Event}");
-            }
-        }
 
         sb.AppendLine();
         sb.AppendLine($"Job state histogram ({stateHistogram.Count} groups):");
@@ -267,8 +292,6 @@ public static class FixtureDiagnostics
         {
             sb.AppendLine($"  [{l.Timestamp:HH:mm:ss.fff}] {l.TaskName ?? "<no-task>"} {l.Status} {l.DurationMs:0.#}ms — {l.Message}");
         }
-
-        return sb.ToString();
     }
 
     private static string ShortTypeName(string? assemblyQualifiedName)

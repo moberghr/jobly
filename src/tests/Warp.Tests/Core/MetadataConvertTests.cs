@@ -79,4 +79,49 @@ public class MetadataConvertTests
 
         result.ShouldBeNull();
     }
+
+    [TimedFact]
+    public void To_DateTime_FromIsoString_ReturnsDateTime()
+    {
+        // JsonSerializer.Serialize writes DateTime as ISO 8601; NativeObjectConverter
+        // surfaces JsonTokenType.String as a string. Without this branch, Total-scope
+        // timeout would silently lose its DeadlineUtc after the first JSON roundtrip.
+        var utc = new DateTime(2026, 5, 12, 12, 0, 0, DateTimeKind.Utc);
+        var iso = utc.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+
+        var result = MetadataConvert.To<DateTime>(iso);
+
+        result.ShouldBe(utc);
+        result.Kind.ShouldBe(DateTimeKind.Utc);
+    }
+
+    [TimedFact]
+    public void To_NullableDateTime_FromIsoString_ReturnsDateTime()
+    {
+        var utc = new DateTime(2026, 5, 12, 12, 0, 0, DateTimeKind.Utc);
+        var iso = utc.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+
+        var result = MetadataConvert.To<DateTime?>(iso);
+
+        result.ShouldNotBeNull();
+        result!.Value.ShouldBe(utc);
+    }
+
+    [TimedFact]
+    public void To_NullableDateTime_FromNull_ReturnsNull()
+    {
+        var result = MetadataConvert.To<DateTime?>(null);
+
+        result.ShouldBeNull();
+    }
+
+    [TimedFact]
+    public void To_DateTime_FromMalformedString_ReturnsDefault()
+    {
+        // Defensive: a non-date string under a DateTime-typed key shouldn't blow up the
+        // metadata accessor — fall through to default(T) so the caller's `?? Fallback` recovers.
+        var result = MetadataConvert.To<DateTime?>("not-a-date");
+
+        result.ShouldBeNull();
+    }
 }

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Warp.Core.Data.Queries;
+using Warp.Core.Events;
 using Warp.Core.Notifications;
 using Warp.Worker.Services;
 
@@ -82,6 +83,7 @@ public class WarpSingleWorkerHost<TContext> : IHostedService
                     _loggerFactory.CreateLogger<WarpWorker<TContext>>(),
                     registration.Config,
                     _pauseStateHolder,
+                    _timeProvider,
                     registration.GroupEntityId);
 
                 await worker.StartAsync(cancellationToken);

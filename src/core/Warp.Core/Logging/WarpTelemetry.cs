@@ -45,6 +45,16 @@ public static class WarpTelemetry
         unit: "ms",
         description: "Duration of in-memory IRequest/IStreamRequest execution through IMediator");
 
+    public static readonly Counter<long> DashboardEventsBroadcast = Meter.CreateCounter<long>(
+        "warp.dashboard.events.broadcast",
+        unit: "{event}",
+        description: "Total dashboard-push events broadcast to connected clients (post-coalesce)");
+
+    public static readonly UpDownCounter<long> DashboardConnectionsActive = Meter.CreateUpDownCounter<long>(
+        "warp.dashboard.connections.active",
+        unit: "{connection}",
+        description: "Number of dashboard SignalR connections currently active");
+
     public static readonly UpDownCounter<long> MediatorInFlight = Meter.CreateUpDownCounter<long>(
         "warp.mediator.in_flight",
         unit: "{request}",
@@ -185,6 +195,14 @@ public static class WarpTelemetry
     /// warp.concurrency.limit, and warp.concurrency.acquired before disposing.
     /// </summary>
     public static Activity? StartConcurrencyActivity() => ActivitySource.StartActivity("warp.concurrency_acquire", ActivityKind.Internal);
+
+    /// <summary>
+    /// Starts an Internal-kind span around a single rate-limit check. Span name
+    /// "warp.rate_limit_check". Caller stamps warp.rate_limit.key, warp.rate_limit.count,
+    /// warp.rate_limit.window_seconds, warp.rate_limit.style, and warp.rate_limit.outcome
+    /// (one of: acquired, skipped, throttled, lock_contention) before disposing.
+    /// </summary>
+    public static Activity? StartRateLimitActivity() => ActivitySource.StartActivity("warp.rate_limit_check", ActivityKind.Internal);
 
     /// <summary>
     /// Bound the length of a string used as an OTel span status description. Activity status

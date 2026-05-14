@@ -4,8 +4,8 @@ Feature ideas for future development.
 
 ## Concurrency & Flow Control
 
-### Job Timeout
-Kill jobs running longer than a configured duration. Leverages existing CancellationMode — worker sets a timer, triggers Graceful cancellation on timeout.
+### ~~Job Timeout~~ ✅
+Implemented as the `opt.AddTimeout()` addon in `Warp.Core.Timeout`. `[Timeout(seconds: N, Mode, Scope)]` attribute and `WithTimeout(TimeSpan, TimeoutMode, TimeoutScope)` extension on `JobParameters`. Two modes: `Delete` (outcome → `Deleted`, not retried) and `Fail` (throws `TimeoutException`, retried by `AddRetry`). Two scopes: `PerAttempt` and `Total` (deadline anchored at `CreateTime`, bounds the full retry chain). Pipeline behaviour wraps the handler with `new CancellationTokenSource(delay, TimeProvider)` for `FakeTimeProvider` testability. `AddRetry()` must be registered before `AddTimeout()` so retry can catch Fail-mode's `TimeoutException`. Cooperative cancellation only — same constraint as `DeleteJob`. `stats:timeout` counter deferred to v1.1.
 
 ### ~~Mutexes~~ ✅
 Implemented via `ConcurrencyKey` on Job entity. Set at publish time via `JobParameters.Mutex`. Worker cancels duplicate if another job with same key is already Processing.

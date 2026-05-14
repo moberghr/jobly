@@ -18,6 +18,7 @@ import type {
   TypeCountModel,
   PagedList,
   ConcurrencyLimitInfo,
+  RateLimitInfo,
 } from '@/types';
 import type { RealtimePoint } from '@/stores/dashboard';
 
@@ -164,6 +165,29 @@ function makeLog(
     exception,
     durationMs,
     workerId,
+    name: null,
+    value: null,
+  };
+}
+
+function makeProgress(
+  id: string,
+  secondsAgo: number,
+  name: string,
+  value: number,
+  workerId: string | null = null,
+): JobLogModel {
+  return {
+    id,
+    eventType: 'Progress',
+    timestamp: ago(secondsAgo),
+    level: 'Information',
+    message: '',
+    exception: null,
+    durationMs: null,
+    workerId,
+    name,
+    value,
   };
 }
 
@@ -280,6 +304,15 @@ export const demoConcurrencyLimits: ConcurrencyLimitInfo[] = [
 ];
 
 // ============================================================
+// Rate limits
+// ============================================================
+
+export const demoRateLimits: RateLimitInfo[] = [
+  { name: 'external-api', count: 100, windowSeconds: 60, updatedAt: ago(60 * 15) },
+  { name: 'newsletter-send', count: 500, windowSeconds: 3600, updatedAt: ago(60 * 60 * 4) },
+];
+
+// ============================================================
 // Realtime chart seed (60 seconds of pre-populated data)
 // ============================================================
 
@@ -302,11 +335,12 @@ export const processingJobs: JobModel[] = [
   {
     ...makeJob(0, State.Processing, 15),
     id: IDS.processingJob,
-    type: 'Acme.Orders.ProcessOrderRequest',
-    handlerType: 'Acme.Orders.ProcessOrderHandler',
+    type: 'Acme.Reports.GenerateQuarterlyReport',
+    handlerType: 'Acme.Reports.GenerateQuarterlyReportHandler',
   },
   ...makeJobs(7, State.Processing, 30).map((j, i) => ({ ...j, id: uid(i + 100) })),
 ];
+
 
 export const scheduledJobs = Array.from({ length: 12 }, (_, i) =>
   makeJob(i, State.Enqueued, 120 + i * 30, true),
@@ -802,6 +836,52 @@ export const jobDetailCompleted: UnifiedJobDetailModel = {
     makeLog('log-c6', 'Log', 595, 'Creating shipment batch for 2 items...', null, null, 'Information', IDS.worker1),
     makeLog('log-c7', 'Log', 594, 'Spawning tax calculation job.', null, null, 'Information', IDS.worker1),
     makeLog('log-c8', 'Completed', 593, null, 4250, null, 'Information', IDS.worker1),
+  ],
+};
+
+// ============================================================
+// Processing-job detail with reported progress bars
+// ============================================================
+
+export const jobDetailProcessing: UnifiedJobDetailModel = {
+  id: IDS.processingJob,
+  kind: 1,
+  type: 'Acme.Reports.GenerateQuarterlyReport',
+  currentState: State.Processing,
+  createTime: ago(120),
+  cancellationMode: CancellationMode.None,
+  message: '{ "quarter": "Q1-2026", "tenantId": "acme-corp" }',
+  handlerType: 'Acme.Reports.GenerateQuarterlyReportHandler',
+  scheduleTime: null,
+  retriedTimes: 0,
+  maxRetries: 0,
+  totalJobs: 0,
+  completedJobs: 0,
+  failedJobs: 0,
+  continuationOptions: 1,
+  queue: 'reports',
+  traceId: IDS.traceId,
+  parentJob: null,
+  spawnedByJob: null,
+  continuations: [],
+  spawnedJobs: [],
+  metadata: { tenantId: 'acme-corp', priority: 'normal' },
+  logs: [
+    makeLog('log-p1', 'Created', 120, null, null),
+    makeLog('log-p2', 'Processing', 119, null, null, null, 'Information', IDS.worker1),
+    makeLog('log-p3', 'Log', 118, 'Connecting to data warehouse...', null, null, 'Information', IDS.worker1),
+    makeLog('log-p4', 'Log', 110, 'Streaming source rows (42M)...', null, null, 'Information', IDS.worker1),
+    makeProgress('log-p-d1', 110, 'download', 10, IDS.worker1),
+    makeProgress('log-p-d2', 95, 'download', 35, IDS.worker1),
+    makeProgress('log-p-d3', 80, 'download', 72, IDS.worker1),
+    makeProgress('log-p-d4', 60, 'download', 100, IDS.worker1),
+    makeLog('log-p5', 'Log', 55, 'Aggregating by region...', null, null, 'Information', IDS.worker1),
+    makeProgress('log-p-a1', 55, 'aggregate', 15, IDS.worker1),
+    makeProgress('log-p-a2', 40, 'aggregate', 48, IDS.worker1),
+    makeProgress('log-p-a3', 20, 'aggregate', 67, IDS.worker1),
+    makeLog('log-p6', 'Log', 10, 'Rendering PDF...', null, null, 'Information', IDS.worker1),
+    makeProgress('log-p-r1', 10, 'render', 8, IDS.worker1),
+    makeProgress('log-p-r2', 5, 'render', 22, IDS.worker1),
   ],
 };
 

@@ -10,8 +10,10 @@ using Warp.Core.Entities;
 using Warp.Core.Enums;
 using Warp.Core.Handlers;
 using Warp.Core.NoRestart;
+using Warp.Core.RateLimit;
 using Warp.Core.Retry;
 using Warp.Core.Services;
+using Warp.Core.Timeout;
 using Warp.Provider.PostgreSql;
 using Warp.Provider.SqlServer;
 using Warp.Tests.Fixtures;
@@ -27,11 +29,13 @@ public class WarpTestServer : IAsyncDisposable
 {
     private readonly IHost _host;
     private readonly IDatabaseFixture _fixture;
+    private readonly JobLogObserver _jobLogObserver;
 
-    private WarpTestServer(IHost host, IDatabaseFixture fixture)
+    private WarpTestServer(IHost host, IDatabaseFixture fixture, JobLogObserver jobLogObserver)
     {
         _host = host;
         _fixture = fixture;
+        _jobLogObserver = jobLogObserver;
     }
 
     public IPublisher CreatePublisher()
@@ -182,6 +186,11 @@ public class WarpTestServer : IAsyncDisposable
             ? baseConnectionString
             : $"{baseConnectionString};Application Name=warp-test-{Guid.NewGuid():N}";
 
+        // One observer per test-server instance — captures every JobLog insertion the
+        // worker pool commits, so WaitForJobLog can complete deterministically the moment
+        // SaveChanges returns rather than polling at a 200 ms cadence.
+        var jobLogObserver = new JobLogObserver();
+
         TestLifecycleTrace.Record("Host.Build starting");
         var host = Host.CreateDefaultBuilder()
             .ConfigureLogging(logging =>
@@ -219,6 +228,8 @@ public class WarpTestServer : IAsyncDisposable
                     {
                         options.UseSqlServer(connectionString, sql => sql.CommandTimeout(5));
                     }
+
+                    options.AddInterceptors(jobLogObserver);
                 });
 
                 services.AddTransient(typeof(IPublishPipelineBehavior<>), typeof(TestData.Handlers.TestMetadataPublishBehavior<>));
@@ -278,6 +289,7 @@ public class WarpTestServer : IAsyncDisposable
                         o.Delays = [1];
                     });
                     config.AddConcurrency();
+                    config.AddRateLimit();
                     config.AddNoRestart();
                     config.AddCircuitBreaker(o =>
                     {
@@ -285,6 +297,7 @@ public class WarpTestServer : IAsyncDisposable
                         o.Duration = TimeSpan.FromHours(1);
                         o.ResetJitter = TimeSpan.FromSeconds(1);
                     });
+                    config.AddTimeout();
                 });
 
                 configureServices?.Invoke(services);
@@ -298,7 +311,7 @@ public class WarpTestServer : IAsyncDisposable
         ServerLifecycleTrace.Record(serverId, "IHost.StartAsync returned");
         TestLifecycleTrace.Record($"WarpTestServer.StartAsync returned (server={serverId})");
 
-        return new WarpTestServer(host, fixture);
+        return new WarpTestServer(host, fixture, jobLogObserver);
     }
 
     public async Task WaitForJobState(Guid jobId, State state, TimeSpan? timeout = null)
@@ -334,23 +347,36 @@ public class WarpTestServer : IAsyncDisposable
 
     public async Task WaitForJobLog(Guid jobId, string eventType, TimeSpan? timeout = null)
     {
-        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
-        while (DateTime.UtcNow < deadline)
+        // Deterministic wait via JobLogObserver: subscribe BEFORE the existence check so
+        // a SaveChanges that lands between the two completes our TCS, eliminating the
+        // race window the previous 200 ms-poll implementation had.
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(5);
+
+        using var subscription = _jobLogObserver.Subscribe(jobId, eventType);
+
+        // Already there? Worker may have committed the row before the test got here.
+        var alreadyLogged = await CreateContext().Set<JobLog>()
+            .AnyAsync(
+                x => x.JobId == jobId && x.EventType == eventType,
+                Xunit.TestContext.Current.CancellationToken);
+
+        if (alreadyLogged)
         {
-            var hasLog = await CreateContext().Set<JobLog>()
-                .AnyAsync(x => x.JobId == jobId && x.EventType == eventType, Xunit.TestContext.Current.CancellationToken);
-
-            if (hasLog)
-            {
-                return;
-            }
-
-            await Task.Delay(200, Xunit.TestContext.Current.CancellationToken);
+            return;
         }
 
-        var logs = await GetJobLogs(jobId);
-        var eventTypes = string.Join(", ", logs.Select(l => l.EventType));
-        throw new TimeoutException($"Job {jobId} did not get log event '{eventType}' within {timeout ?? TimeSpan.FromSeconds(10)}. Events: {eventTypes}");
+        try
+        {
+            await subscription.Task.WaitAsync(effectiveTimeout, Xunit.TestContext.Current.CancellationToken);
+        }
+        catch (TimeoutException)
+        {
+            var logs = await GetJobLogs(jobId);
+            var eventTypes = string.Join(", ", logs.Select(l => l.EventType));
+
+            throw new TimeoutException(
+                $"Job {jobId} did not get log event '{eventType}' within {effectiveTimeout}. Events: {eventTypes}");
+        }
     }
 
     /// <summary>

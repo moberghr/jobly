@@ -8,6 +8,7 @@ import { shortType, shortId } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { State } from '@/types';
 import type { JobModel, PagedList } from '@/types';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import * as api from '@/api';
 
 const stateItems = [
@@ -41,9 +42,8 @@ export function FilteredJobsTable({ title, fetchJobs, fetchCounts, onCountsUpdat
   const onCountsUpdateRef = useRef(onCountsUpdate);
   onCountsUpdateRef.current = onCountsUpdate;
 
-  // Poll counts every 2s
-  useEffect(() => {
-    const update = () => fetchCountsRef.current().then(c => {
+  const updateCounts = useCallback(() => {
+    fetchCountsRef.current().then(c => {
       setCounts(c);
       setCountsError(false);
       onCountsUpdateRef.current?.(c);
@@ -53,10 +53,10 @@ export function FilteredJobsTable({ title, fetchJobs, fetchCounts, onCountsUpdat
         setSelectedState(best.key);
       }
     }).catch(() => setCountsError(true));
-    update();
-    const id = setInterval(update, 2000);
-    return () => clearInterval(id);
   }, []);
+
+  useEffect(() => { updateCounts(); }, [updateCounts]);
+  useRealtimeRefetch('JobFinalized', updateCounts);
 
   const fetch = useCallback(async () => {
     if (!selectedState) return;

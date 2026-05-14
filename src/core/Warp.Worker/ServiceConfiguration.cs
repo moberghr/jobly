@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Warp.Core;
+using Warp.Core.Events;
 using Warp.Core.Logging;
 using Warp.Worker.Services;
 

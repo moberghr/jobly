@@ -45,6 +45,27 @@ internal static class SharedSqlServerContainer
         return new SqlConnectionStringBuilder(masterConn) { InitialCatalog = databaseName }.ConnectionString;
     }
 
+    // Sibling to CreateDatabaseAsync — releases the per-fixture database when the class
+    // fixture is disposed. SET SINGLE_USER WITH ROLLBACK IMMEDIATE kills any sessions still
+    // connected to the DB (the SQL Server analogue of PG's WITH (FORCE)); the subsequent
+    // DROP runs cleanly. Same hygiene as the PG container — see SqlServerClassFixture.
+    public static async Task DropDatabaseAsync(string databaseName, CancellationToken ct)
+    {
+        var masterConn = await EnsureContainerAsync(ct);
+
+        await using var conn = new SqlConnection(masterConn);
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new SqlCommand(
+            $@"IF DB_ID('{databaseName}') IS NOT NULL
+               BEGIN
+                   ALTER DATABASE [{databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                   DROP DATABASE [{databaseName}];
+               END",
+            conn);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
     private static async Task<string> EnsureContainerAsync(CancellationToken ct)
     {
         if (_masterConnectionString != null)

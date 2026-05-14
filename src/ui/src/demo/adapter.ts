@@ -1,9 +1,10 @@
 import type { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import * as data from './data';
-import type { ConcurrencyLimitInfo, SagaDetail, SagaStats } from '@/types';
+import type { ConcurrencyLimitInfo, RateLimitInfo, SagaDetail, SagaStats } from '@/types';
 
 // Mutable copy so demo upsert/delete feel real across the session.
 const concurrencyLimits: ConcurrencyLimitInfo[] = [...data.demoConcurrencyLimits];
+const rateLimits: RateLimitInfo[] = [...data.demoRateLimits];
 
 export function createDemoAdapter(isLoginMode: boolean) {
   let loginActive = isLoginMode;
@@ -33,6 +34,11 @@ export function createDemoAdapter(isLoginMode: boolean) {
     const concurrencyResult = routeConcurrency(method, url, config);
     if (concurrencyResult !== undefined) {
       return concurrencyResult;
+    }
+
+    const rateLimitResult = routeRateLimits(method, url, config);
+    if (rateLimitResult !== undefined) {
+      return rateLimitResult;
     }
 
     // Sagas: demo mode shows the nav (hide-on-404 stays off) and returns mock data so the
@@ -184,6 +190,75 @@ function routeConcurrency(
     const idx = concurrencyLimits.findIndex((x) => x.name === name);
     if (idx >= 0) {
       concurrencyLimits.splice(idx, 1);
+    }
+
+    return resolve({}, config);
+  }
+
+  return undefined;
+}
+
+function routeRateLimits(
+  method: string,
+  url: string,
+  config: InternalAxiosRequestConfig,
+): Promise<AxiosResponse> | undefined {
+  if (!url.startsWith('/ratelimits')) {
+    return undefined;
+  }
+
+  const nameMatch = url.match(/^\/ratelimits\/([^/?]+)/);
+  const name = nameMatch ? decodeURIComponent(nameMatch[1]) : null;
+
+  if (method === 'get' && name === null) {
+    return resolve([...rateLimits].sort((a, b) => a.name.localeCompare(b.name)), config);
+  }
+  if (method === 'get' && name !== null) {
+    const found = rateLimits.find((x) => x.name === name);
+
+    return resolve(found ?? null, config);
+  }
+  if ((method === 'put' || method === 'post') && name !== null) {
+    const body = parseBody(config.data) as { count?: number; windowSeconds?: number } | null;
+    const count = Number(body?.count ?? 1);
+    const windowSeconds = Number(body?.windowSeconds ?? 60);
+    const now = new Date().toISOString();
+    const existing = rateLimits.find((x) => x.name === name);
+    if (existing) {
+      existing.count = count;
+      existing.windowSeconds = windowSeconds;
+      existing.updatedAt = now;
+
+      return resolve({ ...existing }, config);
+    }
+    const created: RateLimitInfo = { name, count, windowSeconds, updatedAt: now };
+    rateLimits.push(created);
+
+    return resolve({ ...created }, config);
+  }
+  if (method === 'post' && name === null) {
+    const body = parseBody(config.data) as { name?: string; count?: number; windowSeconds?: number } | null;
+    const newName = String(body?.name ?? '');
+    const count = Number(body?.count ?? 1);
+    const windowSeconds = Number(body?.windowSeconds ?? 60);
+    const now = new Date().toISOString();
+    const existing = rateLimits.find((x) => x.name === newName);
+    if (existing) {
+      existing.count = count;
+      existing.windowSeconds = windowSeconds;
+      existing.updatedAt = now;
+
+      return resolve({ ...existing }, config);
+    }
+    const created: RateLimitInfo = { name: newName, count, windowSeconds, updatedAt: now };
+    rateLimits.push(created);
+
+    return resolve({ ...created }, config);
+  }
+  if (method === 'delete' && name !== null) {
+    const idx = rateLimits.findIndex((x) => x.name === name);
+    if (idx >= 0) {
+      rateLimits.splice(idx, 1);
     }
 
     return resolve({}, config);
@@ -366,6 +441,9 @@ function routeGet(url: string, params: Record<string, unknown>): unknown {
     }
     if (id === data.IDS.message1) {
       return data.messageDetailUnified;
+    }
+    if (id === data.IDS.processingJob) {
+      return data.jobDetailProcessing;
     }
 
     return { ...data.jobDetailCompleted, id };

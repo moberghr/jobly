@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Warp.Core;
 using Warp.Core.Data;
 using Warp.Core.Data.Queries;
+using Warp.Core.Events;
 using Warp.Core.Notifications;
 using Warp.Core.Services;
 using Warp.Provider.PostgreSql;

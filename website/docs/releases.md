@@ -4,6 +4,64 @@ sidebar_position: 6
 
 # Releases
 
+## 0.14.0
+
+*Unreleased*
+
+Adds opt-in handler-reported progress bars on the dashboard. Handlers call `IJobContext.ReportProgress(name, percent)` to surface per-bar progress on the job detail page; the value persists as `JobLog` rows tagged `EventType = "Progress"` and is decoupled from the job state machine.
+
+### New: `IJobContext.ReportProgress(name, percent)`
+
+```csharp
+public class GenerateReport : IJobHandler<GenerateReportRequest>
+{
+    private readonly IJobContext _context;
+
+    public GenerateReport(IJobContext context) => _context = context;
+
+    public async Task HandleAsync(GenerateReportRequest message, CancellationToken ct)
+    {
+        for (var i = 0; i < total; i++)
+        {
+            // ... process row i ...
+            _context.ReportProgress("rows", (i * 100) / total);
+        }
+
+        _context.ReportProgress("upload", 0);
+        await UploadAsync(ct);
+        _context.ReportProgress("upload", 100);
+    }
+}
+```
+
+Percent is clamped to `0..100`. Multiple named bars per job are supported — pass an empty name (or use the `ReportProgress(int percent)` overload) for the single-bar case. The detail page renders one bar per name in the right column above History/Logs; the card is hidden entirely when a job reported no progress.
+
+Reporting is **opt-in per handler** — jobs that don't call `ReportProgress` incur zero overhead and produce no rows.
+
+### How it works
+
+`IJobContext.ReportProgress` writes to an in-memory `JobProgressCollector` (one per running job, mirrors the existing `JobLogCollector`). The worker's existing `RunJobMonitor` loop drains the collector every ~1s during handler execution and on the terminal commit (success / cancel / fail). Each *changed* bar emits one row; unchanged bars emit nothing, so a stalled bar at 47% doesn't churn rows every second. Final values land in the same `SaveChangesAsync` as the terminal `JobLog` row, so cancellation paths preserve pre-cancellation progress consistently with the audit trail.
+
+Progress is **display telemetry, not state** — it never participates in the state machine, the orchestrator, or worker scheduling.
+
+### Breaking: `IJobContext` gained two abstract members
+
+```csharp
+void ReportProgress(string name, int percent);
+void ReportProgress(int percent);
+```
+
+Anyone with a custom `IJobContext` implementation (test fakes, third-party pipeline integrations) needs to add these two members. Both can usually be empty bodies if your fake doesn't care about progress. The concrete `JobContext` shipped in `Warp.Core` implements them via an internal collector reference.
+
+### Schema additions
+
+Two new nullable columns on `JobLog`:
+
+- `Name` (`nvarchar(100)?` / `varchar(100)?`) — bar name; null for all non-`Progress` rows
+- `Value` (`smallint?`) — percent `0..100`; null for all non-`Progress` rows
+
+No new index — the existing `(JobId)` index serves the detail-page read. Existing deployments need a one-step EF migration to add the two columns; no data backfill required.
+
 ## 0.13.0
 
 *2026-05-11*

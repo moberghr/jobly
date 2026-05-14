@@ -11,6 +11,7 @@ import ServersPage from '@/pages/servers/ServersPage';
 import ServerDetailPage from '@/pages/servers/ServerDetailPage';
 import CountersPage from '@/pages/counters/CountersPage';
 import ConcurrencyLimitsPage from '@/pages/concurrency/ConcurrencyLimitsPage';
+import RateLimitsPage from '@/pages/ratelimits/RateLimitsPage';
 import SagasListPage from '@/pages/sagas/SagasListPage';
 import SagaDetailPage from '@/pages/sagas/SagaDetailPage';
 import WorkerDetailPage from '@/pages/workers/WorkerDetailPage';
@@ -19,6 +20,7 @@ import DetailPage from '@/pages/detail/DetailPage';
 import LoginPage from '@/pages/auth/LoginPage';
 import ExtensionPage from '@/extensions/ExtensionPage';
 import { setOnUnauthorized } from '@/api/client';
+import { useRealtimeStore } from '@/stores/realtime';
 import { loadExtensions } from '@/extensions/loader';
 import { extensionRuntime } from '@/extensions/runtime';
 import { config } from '@/config';
@@ -53,6 +55,10 @@ function App() {
     setNeedsLogin(false);
     // Now authenticated — load extensions
     initExtensions();
+    // Re-attempt realtime probe: a boot-time probe before login lands on a 401
+    // and settles the store into 'disabled', leaving the dashboard polling-only
+    // for the session. Re-probing here transitions disabled → connected.
+    void useRealtimeStore.getState().probeAndConnect();
   }, [initExtensions]);
 
   if (needsLogin) {
@@ -86,6 +92,7 @@ function App() {
           <Route path="/servers" element={<ServersPage />} />
           <Route path="/counters" element={<CountersPage />} />
           <Route path="/concurrency" element={<ConcurrencyLimitsPage />} />
+          <Route path="/ratelimits" element={<RateLimitsPage />} />
           <Route path="/sagas/:id" element={<SagaDetailPage />} />
           <Route path="/sagas" element={<SagasListPage />} />
 

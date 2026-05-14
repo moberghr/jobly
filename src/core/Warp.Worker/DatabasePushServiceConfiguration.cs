@@ -48,15 +48,18 @@ public static class DatabasePushServiceConfiguration
                 ?? throw new InvalidOperationException(
                     "UseDatabasePush requires a provider package. Call opt.UsePostgreSql() or opt.UseSqlServer() inside the AddWarp/AddWarpWorker lambda before opt.UseDatabasePush().");
 
-            var dbOptions = sp.GetRequiredService<DbContextOptions<TContext>>();
+            // AddDbContext registers DbContextOptions<TContext> as Scoped, so the singleton
+            // factory must resolve it inside a scope — otherwise ValidateScopes=true rejects
+            // the resolution from the root provider (silently broken in Dev environments).
+            using var scope = sp.CreateScope();
+            var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<TContext>>();
             var relationalExtension = dbOptions.Extensions.OfType<RelationalOptionsExtension>().FirstOrDefault();
             var connectionString = relationalExtension?.ConnectionString;
 
             // Factory-configured DbContexts (UseNpgsql(sp => ...)) have the extension present but
-            // with a null connection string — resolve via a scoped context.
+            // with a null connection string — fall back to the scoped context.
             if (string.IsNullOrEmpty(connectionString))
             {
-                using var scope = sp.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<TContext>();
                 connectionString = context.Database.GetConnectionString()
                     ?? throw new InvalidOperationException("Cannot resolve connection string for Warp DB push.");
