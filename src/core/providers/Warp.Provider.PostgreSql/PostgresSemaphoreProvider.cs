@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Medallion.Threading;
 using Medallion.Threading.Postgres;
+using Npgsql;
 using Warp.Core;
 
 namespace Warp.Provider.PostgreSql;
@@ -18,6 +19,14 @@ internal sealed class PostgresSemaphoreProvider : IWarpSemaphoreProvider
 
     public PostgresSemaphoreProvider(string connectionString)
         : this(new PostgresDistributedSynchronizationProvider(connectionString))
+    {
+    }
+
+    // Data-source overload — same rationale as PostgresLockProvider: callers using
+    // NpgsqlDataSource (Aspire / Managed Identity / pre-configured SSL) get the same
+    // authentication and encryption settings on the lock connections that EF Core uses.
+    public PostgresSemaphoreProvider(NpgsqlDataSource dataSource)
+        : this(new PostgresDistributedSynchronizationProvider(dataSource))
     {
     }
 

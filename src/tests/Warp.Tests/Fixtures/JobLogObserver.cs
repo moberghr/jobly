@@ -1,24 +1,36 @@
 using System.Collections.Concurrent;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Storage;
 using Warp.Core.Data.Entities;
 
 namespace Warp.Tests.Fixtures;
 
 /// <summary>
-/// EF SaveChanges interceptor that lets tests await a specific JobLog row insertion
-/// deterministically. Replaces 200 ms polling in <c>WarpTestServer.WaitForJobLog</c> —
-/// the waiter completes the instant the worker's SaveChanges commits a matching row,
-/// not up to one poll cycle later. Registered once per <see cref="WarpTestServer"/>
-/// instance so every DbContext built from that server's options invokes it.
+/// EF SaveChanges + transaction interceptor that lets tests await a specific JobLog
+/// row insertion deterministically. Replaces the 200 ms polling that used to live in
+/// <c>WarpTestServer.WaitForJobLog</c> — the waiter completes the instant the row is
+/// visible to other connections, not up to one poll cycle later. Registered once per
+/// <see cref="WarpTestServer"/> instance so every DbContext built from that server's
+/// options invokes it.
 /// <para>
 /// Subscriptions are matched by <c>(JobId, EventType)</c>. Each subscription is
-/// single-shot: once the matching insert fires it completes its TCS and unregisters.
-/// Subscribers that never match are unregistered when their CancellationToken trips
-/// (typically the test's overall deadline).
+/// single-shot: once the matching insert is visible it completes its TCS and
+/// unregisters. Subscribers that never match are unregistered when their
+/// Subscription is disposed (typically end of the test).
+/// </para>
+/// <para>
+/// Transaction-aware: when <c>SaveChangesAsync</c> runs inside an explicit
+/// <c>BeginTransactionAsync</c> scope (worker's cancel/complete/fail paths, see
+/// <c>WarpWorkerService.cs:277</c>), the row is staged but not yet committed when
+/// <c>SavedChangesAsync</c> fires. Firing the waiter there would let the test race
+/// past the commit and read the prior state under <c>READ COMMITTED</c>. So the
+/// snapshot is parked keyed on the underlying <see cref="DbTransaction"/> and only
+/// fired once <see cref="TransactionCommittedAsync"/> reports the commit landed.
 /// </para>
 /// </summary>
-internal sealed class JobLogObserver : SaveChangesInterceptor
+internal sealed class JobLogObserver : SaveChangesInterceptor, IDbTransactionInterceptor
 {
     // Pending insertions snapshot per in-flight SaveChanges. Keyed on the DbContext
     // instance because both SavingChangesAsync and SavedChangesAsync receive the same
@@ -26,7 +38,12 @@ internal sealed class JobLogObserver : SaveChangesInterceptor
     // does NOT work here: EF Core invokes interceptors inside a captured
     // ExecutionContext, so any Set inside SavingChangesAsync is invisible to
     // SavedChangesAsync.
-    private readonly ConcurrentDictionary<DbContext, List<(Guid JobId, string EventType)>> _pending = new();
+    private readonly ConcurrentDictionary<DbContext, List<(Guid JobId, string EventType)>> _pendingByContext = new();
+
+    // Snapshots that landed inside an explicit DB transaction. We hold them here until
+    // the transaction commits — firing on SavedChangesAsync would beat the commit on a
+    // loaded runner and the test's next read sees the pre-commit state.
+    private readonly ConcurrentDictionary<DbTransaction, List<(Guid JobId, string EventType)>> _pendingByTransaction = new();
 
     private readonly ConcurrentBag<Waiter> _waiters = [];
 
@@ -60,7 +77,7 @@ internal sealed class JobLogObserver : SaveChangesInterceptor
 
         if (added.Count > 0)
         {
-            _pending[eventData.Context] = added;
+            _pendingByContext[eventData.Context] = added;
         }
 
         return new(result);
@@ -71,11 +88,102 @@ internal sealed class JobLogObserver : SaveChangesInterceptor
         int result,
         CancellationToken cancellationToken = default)
     {
-        if (eventData.Context == null || !_pending.TryRemove(eventData.Context, out var snapshot))
+        if (eventData.Context == null || !_pendingByContext.TryRemove(eventData.Context, out var snapshot))
         {
             return new(result);
         }
 
+        // No explicit transaction: SavedChangesAsync runs after the implicit batch
+        // transaction has already committed at the database, so the row is visible
+        // to other connections — fire immediately.
+        var dbTransaction = eventData.Context.Database.CurrentTransaction?.GetDbTransaction();
+        if (dbTransaction == null)
+        {
+            FireWaiters(snapshot);
+
+            return new(result);
+        }
+
+        // Inside an explicit transaction: park the snapshot, fire on commit.
+        _pendingByTransaction.AddOrUpdate(
+            dbTransaction,
+            _ => snapshot,
+            (_, existing) =>
+            {
+                existing.AddRange(snapshot);
+
+                return existing;
+            });
+
+        return new(result);
+    }
+
+    public override Task SaveChangesFailedAsync(
+        DbContextErrorEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        // Drop the snapshot on rollback — nothing was committed, no waiter should fire.
+        if (eventData.Context != null)
+        {
+            _pendingByContext.TryRemove(eventData.Context, out _);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task TransactionCommittedAsync(
+        DbTransaction transaction,
+        TransactionEndEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        if (_pendingByTransaction.TryRemove(transaction, out var snapshot))
+        {
+            FireWaiters(snapshot);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public void TransactionCommitted(DbTransaction transaction, TransactionEndEventData eventData)
+    {
+        if (_pendingByTransaction.TryRemove(transaction, out var snapshot))
+        {
+            FireWaiters(snapshot);
+        }
+    }
+
+    public Task TransactionRolledBackAsync(
+        DbTransaction transaction,
+        TransactionEndEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        _pendingByTransaction.TryRemove(transaction, out _);
+
+        return Task.CompletedTask;
+    }
+
+    public void TransactionRolledBack(DbTransaction transaction, TransactionEndEventData eventData)
+    {
+        _pendingByTransaction.TryRemove(transaction, out _);
+    }
+
+    public Task TransactionFailedAsync(
+        DbTransaction transaction,
+        TransactionErrorEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        _pendingByTransaction.TryRemove(transaction, out _);
+
+        return Task.CompletedTask;
+    }
+
+    public void TransactionFailed(DbTransaction transaction, TransactionErrorEventData eventData)
+    {
+        _pendingByTransaction.TryRemove(transaction, out _);
+    }
+
+    private void FireWaiters(List<(Guid JobId, string EventType)> snapshot)
+    {
         foreach (var (jobId, eventType) in snapshot)
         {
             foreach (var waiter in _waiters)
@@ -92,21 +200,6 @@ internal sealed class JobLogObserver : SaveChangesInterceptor
                 }
             }
         }
-
-        return new(result);
-    }
-
-    public override Task SaveChangesFailedAsync(
-        DbContextErrorEventData eventData,
-        CancellationToken cancellationToken = default)
-    {
-        // Drop the snapshot on rollback — nothing was committed, no waiter should fire.
-        if (eventData.Context != null)
-        {
-            _pending.TryRemove(eventData.Context, out _);
-        }
-
-        return Task.CompletedTask;
     }
 
     internal sealed class Waiter

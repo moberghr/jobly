@@ -1,3 +1,4 @@
+using Npgsql;
 using Shouldly;
 using Warp.Core.Notifications;
 using Warp.Provider.PostgreSql;
@@ -86,6 +87,42 @@ public class PostgresNotificationTransportTests : IAsyncLifetime, IClassFixture<
             received.ShouldContain(n => n.Kind == NotificationKind.MessageEnqueued);
             received.ShouldContain(n => n.Kind == NotificationKind.JobFinalized);
             received.ShouldContain(n => n.Kind == NotificationKind.JobEnqueued && n.Queue == "critical");
+        }
+        finally
+        {
+            await cts.CancelAsync();
+            try
+            {
+                await enumerator.DisposeAsync();
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+    }
+
+    [TimedFact]
+    public async Task PublishListen_RoundTrip_WithDataSource_DeliversNotification()
+    {
+        await using var dataSource = NpgsqlDataSource.Create(_fixture.ConnectionString);
+        var transport = new PostgresNotificationTransport(
+            dataSource,
+            new WarpDatabasePushConfiguration { ChannelName = "warp_notify_ds_test" });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        var enumerator = transport.ListenAsync(cts.Token).GetAsyncEnumerator(cts.Token);
+        try
+        {
+            var moveTask = enumerator.MoveNextAsync();
+            await Task.Delay(TimeSpan.FromMilliseconds(300), cts.Token);
+
+            await transport.PublishAsync(NotificationKind.JobEnqueued, "default", cts.Token);
+
+            var hasNext = await moveTask;
+            hasNext.ShouldBeTrue("Expected to receive a notification within the timeout");
+            enumerator.Current.Kind.ShouldBe(NotificationKind.JobEnqueued);
+            enumerator.Current.Queue.ShouldBe("default");
         }
         finally
         {
