@@ -48,6 +48,29 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+@theme inline {
+    --color-state-enqueued: var(--state-enqueued);
+    --color-state-enqueued-bg: var(--state-enqueued-bg);
+    --color-state-awaiting: var(--state-awaiting);
+    --color-state-awaiting-bg: var(--state-awaiting-bg);
+    --color-state-processing: var(--state-processing);
+    --color-state-processing-bg: var(--state-processing-bg);
+    --color-state-completed: var(--state-completed);
+    --color-state-completed-bg: var(--state-completed-bg);
+    --color-state-failed: var(--state-failed);
+    --color-state-failed-bg: var(--state-failed-bg);
+    --color-state-deleted: var(--state-deleted);
+    --color-state-deleted-bg: var(--state-deleted-bg);
+    --color-state-scheduled: var(--state-scheduled);
+    --color-state-scheduled-bg: var(--state-scheduled-bg);
+    --color-state-cancelling: var(--state-cancelling);
+    --color-state-cancelling-bg: var(--state-cancelling-bg);
+    --color-success: var(--success);
+    --color-success-bg: var(--success-bg);
+    --color-warning: var(--warning);
+    --color-warning-bg: var(--warning-bg);
+}
+
 :root {
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
@@ -81,6 +104,28 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+
+    /* Semantic state tokens (light) */
+    --state-enqueued: oklch(0.40 0.15 250);
+    --state-enqueued-bg: oklch(0.94 0.04 250);
+    --state-awaiting: oklch(0.45 0.13 85);
+    --state-awaiting-bg: oklch(0.95 0.06 85);
+    --state-processing: oklch(0.45 0.18 290);
+    --state-processing-bg: oklch(0.94 0.05 290);
+    --state-completed: oklch(0.42 0.14 150);
+    --state-completed-bg: oklch(0.94 0.06 150);
+    --state-failed: oklch(0.45 0.20 25);
+    --state-failed-bg: oklch(0.94 0.06 25);
+    --state-deleted: oklch(0.45 0 0);
+    --state-deleted-bg: oklch(0.93 0 0);
+    --state-scheduled: oklch(0.50 0.15 65);
+    --state-scheduled-bg: oklch(0.95 0.06 65);
+    --state-cancelling: oklch(0.50 0.16 50);
+    --state-cancelling-bg: oklch(0.95 0.06 50);
+    --success: oklch(0.42 0.14 150);
+    --success-bg: oklch(0.94 0.06 150);
+    --warning: oklch(0.50 0.15 65);
+    --warning-bg: oklch(0.95 0.06 65);
 }
 
 .dark {
@@ -115,6 +160,28 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+
+    /* Semantic state tokens (dark) */
+    --state-enqueued: oklch(0.80 0.12 250);
+    --state-enqueued-bg: oklch(0.30 0.08 250);
+    --state-awaiting: oklch(0.85 0.13 85);
+    --state-awaiting-bg: oklch(0.32 0.08 85);
+    --state-processing: oklch(0.82 0.15 290);
+    --state-processing-bg: oklch(0.32 0.10 290);
+    --state-completed: oklch(0.82 0.15 150);
+    --state-completed-bg: oklch(0.30 0.08 150);
+    --state-failed: oklch(0.78 0.16 25);
+    --state-failed-bg: oklch(0.32 0.10 25);
+    --state-deleted: oklch(0.75 0 0);
+    --state-deleted-bg: oklch(0.32 0 0);
+    --state-scheduled: oklch(0.82 0.14 65);
+    --state-scheduled-bg: oklch(0.32 0.08 65);
+    --state-cancelling: oklch(0.82 0.14 50);
+    --state-cancelling-bg: oklch(0.32 0.08 50);
+    --success: oklch(0.82 0.15 150);
+    --success-bg: oklch(0.30 0.08 150);
+    --warning: oklch(0.82 0.14 65);
+    --warning-bg: oklch(0.32 0.08 65);
 }
 
 @layer base {

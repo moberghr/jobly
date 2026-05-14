@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ErrorBoundary } from 'react-error-boundary';
 import MainLayout from '@/layouts/MainLayout';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import JobListPage from '@/pages/jobs/JobListPage';
@@ -22,9 +24,12 @@ import { useRealtimeStore } from '@/stores/realtime';
 import { loadExtensions } from '@/extensions/loader';
 import { extensionRuntime } from '@/extensions/runtime';
 import { config } from '@/config';
+import { queryClient } from '@/lib/queryClient';
+import { Toaster } from '@/components/ui/sonner';
+import { RootErrorFallback } from '@/components/RootErrorFallback';
 import type { ExtensionManifest } from '@/extensions/types';
 
-function App() {
+function AppRoutes() {
   const [needsLogin, setNeedsLogin] = useState(false);
   const [extensions, setExtensions] = useState<ExtensionManifest[]>([]);
   const [extensionsLoaded, setExtensionsLoaded] = useState(false);
@@ -41,9 +46,6 @@ function App() {
       setOnUnauthorized(() => setNeedsLogin(true));
     }
 
-    // Load extensions immediately — if auth is required, the API call will
-    // get a 401 and the loader will return an empty array gracefully.
-    // After login, we reload extensions.
     initExtensions();
 
     return () => extensionRuntime.stop();
@@ -51,11 +53,7 @@ function App() {
 
   const handleLogin = useCallback(() => {
     setNeedsLogin(false);
-    // Now authenticated — load extensions
     initExtensions();
-    // Re-attempt realtime probe: a boot-time probe before login lands on a 401
-    // and settles the store into 'disabled', leaving the dashboard polling-only
-    // for the session. Re-probing here transitions disabled → connected.
     void useRealtimeStore.getState().probeAndConnect();
   }, [initExtensions]);
 
@@ -63,7 +61,6 @@ function App() {
     return <LoginPage onLogin={handleLogin} />;
   }
 
-  // Wait for extensions to load before rendering routes so dynamic pages are available
   if (!extensionsLoaded) {
     return null;
   }
@@ -92,7 +89,6 @@ function App() {
           <Route path="/concurrency" element={<ConcurrencyLimitsPage />} />
           <Route path="/ratelimits" element={<RateLimitsPage />} />
 
-          {/* Extension pages */}
           {extensionPages.map((page) => (
             <Route
               key={page.path}
@@ -103,6 +99,17 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+  );
+}
+
+function App() {
+  return (
+    <ErrorBoundary FallbackComponent={RootErrorFallback}>
+      <QueryClientProvider client={queryClient}>
+        <AppRoutes />
+        <Toaster />
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
