@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,6 +10,11 @@ namespace Warp.PerfTest;
 /// EF Core command interceptor that tallies SQL commands by verb (SELECT/UPDATE/INSERT/DELETE/Other).
 /// Used by the perf scenarios to quantify DB noise per configuration — the whole point of the
 /// DB-push feature is to reduce these numbers.
+/// <para>
+/// Set <see cref="CaptureSql"/> to <c>true</c> to also record a histogram of distinct command
+/// texts (parameter values stripped; one-liner normalized). Off by default — capture has a
+/// hash + dictionary cost per command.
+/// </para>
 /// </summary>
 public sealed class CommandCountingInterceptor : DbCommandInterceptor
 {
@@ -17,6 +23,9 @@ public sealed class CommandCountingInterceptor : DbCommandInterceptor
     private long _insert;
     private long _delete;
     private long _other;
+    private readonly ConcurrentDictionary<string, long> _byText = new(StringComparer.Ordinal);
+
+    public bool CaptureSql { get; set; }
 
     public long Select => Interlocked.Read(ref _select);
     public long Update => Interlocked.Read(ref _update);
@@ -25,6 +34,8 @@ public sealed class CommandCountingInterceptor : DbCommandInterceptor
     public long Other => Interlocked.Read(ref _other);
     public long Total => Select + Update + Insert + Delete + Other;
 
+    public IReadOnlyDictionary<string, long> CapturedByText => _byText;
+
     public void Reset()
     {
         Interlocked.Exchange(ref _select, 0);
@@ -32,6 +43,7 @@ public sealed class CommandCountingInterceptor : DbCommandInterceptor
         Interlocked.Exchange(ref _insert, 0);
         Interlocked.Exchange(ref _delete, 0);
         Interlocked.Exchange(ref _other, 0);
+        _byText.Clear();
     }
 
     public override InterceptionResult<DbDataReader> ReaderExecuting(
@@ -93,6 +105,11 @@ public sealed class CommandCountingInterceptor : DbCommandInterceptor
 
     private void Tally(string sql)
     {
+        if (CaptureSql)
+        {
+            _byText.AddOrUpdate(NormalizeSql(sql), 1L, static (_, v) => v + 1L);
+        }
+
         // Skip whitespace + common EF comment prefixes (-- ...\n) to find the verb.
         var i = 0;
         while (i < sql.Length)
@@ -142,6 +159,53 @@ public sealed class CommandCountingInterceptor : DbCommandInterceptor
         {
             Interlocked.Increment(ref _other);
         }
+    }
+
+    /// <summary>
+    /// Collapse whitespace runs and strip EF-style comments / SET LOCAL prefixes so functionally
+    /// equivalent queries hash to the same key. Parameters are already $1/@p form in the
+    /// captured text, so no value stripping is needed.
+    /// </summary>
+    private static string NormalizeSql(string sql)
+    {
+        var sb = new System.Text.StringBuilder(sql.Length);
+        var lastWhitespace = false;
+        var i = 0;
+        while (i < sql.Length)
+        {
+            var c = sql[i];
+
+            // Skip line-comments through the surrounding newline.
+            if (c == '-' && i + 1 < sql.Length && sql[i + 1] == '-')
+            {
+                var newline = sql.IndexOf('\n', i);
+                i = newline < 0 ? sql.Length : newline + 1;
+                continue;
+            }
+
+            if (char.IsWhiteSpace(c))
+            {
+                if (!lastWhitespace && sb.Length > 0)
+                {
+                    sb.Append(' ');
+                    lastWhitespace = true;
+                }
+
+                i++;
+                continue;
+            }
+
+            sb.Append(c);
+            lastWhitespace = false;
+            i++;
+        }
+
+        if (sb.Length > 0 && sb[^1] == ' ')
+        {
+            sb.Length--;
+        }
+
+        return sb.ToString();
     }
 
     private static bool StartsWith(string sql, int offset, string verb)

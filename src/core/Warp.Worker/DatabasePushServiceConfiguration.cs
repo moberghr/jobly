@@ -39,6 +39,32 @@ public static class DatabasePushServiceConfiguration
         configure?.Invoke(options);
         builder.Services.AddSingleton(options);
 
+        // When push is enabled, signal-driven server tasks (MessageRouter, Orchestrator)
+        // don't need a tight polling cadence — push wakes them immediately, polling is the
+        // backstop. Bump still-at-default intervals so idle bookkeeping doesn't dominate.
+        // Explicit override wins: set MessageRoutingInterval/OrchestrationInterval AFTER
+        // UseDatabasePush() if a tighter cadence is desired.
+        if (builder is WarpWorkerConfiguration workerConfig)
+        {
+            if (workerConfig.MessageRoutingInterval == TimeSpan.FromSeconds(1))
+            {
+                workerConfig.MessageRoutingInterval = TimeSpan.FromSeconds(30);
+            }
+
+            if (workerConfig.OrchestrationInterval == TimeSpan.FromSeconds(10))
+            {
+                workerConfig.OrchestrationInterval = TimeSpan.FromMinutes(1);
+            }
+
+            // The dispatcher's polling-backoff ceiling. With push wired up, polling is just
+            // the silent-transport-failure safety net — 30s is far tighter than necessary.
+            // 5min still meets PushFailurePollingBackstop's contract (max ~3× polling).
+            if (workerConfig.MaxPollingInterval == TimeSpan.FromSeconds(30))
+            {
+                workerConfig.MaxPollingInterval = TimeSpan.FromMinutes(5);
+            }
+        }
+
         // Replace the default NullNotificationTransport with the provider-specific one.
         // RemoveAll is required because the null transport was added via TryAddSingleton in AddWarp.
         builder.Services.RemoveAll<IWarpNotificationTransport>();

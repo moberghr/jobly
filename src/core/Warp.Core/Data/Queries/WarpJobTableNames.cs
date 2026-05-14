@@ -66,6 +66,26 @@ public sealed class WarpJobTableNames
 
     public required string ParentSpanId { get; init; }
 
+    public required string ServerId { get; init; }
+
+    public required string ServerLastHeartbeatTime { get; init; }
+
+    public required string ServerMemoryWorkingSetBytes { get; init; }
+
+    public required string ServerCpuUsagePercent { get; init; }
+
+    public required string ServerPausedAt { get; init; }
+
+    public string? WorkerGroupSchema { get; init; }
+
+    public required string WorkerGroupTable { get; init; }
+
+    public required string WorkerGroupId { get; init; }
+
+    public required string WorkerGroupServerId { get; init; }
+
+    public required string WorkerGroupPausedAt { get; init; }
+
     public static WarpJobTableNames FromModel(IModel model)
     {
         var entity = model.FindEntityType(typeof(Job))
@@ -73,6 +93,9 @@ public sealed class WarpJobTableNames
 
         var serverEntity = model.FindEntityType(typeof(Server))
             ?? throw new InvalidOperationException("Server entity not registered in the DbContext model.");
+
+        var groupEntity = model.FindEntityType(typeof(WorkerGroup))
+            ?? throw new InvalidOperationException("WorkerGroup entity not registered in the DbContext model.");
 
         string Col(string propertyName)
         {
@@ -83,6 +106,24 @@ public sealed class WarpJobTableNames
                 ?? throw new InvalidOperationException($"Job.{propertyName} has no resolved column name.");
         }
 
+        string ServerCol(string propertyName)
+        {
+            var prop = serverEntity.FindProperty(propertyName)
+                ?? throw new InvalidOperationException($"Server.{propertyName} property not found in model.");
+
+            return prop.GetColumnName()
+                ?? throw new InvalidOperationException($"Server.{propertyName} has no resolved column name.");
+        }
+
+        string GroupCol(string propertyName)
+        {
+            var prop = groupEntity.FindProperty(propertyName)
+                ?? throw new InvalidOperationException($"WorkerGroup.{propertyName} property not found in model.");
+
+            return prop.GetColumnName()
+                ?? throw new InvalidOperationException($"WorkerGroup.{propertyName} has no resolved column name.");
+        }
+
         return new WarpJobTableNames
         {
             Schema = entity.GetSchema(),
@@ -91,6 +132,17 @@ public sealed class WarpJobTableNames
             ServerSchema = serverEntity.GetSchema(),
             ServerTable = serverEntity.GetTableName()
                 ?? throw new InvalidOperationException("Server entity has no resolved table name."),
+            ServerId = ServerCol(nameof(Server.Id)),
+            ServerLastHeartbeatTime = ServerCol(nameof(Server.LastHeartbeatTime)),
+            ServerMemoryWorkingSetBytes = ServerCol(nameof(Server.MemoryWorkingSetBytes)),
+            ServerCpuUsagePercent = ServerCol(nameof(Server.CpuUsagePercent)),
+            ServerPausedAt = ServerCol(nameof(Server.PausedAt)),
+            WorkerGroupSchema = groupEntity.GetSchema(),
+            WorkerGroupTable = groupEntity.GetTableName()
+                ?? throw new InvalidOperationException("WorkerGroup entity has no resolved table name."),
+            WorkerGroupId = GroupCol(nameof(WorkerGroup.Id)),
+            WorkerGroupServerId = GroupCol(nameof(WorkerGroup.ServerId)),
+            WorkerGroupPausedAt = GroupCol(nameof(WorkerGroup.PausedAt)),
             Id = Col(nameof(Job.Id)),
             Kind = Col(nameof(Job.Kind)),
             Type = Col(nameof(Job.Type)),

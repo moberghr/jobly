@@ -3,6 +3,7 @@ using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
 using Warp.Core.Models;
+using Warp.Core.Notifications;
 
 namespace Warp.Core.Services;
 
@@ -28,11 +29,13 @@ public class RecurringJobService<TContext> : IRecurringJobService
 {
     private readonly TContext _context;
     private readonly TimeProvider _timeProvider;
+    private readonly IWarpNotificationTransport _notificationTransport;
 
-    public RecurringJobService(TContext context, TimeProvider timeProvider)
+    public RecurringJobService(TContext context, TimeProvider timeProvider, IWarpNotificationTransport notificationTransport)
     {
         _context = context;
         _timeProvider = timeProvider;
+        _notificationTransport = notificationTransport;
     }
 
     public async Task<PagedList<RecurringJobModel>> GetRecurringJobs(BaseListRequest request)
@@ -121,7 +124,10 @@ public class RecurringJobService<TContext> : IRecurringJobService
             JobId = job.Id,
             CreatedAt = now,
         });
+
+        var pending = NotificationDispatch.CapturePending(_context);
         await _context.SaveChangesAsync();
+        await NotificationDispatch.FireAsync(_notificationTransport, pending);
     }
 
     public async Task DeleteRecurringJob(int id)

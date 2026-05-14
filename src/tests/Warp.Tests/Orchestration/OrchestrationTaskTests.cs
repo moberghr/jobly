@@ -165,6 +165,51 @@ public abstract class OrchestrationTaskTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
+    public async Task RunOrchestration_BatchOnlyFailedChild_OnlyOnSucceeded_BatchFails()
+    {
+        // Regression guard for the two-step fetch in FinalizeParentsAsync. The sibling
+        // test (BatchWithFailedChild_OnlyOnSucceeded_BatchFails) seeds one Completed AND
+        // one Failed child — readyParents is non-empty regardless of whether the second
+        // query that populates failedParentIdSet works. This variant seeds ONLY a Failed
+        // child, so the parent depends on the failedParentIdSet lookup to be marked
+        // Failed. A bug that returns an empty set from the second query would silently
+        // promote this parent to Completed instead.
+        var ctx = _fixture.CreateContext();
+        var batchId = Guid.NewGuid();
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = batchId,
+            Kind = JobKind.Batch,
+            CurrentState = State.Awaiting,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            JobCount = 1,
+            ContinuationOptions = ContinuationOptions.OnlyOnSucceeded,
+        });
+
+        ctx.Set<Job>().Add(new Job
+        {
+            Id = Guid.NewGuid(),
+            Kind = JobKind.Job,
+            CurrentState = State.Failed,
+            CreateTime = DateTime.UtcNow,
+            ScheduleTime = DateTime.UtcNow,
+            Queue = "default",
+            ParentJobId = batchId,
+        });
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        var orchCtx = _fixture.CreateContext();
+        await Warp.Tests.Helpers.TestTasks.CreateOrchestrator(orchCtx, TimeProvider.System, TimeSpan.FromDays(1)).RunOrchestrationCoreAsync(CancellationToken.None);
+
+        var readCtx = _fixture.CreateContext();
+        var batch = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == batchId, Xunit.TestContext.Current.CancellationToken);
+        batch.ShouldNotBeNull();
+        batch.CurrentState.ShouldBe(State.Failed);
+    }
+
+    [TimedFact]
     public async Task RunOrchestration_BatchWithFailedChild_OnAnyFinished_BatchCompletes()
     {
         // Arrange

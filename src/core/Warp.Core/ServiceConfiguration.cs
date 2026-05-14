@@ -59,7 +59,7 @@ public static class ServiceConfiguration
         services.AddScoped<IJobQueryService>(x => new JobQueryService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
         services.AddScoped<IJobCommandService>(x => new JobCommandService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IOptions<WarpConfiguration>>(), x.GetRequiredService<IWarpNotificationTransport>(), x.GetRequiredService<IWarpSqlQueries<TContext>>()));
         services.AddScoped<IJobGroupQueryService>(x => new JobGroupQueryService<TContext>(x.GetRequiredService<TContext>()));
-        services.AddScoped<IRecurringJobService>(x => new RecurringJobService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
+        services.AddScoped<IRecurringJobService>(x => new RecurringJobService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IWarpNotificationTransport>()));
         services.AddScoped<IDashboardStatsService>(x => new DashboardStatsService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
         services.AddScoped<IServerCommandService>(x => new ServerCommandService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
         services.AddScoped<IBatchPublisher>(x => new BatchPublisher<TContext>(

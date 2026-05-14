@@ -129,19 +129,31 @@ public static class TestTasks
             context,
             timeProvider,
             transport ?? NullTransport,
-            Options.Create(new WarpWorkerConfiguration()));
+            Options.Create(new WarpWorkerConfiguration()),
+            QueriesFor(context));
     }
 
     public static Orchestrator<TContext> CreateOrchestrator<TContext>(
         TContext context,
         TimeProvider timeProvider,
-        TimeSpan jobExpirationTimeout)
+        TimeSpan jobExpirationTimeout,
+        int? serverTaskBatchSize = null)
         where TContext : DbContext
     {
+        var configuration = new WarpWorkerConfiguration
+        {
+            JobExpirationTimeout = jobExpirationTimeout,
+        };
+
+        if (serverTaskBatchSize.HasValue)
+        {
+            configuration.ServerTaskBatchSize = serverTaskBatchSize.Value;
+        }
+
         return new Orchestrator<TContext>(
             context,
             timeProvider,
-            Options.Create(new WarpWorkerConfiguration { JobExpirationTimeout = jobExpirationTimeout }));
+            Options.Create(configuration));
     }
 
     public static RecurringJobScheduler<TContext> CreateRecurringJobScheduler<TContext>(

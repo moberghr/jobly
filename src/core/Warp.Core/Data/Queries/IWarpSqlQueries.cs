@@ -65,4 +65,60 @@ public interface IWarpSqlQueries<TContext>
     /// delete a server that just sent a fresh heartbeat.
     /// </summary>
     Task<List<Server>> LockAllServersAsync(TContext context, CancellationToken ct);
+
+    /// <summary>
+    /// Atomic heartbeat: updates <c>last_heartbeat_time</c> / memory / CPU on the server row
+    /// AND returns the server's <c>paused_at</c> alongside every worker group's
+    /// <c>(id, paused_at)</c> for this server — all in a single round-trip. Replaces three
+    /// separate queries (UPDATE + paused_at SELECT + worker_group SELECT) and saves two DB
+    /// hops per heartbeat tick (every 3s by default).
+    /// <para>
+    /// <paramref name="memoryBytes"/> / <paramref name="cpuPercent"/> are nullable — the SQL keeps the
+    /// existing column value when either is null (COALESCE / ISNULL). Returns <c>null</c> when
+    /// the server row doesn't exist; caller treats this as the "server was cleaned up" signal.
+    /// </para>
+    /// </summary>
+    Task<HeartbeatResult?> HeartbeatAsync(
+        TContext context,
+        Guid serverId,
+        DateTime now,
+        long? memoryBytes,
+        double? cpuPercent,
+        CancellationToken ct);
+
+    /// <summary>
+    /// Atomic activation of due scheduled jobs: flips <c>State.Scheduled</c> rows whose
+    /// <c>ScheduleTime</c> has elapsed to <c>State.Enqueued</c> and RETURNS the queue of each
+    /// activated row. Caller deduplicates to fire one <c>JobEnqueued</c> notification per
+    /// distinct queue. Replaces a separate SELECT DISTINCT + UPDATE and saves one DB hop per
+    /// ScheduledJobActivation tick (every 5s by default).
+    /// </summary>
+    Task<List<string>> ActivateScheduledJobsAsync(
+        TContext context,
+        DateTime now,
+        CancellationToken ct);
+
+    /// <summary>
+    /// Runs <paramref name="work"/> inside a transaction under a transaction-scoped advisory
+    /// lock keyed by <paramref name="lockKey"/>. PG uses <c>pg_try_advisory_xact_lock</c>; SQL
+    /// Server uses <c>sp_getapplock</c> with <c>@LockOwner='Transaction'</c>. The lock auto-
+    /// releases on COMMIT/ROLLBACK so the implementation doesn't need a separate release call —
+    /// 3 round-trips collapse into 1 transaction.
+    /// <para>
+    /// Returns <c>(true, result)</c> when the lock was acquired and the work committed.
+    /// Returns <c>(false, default)</c> when another caller already holds the lock — in that
+    /// case the transaction is rolled back and no side effects persist. If the work delegate
+    /// throws, the transaction is rolled back and the exception propagates.
+    /// </para>
+    /// <para>
+    /// The work delegate receives the same <paramref name="context"/> — its
+    /// <c>SaveChangesAsync</c> calls join the outer transaction transparently. Do not call
+    /// <c>BeginTransactionAsync</c> from inside the delegate.
+    /// </para>
+    /// </summary>
+    Task<(bool LockHeld, T? Result)> RunUnderTransactionLockAsync<T>(
+        TContext context,
+        string lockKey,
+        Func<TContext, CancellationToken, Task<T>> work,
+        CancellationToken ct);
 }
