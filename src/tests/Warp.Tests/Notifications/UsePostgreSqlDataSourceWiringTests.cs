@@ -29,7 +29,7 @@ public class UsePostgreSqlDataSourceWiringTests
 
         services.AddWarpWorker<TestContext>(opt => opt.UsePostgreSql());
 
-        using var sp = services.BuildServiceProvider();
+        using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var factory = sp.GetRequiredService<IWarpNotificationTransportFactory>();
 
         var transport = factory.Create(
@@ -48,7 +48,7 @@ public class UsePostgreSqlDataSourceWiringTests
 
         services.AddWarpWorker<TestContext>(opt => opt.UsePostgreSql());
 
-        using var sp = services.BuildServiceProvider();
+        using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var factory = sp.GetRequiredService<IWarpNotificationTransportFactory>();
 
         var transport = factory.Create(
@@ -78,7 +78,7 @@ public class UsePostgreSqlDataSourceWiringTests
             opt.UseDatabasePush();
         });
 
-        using var sp = services.BuildServiceProvider();
+        using var sp = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         var transport = sp.GetRequiredService<IWarpNotificationTransport>();
 
         ReadDataSource(transport).ShouldBeSameAs(dataSource);

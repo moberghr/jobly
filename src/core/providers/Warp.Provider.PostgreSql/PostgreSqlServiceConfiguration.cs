@@ -73,8 +73,11 @@ public static class PostgreSqlServiceConfiguration
     private static NpgsqlDataSource? ResolveDataSource<TContext>(IServiceProvider sp)
         where TContext : DbContext
     {
-        // DbContextOptions<TContext> is registered as a singleton by AddDbContext — no scope needed.
-        var dbOptions = sp.GetRequiredService<DbContextOptions<TContext>>();
+        // AddDbContext registers DbContextOptions<TContext> as Scoped (only AddDbContextPool
+        // makes it Singleton), so we have to resolve it through a scope — otherwise providers
+        // built with ValidateScopes=true reject the resolution from the root provider.
+        using var scope = sp.CreateScope();
+        var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<TContext>>();
 
         // EF1001: NpgsqlOptionsExtension is in an Infrastructure.Internal namespace, but it's the
         // documented extension point exposing the DataSource bound to a DbContext — there is no
