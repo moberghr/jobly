@@ -45,11 +45,34 @@ public sealed class MessageRouter<TContext> : IServerTask
 
     public string Name => "MessageRouting";
 
+    // Distributed advisory lock serializes routing across servers. This is necessary for
+    // correctness, not just optimisation: the Job entity has no concurrency token, and
+    // `LockNextEnqueuedMessageAsync`'s `FOR NO KEY UPDATE SKIP LOCKED` releases the row
+    // lock at statement end since this loop doesn't wrap each iteration in a transaction.
+    // Without the advisory lock, two servers could load the same message row, both
+    // discover handlers, and both insert duplicate child Job rows — handlers would fire
+    // twice per message.
+    // <para>
+    // For high-volume multi-server message routing this becomes a throughput ceiling
+    // (only one server routes at a time). The right scaling fix is an atomic
+    // UPDATE-RETURNING claim like <c>WarpDispatcher.ClaimEnqueuedJobsAsync</c> plus
+    // stale-message recovery. Tracked as a follow-up.
+    // </para>
     public string? LockKey => "warp:message-routing";
 
     public TimeSpan? DefaultInterval => _configuration.MessageRoutingInterval;
 
     public IEnumerable<ServerTaskSignal> Signals => [ServerTaskSignal.MessageEnqueued];
+
+    // Hard requirement, not stylistic. RunMessageRoutingAsync commits once per message
+    // (SaveChangesAsync inside the for-loop), so a single ExecuteAsync call produces
+    // multiple distinct transactions. The xact-lock model wraps the entire ExecuteAsync
+    // in ONE transaction — folding this task into that path would prevent intermediate
+    // commits and either deadlock or batch all routed messages into a single mega-tx
+    // (defeating the point of per-message visibility for retry / failure isolation).
+    // The Medallion session-scoped lock (selected by LockKey above + this flag = false)
+    // is what allows multi-iteration commits inside one held lock.
+    public bool LocksWithTransaction => false;
 
     public async Task<string?> ExecuteAsync(CancellationToken ct)
     {
@@ -61,8 +84,14 @@ public sealed class MessageRouter<TContext> : IServerTask
     internal async Task<int> RunMessageRoutingAsync(CancellationToken ct)
     {
         var totalRouted = 0;
+        var batchSize = _configuration.ServerTaskBatchSize;
 
-        while (true)
+        // Bound the per-call loop: if there's a backlog of N >> batchSize messages, we
+        // process up to batchSize then return. ServerTaskLoop's RerunImmediately = true
+        // re-ticks us instantly so the backlog still drains, but each iteration is short
+        // enough for cancellation to propagate and other servers (with the lock dropped
+        // here) can pick up rows we haven't reached yet.
+        for (var i = 0; i < batchSize; i++)
         {
             var message = await _sqlQueries.LockNextEnqueuedMessageAsync(_context, ct);
 

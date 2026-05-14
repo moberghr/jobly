@@ -10,6 +10,20 @@ sidebar_position: 6
 
 Adds opt-in handler-reported progress bars on the dashboard. Handlers call `IJobContext.ReportProgress(name, percent)` to surface per-bar progress on the job detail page; the value persists as `JobLog` rows tagged `EventType = "Progress"` and is decoupled from the job state machine.
 
+Also lands a major idle-query-rate reduction for the server-task path. With `UseDispatcher = true` + `UseDatabasePush()` and default intervals, idle query rate drops from ~10–15 q/s to ~1.2 q/s (~92% reduction) — measured by `Warp.PerfTest --mode idle` against PG with an `ActivityListener` on the Npgsql source. See [perf-results.md](https://github.com/moberghr/warp/blob/main/docs/perf-results.md#idle-queries-per-second-server-task-overhead) for the full matrix.
+
+### Breaking: server-task default changes
+
+The query-rate work changes three defaults. Most users won't notice — the bookkeeping these defaults gate is internal — but anyone tuning intervals or implementing custom `IServerTask`s should review:
+
+- **`IServerTask.LocksWithTransaction` defaults to `true`.** Server tasks now serialize via xact-scoped advisory locks (`pg_try_advisory_xact_lock` / `sp_getapplock` with `@LockOwner='Transaction'`) — auto-released on commit/rollback rather than held via a session-scoped Medallion lock. Cuts the per-iteration lock chatter from 3 round-trips (acquire/release + work) to 1 fold. Custom server tasks that need the **session-scoped** Medallion behaviour (e.g., tasks that span multiple transactions, or call `SaveChangesAsync` more than once per `ExecuteAsync`) must opt out by overriding `LocksWithTransaction => false`. `MessageRouter` does this — it commits once per routed message.
+- **`CounterAggregationInterval` defaults to `60s`** (was `5s`). Counter rows are still written immediately by hot paths; only the aggregation roll-up cadence is relaxed. Dashboard `Statistic` cards will be at most 1 min stale instead of 5 s. If you rely on fresh aggregated counters, set it back: `opt.CounterAggregationInterval = TimeSpan.FromSeconds(5);`.
+- **`MaxPollingInterval` auto-bumps to 5 min when `UseDatabasePush()` is called and the value is still at its default.** Push notifications cover work activation; the long polling fallback exists only to backstop missed notifications, which the listener already drains on reconnect. Explicit overrides on `opt.MaxPollingInterval` are respected — the auto-bump only fires when the value is still the class default. `MessageRoutingInterval` and `OrchestrationInterval` follow the same pattern.
+
+### New: bounded server-task batching
+
+Orchestrator, MessageRouter, ScheduledJobActivation, and StaleJobRecovery now bound their per-iteration work via `WarpWorkerConfiguration.ServerTaskBatchSize` (default `100`). This prevents a single iteration from churning through a multi-thousand-row backlog while holding the orchestration lock; subsequent iterations drain the remainder via `RerunImmediately = true`. Tune up if you've sized your DB to swallow larger batches.
+
 ### New: `IJobContext.ReportProgress(name, percent)`
 
 ```csharp

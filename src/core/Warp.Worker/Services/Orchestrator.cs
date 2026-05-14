@@ -62,6 +62,9 @@ public sealed class Orchestrator<TContext> : IServerTask
 
     private async Task<int> FinalizeParentsAsync(TimeSpan jobExpirationTimeout, CancellationToken ct)
     {
+        // Bound the candidate set so one iteration can't churn through tens of thousands of
+        // parents while holding the orchestration lock. RerunImmediately = true means the
+        // outer loop re-ticks instantly, and the next iteration sees the remaining rows.
         var readyParents = await _context.Set<Job>()
             .Where(p => (p.Kind == JobKind.Message || p.Kind == JobKind.Batch)
                 && (p.CurrentState == State.Awaiting || p.CurrentState == State.Processing))
@@ -72,6 +75,7 @@ public sealed class Orchestrator<TContext> : IServerTask
             .Where(p => _context.Set<Job>()
                 .Any(c => c.ParentJobId == p.Id && c.Kind == JobKind.Job
                     && (c.CurrentState == State.Completed || c.CurrentState == State.Failed)))
+            .Take(_configuration.ServerTaskBatchSize)
             .ToListAsync(ct);
 
         if (readyParents.Count == 0)
@@ -79,14 +83,25 @@ public sealed class Orchestrator<TContext> : IServerTask
             return 0;
         }
 
+        // Two-step fetch (§5.2): a single follow-up query collects every parent id that
+        // owns at least one failed child, instead of an `_context.Set<Job>().Any(...)`
+        // subquery inside the Select projection (which EF Core has translated unreliably
+        // across versions). Folds what used to be a per-parent N+1 of AnyAsync calls into
+        // one round-trip without breaking the projection rule.
+        var parentIds = readyParents.ConvertAll(p => p.Id);
+        var parentIdsWithFailedChild = await _context.Set<Job>()
+            .Where(c => c.Kind == JobKind.Job && c.CurrentState == State.Failed)
+            .Where(c => c.ParentJobId != null && parentIds.Contains(c.ParentJobId.Value))
+            .Select(c => c.ParentJobId!.Value)
+            .Distinct()
+            .ToListAsync(ct);
+        var failedParentIdSet = parentIdsWithFailedChild.ToHashSet();
+
         var now = _time.GetUtcNow().UtcDateTime;
         foreach (var parent in readyParents)
         {
             var continuationOptions = parent.ContinuationOptions ?? ContinuationOptions.OnlyOnSucceeded;
-
-            var hasFailedChildren = await _context.Set<Job>()
-                .Where(c => c.ParentJobId == parent.Id && c.Kind == JobKind.Job && c.CurrentState == State.Failed)
-                .AnyAsync(ct);
+            var hasFailedChildren = failedParentIdSet.Contains(parent.Id);
 
             if (hasFailedChildren && continuationOptions != ContinuationOptions.OnAnyFinishedState)
             {
@@ -114,6 +129,7 @@ public sealed class Orchestrator<TContext> : IServerTask
                 p.Id == c.ParentJobId
                 && (p.CurrentState == State.Completed
                     || (p.CurrentState == State.Failed && p.ContinuationOptions == ContinuationOptions.OnAnyFinishedState))))
+            .Take(_configuration.ServerTaskBatchSize)
             .ToListAsync(ct);
 
         if (awaitingChildren.Count == 0)
@@ -154,6 +170,7 @@ public sealed class Orchestrator<TContext> : IServerTask
             .Where(c => c.CurrentState == State.Awaiting && c.ParentJobId != null)
             .Where(c => _context.Set<Job>().Any(p =>
                 p.Id == c.ParentJobId && p.CurrentState == State.Deleted))
+            .Take(_configuration.ServerTaskBatchSize)
             .ToListAsync(ct);
 
         if (orphaned.Count == 0)

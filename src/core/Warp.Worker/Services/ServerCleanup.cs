@@ -51,7 +51,14 @@ public sealed class ServerCleanup<TContext> : IServerTask
         var now = _time.GetUtcNow().UtcDateTime;
         var removedCount = 0;
 
-        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+        // FOR NO KEY UPDATE requires a wrapping transaction to keep the row lock alive
+        // past the SELECT. ServerTaskLoop's xact-lock provides it on the production hot
+        // path, but direct callers (tests, admin) don't get the wrap — open one then.
+        var hasOuterTx = _context.Database.CurrentTransaction != null;
+        await using var ownedTx = hasOuterTx
+            ? null
+            : await _context.Database.BeginTransactionAsync(ct);
+
         var servers = await _sqlQueries.LockAllServersAsync(_context, ct);
         foreach (var server in servers)
         {
@@ -79,7 +86,10 @@ public sealed class ServerCleanup<TContext> : IServerTask
         }
 
         await _context.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
+        if (ownedTx != null)
+        {
+            await ownedTx.CommitAsync(ct);
+        }
 
         return removedCount;
     }
