@@ -40,6 +40,24 @@ internal static class SharedPostgreSqlContainer
         return new NpgsqlConnectionStringBuilder(adminConn) { Database = databaseName }.ConnectionString;
     }
 
+    // Sibling to CreateDatabaseAsync — releases the per-fixture database when the class
+    // fixture is disposed. DROP DATABASE WITH (FORCE) (PG 13+) terminates any sessions still
+    // connected to it, which is what reclaims connections back to the testcontainer's
+    // max_connections budget. Without this every fixture leaks its full MaxPoolSize=50 quota
+    // server-side until the test process exits — see PostgreSqlClassFixture.DisposeAsync.
+    public static async Task DropDatabaseAsync(string databaseName, CancellationToken ct)
+    {
+        var adminConn = await EnsureContainerAsync(ct);
+
+        await using var conn = new NpgsqlConnection(adminConn);
+        await conn.OpenAsync(ct);
+
+        await using var cmd = new NpgsqlCommand(
+            $"DROP DATABASE IF EXISTS \"{databaseName}\" WITH (FORCE)",
+            conn);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
     private static async Task<string> EnsureContainerAsync(CancellationToken ct)
     {
         if (_adminConnectionString != null)

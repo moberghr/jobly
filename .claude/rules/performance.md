@@ -1,0 +1,10 @@
+# Performance
+
+- **§6.1** The worker fetch/execute hot path is sacred. **NEVER add logic** to `WarpWorkerService` (single-worker mode) or `WarpDispatcher` / `WarpDispatcherWorker` (dispatcher mode) beyond fetch, execute, signal. New orchestration belongs in an `IServerTask` implementation (§2.3).
+- **§6.2** Statistics use Counter rows (write-optimised) aggregated into Statistic rows by `CounterAggregator`. **Never** update `Statistic` rows directly from hot paths — write to `Counter` and let the aggregator collapse them.
+- **§6.3** Signal-driven wake-up for background tasks. `ServerTaskSignals<TContext>.SignalJobFinalized` wakes `Orchestrator`; `SignalMessageEnqueued` wakes `MessageRouter`. **Don't reduce poll intervals** as a performance hack — register a signal instead.
+- **§6.4** Select only the columns you need. Use `.Select()` projections for read paths — never load full entities for read-only display.
+- **§6.5** Avoid initializing collections inside loops.
+- **§6.6** No premature optimization. Measure before optimizing. The `src/benchmarks/` projects (`Warp.Benchmarks`, `Warp.PerfTest`, `Warp.ServerBenchmarks`) exist for this — use them.
+- **§6.7** Default `WorkerCount = Math.Min(Environment.ProcessorCount * 5, 20)`. Workers can be split into groups with independent queues and polling intervals via `opt.AddWorkerGroup()`.
+- **§6.8** Pause/Resume is **not instantaneous** — `PauseServer`/`PauseWorkerGroup` writes `PausedAt`; each server's worker pool keeps fetching until that server's next `Heartbeat` tick refreshes the holder (cadence `HealthCheckInterval`, default 3s), and an in-flight worker iteration that already passed its pause check completes its current claim. Treat pause as "no new fetches after up to one heartbeat", not as a synchronous barrier.

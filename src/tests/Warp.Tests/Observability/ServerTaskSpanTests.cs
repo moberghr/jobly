@@ -17,7 +17,7 @@ public abstract class ServerTaskSpanTestsBase : IntegrationTestBase
     {
     }
 
-    [TimedFact(15_000)]
+    [TimedFact]
     public async Task GivenRunningServer_WhenLoopIterates_ThenServerTaskSpansAreEmitted()
     {
         using var harness = new ActivityListenerHarness();
@@ -60,7 +60,7 @@ public abstract class ServerTaskSpanTestsBase : IntegrationTestBase
         }
     }
 
-    [TimedFact(15_000)]
+    [TimedFact]
     public async Task GivenThrowingServerTask_WhenLoopIterates_ThenSpanRecordsErrorTypeAndStatusError()
     {
         using var harness = new ActivityListenerHarness();

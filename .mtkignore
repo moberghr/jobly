@@ -1,0 +1,17 @@
+# MTK scan exclusions — single source of truth for audit / repomap.
+# Same syntax as .gitignore. Committed so the team shares one set.
+
+graphify-out/
+docs/translations/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.cursor/
+.windsurfrules
+.clinerules
+.github/copilot-instructions.md
+bin/
+obj/
+node_modules/
+src/ui/dist/
+src/ui/node_modules/

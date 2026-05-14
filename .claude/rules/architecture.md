@@ -1,0 +1,30 @@
+# Architecture Patterns
+
+## Unified Data Model
+
+- **§2.1** Everything is a **Job** with a `Kind` discriminator (`Job=1, Message=2, Batch=3`). No separate Message/Batch tables. `ParentJobId` chain handles all parent-child relationships. Messages spawn N child jobs; Batches group children. Continuations chain via `ParentJobId` to a single parent.
+
+## Worker / Server-Task Split
+
+- **§2.2** Workers are **pure executors**. They only fetch and execute `Kind=Job` jobs. Never add orchestration, routing, parent/child finalization, or cross-cutting logic to `WarpWorkerService` or its dispatcher counterparts (`WarpDispatcher`, `WarpDispatcherWorker`).
+- **§2.3** Every background task implements `IServerTask` (`Name`, `LockKey`, `DefaultInterval`, `ExecuteAsync`) and is registered as scoped. `ServerTaskHost<TContext>` resolves one per iteration, takes the distributed lock if `LockKey != null`, runs `ExecuteAsync`, and writes `ServerTask` / `ServerLog` rows. Active tasks: `Heartbeat`, `CounterAggregator`, `ServerCleanup`, `StaleJobRecovery`, `ExpirationCleanup`, `RecurringJobScheduler`, `ScheduledJobActivation`, `MessageRouter`, `Orchestrator`, `NotificationListenerTask` (when DB push is enabled).
+- **§2.4** Services expose interfaces (`IJobCommandService`, `IJobQueryService`, `IRecurringJobService`, `IDashboardStatsService`, etc.). Generic implementations take `TContext : DbContext`. Inject the specific interface — **never inject `IServiceProvider`** (use `IServiceScopeFactory` when you genuinely need scope creation).
+- **§2.5** `AddWarp<TContext>()` / `AddWarpWorker<TContext>()` auto-configure the user's DbContext (row-lock interceptors, model customizer, `TimeProvider.System` via `TryAddSingleton`, `IWarpLockProvider`). Users register their DbContext normally. The builder inherits from `WarpConfiguration` / `WarpWorkerConfiguration`, so config fields (`WorkerCount`, `PollingInterval`, `DefaultQueue`, etc.) are set directly on `opt`.
+
+## In-Memory Requests & Streams
+
+- **§2.6** In-memory `IRequest<TResponse>` goes through `IMediator.Send()` — same `IPipelineBehavior` pipeline as jobs/messages, but no DB persistence. Returns `TResponse` synchronously.
+- **§2.7** `IStreamRequest<TResponse>` extends `IRequest<IAsyncEnumerable<TResponse>>` and goes through `IMediator.CreateStream()`. Request-level `IPipelineBehavior` applies automatically; enumeration-level concerns use `IStreamPipelineBehavior<TRequest, TResponse>`. No DB persistence.
+
+## Scheduling & DB Push
+
+- **§2.8** Future-dated jobs land in `State.Scheduled`. `ScheduledJobActivation` flips them to `Enqueued` when `ScheduleTime <= now`. Cadence is `WarpWorkerConfiguration.ScheduledActivationInterval` (default 5s) — this is the worst-case latency between `ScheduleTime` and pickup eligibility. The task is time-driven and does **not** participate in DB-push wake-up; push only accelerates what happens *after* activation. Worker fetch queries always filter by `CurrentState == Enqueued` with a defensive `ScheduleTime <= now` predicate for pre-upgrade legacy rows. Adding new query sites that filter on `Enqueued` without the time predicate is a latent bug on upgraded deployments.
+- **§2.9** DB push is an opt-in addon. `opt.UseDatabasePush()` replaces the default `NullNotificationTransport` with a provider-specific one (Postgres LISTEN/NOTIFY or SQL Server Service Broker) and registers `NotificationListenerTask`. The transport is resolved via `IWarpNotificationTransportFactory`, registered by the provider package (`opt.UsePostgreSql()` / `opt.UseSqlServer()`) — **call the provider first, push second**. Worker-fetch push only fires when `UseDispatcher = true` (individual-worker mode has a thundering-herd problem and stays on polling). Transports must not throw from `PublishAsync` — they log + increment `WarpTelemetry.NotificationPublishFailures` instead. Missed notifications are caught by drain-on-reconnect in the listener.
+- **§2.10** Realtime dashboard push is an opt-in addon. `opt.AddDashboardPush()` registers a `WarpDashboardHub` (SignalR) at `${RoutePrefix}/api/hub` plus a `DashboardBroadcaster<TContext>` `BackgroundService` that subscribes to `ServerTaskSignals<TContext>` and broadcasts `JobFinalized` / `MessageEnqueued` events. The broadcaster is the **third** consumer of the signal pipe (after `Orchestrator` and `MessageRouter`). Per-view data (filtered job lists, job detail, logs) is **not** pushed — those surfaces stay on event-driven REST refetch. Multi-server fanout reuses §2.9; without `UseDatabasePush()`, push is single-server only. Frontend probes `${RoutePrefix}/api/dashboard/push/probe` and falls back to 30s polling if the addon is absent.
+
+## Addon Composition
+
+- **§2.11** Addons are opt-in via builder methods: `opt.AddRetry()`, `opt.AddConcurrency()`, `opt.AddRateLimit()`, `opt.AddCircuitBreaker()`, `opt.AddNoRestart()`, `opt.AddTimeout()`, `opt.UseDatabasePush()`, `opt.AddDashboardPush()`. Addons compose against Core's public API only — **never use `InternalsVisibleTo` to reach into Core internals**.
+- **§2.12** Pipeline ordering matters (DI insertion order = outer → inner):
+  - `AddRetry()` MUST come **before** `AddTimeout()` — retry's `catch (Exception)` needs to see the `TimeoutException` thrown by Timeout's `Fail` mode.
+  - `AddConcurrency()` MUST come **before** `AddRateLimit()` — preserves rate-limit tokens when the mutex rejects.
