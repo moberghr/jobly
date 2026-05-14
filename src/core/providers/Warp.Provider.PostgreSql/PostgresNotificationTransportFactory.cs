@@ -8,10 +8,6 @@ internal sealed class PostgresNotificationTransportFactory : IWarpNotificationTr
 {
     private readonly NpgsqlDataSource? _dataSource;
 
-    public PostgresNotificationTransportFactory()
-    {
-    }
-
     public PostgresNotificationTransportFactory(NpgsqlDataSource? dataSource)
     {
         _dataSource = dataSource;

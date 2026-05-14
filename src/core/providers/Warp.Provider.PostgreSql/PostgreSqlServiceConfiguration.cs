@@ -35,22 +35,14 @@ public static class PostgreSqlServiceConfiguration
             new PostgresNotificationTransportFactory(ResolveDataSource<TContext>(sp)));
 
         builder.Services.TryAddSingleton<IWarpLockProvider>(sp =>
-        {
-            var dataSource = ResolveDataSource<TContext>(sp);
-
-            return dataSource is not null
+            ResolveDataSource<TContext>(sp) is { } dataSource
                 ? new PostgresLockProvider(dataSource)
-                : new PostgresLockProvider(ResolveConnectionString<TContext>(sp));
-        });
+                : new PostgresLockProvider(ResolveConnectionString<TContext>(sp)));
 
         builder.Services.TryAddSingleton<IWarpSemaphoreProvider>(sp =>
-        {
-            var dataSource = ResolveDataSource<TContext>(sp);
-
-            return dataSource is not null
+            ResolveDataSource<TContext>(sp) is { } dataSource
                 ? new PostgresSemaphoreProvider(dataSource)
-                : new PostgresSemaphoreProvider(ResolveConnectionString<TContext>(sp));
-        });
+                : new PostgresSemaphoreProvider(ResolveConnectionString<TContext>(sp)));
 
         return builder;
     }
@@ -81,8 +73,8 @@ public static class PostgreSqlServiceConfiguration
     private static NpgsqlDataSource? ResolveDataSource<TContext>(IServiceProvider sp)
         where TContext : DbContext
     {
-        using var scope = sp.CreateScope();
-        var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<TContext>>();
+        // DbContextOptions<TContext> is registered as a singleton by AddDbContext — no scope needed.
+        var dbOptions = sp.GetRequiredService<DbContextOptions<TContext>>();
 
         // EF1001: NpgsqlOptionsExtension is in an Infrastructure.Internal namespace, but it's the
         // documented extension point exposing the DataSource bound to a DbContext — there is no
