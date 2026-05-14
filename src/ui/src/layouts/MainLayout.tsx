@@ -3,46 +3,33 @@ import axios from 'axios';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useDashboardStore } from '@/stores/dashboard';
 import { useRealtimeStore } from '@/stores/realtime';
+import { usePageStore } from '@/stores/page';
 import * as api from '@/api';
 import type { ExtensionManifest } from '@/extensions/types';
-import Navbar from '@/layouts/Navbar';
-import TopLevelNav from '@/layouts/TopLevelNav';
-import { buildNavItems } from '@/layouts/navItems';
+import WarpSidebar from '@/layouts/WarpSidebar';
+import WarpTopbar from '@/layouts/WarpTopbar';
 import MobileDrawer from '@/layouts/MobileDrawer';
-import EntityStateSidebar, { type EntityKind } from '@/components/EntityStateSidebar';
+import { buildWarpNavItems } from '@/layouts/warpNavItems';
 import { useRealtimeInvalidation } from '@/hooks/useRealtimeInvalidation';
 
-function detectEntity(pathname: string): EntityKind | null {
-  if (pathname.startsWith('/jobs')) return 'jobs';
-  if (pathname.startsWith('/batches')) return 'batches';
-  if (pathname.startsWith('/messages')) return 'messages';
-
-  return null;
-}
-
 export default function MainLayout({ extensions = [] }: { extensions?: ExtensionManifest[] }) {
-  const { stats, error, fetchStats } = useDashboardStore();
+  const { error, fetchStats } = useDashboardStore();
   const location = useLocation();
   const [concurrencyAvailable, setConcurrencyAvailable] = useState(false);
   const [rateLimitsAvailable, setRateLimitsAvailable] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  const title = usePageStore((s) => s.title);
+  const subtitle = usePageStore((s) => s.subtitle);
+  const right = usePageStore((s) => s.right);
+
   useRealtimeInvalidation();
 
-  // Initial fetch for first paint — after this, fresh stats arrive directly via
-  // the SignalR push payload on every JobFinalized / MessageEnqueued event (see
-  // bridgeEvent in stores/realtime.ts) and are written straight into the dashboard
-  // store. No event-driven REST refetch is needed for stats; the bus emit fired
-  // by the bridge still wakes other pages (jobs, counters, etc.) to refetch their
-  // own scoped views.
+  // Initial fetch for first paint. Further updates arrive via SignalR push.
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
 
-  // Kick off the realtime probe + hub connection once the dashboard has
-  // mounted (and therefore subscribers like the bus listeners are already
-  // registered). Running this from main.tsx races React's useEffect timing
-  // and the post-connect drain emits to zero subscribers.
   useEffect(() => {
     void useRealtimeStore.getState().probeAndConnect();
   }, []);
@@ -59,7 +46,6 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
         if (axios.isAxiosError(e) && e.response?.status === 404) {
           setConcurrencyAvailable(false);
         } else {
-          // Non-404 errors (network, 500): keep hidden, don't surface noise.
           setConcurrencyAvailable(false);
         }
       });
@@ -88,64 +74,40 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
     setDrawerOpen(false);
   }, [location.pathname]);
 
-  const navItems = buildNavItems(extensions, concurrencyAvailable, rateLimitsAvailable);
-  const entity = detectEntity(location.pathname);
+  const navItems = buildWarpNavItems(extensions, concurrencyAvailable, rateLimitsAvailable);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <Navbar
-        desktopNav={<TopLevelNav items={navItems} stats={stats} />}
-        onMenuClick={() => setDrawerOpen(true)}
-      />
+    <div className="relative min-h-screen flex bg-background text-foreground">
+      <div className="warp-ambient" aria-hidden />
 
-      {error && (
-        <div
-          role="alert"
-          className="bg-destructive/10 border-b border-destructive/20 px-4 lg:px-6 py-2 text-sm text-destructive flex items-center gap-2"
-        >
-          <span className="font-medium">Connection lost</span>
-          <span className="text-destructive/70">— Unable to connect to Warp API. Retrying...</span>
-        </div>
-      )}
+      <WarpSidebar items={navItems} />
 
-      <div className="flex flex-1">
-        {entity && (
-          <aside className="hidden lg:block w-64 shrink-0 border-r bg-card min-h-[calc(100vh-3.5rem)] p-4">
-            <EntityStateSidebar entity={entity} stats={stats} />
-          </aside>
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        <WarpTopbar
+          title={title}
+          subtitle={subtitle}
+          right={right}
+          onMenuClick={() => setDrawerOpen(true)}
+        />
+
+        {error && (
+          <div
+            role="alert"
+            className="mx-4 lg:mx-6 mt-3 rounded-md bg-warp-red-soft ring-1 ring-warp-red/30 px-3 py-2 text-sm text-warp-red flex items-center gap-2"
+          >
+            <span className="font-medium">Connection lost</span>
+            <span className="opacity-80">— Unable to connect to Warp API. Retrying...</span>
+          </div>
         )}
 
-        <main className="flex-1 p-4 lg:p-6 min-w-0">
+        <main className="flex-1 p-4 lg:p-6 min-w-0 overflow-auto">
           <Outlet />
         </main>
       </div>
 
       <MobileDrawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <TopLevelNav
-          items={navItems}
-          stats={stats}
-          orientation="vertical"
-          showBadges={false}
-          onNavigate={() => setDrawerOpen(false)}
-        />
-        {entity && (
-          <div>
-            <EntityStateSidebar
-              entity={entity}
-              stats={stats}
-              onNavigate={() => setDrawerOpen(false)}
-            />
-          </div>
-        )}
+        <WarpSidebar items={navItems} mobile onNavigate={() => setDrawerOpen(false)} />
       </MobileDrawer>
-
-      <footer className="border-t bg-card px-4 lg:px-6 py-3 text-xs text-muted-foreground flex items-center justify-between gap-4">
-        <span className="truncate">{stats?.databaseConnection ?? 'Warp Dashboard'}</span>
-        <div className="flex items-center gap-4 tabular-nums shrink-0">
-          {stats && <span className="hidden sm:inline">Servers: {stats.servers} · Workers active</span>}
-          <span>UTC: {new Date().toISOString().replace('T', ' ').substring(0, 19)}</span>
-        </div>
-      </footer>
     </div>
   );
 }
