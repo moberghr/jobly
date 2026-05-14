@@ -1,198 +1,403 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
+import {
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type SortingState,
+  type RowSelectionState,
+} from '@tanstack/react-table';
+import { toast } from 'sonner';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Panel } from '@/components/v2/Panel';
 import { StateBadge } from '@/components/StateBadge';
-import { Pagination } from '@/components/Pagination';
-import { shortType, shortId } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
-import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
+import { shortType, shortId } from '@/utils/format';
+import { usePageStore } from '@/stores/page';
+import { useDashboardStore } from '@/stores/dashboard';
 import {
   useJobsList,
   useFailedJobsByType,
   useFailedJobTypes,
-  useRequeueJob,
-  useDeleteJob,
   useBulkRequeueJobs,
   useBulkDeleteJobs,
   useRequeueFailedJobsByType,
-  useDeleteFailedJobsByType,
+  useRequeueJob,
+  useDeleteJob,
 } from '@/api/hooks/useJobs';
+import type { JobModel } from '@/types';
+import { State } from '@/types';
+import { JobsStateRail } from './JobsStateRail';
+import { JobTypeBar } from './JobTypeBar';
+import { BulkActionBar } from './BulkActionBar';
+
+const PAGE_SIZE = 20;
+
+const SUBTEXT: Record<string, string> = {
+  enqueued: 'Awaiting a worker pickup.',
+  scheduled: 'Future-dated runs.',
+  processing: 'Currently executing.',
+  completed: 'Recent successful runs.',
+  failed: 'Retries exhausted. Filter by type to bulk requeue or delete.',
+  awaiting: 'Awaiting parent / dependency.',
+  deleted: 'Soft-deleted; recoverable until cleanup.',
+};
+
+const STATE_TONE: Record<string, { text: string; bg: string }> = {
+  enqueued:   { text: 'text-state-enqueued',   bg: 'bg-state-enqueued-bg' },
+  scheduled:  { text: 'text-state-scheduled',  bg: 'bg-state-scheduled-bg' },
+  processing: { text: 'text-state-processing', bg: 'bg-state-processing-bg' },
+  completed:  { text: 'text-state-completed',  bg: 'bg-state-completed-bg' },
+  failed:     { text: 'text-state-failed',     bg: 'bg-state-failed-bg' },
+  awaiting:   { text: 'text-state-awaiting',   bg: 'bg-state-awaiting-bg' },
+  deleted:    { text: 'text-state-deleted',    bg: 'bg-state-deleted-bg' },
+};
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 export default function JobListPage() {
   const { state } = useParams<{ state: string }>();
   const resolvedState = state ?? 'enqueued';
   const isFailed = resolvedState === 'failed';
 
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = usePersistedPageSize();
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = Number(searchParams.get('page') ?? '0') || 0;
+  const activeType = searchParams.get('type');
 
+  const setPage = (next: number) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 0) {
+      params.delete('page');
+    } else {
+      params.set('page', String(next));
+    }
+    setSearchParams(params, { replace: true });
+  };
+
+  const setActiveType = (type: string | null) => {
+    const params = new URLSearchParams(searchParams);
+    if (type) {
+      params.set('type', type);
+    } else {
+      params.delete('type');
+    }
+    params.delete('page');
+    setSearchParams(params, { replace: true });
+  };
+
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'createTime', desc: true }]);
+
+  // Reset selection when navigating between state/type/page.
   useEffect(() => {
-    setPage(0);
-    setSelectedIds(new Set());
-    setSelectedType(null);
-  }, [resolvedState]);
+    setRowSelection({});
+  }, [resolvedState, activeType, page]);
 
-  const jobsQuery = useJobsList(resolvedState, page, pageSize);
-  const filteredQuery = useFailedJobsByType(selectedType ?? '', page, pageSize, isFailed && !!selectedType);
+  const jobsQuery = useJobsList(resolvedState, page, PAGE_SIZE);
+  const filteredQuery = useFailedJobsByType(
+    activeType ?? '',
+    page,
+    PAGE_SIZE,
+    isFailed && !!activeType,
+  );
   const typeCountsQuery = useFailedJobTypes(isFailed);
+
+  const activeQuery = isFailed && activeType ? filteredQuery : jobsQuery;
+  const data = activeQuery.data;
+  const error = activeQuery.error;
+  const typeCounts = typeCountsQuery.data ?? [];
 
   const requeueJob = useRequeueJob();
   const deleteJob = useDeleteJob();
   const bulkRequeue = useBulkRequeueJobs();
   const bulkDelete = useBulkDeleteJobs();
   const requeueByType = useRequeueFailedJobsByType();
-  const deleteByType = useDeleteFailedJobsByType();
 
-  const activeQuery = isFailed && selectedType ? filteredQuery : jobsQuery;
-  const data = activeQuery.data;
-  const error = activeQuery.error;
-  const typeCounts = typeCountsQuery.data ?? [];
+  const stats = useDashboardStore((s) => s.stats);
 
-  if (error) return <ErrorState message={(error as Error).message} />;
-  if (!data) return <LoadingState />;
+  // Drive the topbar via the page store.
+  useEffect(() => {
+    if (!stats) {
+      usePageStore.getState().set({ title: 'Jobs', subtitle: undefined });
 
-  const handlePageSizeChange = (size: number) => {
-    setPageSize(size);
-    setPage(0);
-    setSelectedIds(new Set());
+      return;
+    }
+
+    const subtitle = `${stats.failed} failed · ${stats.processing} processing · ${stats.pending} enqueued`;
+    usePageStore.getState().set({ title: 'Jobs', subtitle });
+  }, [stats]);
+  useEffect(() => () => usePageStore.getState().reset(), []);
+
+  const rows = useMemo<JobModel[]>(() => data?.items ?? [], [data]);
+
+  const columns = useMemo<ColumnDef<JobModel>[]>(
+    () => [
+      {
+        id: 'select',
+        header: ({ table }) => (
+          <Checkbox
+            checked={table.getIsAllRowsSelected()}
+            indeterminate={table.getIsSomeRowsSelected()}
+            onChange={table.getToggleAllRowsSelectedHandler()}
+            aria-label="Select all"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onChange={row.getToggleSelectedHandler()}
+            aria-label="Select row"
+          />
+        ),
+        enableSorting: false,
+        size: 36,
+      },
+      {
+        accessorKey: 'id',
+        header: 'ID',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <Link
+            to={`/detail/${row.original.id}`}
+            className="mono text-[12px] text-foreground hover:text-warp-blue transition-colors"
+          >
+            {shortId(row.original.id)}
+          </Link>
+        ),
+      },
+      {
+        accessorKey: 'type',
+        header: 'Type · Handler',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <div>
+            <div className="text-[13px] font-medium text-foreground">{shortType(row.original.type)}</div>
+            {row.original.handlerType && (
+              <div className="mono text-[10.5px] text-text-mute mt-0.5">
+                {shortType(row.original.handlerType)}
+              </div>
+            )}
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'currentState',
+        header: 'State',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <StateBadge
+            state={row.original.currentState}
+            cancellationMode={row.original.cancellationMode}
+          />
+        ),
+      },
+      {
+        accessorKey: 'createTime',
+        header: 'Created',
+        cell: ({ row }) => (
+          <span className="text-[12px] text-text-dim mono">
+            <RelativeTime date={row.original.createTime} />
+          </span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: '',
+        enableSorting: false,
+        cell: ({ row }) => {
+          const isFailedRow = row.original.currentState === State.Failed;
+
+          return (
+            <div className="flex justify-end gap-2">
+              {isFailedRow && (
+                <button
+                  type="button"
+                  onClick={() => requeueJob.mutate(row.original.id)}
+                  className="px-2.5 py-1 text-[11.5px] font-medium rounded-md border border-border bg-panel-2 text-foreground hover:bg-panel transition-colors"
+                >
+                  Retry
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => deleteJob.mutate(row.original.id)}
+                className="px-2.5 py-1 text-[11.5px] font-medium rounded-md border border-warp-red text-warp-red hover:bg-warp-red-soft transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          );
+        },
+      },
+    ],
+    [requeueJob, deleteJob],
+  );
+
+  const table = useReactTable({
+    data: rows,
+    columns,
+    state: { sorting, rowSelection },
+    onSortingChange: setSorting,
+    onRowSelectionChange: setRowSelection,
+    getRowId: (row) => row.id,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    enableRowSelection: true,
+  });
+
+  const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+
+  const handleBulkRequeue = () => {
+    bulkRequeue.mutate(selectedIds, {
+      onSuccess: () => setRowSelection({}),
+    });
   };
 
-  const title = resolvedState.charAt(0).toUpperCase() + resolvedState.slice(1);
+  const handleBulkDelete = () => {
+    bulkDelete.mutate(selectedIds, {
+      onSuccess: () => setRowSelection({}),
+    });
+  };
+
+  const handleRequeueAllType = () => {
+    if (!activeType) {
+      return;
+    }
+
+    requeueByType.mutate(activeType, {
+      onSuccess: () => {
+        setRowSelection({});
+        toast.success(`Requeued all ${shortType(activeType)}`);
+      },
+    });
+  };
+
+  if (error) {
+    return <ErrorState message={(error as Error).message} />;
+  }
+
+  if (!data) {
+    return <LoadingState />;
+  }
+
+  const stateLabel = resolvedState;
+  const tone = STATE_TONE[resolvedState] ?? STATE_TONE.enqueued;
+  const total = data.totalCount;
+  const showingFrom = total === 0 ? 0 : page * PAGE_SIZE + 1;
+  const showingTo = Math.min((page + 1) * PAGE_SIZE, total);
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">{title} Jobs</h1>
-        <span className="text-sm text-muted-foreground">{data.totalCount} total</span>
-      </div>
-
-      {/* Failed type filter bar */}
-      {isFailed && typeCounts.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <Button
-            variant={selectedType === null ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => { setSelectedType(null); setPage(0); setSelectedIds(new Set()); }}
-          >
-            All
-          </Button>
-          {typeCounts.map(tc => (
-            <Button
-              key={tc.type}
-              variant={selectedType === tc.type ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => { setSelectedType(tc.type); setPage(0); setSelectedIds(new Set()); }}
+    <div className="flex flex-col lg:flex-row h-full min-h-0">
+      <JobsStateRail active={resolvedState} />
+      <div className="flex-1 overflow-auto p-5 min-w-0">
+        <header className="mb-4">
+          <h1 className="font-display text-[22px] font-semibold tracking-tight">
+            {capitalize(stateLabel)} jobs
+            <span
+              className={`ml-2.5 inline-flex items-center rounded-md px-2 py-0.5 text-[13px] font-medium align-middle ${tone.bg} ${tone.text}`}
             >
-              {shortType(tc.type)} ({tc.count})
-            </Button>
-          ))}
-        </div>
-      )}
+              {total.toLocaleString()}
+            </span>
+          </h1>
+          <p className="text-[12.5px] text-text-mute mt-1">{SUBTEXT[resolvedState] ?? ''}</p>
+        </header>
 
-      {/* Bulk actions for type filter */}
-      {isFailed && selectedType && (
-        <div className="flex items-center gap-3 mb-3 p-3 bg-muted rounded-md">
-          <span className="text-sm font-medium">Filtered: {shortType(selectedType)}</span>
-          <Button variant="outline" size="sm" onClick={() => requeueByType.mutate(selectedType)}>Requeue All</Button>
-          <Button variant="outline" size="sm" className="text-destructive" onClick={() => deleteByType.mutate(selectedType)}>Delete All</Button>
-        </div>
-      )}
+        <BulkActionBar
+          count={selectedIds.length}
+          total={total}
+          activeType={activeType ? shortType(activeType) : null}
+          stateLabel={stateLabel}
+          onRequeue={handleBulkRequeue}
+          onDelete={handleBulkDelete}
+          onRequeueAllType={isFailed && activeType ? handleRequeueAllType : undefined}
+        />
 
-      {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 mb-3 p-3 bg-muted rounded-md">
-          <span className="text-sm font-medium">{selectedIds.size} selected</span>
-          <Button variant="outline" size="sm" onClick={() => {
-            bulkRequeue.mutate(Array.from(selectedIds), { onSuccess: () => setSelectedIds(new Set()) });
-          }}>Requeue</Button>
-          <Button variant="outline" size="sm" className="text-destructive" onClick={() => {
-            bulkDelete.mutate(Array.from(selectedIds), { onSuccess: () => setSelectedIds(new Set()) });
-          }}>Delete</Button>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Clear</Button>
-        </div>
-      )}
+        {isFailed && typeCounts.length > 0 && (
+          <JobTypeBar types={typeCounts} activeType={activeType} onPick={setActiveType} />
+        )}
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[40px]">
-                <input type="checkbox"
-                  checked={data.items.length > 0 && data.items.every(j => selectedIds.has(j.id))}
-                  onChange={e => {
-                    if (e.target.checked) setSelectedIds(new Set(data.items.map(j => j.id)));
-                    else setSelectedIds(new Set());
-                  }}
-                  className="rounded"
-                />
-              </TableHead>
-              <TableHead className="w-[100px]">ID</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>State</TableHead>
-              <TableHead>Created</TableHead>
-              {resolvedState === 'scheduled' && <TableHead>Scheduled</TableHead>}
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={resolvedState === 'scheduled' ? 7 : 6} className="text-center text-muted-foreground py-8">
-                  No jobs found
-                </TableCell>
-              </TableRow>
-            ) : (
-              data.items.map((job) => (
-                <TableRow key={job.id}>
-                  <TableCell>
-                    <input type="checkbox"
-                      checked={selectedIds.has(job.id)}
-                      onChange={e => {
-                        const next = new Set(selectedIds);
-                        if (e.target.checked) next.add(job.id);
-                        else next.delete(job.id);
-                        setSelectedIds(next);
-                      }}
-                      className="rounded"
-                    />
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    <Link to={`/detail/${job.id}`} className="text-primary hover:underline">
-                      {shortId(job.id)}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <div>{shortType(job.type)}</div>
-                    {job.handlerType && <div className="text-xs text-muted-foreground">{shortType(job.handlerType)}</div>}
-                  </TableCell>
-                  <TableCell><StateBadge state={job.currentState} cancellationMode={job.cancellationMode} /></TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    <RelativeTime date={job.createTime} />
-                  </TableCell>
-                  {resolvedState === 'scheduled' && (
-                    <TableCell className="text-sm text-muted-foreground">
-                      <RelativeTime date={job.scheduleTime ?? job.createTime} />
-                    </TableCell>
-                  )}
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => requeueJob.mutate(job.id)}>
-                      Requeue
-                    </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteJob.mutate(job.id)}>
-                      Delete
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+        <Panel className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                {table.getHeaderGroups().map((hg) => (
+                  <tr key={hg.id} className="bg-panel-2 border-b border-border">
+                    {hg.headers.map((header) => (
+                      <th
+                        key={header.id}
+                        className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold"
+                        style={{ width: header.column.columnDef.size ? header.column.columnDef.size : undefined }}
+                      >
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(header.column.columnDef.header, header.getContext())}
+                      </th>
+                    ))}
+                  </tr>
+                ))}
+              </thead>
+              <tbody>
+                {table.getRowModel().rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={columns.length} className="text-center text-text-mute py-10 text-[13px]">
+                      No jobs found.
+                    </td>
+                  </tr>
+                ) : (
+                  table.getRowModel().rows.map((row) => {
+                    const isSelected = row.getIsSelected();
+                    const selectedBg = isFailed ? 'bg-warp-red-soft' : 'bg-warp-blue-soft';
+
+                    return (
+                      <tr
+                        key={row.id}
+                        className={`border-b border-border last:border-b-0 transition-colors ${
+                          isSelected ? selectedBg : 'hover:bg-panel-2'
+                        }`}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <td key={cell.id} className="px-3.5 py-3 align-middle">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+
+        <div className="flex items-center justify-between mt-3 text-[12px] text-text-mute">
+          <span className="mono">
+            Showing {showingFrom}–{showingTo} of {total.toLocaleString()}
+          </span>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => setPage(page - 1)}
+              disabled={page === 0}
+              className="px-2.5 py-1 text-[11.5px] rounded-md border border-border bg-panel text-text-dim hover:bg-panel-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              ‹ Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage(page + 1)}
+              disabled={page >= data.pageCount - 1}
+              className="px-2.5 py-1 text-[11.5px] rounded-md border border-border bg-panel text-foreground hover:bg-panel-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next ›
+            </button>
+          </div>
+        </div>
       </div>
-
-      <Pagination page={page} pageCount={data.pageCount} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={handlePageSizeChange} />
     </div>
   );
 }
