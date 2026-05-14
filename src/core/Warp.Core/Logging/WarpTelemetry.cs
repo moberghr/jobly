@@ -78,7 +78,7 @@ public static class WarpTelemetry
     public static readonly UpDownCounter<long> SagasLive = Meter.CreateUpDownCounter<long>(
         "warp.sagas.live",
         unit: "{saga}",
-        description: "Per-process net saga count (incremented on start, decremented on completion). Tag: saga_type. Aggregate across worker replicas to estimate cluster-wide live sagas; for an authoritative count query the dashboard's saga stats endpoint instead.");
+        description: "Per-process net saga count (incremented on start, decremented on completion). Tag: saga_type. Same per-process semantics as warp.jobs.active and warp.mediator.in_flight: aggregate across worker replicas in your OTel backend (sum) to estimate cluster-wide live sagas. Note: a saga started by replica A and completed by replica B will show +1 on A and -1 on B; the per-replica gauge can therefore go negative under restart-heavy workloads where the start-increment was lost to a process restart. For an authoritative point-in-time count, query the dashboard's GET /api/sagas/stats endpoint (reads SagaState directly).");
 
     /// <summary>
     /// Starts the consumer activity for handler execution when an <see cref="ActivityListener"/>

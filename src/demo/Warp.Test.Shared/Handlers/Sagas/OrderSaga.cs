@@ -1,6 +1,8 @@
+using Warp.Core;
+using Warp.Core.Handlers;
 using Warp.Core.Sagas;
 
-namespace Warp.Core.Handlers;
+namespace Warp.Test.Shared.Handlers.Sagas;
 
 /// <summary>
 /// Minimal end-to-end saga showing the three core lifecycle states: start, update, complete.

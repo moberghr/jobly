@@ -106,17 +106,10 @@ public sealed class SagaHandlerProxy<TSaga, TMessage> : IMessageHandler<TMessage
             return;
         }
 
-        bool started;
-        bool completed;
-        if (saga == null)
-        {
-            (started, completed) = await HandleStartsSaga(message, correlationKey, cancellationToken);
-        }
-        else
-        {
-            started = false;
-            completed = await HandleExistingSaga(saga, message, cancellationToken);
-        }
+        var started = saga == null;
+        var completed = started
+            ? await HandleStartsSaga(message, correlationKey, cancellationToken)
+            : await HandleExistingSaga(saga!, message, cancellationToken);
 
         await TrySaveAsync(correlationKey, cancellationToken);
 
@@ -154,7 +147,9 @@ public sealed class SagaHandlerProxy<TSaga, TMessage> : IMessageHandler<TMessage
         await _inner.NotFoundAsync(message, _jobContext, cancellationToken);
     }
 
-    private async Task<(bool started, bool completed)> HandleStartsSaga(TMessage message, string correlationKey, CancellationToken cancellationToken)
+    // Returns whether the saga reached the IsCompleted state inside this invocation.
+    // Started=true is implied by the saga==null entry condition.
+    private async Task<bool> HandleStartsSaga(TMessage message, string correlationKey, CancellationToken cancellationToken)
     {
         var saga = new TSaga { CorrelationKey = correlationKey };
         await _inner.HandleAsync(saga, message, cancellationToken);
@@ -168,13 +163,13 @@ public sealed class SagaHandlerProxy<TSaga, TMessage> : IMessageHandler<TMessage
             // SagaStore.SaveChangesAsync rather than the worker's outbox (which sees the rows
             // Unchanged by then). Both lifecycle counters (started + completed) fire in
             // ProcessAsync once the save lands, so an ephemeral saga still gets observability.
-            return (started: true, completed: true);
+            return true;
         }
 
         _store.Add(saga);
         _store.RecordJobLink(saga.Id, _jobContext.JobId);
 
-        return (started: true, completed: false);
+        return false;
     }
 
     private async Task<bool> HandleExistingSaga(TSaga saga, TMessage message, CancellationToken cancellationToken)

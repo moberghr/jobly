@@ -18,6 +18,20 @@ public class SagaCorrelationCacheTests
     }
 
     [TimedFact]
+    public void GetCorrelationKey_CorrelateOnNonPublicProperty_ThrowsWithClearError()
+    {
+        // Reflection scan is Public|Instance only by design — non-public correlation properties
+        // are surfaced as a specific error rather than the misleading "no [Correlate] property
+        // at all" message that a strict public-only scan would otherwise produce.
+        var cache = new SagaCorrelationCache();
+
+        var ex = Should.Throw<SagaConfigurationException>(() => cache.GetCorrelationKey(new InternalCorrelate()));
+        ex.Message.ShouldContain("non-public property");
+        ex.Message.ShouldContain("OrderId");
+        ex.Message.ShouldContain("make the property");
+    }
+
+    [TimedFact]
     public void GetCorrelationKey_NoCorrelateProperty_Throws()
     {
         var cache = new SagaCorrelationCache();
@@ -215,6 +229,12 @@ public class SagaCorrelationCacheTests
     private sealed class MissingCorrelate : IMessage
     {
         public string OrderId { get; set; } = string.Empty;
+    }
+
+    private sealed class InternalCorrelate : IMessage
+    {
+        [Correlate]
+        internal string OrderId { get; set; } = "internal-key";
     }
 
     private sealed class IntCorrelate : IMessage

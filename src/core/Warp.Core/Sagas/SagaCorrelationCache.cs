@@ -50,9 +50,24 @@ public sealed class SagaCorrelationCache
 
         if (correlated.Length == 0)
         {
+            // Diagnostic-only second pass with NonPublic so a user who marked a
+            // protected/internal/private property gets a clear "must be public" error
+            // instead of the misleading "has no [Correlate] property at all".
+            var nonPublicCandidates = messageType.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance)
+                .Where(p => p.GetCustomAttribute<CorrelateAttribute>() != null)
+                .ToArray();
+            if (nonPublicCandidates.Length > 0)
+            {
+                var names = string.Join(", ", nonPublicCandidates.Select(p => p.Name));
+                throw new SagaConfigurationException(
+                    $"Message {messageType.FullName} has [Correlate] on non-public property '{names}'. " +
+                    $"The reflector scans only public instance properties — make the property " +
+                    $"public (the saga pipeline needs to read its value at dispatch time).");
+            }
+
             throw new SagaConfigurationException(
                 $"Message {messageType.FullName} has no [Correlate] property. " +
-                $"Sagas require exactly one string property marked with [Correlate].");
+                $"Sagas require exactly one public string/Guid/int/long property marked with [Correlate].");
         }
 
         if (correlated.Length > 1)

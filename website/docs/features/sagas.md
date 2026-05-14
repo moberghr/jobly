@@ -337,7 +337,7 @@ Counters (emitted via `WarpTelemetry.Meter`):
 - `warp.sagas.started` — tagged `saga_type`
 - `warp.sagas.completed` — tagged `saga_type`
 - `warp.sagas.requeued` — tagged `saga_type` and `reason` (`busy` | `version` | `unique`)
-- `warp.sagas.live` — `UpDownCounter` tagged `saga_type`. +1 on saga start, -1 on completion. **Per-process**: each worker replica reports its own net delta. Sum across replicas in your OTel backend to estimate cluster-wide live sagas. For an authoritative point-in-time count, query the dashboard `/api/sagas/stats` endpoint, which reads `SagaState` directly.
+- `warp.sagas.live` — `UpDownCounter` tagged `saga_type`. +1 on saga start, -1 on completion. **Per-process**: each worker replica reports its own net delta. Sum across replicas in your OTel backend to estimate cluster-wide live sagas. A saga started on replica A and completed on replica B yields `+1` on A and `-1` on B — the per-replica gauge can drift and, under process-restart scenarios, go negative for the replica that handled completion. Some OTel backends flag negative values as anomalies; treat this as a *delta* counter rather than an absolute. For the authoritative point-in-time count, query `/api/sagas/stats` (reads `SagaState` directly).
 
 Saga lifetime (CreatedAt → completion) is not currently instrumented as a histogram. To alert on long-running sagas, query `SagaState.UpdatedAt` (every message touch bumps it, so stale-looking sagas surface there). See the **Operational notes** section.
 

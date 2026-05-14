@@ -1,9 +1,9 @@
 using Warp.Core;
-using Warp.Core.Handlers;
 using Warp.Core.Retry;
 using Warp.Core.Sagas;
 using Warp.Provider.PostgreSql;
 using Warp.Test.Shared;
+using Warp.Test.Shared.Handlers.Sagas;
 using Warp.Worker;
 
 var host = Host.CreateDefaultBuilder(args)
