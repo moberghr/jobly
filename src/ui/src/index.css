@@ -2,12 +2,17 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/space-grotesk";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
+    --font-heading: var(--font-display);
+    --font-display: 'Space Grotesk Variable', 'Geist Variable', sans-serif;
     --font-sans: 'Geist Variable', sans-serif;
+    --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -24,6 +29,7 @@
     --color-ring: var(--ring);
     --color-input: var(--input);
     --color-border: var(--border);
+    --color-border-hi: var(--border-hi);
     --color-destructive: var(--destructive);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
@@ -38,17 +44,25 @@
     --color-card-foreground: var(--card-foreground);
     --color-card: var(--card);
     --color-foreground: var(--foreground);
+    --color-text-dim: var(--text-dim);
+    --color-text-mute: var(--text-mute);
     --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
-}
+    --color-panel: var(--panel);
+    --color-panel-2: var(--panel-2);
 
-@theme inline {
+    /* Command-palette accents */
+    --color-warp-green: var(--warp-green);
+    --color-warp-green-soft: var(--warp-green-soft);
+    --color-warp-red: var(--warp-red);
+    --color-warp-red-soft: var(--warp-red-soft);
+    --color-warp-purple: var(--warp-purple);
+    --color-warp-purple-soft: var(--warp-purple-soft);
+    --color-warp-blue: var(--warp-blue);
+    --color-warp-blue-soft: var(--warp-blue-soft);
+    --color-warp-amber: var(--warp-amber);
+    --color-warp-amber-soft: var(--warp-amber-soft);
+
+    /* Semantic state tokens (drive StateBadge etc.) */
     --color-state-enqueued: var(--state-enqueued);
     --color-state-enqueued-bg: var(--state-enqueued-bg);
     --color-state-awaiting: var(--state-awaiting);
@@ -65,133 +79,242 @@
     --color-state-scheduled-bg: var(--state-scheduled-bg);
     --color-state-cancelling: var(--state-cancelling);
     --color-state-cancelling-bg: var(--state-cancelling-bg);
-    --color-success: var(--success);
-    --color-success-bg: var(--success-bg);
-    --color-warning: var(--warning);
-    --color-warning-bg: var(--warning-bg);
+
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ============ Light = warm cream Command palette ============ */
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    /* surfaces */
+    --background:      #faf9f4;
+    --panel:           #ffffff;
+    --panel-2:         #f4f3ee;
 
-    /* Semantic state tokens (light) */
-    --state-enqueued: oklch(0.40 0.15 250);
-    --state-enqueued-bg: oklch(0.94 0.04 250);
-    --state-awaiting: oklch(0.45 0.13 85);
-    --state-awaiting-bg: oklch(0.95 0.06 85);
-    --state-processing: oklch(0.45 0.18 290);
-    --state-processing-bg: oklch(0.94 0.05 290);
-    --state-completed: oklch(0.42 0.14 150);
-    --state-completed-bg: oklch(0.94 0.06 150);
-    --state-failed: oklch(0.45 0.20 25);
-    --state-failed-bg: oklch(0.94 0.06 25);
-    --state-deleted: oklch(0.45 0 0);
-    --state-deleted-bg: oklch(0.93 0 0);
-    --state-scheduled: oklch(0.50 0.15 65);
-    --state-scheduled-bg: oklch(0.95 0.06 65);
-    --state-cancelling: oklch(0.50 0.16 50);
-    --state-cancelling-bg: oklch(0.95 0.06 50);
-    --success: oklch(0.42 0.14 150);
-    --success-bg: oklch(0.94 0.06 150);
-    --warning: oklch(0.50 0.15 65);
-    --warning-bg: oklch(0.95 0.06 65);
+    --foreground:      #0e0e10;
+    --text-dim:        #4a4a52;
+    --text-mute:       #76747a;
+
+    --card:            #ffffff;
+    --card-foreground: #0e0e10;
+    --popover:         #ffffff;
+    --popover-foreground: #0e0e10;
+
+    --primary:            #16a34a;
+    --primary-foreground: #ffffff;
+    --secondary:          #f4f3ee;
+    --secondary-foreground: #0e0e10;
+    --muted:              #f4f3ee;
+    --muted-foreground:   #76747a;
+    --accent:             #f4f3ee;
+    --accent-foreground:  #0e0e10;
+    --destructive:        #dc2626;
+
+    --border:    #e6e4dc;
+    --border-hi: #d4d2c8;
+    --input:     #e6e4dc;
+    --ring:      #16a34a;
+
+    /* warp accents (light) */
+    --warp-green:       #16a34a;
+    --warp-green-soft:  rgba(22,163,74,0.12);
+    --warp-red:         #dc2626;
+    --warp-red-soft:    rgba(220,38,38,0.10);
+    --warp-purple:      #7c3aed;
+    --warp-purple-soft: rgba(124,58,237,0.12);
+    --warp-blue:        #2563eb;
+    --warp-blue-soft:   rgba(37,99,235,0.12);
+    --warp-amber:       #b45309;
+    --warp-amber-soft:  rgba(180,83,9,0.14);
+
+    /* state tokens (light) — Command palette */
+    --state-enqueued:    #2563eb;
+    --state-enqueued-bg: rgba(37,99,235,0.10);
+    --state-awaiting:    #b45309;
+    --state-awaiting-bg: rgba(180,83,9,0.10);
+    --state-processing:    #7c3aed;
+    --state-processing-bg: rgba(124,58,237,0.10);
+    --state-completed:    #16a34a;
+    --state-completed-bg: rgba(22,163,74,0.10);
+    --state-failed:    #dc2626;
+    --state-failed-bg: rgba(220,38,38,0.10);
+    --state-deleted:    #76747a;
+    --state-deleted-bg: rgba(118,116,122,0.12);
+    --state-scheduled:    #b45309;
+    --state-scheduled-bg: rgba(180,83,9,0.10);
+    --state-cancelling:    #b45309;
+    --state-cancelling-bg: rgba(180,83,9,0.10);
+
+    --chart-1: #16a34a;
+    --chart-2: #2563eb;
+    --chart-3: #7c3aed;
+    --chart-4: #b45309;
+    --chart-5: #dc2626;
+
+    --radius: 0.625rem;
+
+    --sidebar:                    #ffffff;
+    --sidebar-foreground:         #0e0e10;
+    --sidebar-primary:            #16a34a;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent:             #f4f3ee;
+    --sidebar-accent-foreground:  #0e0e10;
+    --sidebar-border:             #e6e4dc;
+    --sidebar-ring:               #16a34a;
 }
 
+/* ============ Dark = near-black Command palette ============ */
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --background:      #0a0a0b;
+    --panel:           #111114;
+    --panel-2:         #16161a;
 
-    /* Semantic state tokens (dark) */
-    --state-enqueued: oklch(0.80 0.12 250);
-    --state-enqueued-bg: oklch(0.30 0.08 250);
-    --state-awaiting: oklch(0.85 0.13 85);
-    --state-awaiting-bg: oklch(0.32 0.08 85);
-    --state-processing: oklch(0.82 0.15 290);
-    --state-processing-bg: oklch(0.32 0.10 290);
-    --state-completed: oklch(0.82 0.15 150);
-    --state-completed-bg: oklch(0.30 0.08 150);
-    --state-failed: oklch(0.78 0.16 25);
-    --state-failed-bg: oklch(0.32 0.10 25);
-    --state-deleted: oklch(0.75 0 0);
-    --state-deleted-bg: oklch(0.32 0 0);
-    --state-scheduled: oklch(0.82 0.14 65);
-    --state-scheduled-bg: oklch(0.32 0.08 65);
-    --state-cancelling: oklch(0.82 0.14 50);
-    --state-cancelling-bg: oklch(0.32 0.08 50);
-    --success: oklch(0.82 0.15 150);
-    --success-bg: oklch(0.30 0.08 150);
-    --warning: oklch(0.82 0.14 65);
-    --warning-bg: oklch(0.32 0.08 65);
+    --foreground:      #fafafa;
+    --text-dim:        #a1a1aa;
+    --text-mute:       #71717a;
+
+    --card:            #111114;
+    --card-foreground: #fafafa;
+    --popover:         #111114;
+    --popover-foreground: #fafafa;
+
+    --primary:            #22c55e;
+    --primary-foreground: #0a0a0b;
+    --secondary:          #16161a;
+    --secondary-foreground: #fafafa;
+    --muted:              #16161a;
+    --muted-foreground:   #71717a;
+    --accent:             #16161a;
+    --accent-foreground:  #fafafa;
+    --destructive:        #ef4444;
+
+    --border:    #23232a;
+    --border-hi: #2e2e36;
+    --input:     #23232a;
+    --ring:      #22c55e;
+
+    --warp-green:       #22c55e;
+    --warp-green-soft:  rgba(34,197,94,0.18);
+    --warp-red:         #ef4444;
+    --warp-red-soft:    rgba(239,68,68,0.20);
+    --warp-purple:      #a855f7;
+    --warp-purple-soft: rgba(168,85,247,0.20);
+    --warp-blue:        #3b82f6;
+    --warp-blue-soft:   rgba(59,130,246,0.20);
+    --warp-amber:       #f59e0b;
+    --warp-amber-soft:  rgba(245,158,11,0.20);
+
+    --state-enqueued:    #3b82f6;
+    --state-enqueued-bg: rgba(59,130,246,0.16);
+    --state-awaiting:    #f59e0b;
+    --state-awaiting-bg: rgba(245,158,11,0.16);
+    --state-processing:    #a855f7;
+    --state-processing-bg: rgba(168,85,247,0.18);
+    --state-completed:    #22c55e;
+    --state-completed-bg: rgba(34,197,94,0.16);
+    --state-failed:    #ef4444;
+    --state-failed-bg: rgba(239,68,68,0.18);
+    --state-deleted:    #a1a1aa;
+    --state-deleted-bg: rgba(161,161,170,0.14);
+    --state-scheduled:    #f59e0b;
+    --state-scheduled-bg: rgba(245,158,11,0.16);
+    --state-cancelling:    #f59e0b;
+    --state-cancelling-bg: rgba(245,158,11,0.16);
+
+    --chart-1: #22c55e;
+    --chart-2: #3b82f6;
+    --chart-3: #a855f7;
+    --chart-4: #f59e0b;
+    --chart-5: #ef4444;
+
+    --sidebar:                    #111114;
+    --sidebar-foreground:         #fafafa;
+    --sidebar-primary:            #22c55e;
+    --sidebar-primary-foreground: #0a0a0b;
+    --sidebar-accent:             #16161a;
+    --sidebar-accent-foreground:  #fafafa;
+    --sidebar-border:             #23232a;
+    --sidebar-ring:               #22c55e;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
     @apply bg-background text-foreground;
-    }
+    font-feature-settings: 'cv11', 'ss01';
+  }
   html {
     @apply font-sans;
-    }
+  }
+  .mono,
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+    font-feature-settings: 'tnum', 'zero', 'ss02';
+  }
+  .font-display {
+    font-family: var(--font-display);
+  }
+}
+
+@layer components {
+  /* Card polish: hairline top highlight + soft drop shadow (light + dark). */
+  .warp-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.7),
+      0 1px 2px rgba(20, 20, 30, 0.04);
+    position: relative;
+  }
+  .dark .warp-panel {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.03),
+      0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+
+  /* Uppercase eyebrow label — used above panel titles. */
+  .warp-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--text-mute);
+  }
+
+  /* Page-level ambient radial gradient (used by main layout). */
+  .warp-ambient {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(60% 50% at 20% 0%, rgba(22, 163, 74, 0.06), transparent 60%),
+      radial-gradient(60% 50% at 100% 100%, rgba(124, 58, 237, 0.04), transparent 60%);
+  }
+  .dark .warp-ambient {
+    background:
+      radial-gradient(60% 50% at 20% 0%, rgba(34, 197, 94, 0.06), transparent 60%),
+      radial-gradient(60% 50% at 100% 100%, rgba(168, 85, 247, 0.05), transparent 60%);
+  }
+
+  /* Soft pulse halo used by the LIVE pill, sidebar status, etc. */
+  @keyframes warp-pulse {
+    0% { transform: scale(1); opacity: 0.45; }
+    70% { transform: scale(2.6); opacity: 0; }
+    100% { opacity: 0; }
+  }
+  .warp-pulse-halo {
+    animation: warp-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
 }
