@@ -6,23 +6,120 @@ sidebar_position: 6
 
 ## 0.14.0
 
-*Unreleased*
+*2026-05-14*
 
-Adds opt-in handler-reported progress bars on the dashboard. Handlers call `IJobContext.ReportProgress(name, percent)` to surface per-bar progress on the job detail page; the value persists as `JobLog` rows tagged `EventType = "Progress"` and is decoupled from the job state machine.
+Two new addons (`[Timeout]` and `[RateLimit]`), realtime dashboard updates over SignalR, opt-in handler-reported progress bars, and a major idle-query-rate reduction on the server-task path. One small but pointed PG provider fix (honour `NpgsqlDataSource`) makes Aspire / Managed Identity / Vault setups work without manual wiring. Two breaking surfaces — a server-task default flip and a cross-addon `IXxxMetadata` property rename — fall out of this work; both are spelled out below.
 
-Also lands a major idle-query-rate reduction for the server-task path. With `UseDispatcher = true` + `UseDatabasePush()` and default intervals, idle query rate drops from ~10–15 q/s to ~1.2 q/s (~92% reduction) — measured by `Warp.PerfTest --mode idle` against PG with an `ActivityListener` on the Npgsql source. See [perf-results.md](https://github.com/moberghr/warp/blob/main/docs/perf-results.md#idle-queries-per-second-server-task-overhead) for the full matrix.
+### New: `[Timeout]` addon
 
-### Breaking: server-task default changes
+Opt-in via `opt.AddTimeout()`. Caps how long a handler is allowed to run; on deadline, the worker cancels the handler's `CancellationToken`.
 
-The query-rate work changes three defaults. Most users won't notice — the bookkeeping these defaults gate is internal — but anyone tuning intervals or implementing custom `IServerTask`s should review:
+```csharp
+opt.AddRetry();    // optional, but MUST come before AddTimeout
+opt.AddTimeout(o => { o.Default = TimeSpan.FromMinutes(10); });
 
-- **`IServerTask.LocksWithTransaction` defaults to `true`.** Server tasks now serialize via xact-scoped advisory locks (`pg_try_advisory_xact_lock` / `sp_getapplock` with `@LockOwner='Transaction'`) — auto-released on commit/rollback rather than held via a session-scoped Medallion lock. Cuts the per-iteration lock chatter from 3 round-trips (acquire/release + work) to 1 fold. Custom server tasks that need the **session-scoped** Medallion behaviour (e.g., tasks that span multiple transactions, or call `SaveChangesAsync` more than once per `ExecuteAsync`) must opt out by overriding `LocksWithTransaction => false`. `MessageRouter` does this — it commits once per routed message.
-- **`CounterAggregationInterval` defaults to `60s`** (was `5s`). Counter rows are still written immediately by hot paths; only the aggregation roll-up cadence is relaxed. Dashboard `Statistic` cards will be at most 1 min stale instead of 5 s. If you rely on fresh aggregated counters, set it back: `opt.CounterAggregationInterval = TimeSpan.FromSeconds(5);`.
-- **`MaxPollingInterval` auto-bumps to 5 min when `UseDatabasePush()` is called and the value is still at its default.** Push notifications cover work activation; the long polling fallback exists only to backstop missed notifications, which the listener already drains on reconnect. Explicit overrides on `opt.MaxPollingInterval` are respected — the auto-bump only fires when the value is still the class default. `MessageRoutingInterval` and `OrchestrationInterval` follow the same pattern.
+[Timeout(seconds: 30)]                                            // Delete, PerAttempt
+[Timeout(seconds: 30, Mode = TimeoutMode.Fail)]                   // throws TimeoutException → retried by AddRetry
+[Timeout(seconds: 30, Mode = TimeoutMode.Fail, Scope = TimeoutScope.Total)]   // bounds the entire retry chain
+public class CallSlowApi : IJob { }
 
-### New: bounded server-task batching
+// or per-publish
+await publisher.Enqueue(new GenerateReport(),
+    new JobParameters().WithTimeout(TimeSpan.FromMinutes(5)));
+```
 
-Orchestrator, MessageRouter, ScheduledJobActivation, and StaleJobRecovery now bound their per-iteration work via `WarpWorkerConfiguration.ServerTaskBatchSize` (default `100`). This prevents a single iteration from churning through a multi-thousand-row backlog while holding the orchestration lock; subsequent iterations drain the remainder via `RerunImmediately = true`. Tune up if you've sized your DB to swallow larger batches.
+Two modes (`TimeoutMode`):
+
+- **`Delete`** (default) — pipeline sets `Outcome { State = Deleted }`. **Not** retried by `AddRetry` (the outcome path bypasses retry's `catch`). Use when "kill it and move on" is the right answer.
+- **`Fail`** — pipeline throws `TimeoutException`, which `AddRetry` catches and reschedules. Without `AddRetry`, the job ends `Failed`. Use when a slow upstream may succeed on retry.
+
+Two scopes (`TimeoutScope`):
+
+- **`PerAttempt`** (default) — each attempt gets a fresh budget.
+- **`Total`** — `DeadlineUtc` stamped on publish; once past the deadline, every attempt's timer fires immediately. Bounds total wall-clock to roughly `TimeoutSeconds` plus retry backoff. Only useful with `Mode = Fail`.
+
+Cooperative cancellation only — handlers that ignore the token complete normally, and the timeout doesn't fire after-the-fact. See [the Timeout feature page](features/timeout) for the full breakdown.
+
+**Pipeline ordering rule:** `AddRetry()` MUST be called before `AddTimeout()`. DI insertion order is outer→inner; retry has to wrap timeout to see the `TimeoutException`. `TimeoutAddonOrderingTests` pins this.
+
+### New: `[RateLimit]` addon
+
+Opt-in via `opt.AddRateLimit()`. Throttle jobs sharing a key to N starts per window.
+
+```csharp
+opt.AddConcurrency();  // optional, but MUST come before AddRateLimit
+opt.AddRateLimit();
+
+[RateLimit("sendgrid", count: 10, perSeconds: 60)]                              // Fixed, Skip (defaults)
+[RateLimit("sendgrid", count: 10, perSeconds: 60, Mode = RateLimitMode.Wait)]   // requeue surplus
+[RateLimit("crm", count: 100, perSeconds: 60, Style = RateLimitStyle.Sliding)]  // rolling window
+public class SendEmail : IJob { }
+
+// or per-publish
+new JobParameters().WithRateLimit("sendgrid", 10, TimeSpan.FromSeconds(60));
+```
+
+Two styles (`RateLimitStyle`):
+
+- **`Fixed`** (default) — wall-clock window floor-aligned to global UTC ticks. Cheap, predictable bursts at boundaries.
+- **`Sliding`** — rolling window over the last N starts, defensively trimmed. Smoother distribution; slightly more storage churn per check.
+
+Two outcome policies (`RateLimitMode`):
+
+- **`Skip`** (default) — surplus jobs end `Deleted`.
+- **`Wait`** — surplus jobs are rescheduled via `JobOutcome.RescheduledState` with 100–500 ms jitter on lock contention.
+
+Live state lives in a new `RateLimitBucket` entity; admin overrides in `RateLimitOverride`. Both are contributed only when `AddRateLimit()` is registered. `perSeconds` is capped at 7 days (`MaxWindowSeconds`). The pipeline lock is released after check-and-increment — **not** held during handler execution (unlike `[Mutex]`).
+
+Dashboard CRUD lives at `/warp/ratelimits` and follows the hide-on-404 nav probe.
+
+**Caveats:**
+
+- DB push does **not** accelerate `Wait`-mode reschedules — they land in `State.Scheduled` and depend on `ScheduledJobActivation` polling.
+- Don't put PII in the key — keys appear in `JobLog.Message` and on the dashboard.
+- **Pipeline ordering rule:** `AddConcurrency()` before `AddRateLimit()`. Mutex/Semaphore rejection should not waste a rate-limit token; reversing the order causes the wasted-token bug until the next window rollover.
+
+See [the Rate Limit feature page](features/rate-limit) for the matrix and tuning notes.
+
+### Breaking: cross-addon `IXxxMetadata` property rename
+
+`IConcurrencyMetadata` properties were unprefixed (`Key`, `Limit`, `Mode`) in 0.13.0. All `IXxxMetadata` interfaces share a single backing `Dictionary<string, object>` per job, so bare names silently collided when a job carried both `[Mutex]` and the new `[RateLimit]`. The fix renames every metadata property to its addon namespace:
+
+- `IConcurrencyMetadata.Key` → `ConcurrencyKey`
+- `IConcurrencyMetadata.Limit` → `ConcurrencyLimit`
+- `IConcurrencyMetadata.Mode` → `ConcurrencyMode`
+- `IRateLimitMetadata` ships with `RateLimitKey` / `RateLimitCount` / `RateLimitWindowSeconds` / `RateLimitMode` / `RateLimitStyle`.
+
+The attribute and fluent surfaces (`[Mutex("k")]`, `[Semaphore("k", N)]`, `WithMutex(...)`, `WithSemaphore(...)`) are unchanged — only direct callers of `IConcurrencyMetadata` need updating. Custom pipeline behaviours, test fakes, or third-party integrations that read or set these properties must rename to the prefixed form.
+
+### New: realtime dashboard push (SignalR)
+
+Opt-in via `opt.AddDashboardPush()`. Registers a `WarpDashboardHub` at `${RoutePrefix}/api/hub` plus a `DashboardBroadcaster<TContext>` `BackgroundService`. The broadcaster subscribes to `ServerTaskSignals<TContext>` (third consumer after `Orchestrator` and `MessageRouter`) and emits `JobFinalized` / `MessageEnqueued` events to connected dashboards. Each broadcast carries the current `DashboardStatistics` DTO as the SignalR payload, so N connected clients no longer trigger N × `GET /api/status` refetches.
+
+```csharp
+builder.Services.AddWarp<AppDbContext>(opt =>
+{
+    opt.UsePostgreSql();
+    opt.UseDatabasePush();    // required for multi-server fanout
+    opt.AddDashboardPush();
+});
+```
+
+Coalesce window defaults to 100 ms (`WarpDashboardPushConfiguration.CoalesceWindow`) — burst signals (a 50-job batch finalising) collapse to one broadcast per kind per window.
+
+**Caveats:**
+
+- Multi-server fanout reuses `UseDatabasePush()`. Without it, each server's broadcaster only sees signals from its own workers; clients connected to server A miss events originating on server B until the 30 s safety-net poll.
+- Per-view data (filtered job lists, job detail, logs) stays on event-driven REST refetch. Push is invalidations + the stats DTO, not per-view payloads.
+- Frontend probes `${RoutePrefix}/api/dashboard/push/probe` once at boot and falls back to 30 s polling when the addon is absent (hide-on-404 mirroring `/api/concurrency`).
+
+Auth piggybacks on the existing `WarpUIMiddleware` — both the SignalR negotiate and the WebSocket-upgrade HTTP requests pass through `/api/`, so an auth-protected dashboard requires no extra wiring.
+
+See [the Dashboard Push feature page](features/dashboard-push) for telemetry hooks and tuning.
+
+### Breaking: `ServerTaskSignals<TContext>` moved namespace
+
+`ServerTaskSignals<TContext>` and `ServerTaskSignal` enum moved from `Warp.Worker.Services` to `Warp.Core.Events` so addons can subscribe without taking a dependency on the worker assembly. `Subscribe()` is promoted to `public IDisposable`. Anyone reaching into these types directly (rare — most consumers use the addon surface) needs to update their `using` directive.
 
 ### New: `IJobContext.ReportProgress(name, percent)`
 
@@ -48,13 +145,9 @@ public class GenerateReport : IJobHandler<GenerateReportRequest>
 }
 ```
 
-Percent is clamped to `0..100`. Multiple named bars per job are supported — pass an empty name (or use the `ReportProgress(int percent)` overload) for the single-bar case. The detail page renders one bar per name in the right column above History/Logs; the card is hidden entirely when a job reported no progress.
+Percent is clamped to `0..100`. Multiple named bars per job are supported — pass an empty name (or use the `ReportProgress(int percent)` overload) for the single-bar case. The detail page renders one bar per name in the right column above History/Logs; the card is hidden entirely when a job reported no progress. Reporting is **opt-in per handler** — jobs that don't call `ReportProgress` incur zero overhead and produce no rows.
 
-Reporting is **opt-in per handler** — jobs that don't call `ReportProgress` incur zero overhead and produce no rows.
-
-### How it works
-
-`IJobContext.ReportProgress` writes to an in-memory `JobProgressCollector` (one per running job, mirrors the existing `JobLogCollector`). The worker's existing `RunJobMonitor` loop drains the collector every ~1s during handler execution and on the terminal commit (success / cancel / fail). Each *changed* bar emits one row; unchanged bars emit nothing, so a stalled bar at 47% doesn't churn rows every second. Final values land in the same `SaveChangesAsync` as the terminal `JobLog` row, so cancellation paths preserve pre-cancellation progress consistently with the audit trail.
+`IJobContext.ReportProgress` writes to an in-memory `JobProgressCollector` (one per running job, mirrors the existing `JobLogCollector`). The worker's existing `RunJobMonitor` loop drains the collector every ~1 s during handler execution and on the terminal commit. Each *changed* bar emits one row; unchanged bars emit nothing, so a stalled bar at 47% doesn't churn rows every second. Final values land in the same `SaveChangesAsync` as the terminal `JobLog` row.
 
 Progress is **display telemetry, not state** — it never participates in the state machine, the orchestrator, or worker scheduling.
 
@@ -65,16 +158,49 @@ void ReportProgress(string name, int percent);
 void ReportProgress(int percent);
 ```
 
-Anyone with a custom `IJobContext` implementation (test fakes, third-party pipeline integrations) needs to add these two members. Both can usually be empty bodies if your fake doesn't care about progress. The concrete `JobContext` shipped in `Warp.Core` implements them via an internal collector reference.
+Custom `IJobContext` implementations (test fakes, third-party pipeline integrations) need to add these two members. Both can be empty bodies if the fake doesn't care about progress. The concrete `JobContext` shipped in `Warp.Core` implements them via an internal collector reference.
+
+### Perf: server-task idle query rate down ~92%
+
+With `UseDispatcher = true` + `UseDatabasePush()` and default intervals, idle query rate drops from ~10–15 q/s to ~1.2 q/s — measured by `Warp.PerfTest --mode idle` against PG with an `ActivityListener` on the Npgsql source. See [perf-results.md](https://github.com/moberghr/warp/blob/main/docs/perf-results.md#idle-queries-per-second-server-task-overhead) for the full matrix.
+
+### Breaking: server-task default changes
+
+The query-rate work changes three defaults. Most users won't notice — the bookkeeping these defaults gate is internal — but anyone tuning intervals or implementing custom `IServerTask`s should review:
+
+- **`IServerTask.LocksWithTransaction` defaults to `true`.** Server tasks now serialize via xact-scoped advisory locks (`pg_try_advisory_xact_lock` / `sp_getapplock` with `@LockOwner='Transaction'`) — auto-released on commit/rollback rather than held via a session-scoped Medallion lock. Cuts the per-iteration lock chatter from 3 round-trips (acquire/release + work) to 1 fold. Custom server tasks that need the **session-scoped** Medallion behaviour (e.g., tasks that span multiple transactions, or call `SaveChangesAsync` more than once per `ExecuteAsync`) must opt out by overriding `LocksWithTransaction => false`. `MessageRouter` does this — it commits once per routed message.
+- **`CounterAggregationInterval` defaults to `60s`** (was `5s`). Counter rows are still written immediately by hot paths; only the aggregation roll-up cadence is relaxed. Dashboard `Statistic` cards will be at most 1 min stale instead of 5 s. If you rely on fresh aggregated counters, set it back: `opt.CounterAggregationInterval = TimeSpan.FromSeconds(5);`.
+- **`MaxPollingInterval` auto-bumps to 5 min when `UseDatabasePush()` is called and the value is still at its default.** Push notifications cover work activation; the long polling fallback exists only to backstop missed notifications, which the listener already drains on reconnect. Explicit overrides on `opt.MaxPollingInterval` are respected — the auto-bump only fires when the value is still the class default. `MessageRoutingInterval` and `OrchestrationInterval` follow the same pattern.
+
+### New: bounded server-task batching
+
+Orchestrator, MessageRouter, ScheduledJobActivation, and StaleJobRecovery now bound their per-iteration work via `WarpWorkerConfiguration.ServerTaskBatchSize` (default `100`). This prevents a single iteration from churning through a multi-thousand-row backlog while holding the orchestration lock; subsequent iterations drain the remainder via `RerunImmediately = true`. Tune up if you've sized your DB to swallow larger batches.
+
+### Fix: PG provider honours `NpgsqlDataSource`
+
+`Warp.Provider.PostgreSql` previously opened raw `NpgsqlConnection`s from the EF connection string for its distributed lock, semaphore, and LISTEN/NOTIFY transport. That bypassed any `NpgsqlDataSource` attached to the `DbContext` options — Aspire's `AddAzureNpgsqlDataSource` against Postgres Flexible Server with Managed Identity, custom `NpgsqlDataSourceBuilder` config (Vault-issued passwords, custom cert validation, channel binding), and similar setups all broke with a `28000 / no pg_hba.conf entry` from the first `AddOrUpdateRecurringJob` call.
+
+`UsePostgreSql<TContext>` now reads `NpgsqlOptionsExtension.DataSource` off the `DbContextOptions<TContext>` and threads it through to `PostgresLockProvider`, `PostgresSemaphoreProvider`, and `PostgresNotificationTransport` — lock + semaphore via Medallion's `PostgresDistributedSynchronizationProvider(DbDataSource)`, transport via `dataSource.OpenConnectionAsync`. When the data source isn't present (plain `UseNpgsql(connectionString)`), behaviour is unchanged.
+
+No public-surface breaking changes — all new entry points are additive ctors plus a private resolver.
 
 ### Schema additions
 
-Two new nullable columns on `JobLog`:
+Two new tables (contributed only when `AddRateLimit()` is registered):
 
-- `Name` (`nvarchar(100)?` / `varchar(100)?`) — bar name; null for all non-`Progress` rows
+- `RateLimitBucket` — live per-key window state
+- `RateLimitOverride` — admin runtime overrides
+
+Two new nullable columns on `JobLog` (always present):
+
+- `Name` (`nvarchar(100)?` / `varchar(100)?`) — progress bar name; null for all non-`Progress` rows
 - `Value` (`smallint?`) — percent `0..100`; null for all non-`Progress` rows
 
-No new index — the existing `(JobId)` index serves the detail-page read. Existing deployments need a one-step EF migration to add the two columns; no data backfill required.
+No new indexes — the existing `(JobId)` index serves the progress detail-page read; rate-limit reads are keyed by bucket name. Existing deployments need a one-step EF migration to add the two `JobLog` columns plus the two new tables (the latter only when opting into `AddRateLimit()`); no data backfill required.
+
+### Dependencies
+
+`@microsoft/signalr@^9.0.6` added to the UI for the new dashboard-push transport. Eleven transitive Dependabot alerts cleared via lockfile bumps (no direct upgrades).
 
 ## 0.13.0
 

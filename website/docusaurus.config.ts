@@ -99,6 +99,11 @@ const config: Config = {
       respectPrefersColorScheme: true,
       disableSwitch: false,
     },
+    docs: {
+      sidebar: {
+        autoCollapseCategories: true,
+      },
+    },
     navbar: {
       title: 'Warp',
       items: [
