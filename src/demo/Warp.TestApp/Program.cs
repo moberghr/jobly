@@ -419,7 +419,7 @@ app.MapPost("/seed/sagas", async (IPublisher publisher) =>
     {
         sagas = "/warp/sagas",
         completed = "ORD-S-001 + ORD-S-002",
-        pending = "ORD-S-003 (waiting for OrderTimeout)",
+        pending = "ORD-S-003 — fires OrderTimeout in ~30s, then compensates and completes",
     });
 });
 

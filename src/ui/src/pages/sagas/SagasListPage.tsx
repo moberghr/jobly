@@ -8,6 +8,7 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import { useRefreshKey } from '@/hooks/useRefreshKey';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import type { SagaListItem, SagaStats, PagedList } from '@/types';
 import * as api from '@/api';
 
@@ -47,9 +48,12 @@ export default function SagasListPage() {
 
   useEffect(() => {
     fetchAll();
-    const id = setInterval(fetchAll, 5000);
-    return () => clearInterval(id);
   }, [refreshKey, fetchAll]);
+
+  // Live updates: saga lifecycle is driven by message arrivals (proxy commits inside
+  // SaveChanges, which emits MessageEnqueued for routed children and JobFinalized when
+  // those jobs settle). Either event indicates a saga may have changed.
+  useRealtimeRefetch(['JobFinalized', 'MessageEnqueued'], fetchAll);
 
   if (unavailable) {
     return (

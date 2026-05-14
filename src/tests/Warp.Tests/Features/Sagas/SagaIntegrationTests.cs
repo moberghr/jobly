@@ -177,6 +177,22 @@ public abstract class SagaIntegrationTestsBase : IntegrationTestBase
 
         sawBusy.ShouldBeTrue("expected a 'busy for contended' requeue log within 10s");
 
+        // Verify jitter survives to the DB: the requeued routed-message job sits in Scheduled
+        // with ScheduleTime in the near future, not Enqueued at now. Without jitter, N workers
+        // hitting the same busy mutex would lock-step into a tight fetch→busy→fetch loop. The
+        // 50–250ms jitter prevents sympathy.
+        var jitteredJob = await server.CreateContext().Set<Warp.Core.Entities.Job>()
+            .AsNoTracking()
+            .Where(j => j.CurrentState == Warp.Core.Enums.State.Scheduled)
+            .Where(j => j.Type != null && j.Type.Contains("BarrierStartMessage"))
+            .OrderByDescending(j => j.CreateTime)
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
+
+        jitteredJob.ShouldNotBeNull("expected the requeued message-job to sit in Scheduled state");
+        var delay = jitteredJob.ScheduleTime - jitteredJob.CreateTime;
+        delay.TotalMilliseconds.ShouldBeGreaterThan(0, "ScheduleTime must be in the future relative to CreateTime (jitter applied)");
+        delay.TotalMilliseconds.ShouldBeLessThan(1000, "jitter should be capped well under 1s");
+
         // Release the barrier so the first handler completes and the test doesn't hang in cleanup.
         signal.CanFinish.Release(10);
     }

@@ -73,7 +73,12 @@ public static class WarpTelemetry
     public static readonly Counter<long> SagasRequeued = Meter.CreateCounter<long>(
         "warp.sagas.requeued",
         unit: "{saga}",
-        description: "Total saga messages requeued due to mutex contention or optimistic-concurrency conflict. Reason tag: busy | version.");
+        description: "Total saga messages requeued due to mutex contention or optimistic-concurrency conflict. Reason tag: busy | version | unique.");
+
+    public static readonly UpDownCounter<long> SagasLive = Meter.CreateUpDownCounter<long>(
+        "warp.sagas.live",
+        unit: "{saga}",
+        description: "Per-process net saga count (incremented on start, decremented on completion). Tag: saga_type. Aggregate across worker replicas to estimate cluster-wide live sagas; for an authoritative count query the dashboard's saga stats endpoint instead.");
 
     /// <summary>
     /// Starts the consumer activity for handler execution when an <see cref="ActivityListener"/>

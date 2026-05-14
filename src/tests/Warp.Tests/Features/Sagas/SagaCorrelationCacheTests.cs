@@ -114,6 +114,19 @@ public class SagaCorrelationCacheTests
     }
 
     [TimedFact]
+    public void GetCorrelationKey_StringWithEmbeddedControlChar_PreservedAsLiteral()
+    {
+        // Trim removes leading/trailing whitespace including \r\n\t; embedded control chars
+        // must NOT be normalized away — they're part of the user-supplied identifier and
+        // round-trip storage + dashboard search must preserve them exactly.
+        var cache = new SagaCorrelationCache();
+
+        var key = cache.GetCorrelationKey(new GoodMessage { OrderId = "O-1\nO-2" });
+
+        key.ShouldBe("O-1\nO-2");
+    }
+
+    [TimedFact]
     public void GetCorrelationKey_StringWithSurroundingWhitespace_TrimmedToCanonical()
     {
         var cache = new SagaCorrelationCache();

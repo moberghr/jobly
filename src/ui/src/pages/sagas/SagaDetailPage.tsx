@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { useRefreshKey } from '@/hooks/useRefreshKey';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import type { SagaDetail, SagaActivityResponse } from '@/types';
 import * as api from '@/api';
 
@@ -43,9 +44,12 @@ export default function SagaDetailPage() {
 
   useEffect(() => {
     fetchData();
-    const intervalId = setInterval(fetchData, 5000);
-    return () => clearInterval(intervalId);
   }, [refreshKey, fetchData]);
+
+  // Live updates via the SignalR push bus: every routed message arrival or job
+  // finalization is a candidate event for the saga's state moving. 30s safety net
+  // catches anything the push channel misses (and matches other detail pages).
+  useRealtimeRefetch(['JobFinalized', 'MessageEnqueued'], fetchData);
 
   const forceComplete = async () => {
     if (!saga || confirmInput !== saga.correlationKey) return;

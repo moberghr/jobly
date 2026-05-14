@@ -21,7 +21,9 @@ builder.Services.AddWarpWorker<AppDbContext>(opt =>
 builder.Services.AddSagaHandler<OrderWorkflow>();
 ```
 
-`AddSagas()` contributes the `Saga` entity to your DbContext (run `dotnet ef migrations add AddWarpSagas` to pick it up) and registers the infrastructure. `AddSagaHandler<>()` reflects over the handler's implemented `ISagaHandler<TSaga, TMessage>` interfaces and registers a `SagaHandlerProxy<TSaga, TMessage>` as `IMessageHandler<TMessage>` for each.
+`AddSagas()` contributes **two entities** to your DbContext — `SagaState` (one row per live saga, deleted on completion) and `SagaJobLink` (the activity-log join table, cleaned up via FK cascade when the saga is removed). Run `dotnet ef migrations add AddWarpSagas` to generate the migration; both tables appear in it by design.
+
+`AddSagaHandler<>()` reflects over the handler's implemented `ISagaHandler<TSaga, TMessage>` interfaces and registers a `SagaHandlerProxy<TSaga, TMessage>` as `IMessageHandler<TMessage>` for each.
 
 ## Defining a saga
 
@@ -323,6 +325,10 @@ This pairs with `ITimeoutMessage`'s missing-saga silent-drop behavior — comple
 - **Sagas attach only to `IMessage`, not `IJob`.** Jobs are single-handler, single-shot — they don't fit the multi-message-correlation shape. Wrap a job in a message if you need both.
 - **No audit history after completion.** Sagas are deleted on `MarkCompleted()`, so the dashboard's `CompletedToday` stat is always 0 and there's no historical row to query. The `warp.sagas.completed` OTel counter records the count but not individual saga IDs. If you need post-completion traceability, write your own audit event from the handler before calling `MarkCompleted()`.
 - **No automatic expiry.** Sagas live until `MarkCompleted()` or operator `ForceComplete`. A misconfigured saga that never completes accumulates forever. Schedule a self-cleanup `ITimeoutMessage` if you need a hard ceiling.
+- **Per-message pipeline addons are job-only.** `[Timeout]`, `[RateLimit]`, `[Concurrency]` / `[Mutex]` / `[Semaphore]` pipeline behaviors gate on `IJob` and skip `IMessage` requests by design. Attaching these attributes to a saga message has no effect — no error, no warning. If you need rate-limiting, timeouts, or extra mutual-exclusion around saga work, apply the attribute to the child `IJob` types the saga publishes from inside the handler, not to the saga message itself.
+- **Saga handlers don't receive `IJobContext` directly.** `ISagaHandler<TSaga, TMessage>.HandleAsync(saga, message, ct)` takes no context parameter (unlike `NotFoundAsync`). To access metadata, the current job's id, or `IJobContext.ReportProgress`, inject `IJobContext` via the handler's constructor — it's registered as scoped and resolves to the same context the proxy uses.
+- **No per-tenant access controls on the dashboard.** Any operator with dashboard access can `ForceComplete` any saga across all tenants. This is the same limitation as every other dashboard operation. Enforce multi-tenant isolation upstream of the dashboard — separate Warp instances per tenant, or a custom `IWarpAuthorizationFilter` that scopes by tenant claim.
+- **Saga type strings stored in the database are assembly-qualified.** `SagaState.Type` is `typeof(TSaga).FullName` (namespace + class). Renaming or moving a saga class without a data migration step **orphans all in-flight rows for that type** — the proxy looks up by `Type` string equality. Operators viewing the dashboard see the raw type strings, which include the namespace prefix. Compound effect: the type filter dropdown shows `MyCompany.Workflows.OrderSaga` while the activity log shows the short message-class name. Cosmetic inconsistency for v1.
 
 ## Telemetry
 
@@ -330,17 +336,76 @@ Counters (emitted via `WarpTelemetry.Meter`):
 
 - `warp.sagas.started` — tagged `saga_type`
 - `warp.sagas.completed` — tagged `saga_type`
-- `warp.sagas.requeued` — tagged `saga_type` and `reason` (`busy` | `version`)
+- `warp.sagas.requeued` — tagged `saga_type` and `reason` (`busy` | `version` | `unique`)
+- `warp.sagas.live` — `UpDownCounter` tagged `saga_type`. +1 on saga start, -1 on completion. **Per-process**: each worker replica reports its own net delta. Sum across replicas in your OTel backend to estimate cluster-wide live sagas. For an authoritative point-in-time count, query the dashboard `/api/sagas/stats` endpoint, which reads `SagaState` directly.
+
+Saga lifetime (CreatedAt → completion) is not currently instrumented as a histogram. To alert on long-running sagas, query `SagaState.UpdatedAt` (every message touch bumps it, so stale-looking sagas surface there). See the **Operational notes** section.
 
 Wire these into your OpenTelemetry pipeline via the standard `Warp` meter source.
 
 ## Migration
 
-`AddSagas()` adds a single `Saga` entity to your DbContext model. After enabling the addon, run:
+`AddSagas()` contributes **two entities** to your DbContext model. After enabling the addon, run:
 
 ```bash
 dotnet ef migrations add AddWarpSagas
 dotnet ef database update
 ```
 
-The migration adds one table (`warp.saga` by default) with a primary key on `id`, a unique index on `(type, correlation_key)`, and a `Guid` row version. No changes to existing Warp tables.
+The migration adds two tables (default schema `warp`, exact names depend on your naming convention — snake_case versions shown):
+
+- **`warp.saga_state`** — one row per live saga. Primary key on `id`. Unique index on `(type, correlation_key)`. Index on `created_at` (drives the "started today" stat). `Guid` row version for optimistic concurrency.
+- **`warp.saga_job_link`** — activity-log extension table written by the saga proxy on every invocation. Composite PK `(saga_id, job_id)`. Index on `(saga_id, created_at)` for time-ordered reads. Foreign key to `saga_state.id` with **ON DELETE CASCADE** — when a saga is removed (`MarkCompleted()` or `ForceComplete`), its links are atomically deleted by the same `SaveChanges`. The FK cascade is the belt-and-braces backstop for any code path that bypasses the proxy's change-tracker-staged `RemoveRange`.
+
+No changes to existing Warp tables.
+
+### Renaming a saga property safely
+
+Sagas serialize their state to a JSON column. Renaming a property on your saga subclass without a data migration step **silently loses the field** for in-flight rows: `UnmappedMemberHandling.Skip` (used by the deserializer for forward compatibility) drops the old JSON key, and the new property loads with its default value. For long-lived sagas this means lost business state.
+
+Safe rolling-deploy pattern:
+
+1. **Deploy A — add the new property alongside the old.** Both serialize to the JSON column. Read from whichever is populated:
+   ```csharp
+   public string CustomerEmail { get; set; } = "";  // old
+   public string CustomerEmailAddress { get; set; } = "";  // new
+   public string Email => string.IsNullOrEmpty(CustomerEmailAddress) ? CustomerEmail : CustomerEmailAddress;
+   ```
+   Handlers write to **both**.
+2. **Deploy B — stop writing to the old property.** Continue reading via the fallback. All new saga writes use only the new property; old rows still carry the old JSON key.
+3. **Deploy C — remove the old property.** Any saga still carrying the old JSON key has it dropped silently on load (no field to deserialize into); the new property's default is fine because Deploy A populated it before the old one was discarded.
+
+For short-lived sagas (minutes) the dual-write phase can be a single deploy; for sagas that span days, hold each phase until the lifetime of any pre-deploy saga has elapsed.
+
+## Operational notes
+
+### Finding stuck sagas
+
+`SagaState.UpdatedAt` is bumped on every message touch (even no-op handlers — this is the "last touched" signal, not "last meaningful change"). Operators investigating a saga backlog query for sagas not touched in N days:
+
+```sql
+SELECT type, correlation_key, created_at, updated_at
+FROM warp.saga_state
+WHERE updated_at < NOW() - INTERVAL '7 days'
+ORDER BY updated_at ASC;
+```
+
+The dashboard sorts the list page by `UpdatedAt` descending (most recently touched first). To find the *oldest-untouched* sagas, query the database directly.
+
+### `ForceComplete` returned 404 / "not found"
+
+The dashboard's force-complete button calls `DELETE /api/sagas/{id}`. If the saga's mutex is held by an in-flight handler longer than 5 seconds, the service returns `false` (surfaced as 404). Diagnostic path:
+
+1. The structured-log entry (`LogLevel.Warning`) records the saga id + mutex name. Look in your application logs for `"Force-complete on saga {SagaId} ... aborted: mutex held by in-flight handler"`.
+2. Find the holder: the saga's activity log will show a job in `Processing` state. Click through to the job detail — its `Last Keep-Alive` timestamp tells you whether the handler is alive or stalled.
+3. If the handler is genuinely stuck and you've confirmed the worker is dead, `StaleJobRecovery` will release the lock automatically once `LastKeepAlive` exceeds `InvisibilityTimeout` (default 1 minute). Wait or restart the worker.
+
+### Worker crash mid-handler — idempotency contract
+
+If a worker dies after the saga handler returns but before `SagaStore.SaveChangesAsync` commits, all of the handler's state changes are lost. The distributed lock (Postgres advisory lock or SQL Server `SqlDistributedSemaphore`) releases automatically when the worker's connection drops. `StaleJobRecovery` requeues the routed message; the next worker re-runs the handler from the **pre-crash saga state**.
+
+This means saga handlers must be safe to **replay from old state**. Practical implications:
+
+- A handler that calls `_publisher.Enqueue(new ShipOrder(...))` and then a worker crash → the next attempt re-publishes `ShipOrder`. Use idempotency keys on the downstream job or a check-before-publish pattern (`if (saga.ShipmentEnqueued) return;`).
+- A handler that performs an external side effect (HTTP call, email send) must check whether the side effect already happened before retrying, or use an idempotent operation.
+- Pure in-process mutations on the saga object are always safe — they're discarded by `DiscardPendingChanges()` and re-applied on retry.

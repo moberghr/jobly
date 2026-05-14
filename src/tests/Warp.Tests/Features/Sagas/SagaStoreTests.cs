@@ -265,6 +265,44 @@ public abstract class SagaStoreTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
+    public async Task Load_StateJsonMissingNewProperty_LoadsWithDefault_AndPersistsAfterUpdate()
+    {
+        // Reverse schema-evolution scenario: an old row was written without a property that
+        // the current TestSaga class now declares (e.g. `Counter`). System.Text.Json's
+        // default for an absent member is the property's default value. After a handler
+        // updates the property, the next Update + SaveChanges must persist it; the next
+        // Load must read it back. Closes the documented additive direction of the policy.
+        var sagaId = Guid.NewGuid();
+        var ctx = _fixture.CreateContext();
+        ctx.Set<SagaState>().Add(new SagaState
+        {
+            Id = sagaId,
+            Type = typeof(TestSaga).FullName!,
+            CorrelationKey = "additive",
+            StateJson = "{}",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+        await ctx.SaveChangesAsync(TestCancellation);
+
+        var actCtx = _fixture.CreateContext();
+        var store = new SagaStore<TestContext>(actCtx, TimeProvider.System, new NullNotificationTransport(), new FakeExceptionClassifier());
+        var loaded = await store.Load<TestSaga>("additive", TestCancellation);
+        loaded.ShouldNotBeNull();
+        loaded.Counter.ShouldBe(0); // default — absent from JSON
+
+        loaded.Counter = 77;
+        store.Update(loaded);
+        await store.SaveChangesAsync(TestCancellation);
+
+        var verifyCtx = _fixture.CreateContext();
+        var roundTripStore = new SagaStore<TestContext>(verifyCtx, TimeProvider.System, new NullNotificationTransport(), new FakeExceptionClassifier());
+        var reloaded = await roundTripStore.Load<TestSaga>("additive", TestCancellation);
+        reloaded.ShouldNotBeNull();
+        reloaded.Counter.ShouldBe(77);
+    }
+
+    [TimedFact]
     public async Task Add_GuidKeyedSagaSubclass_StoresOnlySubclassStateInJson_AndRoundTrips()
     {
         var orderId = Guid.NewGuid();

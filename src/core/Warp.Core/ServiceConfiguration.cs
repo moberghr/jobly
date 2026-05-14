@@ -477,6 +477,11 @@ public static class ServiceConfiguration
         // the correlation key after completion is immediately legal — same pattern as Wolverine.
         sagaState.HasIndex(p => new { p.Type, p.CorrelationKey }).IsUnique();
 
+        // SagaQueryService.GetStats filters WHERE CreatedAt >= todayStart for the StartedToday
+        // counter. Delete-on-completion bounds the table to live sagas only, but a deployment
+        // with many long-lived sagas still benefits from an index lookup over a full scan.
+        sagaState.HasIndex(p => p.CreatedAt);
+
         sagaState.Metadata.SetSchema(schema);
     }
 }

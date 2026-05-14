@@ -11,9 +11,21 @@ namespace Warp.Core.Sagas;
 /// property's name matches a high-confidence PII regex.
 /// </summary>
 /// <remarks>
+/// <para>
+/// <b>Scope is deliberately narrow.</b> The regex covers the 15 most common bare-name PII
+/// fields (<c>Email</c>, <c>Phone</c>, <c>SSN</c>, <c>CreditCard</c>, etc.). Compound names
+/// like <c>UserEmail</c>, <c>CustomerPhone</c>, or <c>EmployeeSSN</c> are <b>not</b> blocked —
+/// these often hold opaque IDs (numeric customer ID, business-tenant identifier) rather than
+/// raw PII, and a broader regex would force most real applications to either rename properties
+/// or set <c>IsAnonymized</c> on every saga. The check is a tripwire for the most obvious
+/// mistakes, not a comprehensive PII scanner. Application code is responsible for ensuring
+/// non-obvious PII property names do not reach correlation keys.
+/// </para>
+/// <para>
 /// False positives are inevitable. Users who have a property genuinely named <c>Email</c> but
 /// holding an opaque token (e.g. a hashed identifier) can set
 /// <see cref="CorrelateAttribute.IsAnonymized"/> to suppress the check.
+/// </para>
 /// </remarks>
 internal static partial class SagaPiiCheck
 {

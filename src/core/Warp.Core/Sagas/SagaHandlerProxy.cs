@@ -106,16 +106,39 @@ public sealed class SagaHandlerProxy<TSaga, TMessage> : IMessageHandler<TMessage
             return;
         }
 
+        bool started;
+        bool completed;
         if (saga == null)
         {
-            await HandleStartsSaga(message, correlationKey, cancellationToken);
-            await TrySaveAsync(correlationKey, cancellationToken);
-
-            return;
+            (started, completed) = await HandleStartsSaga(message, correlationKey, cancellationToken);
+        }
+        else
+        {
+            started = false;
+            completed = await HandleExistingSaga(saga, message, cancellationToken);
         }
 
-        await HandleExistingSaga(saga, message, cancellationToken);
         await TrySaveAsync(correlationKey, cancellationToken);
+
+        // Lifecycle counters fire only on a clean save. If TrySaveAsync hit a conflict it set
+        // the requeue Outcome; firing here would double-count when the retry runs the same
+        // handler and reaches the same Started/Completed branches again. The outcome-gate
+        // also covers any other path that pre-set an Outcome before we got here.
+        if (_jobContext.Outcome == null)
+        {
+            var sagaType = new KeyValuePair<string, object?>("saga_type", typeof(TSaga).Name);
+            if (started)
+            {
+                WarpTelemetry.SagasStarted.Add(1, sagaType);
+                WarpTelemetry.SagasLive.Add(1, sagaType);
+            }
+
+            if (completed)
+            {
+                WarpTelemetry.SagasCompleted.Add(1, sagaType);
+                WarpTelemetry.SagasLive.Add(-1, sagaType);
+            }
+        }
     }
 
     private void HandleExpiredTimeout(string correlationKey)
@@ -131,7 +154,7 @@ public sealed class SagaHandlerProxy<TSaga, TMessage> : IMessageHandler<TMessage
         await _inner.NotFoundAsync(message, _jobContext, cancellationToken);
     }
 
-    private async Task HandleStartsSaga(TMessage message, string correlationKey, CancellationToken cancellationToken)
+    private async Task<(bool started, bool completed)> HandleStartsSaga(TMessage message, string correlationKey, CancellationToken cancellationToken)
     {
         var saga = new TSaga { CorrelationKey = correlationKey };
         await _inner.HandleAsync(saga, message, cancellationToken);
@@ -139,23 +162,22 @@ public sealed class SagaHandlerProxy<TSaga, TMessage> : IMessageHandler<TMessage
         if (saga.IsCompleted)
         {
             // [StartsSaga] message that completes the saga in the same call (rare but legal).
-            // Nothing to persist for the saga itself — never inserted. Both counters fire so
-            // observability records the ephemeral saga. The caller still runs TrySaveAsync
-            // after we return: the handler may have invoked the publisher to add child rows,
-            // and that commit must fire its notifications via SagaStore.SaveChangesAsync rather
-            // than the worker's outbox (which sees the rows Unchanged by then).
-            WarpTelemetry.SagasStarted.Add(1, new KeyValuePair<string, object?>("saga_type", typeof(TSaga).Name));
-            WarpTelemetry.SagasCompleted.Add(1, new KeyValuePair<string, object?>("saga_type", typeof(TSaga).Name));
-
-            return;
+            // Nothing to persist for the saga itself — never inserted. The caller still runs
+            // TrySaveAsync after we return: the handler may have invoked the publisher to add
+            // child rows, and that commit must fire its notifications via
+            // SagaStore.SaveChangesAsync rather than the worker's outbox (which sees the rows
+            // Unchanged by then). Both lifecycle counters (started + completed) fire in
+            // ProcessAsync once the save lands, so an ephemeral saga still gets observability.
+            return (started: true, completed: true);
         }
 
         _store.Add(saga);
         _store.RecordJobLink(saga.Id, _jobContext.JobId);
-        WarpTelemetry.SagasStarted.Add(1, new KeyValuePair<string, object?>("saga_type", typeof(TSaga).Name));
+
+        return (started: true, completed: false);
     }
 
-    private async Task HandleExistingSaga(TSaga saga, TMessage message, CancellationToken cancellationToken)
+    private async Task<bool> HandleExistingSaga(TSaga saga, TMessage message, CancellationToken cancellationToken)
     {
         await _inner.HandleAsync(saga, message, cancellationToken);
 
@@ -163,13 +185,14 @@ public sealed class SagaHandlerProxy<TSaga, TMessage> : IMessageHandler<TMessage
         {
             _store.Remove(saga);
             await _store.RemoveLinksForSagaAsync(saga.Id, cancellationToken);
-            WarpTelemetry.SagasCompleted.Add(1, new KeyValuePair<string, object?>("saga_type", typeof(TSaga).Name));
 
-            return;
+            return true;
         }
 
         _store.Update(saga);
         _store.RecordJobLink(saga.Id, _jobContext.JobId);
+
+        return false;
     }
 
     private async Task TrySaveAsync(string correlationKey, CancellationToken cancellationToken)

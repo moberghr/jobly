@@ -1,4 +1,3 @@
-using Warp.Core.Handlers;
 using Warp.Core.Sagas;
 
 namespace Warp.Core.Handlers;
@@ -41,7 +40,9 @@ public sealed class OrderTimeout : ITimeoutMessage
     [Correlate]
     public string OrderId { get; set; } = string.Empty;
 
-    public TimeSpan Delay => TimeSpan.FromMinutes(5);
+    // Short for the demo so the timeout-after-completion path is observable within seconds.
+    // Real workflows would set this to minutes-to-hours matching their business deadline.
+    public TimeSpan Delay => TimeSpan.FromSeconds(30);
 }
 
 public sealed class OrderSagaWorkflow :

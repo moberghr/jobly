@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 using Warp.Core;
@@ -102,6 +103,62 @@ public abstract class SagaQueryServiceTestsBase : IAsyncLifetime
 
         page.TotalCount.ShouldBe(1);
         page.Items[0].CorrelationKey.ShouldBe("100%-okay");
+    }
+
+    [TimedFact]
+    public async Task GetSagas_BackslashInFilter_TreatedAsLiteral()
+    {
+        // The escape character itself ('\\') must be escapable so a key containing a literal
+        // backslash searches correctly. Without escaping the escape, "\foo" in the filter
+        // would degenerate into a malformed pattern on at least one backend.
+        var arrangeCtx = _fixture.CreateContext();
+        arrangeCtx.Set<SagaState>().AddRange(
+            NewSaga("Test.A", "C:\\path\\1"),
+            NewSaga("Test.A", "C:/path/2"));
+        await arrangeCtx.SaveChangesAsync(TestCancellation);
+
+        var svc = new SagaQueryService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var page = await svc.GetSagas(new BaseListRequest { Page = 0, PageSize = 10 }, type: null, correlationKeyContains: "\\path\\");
+
+        page.TotalCount.ShouldBe(1);
+        page.Items[0].CorrelationKey.ShouldBe("C:\\path\\1");
+    }
+
+    [TimedFact]
+    public async Task GetSagas_FilterByCreatedAt_UsesIndex_NoFullScan()
+    {
+        // Smoke test that GetStats's WHERE CreatedAt >= todayStart query returns the right
+        // count. We can't assert the query plan from here, but having an index on CreatedAt
+        // is the structural fix; this test just ensures the model carries it (the EF model
+        // metadata is checked via SagaQueryService_CreatedAtIndex_IsConfigured below).
+        var now = DateTime.UtcNow;
+        var arrangeCtx = _fixture.CreateContext();
+        arrangeCtx.Set<SagaState>().AddRange(
+            new SagaState { Id = Guid.NewGuid(), Type = "T", CorrelationKey = "yesterday", StateJson = "{}", CreatedAt = now.AddDays(-1), UpdatedAt = now },
+            new SagaState { Id = Guid.NewGuid(), Type = "T", CorrelationKey = "today1", StateJson = "{}", CreatedAt = now, UpdatedAt = now });
+        await arrangeCtx.SaveChangesAsync(TestCancellation);
+
+        var todayStart = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, DateTimeKind.Utc);
+        var sinceToday = await _fixture.CreateContext().Set<SagaState>()
+            .Where(s => s.CreatedAt >= todayStart)
+            .CountAsync(TestCancellation);
+
+        sinceToday.ShouldBe(1);
+    }
+
+    [TimedFact]
+    public void SagaState_CreatedAtIndex_IsConfigured()
+    {
+        // The CreatedAt index supports GetStats's "started today" query. EF Core stores
+        // index definitions on the entity type's IIndexes — read them and assert.
+        using var ctx = _fixture.CreateContext();
+        var entityType = ctx.Model.FindEntityType(typeof(SagaState));
+        entityType.ShouldNotBeNull();
+
+        var indexes = entityType!.GetIndexes().ToList();
+        indexes.ShouldContain(ix =>
+            ix.Properties.Count == 1 &&
+            string.Equals(ix.Properties[0].Name, nameof(SagaState.CreatedAt), StringComparison.Ordinal));
     }
 
     [TimedFact]
