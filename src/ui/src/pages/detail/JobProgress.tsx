@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Panel, PanelHeader } from '@/components/v2/Panel';
 
 interface BatchProgress {
   totalJobs: number;
@@ -14,54 +14,65 @@ interface JobProgressProps {
 
 export function JobProgress({ jobId, batch, reportedBars }: JobProgressProps) {
   const jobContext = JSON.stringify({ jobId });
-  const hasBatch = batch && batch.totalJobs > 0;
-  const hasBars = reportedBars && reportedBars.length > 0;
+  const hasBatch = !!batch && batch.totalJobs > 0;
+  const hasBars = !!reportedBars && reportedBars.length > 0;
 
-  if (!hasBatch && !hasBars) return null;
+  if (!hasBatch && !hasBars) {
+    return null;
+  }
 
   const done = batch ? batch.completedJobs + batch.failedJobs : 0;
-  const pct = hasBatch ? Math.round((done / batch.totalJobs) * 100) : 0;
-  const greenPct = hasBatch ? (batch.completedJobs / batch.totalJobs) * 100 : 0;
-  const redPct = hasBatch ? (batch.failedJobs / batch.totalJobs) * 100 : 0;
+  const pct = hasBatch && batch ? Math.round((done / batch.totalJobs) * 100) : 0;
+  const greenPct = hasBatch && batch ? (batch.completedJobs / batch.totalJobs) * 100 : 0;
+  const redPct = hasBatch && batch ? (batch.failedJobs / batch.totalJobs) * 100 : 0;
 
   return (
     <>
-      {hasBatch && (
+      {hasBatch && batch && (
         <div data-warp-slot="detail.progress" data-warp-context={jobContext} key={`progress-${jobId}`}>
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Progress</CardTitle></CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4">
-                <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden flex">
-                  {greenPct > 0 && <div className="h-full bg-green-500 transition-all" style={{ width: `${greenPct}%` }} />}
-                  {redPct > 0 && <div className="h-full bg-red-500 transition-all" style={{ width: `${redPct}%` }} />}
-                </div>
-                <span className="text-sm font-medium">{done}/{batch.totalJobs} ({pct}%)</span>
+          <Panel>
+            <PanelHeader
+              eyebrow="Progress"
+              action={
+                <span className="mono text-[11px] text-text-mute">
+                  {done}/{batch.totalJobs} · {pct}%
+                </span>
+              }
+            />
+            <div className="px-4 py-3">
+              <div className="flex h-3 overflow-hidden rounded-full bg-panel-2">
+                {greenPct > 0 && (
+                  <div className="h-full transition-all" style={{ width: `${greenPct}%`, background: 'var(--warp-green)' }} />
+                )}
+                {redPct > 0 && (
+                  <div className="h-full transition-all" style={{ width: `${redPct}%`, background: 'var(--warp-red)' }} />
+                )}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
       )}
-      {hasBars && (
+      {hasBars && reportedBars && (
         <div data-warp-slot="detail.reportedProgress" data-warp-context={jobContext} key={`reported-progress-${jobId}`}>
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Reported Progress</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {reportedBars!.map(([name, value]) => (
-                  <div key={name}>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">{name === '' ? 'Progress' : name}</span>
-                      <span className="font-medium">{value}%</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 transition-all" style={{ width: `${value}%` }} />
-                    </div>
+          <Panel>
+            <PanelHeader eyebrow="Reported progress" />
+            <div className="space-y-3 px-4 py-3">
+              {reportedBars.map(([name, value]) => (
+                <div key={name}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="text-text-dim">{name === '' ? 'Progress' : name}</span>
+                    <span className="mono font-medium text-foreground">{value}%</span>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="h-2 overflow-hidden rounded-full bg-panel-2">
+                    <div
+                      className="h-full transition-all"
+                      style={{ width: `${value}%`, background: 'var(--warp-blue)' }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
         </div>
       )}
     </>
