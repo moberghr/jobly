@@ -1,27 +1,30 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { RelativeTime } from '@/components/RelativeTime';
 import { useRefreshKey } from '@/hooks/useRefreshKey';
-import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import type { RateLimitInfo } from '@/types';
 import * as api from '@/api';
+import { RateLimitFormDialog } from '@/components/forms/RateLimitFormDialog';
+import { ConfirmDialog } from '@/components/forms/ConfirmDialog';
+import type { RateLimitFormValues } from '@/lib/schemas/rateLimit';
 
-type ConfirmDelete = { name: string } | null;
+type EditState =
+  | { mode: 'create' }
+  | { mode: 'edit'; initial: RateLimitFormValues }
+  | null;
 
 export default function RateLimitsPage() {
   const [limits, setLimits] = useState<RateLimitInfo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
-  const [editingName, setEditingName] = useState<string | null>(null);
-  const [editCount, setEditCount] = useState<string>('');
-  const [editWindow, setEditWindow] = useState<string>('');
-  const [editError, setEditError] = useState<string | null>(null);
-  const [showAdd, setShowAdd] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<ConfirmDelete>(null);
+  const [editState, setEditState] = useState<EditState>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ name: string } | null>(null);
   const refreshKey = useRefreshKey();
 
   const fetchAll = useCallback(async () => {
@@ -48,49 +51,22 @@ export default function RateLimitsPage() {
     return () => clearInterval(id);
   }, [refreshKey, fetchAll]);
 
-  const startEdit = (limit: RateLimitInfo) => {
-    setEditingName(limit.name);
-    setEditCount(String(limit.count));
-    setEditWindow(String(limit.windowSeconds));
-    setEditError(null);
+  const handleSubmit = async (values: RateLimitFormValues) => {
+    await api.upsertRateLimit(values.name, values.count, values.windowSeconds);
+    await fetchAll();
   };
 
-  const cancelEdit = () => {
-    setEditingName(null);
-    setEditCount('');
-    setEditWindow('');
-    setEditError(null);
-  };
-
-  const saveEdit = async (name: string) => {
-    const parsedCount = Number(editCount);
-    const parsedWindow = Number(editWindow);
-    if (!Number.isInteger(parsedCount) || parsedCount < 1) {
-      setEditError('Count must be a positive integer');
-
-      return;
-    }
-    if (!Number.isInteger(parsedWindow) || parsedWindow < 1) {
-      setEditError('Window must be a positive integer (seconds)');
-
+  const handleDelete = async () => {
+    if (!confirmDelete) {
       return;
     }
     try {
-      await api.upsertRateLimit(name, parsedCount, parsedWindow);
-      cancelEdit();
-      await fetchAll();
-    } catch {
-      setEditError('Failed to save');
-    }
-  };
-
-  const handleDelete = async (name: string) => {
-    try {
-      await api.deleteRateLimit(name);
+      await api.deleteRateLimit(confirmDelete.name);
+      toast.success('Rate limit deleted');
       setConfirmDelete(null);
       await fetchAll();
     } catch {
-      setError('Failed to delete rate limit');
+      toast.error('Failed to delete rate limit');
     }
   };
 
@@ -111,12 +87,13 @@ export default function RateLimitsPage() {
   }
 
   const sorted = [...limits].sort((a, b) => a.name.localeCompare(b.name));
+  const existingNames = new Set(limits.map((x) => x.name));
 
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-2xl font-bold">Rate Limits</h1>
-        <Button onClick={() => setShowAdd(true)}>
+        <Button onClick={() => setEditState({ mode: 'create' })}>
           <Plus className="h-4 w-4" />
           Add rate limit
         </Button>
@@ -145,293 +122,82 @@ export default function RateLimitsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                sorted.map((limit) => {
-                  const isEditing = editingName === limit.name;
-
-                  return (
-                    <TableRow key={limit.name}>
-                      <TableCell className="font-mono">{limit.name}</TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <input
-                            type="number"
-                            min={1}
-                            autoFocus
-                            value={editCount}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditCount(e.target.value)}
-                            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                              if (e.key === 'Enter') {
-                                saveEdit(limit.name);
-                              } else if (e.key === 'Escape') {
-                                cancelEdit();
-                              }
-                            }}
-                            className="w-20 rounded-md border border-input bg-background px-2 py-1 text-sm"
-                          />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => startEdit(limit)}
-                            className="font-mono hover:underline focus:outline-none"
-                            title="Click to edit"
-                          >
-                            {limit.count}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {isEditing ? (
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              min={1}
-                              value={editWindow}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditWindow(e.target.value)}
-                              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                                if (e.key === 'Enter') {
-                                  saveEdit(limit.name);
-                                } else if (e.key === 'Escape') {
-                                  cancelEdit();
-                                }
-                              }}
-                              className="w-24 rounded-md border border-input bg-background px-2 py-1 text-sm"
-                            />
-                            <Button variant="ghost" size="icon-sm" onClick={() => saveEdit(limit.name)} title="Save">
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon-sm" onClick={cancelEdit} title="Cancel">
-                              <X className="h-4 w-4" />
-                            </Button>
-                            {editError && (
-                              <span className="text-xs text-destructive ml-2">{editError}</span>
-                            )}
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => startEdit(limit)}
-                            className="font-mono hover:underline focus:outline-none"
-                            title="Click to edit"
-                          >
-                            {limit.windowSeconds}
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        <RelativeTime date={limit.updatedAt} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {!isEditing && (
-                          <>
-                            <Button variant="ghost" size="sm" onClick={() => startEdit(limit)}>
-                              <Pencil className="h-4 w-4" />
-                              Edit
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive"
-                              onClick={() => setConfirmDelete({ name: limit.name })}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Delete
-                            </Button>
-                          </>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                sorted.map((limit) => (
+                  <TableRow key={limit.name}>
+                    <TableCell className="font-mono">{limit.name}</TableCell>
+                    <TableCell className="font-mono">{limit.count}</TableCell>
+                    <TableCell className="font-mono">{limit.windowSeconds}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      <RelativeTime date={limit.updatedAt} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setEditState({
+                            mode: 'edit',
+                            initial: {
+                              name: limit.name,
+                              count: limit.count,
+                              windowSeconds: limit.windowSeconds,
+                            },
+                          })
+                        }
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={() => setConfirmDelete({ name: limit.name })}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      {showAdd && (
-        <AddRateLimitModal
-          onClose={() => setShowAdd(false)}
-          onSaved={() => {
-            setShowAdd(false);
-            fetchAll();
-          }}
-          existingNames={new Set(limits.map((x) => x.name))}
-        />
-      )}
+      <RateLimitFormDialog
+        open={editState !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditState(null);
+          }
+        }}
+        mode={editState?.mode ?? 'create'}
+        initial={editState?.mode === 'edit' ? editState.initial : undefined}
+        existingNames={existingNames}
+        onSubmit={handleSubmit}
+      />
 
-      {confirmDelete && (
-        <ConfirmDeleteModal
-          name={confirmDelete.name}
-          onCancel={() => setConfirmDelete(null)}
-          onConfirm={() => handleDelete(confirmDelete.name)}
-        />
-      )}
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmDelete(null);
+          }
+        }}
+        title="Delete rate limit?"
+        description={
+          confirmDelete ? (
+            <>
+              Remove the override for <code className="font-mono">{confirmDelete.name}</code>? Jobs will fall back to the attribute count and window.
+            </>
+          ) : null
+        }
+        confirmLabel="Delete"
+        destructive
+        onConfirm={handleDelete}
+      />
     </div>
-  );
-}
-
-function ModalShell({
-  title,
-  children,
-  onClose,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-xl bg-card p-6 ring-1 ring-foreground/10 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-lg font-semibold mb-4">{title}</h2>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function AddRateLimitModal({
-  onClose,
-  onSaved,
-  existingNames,
-}: {
-  onClose: () => void;
-  onSaved: () => void;
-  existingNames: Set<string>;
-}) {
-  const [name, setName] = useState('');
-  const [count, setCount] = useState('100');
-  const [windowSeconds, setWindowSeconds] = useState('60');
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setError('Name is required');
-
-      return;
-    }
-    if (existingNames.has(trimmed)) {
-      setError('A rate limit with that name already exists');
-
-      return;
-    }
-    const parsedCount = Number(count);
-    if (!Number.isInteger(parsedCount) || parsedCount < 1) {
-      setError('Count must be a positive integer');
-
-      return;
-    }
-    const parsedWindow = Number(windowSeconds);
-    if (!Number.isInteger(parsedWindow) || parsedWindow < 1) {
-      setError('Window must be a positive integer (seconds)');
-
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await api.upsertRateLimit(trimmed, parsedCount, parsedWindow);
-      onSaved();
-    } catch {
-      setError('Failed to save');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <ModalShell title="Add rate limit" onClose={onClose}>
-      <form onSubmit={submit} className="space-y-4">
-        <div>
-          <label htmlFor="rl-name" className="text-sm font-medium block mb-1">Name</label>
-          <input
-            id="rl-name"
-            autoFocus
-            value={name}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
-            placeholder="e.g. external-api"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
-          />
-        </div>
-        <div>
-          <label htmlFor="rl-count" className="text-sm font-medium block mb-1">Count</label>
-          <input
-            id="rl-count"
-            type="number"
-            min={1}
-            value={count}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCount(e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label htmlFor="rl-window" className="text-sm font-medium block mb-1">Window (seconds)</label>
-          <input
-            id="rl-window"
-            type="number"
-            min={1}
-            value={windowSeconds}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWindowSeconds(e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          />
-        </div>
-        {error && <div className="text-sm text-destructive">{error}</div>}
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </Button>
-        </div>
-      </form>
-    </ModalShell>
-  );
-}
-
-function ConfirmDeleteModal({
-  name,
-  onCancel,
-  onConfirm,
-}: {
-  name: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <ModalShell title="Delete rate limit?" onClose={onCancel}>
-      <p className="text-sm text-muted-foreground mb-4">
-        Remove the override for <code className="font-mono">{name}</code>? Jobs will fall back to the attribute count and window.
-      </p>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="button" variant="destructive" onClick={onConfirm}>
-          Delete
-        </Button>
-      </div>
-    </ModalShell>
   );
 }
