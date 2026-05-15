@@ -64,10 +64,12 @@ public abstract class ListenerReconnectDrainTestsBase : IntegrationTestBase
                 services.AddSingleton<IWarpNotificationTransport>(transport);
             });
 
-        // Let the listener loop at least once so the dispatcher has seen the startup drain
-        // and settled into its 30s wait. The reconnect drain that fires after enqueue is what
-        // the test is measuring.
-        await Task.Delay(1200, Xunit.TestContext.Current.CancellationToken);
+        // Deterministic: wait until the listener has STARTED its second attempt. That proves
+        // the first attempt fully unwound (throw → log → backoff sleep → loop back), so the
+        // startup-drain has already fired and the dispatcher is no longer running a fresh poll.
+        // Any subsequent ListenAttempts increment from this point onward is a reconnect that
+        // happened AFTER our enqueue below.
+        await transport.SecondAttemptStarted.WaitAsync(Xunit.TestContext.Current.CancellationToken);
         var listenAttemptsBeforeEnqueue = transport.ListenAttempts;
 
         var publisher = server.CreatePublisher();
@@ -88,15 +90,25 @@ public abstract class ListenerReconnectDrainTestsBase : IntegrationTestBase
     // notification — so any delivery is through the reconnect-driven DrainSignals path.
     private sealed class ListenFailingTransport : IWarpNotificationTransport
     {
+        private readonly TaskCompletionSource _secondAttemptStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _listenAttempts;
 
         public int ListenAttempts => _listenAttempts;
+
+        // Fires when ListenAsync is entered for the SECOND time, i.e. after the first attempt
+        // fully unwound through the reconnect-backoff sleep and the listener task looped back.
+        public Task SecondAttemptStarted => _secondAttemptStarted.Task;
 
         public Task PublishAsync(NotificationKind kind, string? queue, CancellationToken ct) => Task.CompletedTask;
 
         public async IAsyncEnumerable<Notification> ListenAsync([EnumeratorCancellation] CancellationToken ct)
         {
-            Interlocked.Increment(ref _listenAttempts);
+            var attempt = Interlocked.Increment(ref _listenAttempts);
+            if (attempt >= 2)
+            {
+                _secondAttemptStarted.TrySetResult();
+            }
+
             await Task.Yield();
             throw new InvalidOperationException("ListenFailingTransport: listen deliberately throws to exercise reconnect-drain");
 #pragma warning disable CS0162
