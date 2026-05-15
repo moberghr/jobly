@@ -16,6 +16,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      Copy appsettings to the output dir so the dll is launchable from any cwd
+      (Rider debugger, Docker, raw `dotnet path/to.dll`). Without this, the
+      content root defaults to cwd and the ConnectionString comes back null,
+      crashing on first DB call before any logs are emitted.
+    -->
+    <Content Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Update="appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.3.1" />
   </ItemGroup>
