@@ -42,9 +42,12 @@ public sealed class OrderTimeout : ITimeoutMessage
     [Correlate]
     public string OrderId { get; set; } = string.Empty;
 
-    // Short for the demo so the timeout-after-completion path is observable within seconds.
-    // Real workflows would set this to minutes-to-hours matching their business deadline.
-    public TimeSpan Delay => TimeSpan.FromSeconds(30);
+    // Long enough that sagas stick around in the dashboard for inspection. The seed
+    // endpoint produces ORD-S-003 with no payment/inventory follow-up, so this saga will
+    // wait the full hour before its timeout fires and completes the saga via the handler.
+    // Operators can use "Force complete" from the dashboard to test the compensation path
+    // without waiting. Real workflows pick this delay to match their business deadline.
+    public TimeSpan Delay => TimeSpan.FromHours(1);
 }
 
 public sealed class OrderSagaWorkflow :

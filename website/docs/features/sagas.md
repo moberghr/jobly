@@ -343,6 +343,21 @@ Saga lifetime (CreatedAt → completion) is not currently instrumented as a hist
 
 Wire these into your OpenTelemetry pipeline via the standard `Warp` meter source.
 
+### Dashboard counters
+
+Lifecycle events also write to the in-DB `Counter` entity that powers the dashboard's `/warp/counters` page. Each event writes two rows in the same `SaveChanges` as the saga state change — a cumulative key and a per-hour bucket that feeds the historical chart:
+
+- `stats:saga_started` (+ `stats:saga_started:{yyyy-MM-dd-HH}`)
+- `stats:saga_completed` (+ hour bucket)
+- `stats:saga_force_completed` (+ hour bucket) — operator-initiated audit signal
+
+Save conflicts roll back the counter deltas alongside the saga changes, mirroring the OTel gate — counters reflect only logical-success outcomes.
+
+**Not currently in DB counters** (OTel only, by design):
+
+- Requeues — the busy / version / unique paths don't naturally hit a save (mutex-busy never touches the store; save conflicts clear the change tracker). Adding DB counters here would require a separate write scope. Use the OTel `warp.sagas.requeued` counter for alerting on contention.
+- Missing-saga (`NotFoundAsync`) — the proxy doesn't commit on this path. Same trade-off as requeues.
+
 ## Migration
 
 `AddSagas()` contributes **two entities** to your DbContext model. After enabling the addon, run:

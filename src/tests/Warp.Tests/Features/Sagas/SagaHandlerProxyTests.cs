@@ -171,6 +171,64 @@ public class SagaHandlerProxyTests
     }
 
     [TimedFact]
+    public async Task SuccessfulStart_WritesSagaStartedCounters_BothCumulativeAndHourBucket()
+    {
+        var (store, semaphore, jobContext, cache, time) = SetUp();
+        var proxy = new SagaHandlerProxy<OrderSaga, StartOrder>(new RecordingHandler(), store, semaphore, jobContext, time, cache);
+
+        await proxy.HandleAsync(new StartOrder { OrderId = "O-counter" }, CancellationToken.None);
+
+        // Cumulative key for the dashboard's headline counter.
+        store.CounterDeltas.ShouldContainKey("stats:saga_started");
+        store.CounterDeltas["stats:saga_started"].ShouldBe(1);
+
+        // Hour-bucket key for the historical chart. Exact suffix is time-dependent; assert
+        // exactly one matches the prefix.
+        var hourKeys = store.CounterDeltas.Keys.Where(k => k.StartsWith("stats:saga_started:", StringComparison.Ordinal)).ToList();
+        hourKeys.Count.ShouldBe(1);
+        store.CounterDeltas[hourKeys[0]].ShouldBe(1);
+
+        // No completion counter — only the start fired.
+        store.CounterDeltas.ContainsKey("stats:saga_completed").ShouldBeFalse();
+    }
+
+    [TimedFact]
+    public async Task InstantCompleteStartsSaga_WritesBothStartedAndCompletedCounters()
+    {
+        // [StartsSaga] handler calls MarkCompleted in the same invocation — both lifecycle
+        // counters must fire so observability records the ephemeral saga.
+        var (store, semaphore, jobContext, cache, time) = SetUp();
+        var proxy = new SagaHandlerProxy<OrderSaga, StartOrder>(new InstantCompleteStartHandler(), store, semaphore, jobContext, time, cache);
+
+        await proxy.HandleAsync(new StartOrder { OrderId = "O-ephemeral" }, CancellationToken.None);
+
+        store.CounterDeltas["stats:saga_started"].ShouldBe(1);
+        store.CounterDeltas["stats:saga_completed"].ShouldBe(1);
+    }
+
+    [TimedFact]
+    public async Task SaveConflict_RollsBackCounterDeltas()
+    {
+        // The DB counters are staged in the change tracker so they commit atomically with the
+        // saga's own state. On conflict the tracker clears; the counter rows must vanish too
+        // so a retry's increment lands exactly once. Mirrors the SagasCompleted OTel gate.
+        var (store, semaphore, jobContext, cache, time) = SetUp();
+        store.Seed("O-rollback", new OrderSaga { CorrelationKey = "O-rollback" });
+        store.ThrowConflictKindOnNextSave = SagaSaveConflictKind.Version;
+
+        var proxy = new SagaHandlerProxy<OrderSaga, ContinueOrder>(new CompletingHandler(), store, semaphore, jobContext, time, cache);
+
+        await proxy.HandleAsync(new ContinueOrder { OrderId = "O-rollback" }, CancellationToken.None);
+
+        jobContext.Outcome.ShouldNotBeNull();
+        jobContext.Outcome.LogMessage!.ShouldContain("version conflict");
+
+        // CounterDeltas reflects committed values only — staged increments were discarded by
+        // ThrowConflictKindOnNextSave alongside the saga's own pending change.
+        store.CounterDeltas.ContainsKey("stats:saga_completed").ShouldBeFalse();
+    }
+
+    [TimedFact]
     public async Task MarkCompleted_CalledTwice_IsIdempotent()
     {
         var (store, semaphore, jobContext, cache, time) = SetUp();

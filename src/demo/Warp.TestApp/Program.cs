@@ -420,7 +420,7 @@ app.MapPost("/seed/sagas", async (IPublisher publisher) =>
     {
         sagas = "/warp/sagas",
         completed = "ORD-S-001 + ORD-S-002",
-        pending = "ORD-S-003 — fires OrderTimeout in ~30s, then compensates and completes",
+        pending = "ORD-S-003 sticks around for 1h (OrderTimeout delay); use the dashboard's Force complete button to exercise compensation early",
     });
 });
 

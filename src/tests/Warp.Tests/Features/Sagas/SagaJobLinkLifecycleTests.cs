@@ -41,6 +41,15 @@ public abstract class SagaJobLinkLifecycleTestsBase : IAsyncLifetime
         var linkCount = await _fixture.CreateContext().Set<SagaJobLink>().Where(l => l.SagaId == sagaId).CountAsync(TestCancellation);
         sagaCount.ShouldBe(0);
         linkCount.ShouldBe(0);
+
+        // Operator-action audit signal — both the cumulative and the hour-bucket Counter rows
+        // commit in the same SaveChanges as the deletion. Dashboard's Counters page picks them
+        // up after CounterAggregator runs.
+        var counters = await _fixture.CreateContext().Set<Warp.Core.Data.Entities.Counter>()
+            .Where(c => c.Key == "stats:saga_force_completed" || c.Key.StartsWith("stats:saga_force_completed:"))
+            .ToListAsync(TestCancellation);
+        counters.Sum(c => c.Value).ShouldBe(2); // base + hour bucket = 1 + 1
+        counters.Count.ShouldBe(2);
     }
 
     [TimedFact]

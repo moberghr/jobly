@@ -78,4 +78,19 @@ public interface ISagaStore
     /// set rolls back together — no orphan link rows.
     /// </remarks>
     Task RemoveLinksForSagaAsync(Guid sagaId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Stages an in-DB <c>Counter</c> row increment for the named statistic key. The row commits
+    /// with the saga's next <c>SaveChangesAsync</c>; if that save fails (concurrency/unique
+    /// conflict) the counter delta is rolled back along with the saga changes — counters reflect
+    /// only logical-success outcomes, mirroring the OTel emit gate.
+    /// </summary>
+    /// <remarks>
+    /// Powers the dashboard's <c>/warp/counters</c> page so saga lifecycle events show up
+    /// alongside the existing <c>stats:succeeded</c> / <c>stats:failed</c> / <c>stats:deleted</c>
+    /// keys. The proxy writes one base key per event (e.g. <c>stats:saga_started</c>) plus the
+    /// per-hour bucket key (<c>stats:saga_started:yyyy-MM-dd-HH</c>) that drives the historical
+    /// chart.
+    /// </remarks>
+    void RecordCounterDelta(string key, int value);
 }

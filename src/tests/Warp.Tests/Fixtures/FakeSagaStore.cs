@@ -112,6 +112,19 @@ internal sealed class FakeSagaStore : ISagaStore
         return Task.CompletedTask;
     }
 
+    public Dictionary<string, int> CounterDeltas { get; } = new(StringComparer.Ordinal);
+
+    public void RecordCounterDelta(string key, int value)
+    {
+        // Counter writes are staged in the change tracker in production. The fake clears them
+        // on ThrowOnNextSave to mirror the real store's tracker-clear-on-conflict behavior.
+        _pending.Add(() =>
+        {
+            CounterDeltas.TryGetValue(key, out var existing);
+            CounterDeltas[key] = existing + value;
+        });
+    }
+
     public bool ContainsSaga<TSaga>(string correlationKey)
         where TSaga : Saga
         => _rows.ContainsKey((typeof(TSaga), correlationKey));

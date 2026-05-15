@@ -160,6 +160,11 @@ public sealed class SagaStore<TContext> : ISagaStore
 
     public void DiscardPendingChanges() => _context.ChangeTracker.Clear();
 
+    public void RecordCounterDelta(string key, int value)
+    {
+        _context.Set<Counter>().Add(new Counter { Key = key, Value = value });
+    }
+
     public void RecordJobLink(Guid sagaId, Guid jobId)
     {
         _context.Set<SagaJobLink>().Add(new SagaJobLink

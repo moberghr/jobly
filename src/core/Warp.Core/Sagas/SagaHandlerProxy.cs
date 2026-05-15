@@ -111,10 +111,31 @@ public sealed class SagaHandlerProxy<TSaga, TMessage> : IMessageHandler<TMessage
             ? await HandleStartsSaga(message, correlationKey, cancellationToken)
             : await HandleExistingSaga(saga!, message, cancellationToken);
 
+        // Stage dashboard Counter rows *before* the save so they commit atomically with the
+        // saga's own change set. The save-conflict path clears the change tracker and the
+        // counter deltas roll back with it — Counters reflect only logical-success outcomes,
+        // mirroring the OTel emit gate below. Hour-bucket keys feed the historical chart.
+        if (started || completed)
+        {
+            var nowUtc = _time.GetUtcNow().UtcDateTime;
+            var hour = nowUtc.ToString("yyyy-MM-dd-HH", System.Globalization.CultureInfo.InvariantCulture);
+            if (started)
+            {
+                _store.RecordCounterDelta("stats:saga_started", 1);
+                _store.RecordCounterDelta($"stats:saga_started:{hour}", 1);
+            }
+
+            if (completed)
+            {
+                _store.RecordCounterDelta("stats:saga_completed", 1);
+                _store.RecordCounterDelta($"stats:saga_completed:{hour}", 1);
+            }
+        }
+
         await TrySaveAsync(correlationKey, cancellationToken);
 
-        // Lifecycle counters fire only on a clean save. If TrySaveAsync hit a conflict it set
-        // the requeue Outcome; firing here would double-count when the retry runs the same
+        // OTel lifecycle counters fire only on a clean save. If TrySaveAsync hit a conflict it
+        // set the requeue Outcome; firing here would double-count when the retry runs the same
         // handler and reaches the same Started/Completed branches again. The outcome-gate
         // also covers any other path that pre-set an Outcome before we got here.
         if (_jobContext.Outcome == null)

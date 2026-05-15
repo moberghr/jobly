@@ -109,6 +109,14 @@ public class SagaCommandService<TContext> : ISagaCommandService
         _context.Set<SagaJobLink>().RemoveRange(links);
         _context.Set<SagaState>().Remove(fresh);
 
+        // Counter writes commit in the same SaveChanges as the deletion. Bucketed by hour for
+        // the historical chart on the dashboard's Counters page; the operational signal is
+        // "how often did an operator have to step in?".
+        var now = DateTime.UtcNow;
+        var hour = now.ToString("yyyy-MM-dd-HH", System.Globalization.CultureInfo.InvariantCulture);
+        _context.Set<Counter>().Add(new Counter { Key = "stats:saga_force_completed", Value = 1 });
+        _context.Set<Counter>().Add(new Counter { Key = $"stats:saga_force_completed:{hour}", Value = 1 });
+
         await _context.SaveChangesAsync();
 
         // Structured-log audit. The row is gone; this is the only record that the saga existed
