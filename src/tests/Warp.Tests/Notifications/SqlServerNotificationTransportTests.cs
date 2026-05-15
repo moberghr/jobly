@@ -29,8 +29,11 @@ public class SqlServerNotificationTransportTests : IAsyncLifetime, IClassFixture
         var enumerator = transport.ListenAsync(cts.Token).GetAsyncEnumerator(cts.Token);
         try
         {
+            // Service Broker queues are persistent: WAITFOR (RECEIVE) returns any messages
+            // already enqueued at the moment it runs. Unlike PG LISTEN/NOTIFY (where a NOTIFY
+            // fired before LISTEN is registered is lost), publish-before-listen is safe here.
+            // No timing guard needed.
             var moveTask = enumerator.MoveNextAsync();
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cts.Token);
 
             await transport.PublishAsync(NotificationKind.JobEnqueued, "default", cts.Token);
 
@@ -62,8 +65,8 @@ public class SqlServerNotificationTransportTests : IAsyncLifetime, IClassFixture
         var enumerator = transport.ListenAsync(cts.Token).GetAsyncEnumerator(cts.Token);
         try
         {
+            // Persistent queue — see PublishListen_RoundTrip_DeliversNotification for rationale.
             var firstMoveTask = enumerator.MoveNextAsync();
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cts.Token);
 
             await transport.PublishAsync(NotificationKind.MessageEnqueued, null, cts.Token);
             await transport.PublishAsync(NotificationKind.JobFinalized, null, cts.Token);

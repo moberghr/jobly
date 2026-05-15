@@ -8,9 +8,9 @@ namespace Warp.Provider.PostgreSql;
 
 /// <summary>
 /// PostgreSQL LISTEN/NOTIFY transport. <see cref="PublishAsync"/> opens a short-lived
-/// (pooled) connection and issues <c>SELECT pg_notify(...)</c>; <see cref="ListenAsync"/>
+/// (pooled) connection and issues <c>SELECT pg_notify(...)</c>; <see cref="ListenAsync(CancellationToken)"/>
 /// holds a dedicated long-lived connection, issues <c>LISTEN</c>, and yields each arriving
-/// notification. Reconnect is the caller's responsibility — <see cref="ListenAsync"/>
+/// notification. Reconnect is the caller's responsibility — <see cref="ListenAsync(CancellationToken)"/>
 /// terminates on connection failure or cancellation, and the hosting listener task wraps
 /// it in an outer reconnect loop.
 /// </summary>
@@ -65,7 +65,20 @@ public sealed class PostgresNotificationTransport : IWarpNotificationTransport
         }
     }
 
-    public async IAsyncEnumerable<Notification> ListenAsync([EnumeratorCancellation] CancellationToken ct)
+    public IAsyncEnumerable<Notification> ListenAsync(CancellationToken ct)
+    {
+        return ListenCoreAsync(readySignal: null, ct);
+    }
+
+    // Test hook: deterministic listener-ready signal. Fires after LISTEN has been
+    // executed on the wire, before the first WaitAsync. Lets tests await readiness
+    // instead of guessing with Task.Delay — see PostgresNotificationTransportTests.
+    internal IAsyncEnumerable<Notification> ListenAsync(TaskCompletionSource ready, CancellationToken ct)
+    {
+        return ListenCoreAsync(ready, ct);
+    }
+
+    private async IAsyncEnumerable<Notification> ListenCoreAsync(TaskCompletionSource? readySignal, [EnumeratorCancellation] CancellationToken ct)
     {
         await using var conn = await OpenConnectionAsync(ct);
 
@@ -75,6 +88,8 @@ public sealed class PostgresNotificationTransport : IWarpNotificationTransport
         {
             await cmd.ExecuteNonQueryAsync(ct);
         }
+
+        readySignal?.TrySetResult();
 
         // Npgsql fires the Notification event synchronously during WaitAsync on the same thread
         // the iterator runs on — so a plain Queue is safe, no Channel/Task.Run needed. The event
