@@ -318,3 +318,7 @@ export interface SagaStats {
   startedToday: number;
   completedToday: number;
 }
+
+export interface AuthStatus {
+  authenticated: boolean;
+}

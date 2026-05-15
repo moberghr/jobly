@@ -145,6 +145,71 @@ public class DashboardAuthTests
     }
 
     [TimedFact]
+    public async Task AuthStatus_NoAuth_ReturnsAuthenticatedTrue()
+    {
+        var (app, client) = await CreateApp();
+        try
+        {
+            var response = await client.GetAsync("/warp/api/auth/status", CancellationToken.None);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            var body = await response.Content.ReadAsStringAsync(CancellationToken.None);
+            body.ShouldBe("{\"authenticated\":true}");
+        }
+        finally
+        {
+            client.Dispose();
+            await app.DisposeAsync();
+        }
+    }
+
+    [TimedFact]
+    public async Task AuthStatus_BuiltInLogin_NoCookie_ReturnsAuthenticatedFalse()
+    {
+        var (app, client) = await CreateApp(o => o.UseBuiltInLogin<TestCredentialValidator>());
+        try
+        {
+            var response = await client.GetAsync("/warp/api/auth/status", CancellationToken.None);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            var body = await response.Content.ReadAsStringAsync(CancellationToken.None);
+            body.ShouldBe("{\"authenticated\":false}");
+        }
+        finally
+        {
+            client.Dispose();
+            await app.DisposeAsync();
+        }
+    }
+
+    [TimedFact]
+    public async Task AuthStatus_BuiltInLogin_WithCookie_ReturnsAuthenticatedTrue()
+    {
+        var (app, client) = await CreateApp(o => o.UseBuiltInLogin<TestCredentialValidator>());
+        try
+        {
+            var form = new FormUrlEncodedContent([
+                new KeyValuePair<string, string>("username", "admin"),
+                new KeyValuePair<string, string>("password", "admin"),
+            ]);
+            var loginResponse = await client.PostAsync("/warp/api/auth/login", form, CancellationToken.None);
+            loginResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            var setCookie = loginResponse.Headers.GetValues("Set-Cookie").First();
+            var cookieValue = setCookie.Split(';')[0];
+            client.DefaultRequestHeaders.Add("Cookie", cookieValue);
+
+            var response = await client.GetAsync("/warp/api/auth/status", CancellationToken.None);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            var body = await response.Content.ReadAsStringAsync(CancellationToken.None);
+            body.ShouldBe("{\"authenticated\":true}");
+        }
+        finally
+        {
+            client.Dispose();
+            await app.DisposeAsync();
+        }
+    }
+
+    [TimedFact]
     public async Task CustomAuthFilter_Unauthorized_Returns401ForApi()
     {
         var (app, client) = await CreateApp(o => o.Authorization = new DenyAllFilter());

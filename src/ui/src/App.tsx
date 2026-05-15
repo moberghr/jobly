@@ -23,6 +23,7 @@ import { setOnUnauthorized } from '@/api/client';
 import { useRealtimeStore } from '@/stores/realtime';
 import { loadExtensions } from '@/extensions/loader';
 import { extensionRuntime } from '@/extensions/runtime';
+import { getAuthStatus } from '@/api';
 import { config } from '@/config';
 import type { ExtensionManifest } from '@/extensions/types';
 
@@ -30,6 +31,10 @@ function App() {
   const [needsLogin, setNeedsLogin] = useState(false);
   const [extensions, setExtensions] = useState<ExtensionManifest[]>([]);
   const [extensionsLoaded, setExtensionsLoaded] = useState(false);
+  // Cold-boot gate so we don't fire any other API calls before we know whether
+  // the user is authenticated. Skipped entirely when the built-in login addon
+  // isn't enabled — those deployments have no 401 problem.
+  const [authProbeDone, setAuthProbeDone] = useState(!config.hasBuiltInLogin);
 
   const initExtensions = useCallback(() => {
     loadExtensions().then((manifests) => {
@@ -40,13 +45,27 @@ function App() {
 
   useEffect(() => {
     if (config.hasBuiltInLogin) {
+      // Keep the 401 interceptor as the fallback for session-expired scenarios
+      // mid-session; the cold-boot path no longer relies on it.
       setOnUnauthorized(() => setNeedsLogin(true));
-    }
 
-    // Load extensions immediately — if auth is required, the API call will
-    // get a 401 and the loader will return an empty array gracefully.
-    // After login, we reload extensions.
-    initExtensions();
+      getAuthStatus()
+        .then((s) => {
+          if (s.authenticated) {
+            initExtensions();
+          } else {
+            setNeedsLogin(true);
+          }
+        })
+        .catch(() => {
+          // Probe failed (network, server down). Treat as unauthenticated so the
+          // login page renders; the user can retry from there.
+          setNeedsLogin(true);
+        })
+        .finally(() => setAuthProbeDone(true));
+    } else {
+      initExtensions();
+    }
 
     return () => extensionRuntime.stop();
   }, [initExtensions]);
@@ -60,6 +79,10 @@ function App() {
     // for the session. Re-probing here transitions disabled → connected.
     void useRealtimeStore.getState().probeAndConnect();
   }, [initExtensions]);
+
+  if (!authProbeDone) {
+    return null;
+  }
 
   if (needsLogin) {
     return <LoginPage onLogin={handleLogin} />;
