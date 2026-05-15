@@ -8,6 +8,19 @@
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
   </PropertyGroup>
 
+  <!--
+    macOS Sequoia tags files created inside Claude-Code's worktree dirs with
+    com.apple.provenance, and AppleSystemPolicy then SIGKILLs ad-hoc-signed
+    .NET apphosts launched from those locations (Rider reports exit 137 /
+    "exited before any CLR were loaded"). Skip apphost generation on local
+    macOS Debug builds — Rider launches via `dotnet *.dll` instead, which
+    is properly signed and not policy-rejected. Release & non-mac builds
+    keep the apphost.
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' AND '$([MSBuild]::IsOSPlatform(`OSX`))' == 'true'">
+    <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Remove="wwwroot\**" />
     <Content Remove="wwwroot\**" />
