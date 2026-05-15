@@ -65,6 +65,62 @@ public abstract class DashboardBreakdownTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
+    public async Task GetWarpStatus_Messages_CountsActiveStatesOnly()
+    {
+        // Arrange — one of every state, message kind
+        var ctx = _fixture.CreateContext();
+
+        ctx.Set<Job>().Add(CreateJob(JobKind.Message, State.Enqueued));
+        ctx.Set<Job>().Add(CreateJob(JobKind.Message, State.Awaiting));
+        ctx.Set<Job>().Add(CreateJob(JobKind.Message, State.Processing));
+        ctx.Set<Job>().Add(CreateJob(JobKind.Message, State.Scheduled));
+        ctx.Set<Job>().Add(CreateJob(JobKind.Message, State.Completed));
+        ctx.Set<Job>().Add(CreateJob(JobKind.Message, State.Failed));
+        ctx.Set<Job>().Add(CreateJob(JobKind.Message, State.Deleted));
+
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        // Act
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var status = await svc.GetWarpStatus();
+
+        // Assert — only Enqueued + Awaiting + Processing + Scheduled (saga timeouts) count as active
+        status.Messages.ShouldBe(4);
+    }
+
+    [TimedFact]
+    public async Task GetWarpStatus_Messages_ExcludesFailedAndCompleted()
+    {
+        // Repro of issue #177: seed-sagas leaves four failed, three completed, and three
+        // scheduled message rows; only the scheduled ones should show in the navbar badge.
+        var ctx = _fixture.CreateContext();
+
+        for (var i = 0; i < 4; i++)
+        {
+            ctx.Set<Job>().Add(CreateJob(JobKind.Message, State.Failed));
+        }
+
+        for (var i = 0; i < 3; i++)
+        {
+            ctx.Set<Job>().Add(CreateJob(JobKind.Message, State.Completed));
+        }
+
+        for (var i = 0; i < 3; i++)
+        {
+            ctx.Set<Job>().Add(CreateJob(JobKind.Message, State.Scheduled));
+        }
+
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        var svc = new DashboardStatsService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var status = await svc.GetWarpStatus();
+
+        status.Messages.ShouldBe(3);
+        status.MessagesFailed.ShouldBe(4);
+        status.MessagesCompleted.ShouldBe(3);
+    }
+
+    [TimedFact]
     public async Task GetWarpStatus_CountsBatchesByState()
     {
         // Arrange
