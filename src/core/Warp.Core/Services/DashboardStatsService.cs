@@ -58,7 +58,11 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
         var awaiting = await GetJobsCount(State.Awaiting);
         var deleted = await GetJobsCount(State.Deleted);
         var messages = await _context.Set<Job>()
-            .Where(x => x.Kind == JobKind.Message && x.CurrentState != State.Completed)
+            .Where(x => x.Kind == JobKind.Message)
+            .Where(x => x.CurrentState == State.Enqueued
+                || x.CurrentState == State.Awaiting
+                || x.CurrentState == State.Processing
+                || x.CurrentState == State.Scheduled)
             .CountAsync();
         var batches = await _context.Set<Job>()
             .Where(x => x.Kind == JobKind.Batch && x.CurrentState != State.Deleted)
