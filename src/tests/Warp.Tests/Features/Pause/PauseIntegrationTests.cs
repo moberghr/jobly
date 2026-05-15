@@ -58,12 +58,16 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         await server.RunHeartbeatOnceAsync(Xunit.TestContext.Current.CancellationToken);
         server.PauseState.IsPaused(groupId).ShouldBeTrue();
 
-        // Drain in-flight worker iterations. A worker that read holder=false just before the
-        // manual heartbeat is now somewhere in GetAndProcessJob; if we published immediately,
-        // its already-running SQL claim could see the new row even though the holder is now
-        // paused. Waiting one full polling cycle (PollingInterval = 100ms in test config)
-        // plus slack guarantees every such iteration finishes against an empty queue, loops
-        // back, and reads paused=true on its next check.
+        // Drain in-flight worker iterations. This is NOT a timing guess — it models the §6.8
+        // pause contract: pause is "no new fetches after up to one heartbeat", deliberately
+        // non-synchronous so the worker fetch/execute hot path stays observation-free (§6.1).
+        // A worker that read holder=false just before the manual heartbeat is now somewhere
+        // in GetAndProcessJob; without this drain its already-running SQL claim could see the
+        // row we're about to publish. Waiting one full PollingInterval (100ms in test config)
+        // plus 4× slack guarantees every such iteration finishes against an empty queue, loops
+        // back, and reads paused=true on its next check. Making this deterministic would
+        // require either worker-iteration observability (forbidden by §6.1) or making pause
+        // synchronous (a contract change). The wall-clock wait is the contract.
         await Task.Delay(500, Xunit.TestContext.Current.CancellationToken);
 
         // Publish a job — by now all worker iterations are either sleeping in the pause
@@ -72,15 +76,15 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // Confirm it stays Enqueued for the duration we'd reasonably expect a worker to pick
-        // it up if pause weren't honored.
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
-        while (DateTime.UtcNow < deadline)
-        {
-            var job = await server.GetJob(jobId);
-            job.CurrentState.ShouldBe(State.Enqueued);
-            await Task.Delay(200, Xunit.TestContext.Current.CancellationToken);
-        }
+        // Confirm pause is honored: WaitForCompletion must time out, because the (paused)
+        // worker can't claim the only outstanding job. Expressing the negative assertion as a
+        // bounded WaitForCompletion replaces a polling-loop-with-Delay; the 2s budget is the
+        // window over which we expect no worker iteration to misbehave.
+        await Should.ThrowAsync<TimeoutException>(
+            async () => await server.WaitForCompletion(TimeSpan.FromSeconds(2)));
+
+        var jobBeforeResume = await server.GetJob(jobId);
+        jobBeforeResume.CurrentState.ShouldBe(State.Enqueued);
 
         // Resume + manual heartbeat to flip the holder back, then let workers process.
         await svc.ResumeServer(server.ServerId);
@@ -123,20 +127,20 @@ public abstract class PauseIntegrationTestsBase : IntegrationTestBase
         await server.RunHeartbeatOnceAsync(Xunit.TestContext.Current.CancellationToken);
         server.PauseState.IsPaused(groupId).ShouldBeTrue();
 
-        // Drain in-flight worker iterations — see PauseServer_JobsStayEnqueued for rationale.
+        // Drain in-flight worker iterations — see PauseServer_JobsStayEnqueued for the §6.8
+        // contract rationale and why this isn't a timing guess.
         await Task.Delay(500, Xunit.TestContext.Current.CancellationToken);
 
         var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new UnitRequest());
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
-        while (DateTime.UtcNow < deadline)
-        {
-            var job = await server.GetJob(jobId);
-            job.CurrentState.ShouldBe(State.Enqueued);
-            await Task.Delay(200, Xunit.TestContext.Current.CancellationToken);
-        }
+        // Negative-window assertion — see PauseServer_JobsStayEnqueued for rationale.
+        await Should.ThrowAsync<TimeoutException>(
+            async () => await server.WaitForCompletion(TimeSpan.FromSeconds(2)));
+
+        var jobBeforeResume = await server.GetJob(jobId);
+        jobBeforeResume.CurrentState.ShouldBe(State.Enqueued);
 
         await svc.ResumeWorkerGroup(groupId);
         await server.RunHeartbeatOnceAsync(Xunit.TestContext.Current.CancellationToken);

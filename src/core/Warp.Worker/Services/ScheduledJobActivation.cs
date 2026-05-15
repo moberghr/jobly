@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Warp.Core.Data.Queries;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
 using Warp.Core.Notifications;
@@ -18,17 +19,20 @@ public sealed class ScheduledJobActivation<TContext> : IServerTask
     private readonly TimeProvider _time;
     private readonly IWarpNotificationTransport _transport;
     private readonly WarpWorkerConfiguration _configuration;
+    private readonly IWarpSqlQueries<TContext> _sqlQueries;
 
     public ScheduledJobActivation(
         TContext context,
         TimeProvider time,
         IWarpNotificationTransport transport,
-        IOptions<WarpWorkerConfiguration> configuration)
+        IOptions<WarpWorkerConfiguration> configuration,
+        IWarpSqlQueries<TContext> sqlQueries)
     {
         _context = context;
         _time = time;
         _transport = transport;
         _configuration = configuration.Value;
+        _sqlQueries = sqlQueries;
     }
 
     public string Name => "ScheduledJobActivation";
@@ -48,26 +52,20 @@ public sealed class ScheduledJobActivation<TContext> : IServerTask
     {
         var now = _time.GetUtcNow().UtcDateTime;
 
-        var queues = await _context.Set<Job>()
-            .Where(x => x.CurrentState == State.Scheduled)
-            .Where(x => x.ScheduleTime <= now)
-            .Select(x => x.Queue)
-            .Distinct()
-            .ToListAsync(ct);
+        // Single round-trip: atomically flip every due Scheduled row to Enqueued AND stream
+        // back its queue. The list has one entry per activated row; deduplicate in-memory
+        // so we publish one JobEnqueued notification per distinct queue.
+        var activatedQueues = await _sqlQueries.ActivateScheduledJobsAsync(_context, now, ct);
 
-        var activated = await _context.Set<Job>()
-            .Where(x => x.CurrentState == State.Scheduled)
-            .Where(x => x.ScheduleTime <= now)
-            .ExecuteUpdateAsync(
-                x => x.SetProperty(p => p.CurrentState, State.Enqueued),
-                ct);
-
-        if (activated > 0 && queues.Count > 0)
+        if (activatedQueues.Count == 0)
         {
-            var notifications = queues.ConvertAll(q => new Notification(NotificationKind.JobEnqueued, q));
-            await NotificationDispatch.FireAsync(_transport, notifications, ct);
+            return (0, []);
         }
 
-        return (activated, queues);
+        var distinctQueues = new HashSet<string>(activatedQueues, StringComparer.Ordinal).ToList();
+        var notifications = distinctQueues.ConvertAll(q => new Notification(NotificationKind.JobEnqueued, q));
+        await NotificationDispatch.FireAsync(_transport, notifications, ct);
+
+        return (activatedQueues.Count, distinctQueues);
     }
 }

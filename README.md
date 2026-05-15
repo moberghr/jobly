@@ -1,6 +1,6 @@
 # Warp
 
-A distributed job processing, message queue, and in-memory mediator library for .NET 10. Four patterns, one unified pipeline, a real-time dashboard.
+A distributed job processing, message queue, and in-memory mediator library for .NET 10. Five patterns, one unified pipeline, a real-time dashboard.
 
 [![NuGet](https://img.shields.io/nuget/v/Moberg.Warp.Core?label=Warp.Core)](https://www.nuget.org/packages/Moberg.Warp.Core)
 [![NuGet](https://img.shields.io/nuget/v/Moberg.Warp.Worker?label=Warp.Worker)](https://www.nuget.org/packages/Moberg.Warp.Worker)
@@ -14,6 +14,7 @@ A distributed job processing, message queue, and in-memory mediator library for 
 - **Message Queue** — Publish messages with multiple handlers. Each handler runs as an independent, retryable job.
 - **In-Memory Requests** — `IRequest<TResponse>` with `IMediator.Send()` for immediate, typed request/response. No database persistence.
 - **In-Memory Streams** — `IStreamRequest<TResponse>` with `IMediator.CreateStream()` for lazy, item-by-item streaming via `IAsyncEnumerable<TResponse>`. No database persistence.
+- **Sagas** — `Saga` base class + `ISagaHandler<TSaga, TMessage>` for long-lived, correlated state across multiple message arrivals. Opt-in via `opt.AddSagas()`. Distributed mutex serialization, optimistic concurrency defense-in-depth. See `website/docs/features/sagas.md`.
 - **Unified Pipeline** — `IPipelineBehavior<T, TResponse>` wraps all four patterns. `IStreamPipelineBehavior<T, TResponse>` adds enumeration-level wrapping for streams.
 - **Named Queues** — Assign jobs to queues. Workers subscribe to specific queues. Alphabetical order = priority.
 - **Execution Logs** — ILogger output automatically captured and flushed to the database every ~1 second during handler execution, viewable in dashboard in real time. Each log entry tracks which worker produced it.

@@ -14,6 +14,8 @@ import ServerDetailPage from '@/pages/servers/ServerDetailPage';
 import CountersPage from '@/pages/counters/CountersPage';
 import ConcurrencyLimitsPage from '@/pages/concurrency/ConcurrencyLimitsPage';
 import RateLimitsPage from '@/pages/ratelimits/RateLimitsPage';
+import SagasListPage from '@/pages/sagas/SagasListPage';
+import SagaDetailPage from '@/pages/sagas/SagaDetailPage';
 import WorkerDetailPage from '@/pages/workers/WorkerDetailPage';
 import TracePage from '@/pages/trace/TracePage';
 import DetailPage from '@/pages/detail/DetailPage';
@@ -23,6 +25,7 @@ import { setOnUnauthorized } from '@/api/client';
 import { useRealtimeStore } from '@/stores/realtime';
 import { loadExtensions } from '@/extensions/loader';
 import { extensionRuntime } from '@/extensions/runtime';
+import { getAuthStatus } from '@/api';
 import { config } from '@/config';
 import { queryClient } from '@/lib/queryClient';
 import { Toaster } from '@/components/ui/sonner';
@@ -33,6 +36,10 @@ function AppRoutes() {
   const [needsLogin, setNeedsLogin] = useState(false);
   const [extensions, setExtensions] = useState<ExtensionManifest[]>([]);
   const [extensionsLoaded, setExtensionsLoaded] = useState(false);
+  // Cold-boot gate so we don't fire any other API calls before we know whether
+  // the user is authenticated. Skipped entirely when the built-in login addon
+  // isn't enabled — those deployments have no 401 problem.
+  const [authProbeDone, setAuthProbeDone] = useState(!config.hasBuiltInLogin);
 
   const initExtensions = useCallback(() => {
     loadExtensions().then((manifests) => {
@@ -43,10 +50,27 @@ function AppRoutes() {
 
   useEffect(() => {
     if (config.hasBuiltInLogin) {
+      // Keep the 401 interceptor as the fallback for session-expired scenarios
+      // mid-session; the cold-boot path no longer relies on it.
       setOnUnauthorized(() => setNeedsLogin(true));
-    }
 
-    initExtensions();
+      getAuthStatus()
+        .then((s) => {
+          if (s.authenticated) {
+            initExtensions();
+          } else {
+            setNeedsLogin(true);
+          }
+        })
+        .catch(() => {
+          // Probe failed (network, server down). Treat as unauthenticated so the
+          // login page renders; the user can retry from there.
+          setNeedsLogin(true);
+        })
+        .finally(() => setAuthProbeDone(true));
+    } else {
+      initExtensions();
+    }
 
     return () => extensionRuntime.stop();
   }, [initExtensions]);
@@ -56,6 +80,10 @@ function AppRoutes() {
     initExtensions();
     void useRealtimeStore.getState().probeAndConnect();
   }, [initExtensions]);
+
+  if (!authProbeDone) {
+    return null;
+  }
 
   if (needsLogin) {
     return <LoginPage onLogin={handleLogin} />;
@@ -88,6 +116,8 @@ function AppRoutes() {
           <Route path="/counters" element={<CountersPage />} />
           <Route path="/concurrency" element={<ConcurrencyLimitsPage />} />
           <Route path="/ratelimits" element={<RateLimitsPage />} />
+          <Route path="/sagas/:id" element={<SagaDetailPage />} />
+          <Route path="/sagas" element={<SagasListPage />} />
 
           {extensionPages.map((page) => (
             <Route

@@ -61,4 +61,24 @@ public interface IServerTask
     /// <see cref="ServerTaskSignals{TContext}"/> at startup and unsubscribes on shutdown.
     /// </summary>
     IEnumerable<ServerTaskSignal> Signals => [];
+
+    /// <summary>
+    /// When <c>true</c> (default), the host runs this task's iteration inside a transaction
+    /// that holds a transaction-scoped advisory lock (PG: <c>pg_try_advisory_xact_lock</c>;
+    /// MSSQL: <c>sp_getapplock</c> with <c>@LockOwner='Transaction'</c>). The lock is released
+    /// automatically when the transaction commits or rolls back — saving two DB round-trips
+    /// per iteration vs. the Medallion session-scoped <c>IWarpLockProvider</c> path.
+    /// <para>
+    /// Override to <c>false</c> only when <see cref="ExecuteAsync"/> needs to commit and
+    /// release its work in multiple distinct transactions per iteration (so each commit's
+    /// state is visible to other servers before the next), or when the task opens explicit
+    /// transactions with <c>BeginTransactionAsync</c>. Both patterns are rare — built-in
+    /// Warp server tasks all fit the single-transaction model.
+    /// </para>
+    /// <para>
+    /// <see cref="LockKey"/> must be non-null for this flag to take effect; tasks without a
+    /// lock key bypass the lock primitive entirely.
+    /// </para>
+    /// </summary>
+    bool LocksWithTransaction => true;
 }

@@ -10,6 +10,7 @@ import {
   Loader,
   KeyRound,
   Timer,
+  GitBranch,
   Puzzle,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
@@ -127,6 +128,11 @@ const rateLimitsNavItem: WarpNavItem = {
   label: 'Rate Limits',
   icon: Timer,
 };
+const sagasNavItem: WarpNavItem = {
+  to: '/sagas',
+  label: 'Sagas',
+  icon: GitBranch,
+};
 
 function resolveIcon(name?: string): React.ComponentType<{ className?: string }> {
   if (!name) {
@@ -146,11 +152,13 @@ export function buildWarpNavItems(
   extensions: ExtensionManifest[],
   concurrencyAvailable: boolean,
   rateLimitsAvailable: boolean,
+  sagasAvailable: boolean = false,
 ): WarpNavItem[] {
   return [
     ...builtInNavItems,
     ...(concurrencyAvailable ? [concurrencyNavItem] : []),
     ...(rateLimitsAvailable ? [rateLimitsNavItem] : []),
+    ...(sagasAvailable ? [sagasNavItem] : []),
     ...extensions.flatMap((ext) =>
       ext.pages.map((page) => ({
         to: page.path,

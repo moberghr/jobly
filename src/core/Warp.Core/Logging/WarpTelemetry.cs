@@ -60,6 +60,26 @@ public static class WarpTelemetry
         unit: "{request}",
         description: "Number of in-memory mediator requests currently executing");
 
+    public static readonly Counter<long> SagasStarted = Meter.CreateCounter<long>(
+        "warp.sagas.started",
+        unit: "{saga}",
+        description: "Total saga instances created (a [StartsSaga] message arrived for a new correlation key)");
+
+    public static readonly Counter<long> SagasCompleted = Meter.CreateCounter<long>(
+        "warp.sagas.completed",
+        unit: "{saga}",
+        description: "Total saga instances marked completed and removed");
+
+    public static readonly Counter<long> SagasRequeued = Meter.CreateCounter<long>(
+        "warp.sagas.requeued",
+        unit: "{saga}",
+        description: "Total saga messages requeued due to mutex contention or optimistic-concurrency conflict. Reason tag: busy | version | unique.");
+
+    public static readonly UpDownCounter<long> SagasLive = Meter.CreateUpDownCounter<long>(
+        "warp.sagas.live",
+        unit: "{saga}",
+        description: "Per-process net saga count (incremented on start, decremented on completion). Tag: saga_type. Same per-process semantics as warp.jobs.active and warp.mediator.in_flight: aggregate across worker replicas in your OTel backend (sum) to estimate cluster-wide live sagas. Note: a saga started by replica A and completed by replica B will show +1 on A and -1 on B; the per-replica gauge can therefore go negative under restart-heavy workloads where the start-increment was lost to a process restart. For an authoritative point-in-time count, query the dashboard's GET /api/sagas/stats endpoint (reads SagaState directly).");
+
     /// <summary>
     /// Starts the consumer activity for handler execution when an <see cref="ActivityListener"/>
     /// is attached to the Warp source. Returns null when no listener is registered — workers

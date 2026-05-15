@@ -173,6 +173,10 @@ public class ServerTaskHostTests
 
         public TimeSpan? DefaultInterval => TimeSpan.FromSeconds(1);
 
+        // Stay on the Medallion lock path — the NoDb harness mocks IWarpLockProvider via
+        // FakeLockProvider; the xact-lock path needs a real IWarpSqlQueries / DbContext.
+        public bool LocksWithTransaction => false;
+
         public Task<string?> ExecuteAsync(CancellationToken ct) =>
             Task.FromResult<string?>("ok");
     }

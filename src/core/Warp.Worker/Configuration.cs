@@ -64,6 +64,15 @@ public class WarpWorkerConfiguration : WarpConfiguration
     public string[] Queues { get; set; } = ["default"];
 
     /// <summary>
+    /// Upper bound on how many rows <see cref="Services.MessageRouter{TContext}"/> and
+    /// <see cref="Services.Orchestrator{TContext}"/> process in a single ExecuteAsync call.
+    /// When the limit is hit the task returns and the host re-ticks immediately (RerunImmediately
+    /// = true) — bounded latency keeps cancellation responsive and prevents one server from
+    /// hogging the lock through a huge backlog.
+    /// </summary>
+    public int ServerTaskBatchSize { get; set; } = 100;
+
+    /// <summary>
     /// Cadence at which <see cref="Services.Heartbeat{TContext}"/> refreshes
     /// <c>LastHeartbeatTime</c> and re-reads <c>PausedAt</c> into the in-memory
     /// <see cref="PauseStateHolder"/>. Set to <c>null</c> to disable the auto-run loop —
@@ -78,8 +87,13 @@ public class WarpWorkerConfiguration : WarpConfiguration
     /// How often <see cref="Services.CounterAggregator{TContext}"/> folds pending Counter rows
     /// into the Statistic table. Set to <c>null</c> to disable the auto-run loop — the task
     /// stays DI-resolvable but no server runs it on a schedule.
+    /// <para>
+    /// Dashboard counter graphs refresh at this cadence. The default is 1 minute because
+    /// counter aggregation is not latency-critical; tighten it if you need fresher dashboard
+    /// stats and don't mind the extra DB chatter (one SELECT every interval).
+    /// </para>
     /// </summary>
-    public TimeSpan? CounterAggregationInterval { get; set; } = TimeSpan.FromSeconds(5);
+    public TimeSpan? CounterAggregationInterval { get; set; } = TimeSpan.FromMinutes(1);
 
     /// <summary>
     /// How often <see cref="Services.ServerCleanup{TContext}"/> removes Server rows whose

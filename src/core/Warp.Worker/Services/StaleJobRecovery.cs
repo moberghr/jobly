@@ -59,7 +59,16 @@ public sealed class StaleJobRecovery<TContext> : IServerTask
         var cutoff = now - _configuration.InvisibilityTimeout;
         var restartByDefault = _configuration.RestartStaleJobsByDefault;
 
-        await using var transaction = await _context.Database.BeginTransactionAsync(ct);
+        // FOR NO KEY UPDATE SKIP LOCKED requires a wrapping transaction to keep the row
+        // lock alive past the SELECT statement. ServerTaskLoop's xact-lock path provides
+        // that wrap for the production hot path, but direct callers (tests, admin triggers
+        // through DI) don't get it. Detect and open one only when needed — opening a nested
+        // tx under ServerTaskLoop's xact-lock would throw InvalidOperationException.
+        var hasOuterTx = _context.Database.CurrentTransaction != null;
+        await using var ownedTx = hasOuterTx
+            ? null
+            : await _context.Database.BeginTransactionAsync(ct);
+
         var staleJobs = await _sqlQueries.LockStaleProcessingJobsAsync(_context, cutoff, ct);
 
         var requeued = 0;
@@ -123,7 +132,10 @@ public sealed class StaleJobRecovery<TContext> : IServerTask
         }
 
         await _context.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
+        if (ownedTx != null)
+        {
+            await ownedTx.CommitAsync(ct);
+        }
 
         return new StaleJobRecoveryResult(requeued, failed, deleted);
     }

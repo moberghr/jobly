@@ -42,6 +42,19 @@ public class WarpUIMiddleware
     {
         var path = httpContext.Request.Path.Value!;
 
+        // Cookie-free status probe — lets the SPA decide whether to render the login page
+        // before firing any other API calls. Bypasses the auth filter on purpose so a fresh
+        // browser session does not log a 401 in the console on every boot.
+        var statusPath = $"{_options.RoutePrefix}/api/auth/status";
+        if (path.Equals(statusPath, StringComparison.OrdinalIgnoreCase) && string.Equals(httpContext.Request.Method, "GET", StringComparison.Ordinal))
+        {
+            var authenticated = _options.Authorization == null || _options.Authorization.Authorize(httpContext);
+            httpContext.Response.StatusCode = 200;
+            httpContext.Response.ContentType = "application/json";
+            await httpContext.Response.WriteAsync(authenticated ? "{\"authenticated\":true}" : "{\"authenticated\":false}", Encoding.UTF8, httpContext.RequestAborted);
+            return;
+        }
+
         // Handle built-in login/logout endpoints
         if (_options.CredentialValidatorType != null)
         {

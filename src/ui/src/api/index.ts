@@ -1,5 +1,5 @@
 import api from './client';
-import type { DashboardStatistics, JobModel, JobGroupModel, JobGroupDetailModel, RecurringJobModel, RecurringJobDetailModel, RecurringJobHistoryModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint, CounterModel, CounterHistoryPoint, ConcurrencyLimitInfo, RateLimitInfo, TypeCountModel, WorkerDetailModel, WorkerJobLogModel, TraceJobModel, UnifiedJobDetailModel } from '@/types';
+import type { DashboardStatistics, JobModel, JobGroupModel, JobGroupDetailModel, RecurringJobModel, RecurringJobDetailModel, RecurringJobHistoryModel, ServerModel, ServerTaskSummary, ServerLogModel, PagedList, BulkResult, StatsHistoryPoint, CounterModel, CounterHistoryPoint, ConcurrencyLimitInfo, RateLimitInfo, TypeCountModel, WorkerDetailModel, WorkerJobLogModel, TraceJobModel, UnifiedJobDetailModel, SagaListItem, SagaDetail, SagaActivityResponse, SagaStats, AuthStatus } from '@/types';
 import type { ExtensionManifest } from '@/extensions/types';
 
 // Dashboard
@@ -164,6 +164,33 @@ export const upsertRateLimit = (name: string, count: number, windowSeconds: numb
 export const deleteRateLimit = (name: string) =>
   api.delete(`/ratelimits/${encodeURIComponent(name)}`).then(() => undefined);
 
+// Sagas
+export const listSagas = (page = 0, pageSize = 20, type?: string, key?: string) => {
+  const params: Record<string, string | number> = { page, pageSize };
+  if (type) params.type = type;
+  if (key) params.key = key;
+  return api.get<PagedList<SagaListItem>>('/sagas', { params }).then(r => r.data);
+};
+
+export const getSagaTypes = () =>
+  api.get<string[]>('/sagas/types').then(r => r.data);
+
+export const getSagaStats = () =>
+  api.get<SagaStats>('/sagas/stats').then(r => r.data);
+
+export const getSagaById = (id: string) =>
+  api.get<SagaDetail>(`/sagas/${encodeURIComponent(id)}`).then(r => r.data);
+
+export const getSagaActivity = (id: string) =>
+  api.get<SagaActivityResponse>(`/sagas/${encodeURIComponent(id)}/activity`).then(r => r.data);
+
+export const forceCompleteSaga = (id: string) =>
+  api.delete(`/sagas/${encodeURIComponent(id)}`).then(() => undefined);
+
 // Extensions
 export const getExtensions = () =>
   api.get<ExtensionManifest[]>('/extensions').then(r => r.data);
+
+// Auth — cookie-free probe so the SPA can render the login page without firing a 401 first.
+export const getAuthStatus = () =>
+  api.get<AuthStatus>('/auth/status').then(r => r.data);

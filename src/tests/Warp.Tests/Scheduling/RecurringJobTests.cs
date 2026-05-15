@@ -5,6 +5,7 @@ using Warp.Core;
 using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
+using Warp.Core.Notifications;
 using Warp.Core.Services;
 using Warp.Tests.Fixtures;
 using Warp.Tests.TestData.Handlers;
@@ -55,7 +56,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         }
 
         // Act
-        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System, new NullNotificationTransport());
         var result = await svc.GetRecurringJobs(new BaseListRequest { Page = 0, PageSize = 20 });
 
         // Assert
@@ -74,7 +75,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "detail-test", Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System, new NullNotificationTransport());
         var detail = await svc.GetRecurringJobById(rj.Id);
 
         // Assert
@@ -102,7 +103,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
             .ExecuteDeleteAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System, new NullNotificationTransport());
         await svc.DeleteRecurringJob(rjId);
 
         // Assert
@@ -127,7 +128,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
             .CountAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System, new NullNotificationTransport());
         await svc.TriggerRecurringJob(rj.Id);
 
         // Assert
@@ -136,6 +137,49 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
             .CountAsync(Xunit.TestContext.Current.CancellationToken);
 
         jobCountAfter.ShouldBe(jobCountBefore + 1);
+    }
+
+    [TimedFact]
+    public async Task TriggerRecurringJob_FiresJobEnqueuedNotification()
+    {
+        // Regression: with DB push enabled, the dashboard "Trigger Now" button used to
+        // bypass NotificationDispatch and rely on the 1s polling backstop to discover the
+        // newly-enqueued job. The dispatcher should be woken via push the moment the job
+        // row lands in State.Enqueued — same contract as Publisher.SaveChangesAsync.
+        var ctx = _fixture.CreateContext();
+        var publisher = new RecurringJobPublisher<TestContext>(ctx, TimeProvider.System, new FakeLockProvider());
+        await publisher.AddOrUpdateRecurringJob(new UnitRequest(), "trigger-push-test", "* * * * *");
+
+        var readCtx = _fixture.CreateContext();
+        var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "trigger-push-test", Xunit.TestContext.Current.CancellationToken);
+
+        var transport = new RecordingNotificationTransport();
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System, transport);
+
+        await svc.TriggerRecurringJob(rj.Id);
+
+        transport.Published.Count.ShouldBe(1);
+        transport.Published[0].Kind.ShouldBe(NotificationKind.JobEnqueued);
+        transport.Published[0].Queue.ShouldBe("default");
+    }
+
+    private sealed class RecordingNotificationTransport : IWarpNotificationTransport
+    {
+        public List<(NotificationKind Kind, string? Queue)> Published { get; } = [];
+
+        public Task PublishAsync(NotificationKind kind, string? queue, CancellationToken ct)
+        {
+            Published.Add((kind, queue));
+
+            return Task.CompletedTask;
+        }
+
+        public async IAsyncEnumerable<Notification> ListenAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        {
+            // Test-only — listening is irrelevant for the publish-side regression.
+            await Task.Yield();
+            yield break;
+        }
     }
 
     [TimedFact]
@@ -150,7 +194,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "disable-test", Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System, new NullNotificationTransport());
         await svc.DisableRecurringJob(rj.Id);
 
         // Assert
@@ -180,7 +224,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "enable-test", Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System, new NullNotificationTransport());
         await svc.EnableRecurringJob(rj.Id);
 
         // Assert
@@ -208,7 +252,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System, new NullNotificationTransport());
         var result = await svc.GetRecurringJobs(new BaseListRequest { Page = 0, PageSize = 20 });
 
         // Assert
@@ -239,7 +283,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         var rj = await readCtx.Set<RecurringJob>().FirstAsync(r => r.Name == "disabled-detail-test", Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System, new NullNotificationTransport());
         var detail = await svc.GetRecurringJobById(rj.Id);
 
         // Assert
@@ -274,7 +318,7 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
         await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
         // Act
-        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System);
+        var svc = new RecurringJobService<TestContext>(_fixture.CreateContext(), TimeProvider.System, new NullNotificationTransport());
         var history = await svc.GetRecurringJobHistory(recurringJob.Id, new BaseListRequest { Page = 0, PageSize = 20 });
 
         // Assert

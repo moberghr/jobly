@@ -29,5 +29,7 @@ public class TestContext : DbContext
         ServiceConfiguration.AddConcurrencyLimitEntity(modelBuilder, _schema);
         ServiceConfiguration.AddRateLimitBucketEntity(modelBuilder, _schema);
         ServiceConfiguration.AddRateLimitOverrideEntity(modelBuilder, _schema);
+        ServiceConfiguration.AddSagaStateEntity(modelBuilder, _schema);
+        ServiceConfiguration.AddSagaJobLinkEntity(modelBuilder, _schema);
     }
 }

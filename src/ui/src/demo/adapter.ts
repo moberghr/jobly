@@ -1,6 +1,6 @@
 import type { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import * as data from './data';
-import type { ConcurrencyLimitInfo, RateLimitInfo } from '@/types';
+import type { ConcurrencyLimitInfo, RateLimitInfo, SagaDetail, SagaStats } from '@/types';
 
 // Mutable copy so demo upsert/delete feel real across the session.
 const concurrencyLimits: ConcurrencyLimitInfo[] = [...data.demoConcurrencyLimits];
@@ -41,6 +41,13 @@ export function createDemoAdapter(isLoginMode: boolean) {
       return rateLimitResult;
     }
 
+    // Sagas: demo mode shows the nav (hide-on-404 stays off) and returns mock data so the
+    // screenshots have content.
+    const sagaResult = routeSagas(method, url, config);
+    if (sagaResult !== undefined) {
+      return sagaResult;
+    }
+
     // All POST/DELETE routes return success
     if (method === 'post') {
       if (url.includes('/bulk/')) {
@@ -59,6 +66,71 @@ export function createDemoAdapter(isLoginMode: boolean) {
     // GET routes — return mock data
     return resolve(routeGet(url, params), config);
   };
+}
+
+function routeSagas(
+  method: string,
+  url: string,
+  config: InternalAxiosRequestConfig,
+): Promise<AxiosResponse> | undefined {
+  if (!url.startsWith('/sagas')) {
+    return undefined;
+  }
+
+  // Reserved sub-routes that the detailMatch regex must NOT swallow.
+  const RESERVED = new Set(['types', 'stats']);
+
+  if (method === 'get' && (url === '/sagas' || url.startsWith('/sagas?'))) {
+    return resolve(
+      {
+        items: data.demoSagas,
+        totalCount: data.demoSagas.length,
+        page: 0,
+        pageSize: 20,
+      },
+      config,
+    );
+  }
+  if (method === 'get' && url === '/sagas/types') {
+    return resolve([...new Set(data.demoSagas.map((s) => s.type))].sort(), config);
+  }
+  if (method === 'get' && url === '/sagas/stats') {
+    return resolve(
+      { liveSagas: data.demoSagas.length, startedToday: 5, completedToday: 0 } as SagaStats,
+      config,
+    );
+  }
+  const activityMatch = url.match(/^\/sagas\/([^/]+)\/activity$/);
+  if (method === 'get' && activityMatch && !RESERVED.has(activityMatch[1])) {
+    return resolve(
+      {
+        entries: data.demoSagaActivity,
+        totalInvocations: data.demoSagaActivity.length,
+        isTruncated: false,
+      },
+      config,
+    );
+  }
+  const detailMatch = url.match(/^\/sagas\/([^/?]+)$/);
+  if (method === 'get' && detailMatch && !RESERVED.has(detailMatch[1])) {
+    const id = detailMatch[1];
+    const found = data.demoSagas.find((s) => s.id === id);
+    if (!found) {
+      return Promise.reject({ response: { status: 404, statusText: 'Not Found', data: {}, headers: {}, config } });
+    }
+    const detail: SagaDetail = {
+      ...found,
+      stateJson: JSON.stringify({ OrderId: found.correlationKey, PaymentCaptured: true, InventoryReserved: false }, null, 2),
+      version: '00000000-0000-0000-0000-000000000001',
+    };
+
+    return resolve(detail, config);
+  }
+  if (method === 'delete' && detailMatch && !RESERVED.has(detailMatch[1])) {
+    return resolve({}, config);
+  }
+
+  return undefined;
 }
 
 function routeConcurrency(

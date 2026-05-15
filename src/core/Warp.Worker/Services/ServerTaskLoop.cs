@@ -4,10 +4,29 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Warp.Core;
 using Warp.Core.Data.Entities;
+using Warp.Core.Data.Queries;
 using Warp.Core.Events;
 using Warp.Core.Logging;
 
 namespace Warp.Worker.Services;
+
+// Non-generic holder so S2743 (static fields in generic types) isn't tripped by per-task
+// constants that don't depend on TContext.
+file static class ServerTaskLoopConstants
+{
+    // Cache the per-task IntervalSeconds DB read for IntervalCacheLifetime instead of
+    // issuing a SELECT every iteration. Idle tasks (MessageRouter, etc.) loop frequently
+    // and the DB value almost never changes — recovering the cost matters more than
+    // catching dashboard edits within the second.
+    public static readonly TimeSpan IntervalCacheLifetime = TimeSpan.FromMinutes(1);
+
+    // Throttle UPDATE server_task writes when the task keeps returning "Skipped". State
+    // transitions (Completed/Failed/back-to-Skipped-after-work) always flush, so dashboard
+    // "last did real work" stays current. A long idle task's LastRun ages up to 5 minutes —
+    // operators can still see the parent Server's Heartbeat (every 3s) to confirm the
+    // process is alive.
+    public static readonly TimeSpan SkippedUpdateThrottle = TimeSpan.FromMinutes(5);
+}
 
 /// <summary>
 /// Per-task loop driven by <see cref="ServerTaskHost{TContext}"/>. Owns the task's lifecycle
@@ -20,6 +39,7 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
     private readonly Type _taskType;
     private readonly string _name;
     private readonly string? _lockKey;
+    private readonly bool _locksWithTransaction;
     private readonly TimeSpan _defaultInterval;
     private readonly bool _rerunImmediately;
     private readonly bool _logOnSuccess;
@@ -35,6 +55,13 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
     private readonly Lock _signalLock = new();
     private int? _serverTaskId;
 
+    private TimeSpan? _cachedInterval;
+    private DateTimeOffset _intervalCachedAt = DateTimeOffset.MinValue;
+    private bool _intervalCacheValid;
+
+    private string? _lastUpdateStatus;
+    private DateTimeOffset _lastUpdateAt = DateTimeOffset.MinValue;
+
     public ServerTaskLoop(
         IServerTask template,
         IServiceScopeFactory scopes,
@@ -46,6 +73,7 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
         _taskType = template.GetType();
         _name = template.Name;
         _lockKey = template.LockKey;
+        _locksWithTransaction = template.LocksWithTransaction;
         _defaultInterval = template.DefaultInterval
             ?? throw new ArgumentException(
                 $"Cannot build a loop for {template.GetType().Name}: DefaultInterval is null (auto-run disabled).",
@@ -258,6 +286,30 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
     /// </summary>
     private async Task<(bool LockHeld, string? Message)> TryAcquireLockAndExecuteAsync(CancellationToken ct)
     {
+        // Transaction-scoped advisory lock path: collapses acquire + work + release into one
+        // transaction. The task's ExecuteAsync runs against a context whose connection has the
+        // xact-lock held; SaveChangesAsync joins the outer transaction (so the lock is released
+        // automatically on COMMIT). Saves 2 round-trips per iteration vs. the session-lock path.
+        if (_lockKey != null && _locksWithTransaction)
+        {
+            await using var scope = _scopes.CreateAsyncScope();
+            var task = scope.ServiceProvider
+                .GetServices<IServerTask>()
+                .First(x => x.GetType() == _taskType);
+            var ctx = scope.ServiceProvider.GetRequiredService<TContext>();
+            var sqlQueries = scope.ServiceProvider.GetRequiredService<IWarpSqlQueries<TContext>>();
+
+            var outcome = await sqlQueries.RunUnderTransactionLockAsync<string?>(
+                ctx,
+                _lockKey,
+                async (_, innerCt) => await task.ExecuteAsync(innerCt),
+                ct);
+
+            return (outcome.LockHeld, outcome.Result);
+        }
+
+        // Session-scoped (Medallion) path — required for tasks whose work spans multiple
+        // transactions (e.g. MessageRouter looping through messages with per-message commits).
         IAsyncDisposable? handle = null;
         if (_lockKey != null)
         {
@@ -316,11 +368,18 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
         _serverTaskId = entity.Id;
     }
 
-    private async Task<TimeSpan?> GetIntervalAsync(CancellationToken ct)
+    // Internal for tests: exercises the cache directly without driving the full RunAsync loop.
+    internal async Task<TimeSpan?> GetIntervalAsync(CancellationToken ct)
     {
         if (_serverTaskId == null)
         {
             return null;
+        }
+
+        var now = _time.GetUtcNow();
+        if (_intervalCacheValid && now - _intervalCachedAt < ServerTaskLoopConstants.IntervalCacheLifetime)
+        {
+            return _cachedInterval;
         }
 
         using var scope = _scopes.CreateScope();
@@ -331,8 +390,18 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
             .Select(x => x.IntervalSeconds)
             .FirstOrDefaultAsync(ct);
 
-        return seconds.HasValue ? TimeSpan.FromSeconds(seconds.Value) : null;
+        _cachedInterval = seconds.HasValue ? TimeSpan.FromSeconds(seconds.Value) : null;
+        _intervalCachedAt = now;
+        _intervalCacheValid = true;
+
+        return _cachedInterval;
     }
+
+    // Internal for tests: lets tests seed _serverTaskId without running EnsureRegisteredAsync.
+    internal void SetServerTaskIdForTest(int id) => _serverTaskId = id;
+
+    // Internal for tests: lets tests inspect the throttle state directly.
+    internal string? LastUpdateStatusForTest => _lastUpdateStatus;
 
     private async Task WaitForNextRunAsync(TimeSpan interval, CancellationToken ct)
     {
@@ -366,11 +435,25 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
                 .SetProperty(x => x.LastDurationMs, durationMs));
     }
 
-    private async Task TryUpdateServerTaskAsync(string status, string? message, double durationMs)
+    // Internal for tests: exercises the throttle directly without driving the full RunAsync loop.
+    internal async Task TryUpdateServerTaskAsync(string status, string? message, double durationMs)
     {
+        // Coalesce a run of Skipped updates: when the task has had nothing to do for a while,
+        // there's no operator value in refreshing LastRun every iteration. State transitions
+        // (Completed, Failed, or first Skipped after work) always flush so the dashboard
+        // reflects real activity promptly.
+        if (string.Equals(status, "Skipped", StringComparison.Ordinal)
+            && string.Equals(_lastUpdateStatus, "Skipped", StringComparison.Ordinal)
+            && _time.GetUtcNow() - _lastUpdateAt < ServerTaskLoopConstants.SkippedUpdateThrottle)
+        {
+            return;
+        }
+
         try
         {
             await UpdateServerTaskAsync(status, message, durationMs);
+            _lastUpdateStatus = status;
+            _lastUpdateAt = _time.GetUtcNow();
         }
         catch (Exception ex)
         {

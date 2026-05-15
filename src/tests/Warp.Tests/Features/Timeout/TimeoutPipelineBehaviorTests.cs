@@ -39,6 +39,31 @@ public class TimeoutPipelineBehaviorTests
     }
 
     [TimedFact]
+    public async Task IMessageRequest_PassesThroughWithoutTimeout()
+    {
+        // Saga messages are IMessage, not IJob. The Timeout addon must skip them — sagas
+        // serialize on their own mutex inside SagaHandlerProxy and applying a timeout to
+        // the proxy's HandleAsync would race the mutex hold + SaveChanges. The Limitations
+        // section of website/docs/features/sagas.md documents this; this test pins it.
+        var time = new FakeTimeProvider();
+        var ctx = new JobContext { JobId = Guid.NewGuid() };
+        ctx.Metadata["TimeoutSeconds"] = 1L;
+        ctx.Metadata["TimeoutMode"] = (int)TimeoutMode.Delete;
+
+        var behavior = new TimeoutPipelineBehavior<SagaShapedMessage, Unit>(ctx, time);
+
+        var result = await behavior.HandleAsync(
+            new SagaShapedMessage(),
+            (req, ct) => Task.FromResult(Unit.Value),
+            CancellationToken.None);
+
+        result.ShouldBe(Unit.Value);
+        ctx.Outcome.ShouldBeNull();
+    }
+
+    private sealed class SagaShapedMessage : IMessage;
+
+    [TimedFact]
     public async Task NoTimeoutMetadata_PassesThrough()
     {
         var time = new FakeTimeProvider();

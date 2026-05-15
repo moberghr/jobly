@@ -444,10 +444,11 @@ public abstract class MultiServerTestsBase : IntegrationTestBase
         server1.PauseState.IsPaused(server1GroupId).ShouldBeTrue();
 
         // Drain any server1 worker iterations that were already mid-fetch when the holder
-        // flipped — without this slack they could still claim a freshly-published row from
-        // their already-running SQL query. One PollingInterval (100ms test config) plus slack
-        // guarantees every such iteration finishes against the empty queue, loops back, and
-        // sees paused=true on its next check.
+        // flipped — this models the §6.8 pause contract ("no new fetches after up to one
+        // heartbeat"), not a timing guess. Without this slack, a worker mid-fetch could still
+        // claim a freshly-published row from its already-running SQL query. One PollingInterval
+        // (100ms test config) plus 4× slack covers every such iteration. Making this
+        // deterministic would require worker-iteration observability (forbidden by §6.1).
         await Task.Delay(500, Xunit.TestContext.Current.CancellationToken);
 
         // Enqueue jobs while server1 is paused

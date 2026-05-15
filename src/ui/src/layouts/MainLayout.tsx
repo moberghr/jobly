@@ -18,6 +18,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   const [concurrencyAvailable, setConcurrencyAvailable] = useState(false);
   const [rateLimitsAvailable, setRateLimitsAvailable] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sagasAvailable, setSagasAvailable] = useState(false);
 
   const title = usePageStore((s) => s.title);
   const subtitle = usePageStore((s) => s.subtitle);
@@ -64,6 +65,15 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
         }
       });
 
+    api
+      .getSagaStats()
+      .then(() => {
+        if (!cancelled) setSagasAvailable(true);
+      })
+      .catch(() => {
+        if (!cancelled) setSagasAvailable(false);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -74,7 +84,12 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
     setDrawerOpen(false);
   }, [location.pathname]);
 
-  const navItems = buildWarpNavItems(extensions, concurrencyAvailable, rateLimitsAvailable);
+  const navItems = buildWarpNavItems(
+    extensions,
+    concurrencyAvailable,
+    rateLimitsAvailable,
+    sagasAvailable,
+  );
 
   return (
     <div className="relative min-h-screen flex bg-background text-foreground">
