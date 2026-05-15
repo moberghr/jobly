@@ -280,3 +280,41 @@ export interface RateLimitInfo {
   windowSeconds: number;
   updatedAt: string;
 }
+
+export interface SagaListItem {
+  id: string;
+  type: string;
+  correlationKey: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SagaDetail {
+  id: string;
+  type: string;
+  correlationKey: string;
+  stateJson: string;
+  createdAt: string;
+  updatedAt: string;
+  version: string;
+}
+
+export interface SagaActivityEntry {
+  jobId: string;
+  messageType: string;
+  jobState: string;
+  createTime: string;
+  logs: JobLogModel[];
+}
+
+export interface SagaActivityResponse {
+  entries: SagaActivityEntry[];
+  totalInvocations: number;
+  isTruncated: boolean;
+}
+
+export interface SagaStats {
+  liveSagas: number;
+  startedToday: number;
+  completedToday: number;
+}

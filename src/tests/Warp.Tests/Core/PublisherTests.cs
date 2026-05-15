@@ -30,6 +30,50 @@ public abstract class PublisherTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
+    public async Task Publish_TimeoutMessage_SchedulesWithDelay()
+    {
+        var ctx = _fixture.CreateContext();
+        var publisher = CreatePublisher(ctx);
+        var before = DateTime.UtcNow;
+
+        var id = await publisher.Publish(new TimeoutSampleMessage());
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
+        job.ShouldNotBeNull();
+        job.Kind.ShouldBe(JobKind.Message);
+        job.CurrentState.ShouldBe(State.Scheduled);
+        var delay = job.ScheduleTime - before;
+        delay.ShouldBeGreaterThan(TimeSpan.FromSeconds(4));
+    }
+
+    [TimedFact]
+    public async Task Publish_TimeoutMessageWithZeroDelay_IsImmediate()
+    {
+        var ctx = _fixture.CreateContext();
+        var publisher = CreatePublisher(ctx);
+
+        var id = await publisher.Publish(new ZeroDelayTimeoutMessage());
+        await ctx.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        var readCtx = _fixture.CreateContext();
+        var job = await readCtx.Set<Job>().FirstOrDefaultAsync(j => j.Id == id, Xunit.TestContext.Current.CancellationToken);
+        job.ShouldNotBeNull();
+        job.CurrentState.ShouldBe(State.Enqueued);
+    }
+
+    private sealed class TimeoutSampleMessage : ITimeoutMessage
+    {
+        public TimeSpan Delay => TimeSpan.FromSeconds(5);
+    }
+
+    private sealed class ZeroDelayTimeoutMessage : ITimeoutMessage
+    {
+        public TimeSpan Delay => TimeSpan.Zero;
+    }
+
+    [TimedFact]
     public async Task Publish_CreatesMessageKindJobWithEnqueuedState()
     {
         // Arrange

@@ -359,6 +359,85 @@ public static class WarpEndpoints
 
         apiGroup.MapGet("scheduled", async ([FromServices] IJobQueryService jobQueryService, [AsParameters] BaseListRequest request) => await jobQueryService.GetScheduledJobs(request));
 
+        // Sagas — endpoints return 404 when the addon isn't registered (drives sidebar hide).
+        apiGroup.MapGet("sagas", async (
+            [FromServices] ISagaQueryService? svc,
+            [FromQuery] int page,
+            [FromQuery] int pageSize,
+            [FromQuery] string? type,
+            [FromQuery] string? key) =>
+        {
+            if (svc is null)
+            {
+                return Results.NotFound();
+            }
+
+            var request = new BaseListRequest { Page = page, PageSize = pageSize > 0 ? pageSize : 20 };
+            var result = await svc.GetSagas(request, type, key);
+
+            return Results.Ok(result);
+        });
+
+        apiGroup.MapGet("sagas/types", async ([FromServices] ISagaQueryService? svc) =>
+        {
+            if (svc is null)
+            {
+                return Results.NotFound();
+            }
+
+            var types = await svc.GetSagaTypes();
+
+            return Results.Ok(types);
+        });
+
+        apiGroup.MapGet("sagas/stats", async ([FromServices] ISagaQueryService? svc) =>
+        {
+            if (svc is null)
+            {
+                return Results.NotFound();
+            }
+
+            var stats = await svc.GetStats();
+
+            return Results.Ok(stats);
+        });
+
+        apiGroup.MapGet("sagas/{id}", async ([FromServices] ISagaQueryService? svc, Guid id) =>
+        {
+            if (svc is null)
+            {
+                return Results.NotFound();
+            }
+
+            var saga = await svc.GetSagaById(id);
+
+            return saga is null ? Results.NotFound() : Results.Ok(saga);
+        });
+
+        apiGroup.MapGet("sagas/{id}/activity", async ([FromServices] ISagaQueryService? svc, Guid id) =>
+        {
+            if (svc is null)
+            {
+                return Results.NotFound();
+            }
+
+            var activity = await svc.GetSagaActivity(id);
+
+            return Results.Ok(activity);
+        });
+
+        apiGroup.MapDelete("sagas/{id}", async ([FromServices] ISagaCommandService? svc, Guid id) =>
+        {
+            if (svc is null)
+            {
+                return Results.NotFound();
+            }
+
+            var removed = await svc.ForceComplete(id);
+
+            return removed ? Results.NoContent() : Results.NotFound();
+        });
+
         // Extension manifests
         var manifests = extensions.ConvertAll(x => x.GetManifest());
         apiGroup.MapGet("extensions", () => manifests);

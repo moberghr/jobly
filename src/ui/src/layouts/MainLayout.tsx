@@ -17,6 +17,7 @@ import {
   Gauge,
   KeyRound,
   Timer,
+  GitBranch,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { useRealtimeStore } from '@/stores/realtime';
@@ -37,6 +38,7 @@ const builtInNavItems = [
 
 const concurrencyNavItem = { to: '/concurrency', label: 'Concurrency', icon: KeyRound };
 const rateLimitsNavItem = { to: '/ratelimits', label: 'Rate Limits', icon: Timer };
+const sagasNavItem = { to: '/sagas', label: 'Sagas', icon: GitBranch };
 
 function resolveIcon(name?: string): React.ComponentType<{ className?: string }> {
   if (!name) {
@@ -61,6 +63,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   const realtimeStatus = useRealtimeStore((s) => s.status);
   const [concurrencyAvailable, setConcurrencyAvailable] = useState(false);
   const [rateLimitsAvailable, setRateLimitsAvailable] = useState(false);
+  const [sagasAvailable, setSagasAvailable] = useState(false);
 
   // Initial fetch for first paint — after this, fresh stats arrive directly via
   // the SignalR push payload on every JobFinalized / MessageEnqueued event (see
@@ -109,6 +112,15 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
         }
       });
 
+    api
+      .getSagaStats()
+      .then(() => {
+        if (!cancelled) setSagasAvailable(true);
+      })
+      .catch(() => {
+        if (!cancelled) setSagasAvailable(false);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -129,6 +141,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
               ...builtInNavItems,
               ...(concurrencyAvailable ? [concurrencyNavItem] : []),
               ...(rateLimitsAvailable ? [rateLimitsNavItem] : []),
+              ...(sagasAvailable ? [sagasNavItem] : []),
               ...extensions.flatMap((ext) =>
                 ext.pages.map((page) => ({
                   to: page.path,

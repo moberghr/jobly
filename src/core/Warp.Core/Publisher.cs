@@ -98,6 +98,11 @@ public class Publisher<TContext> : IPublisher
 
         using var producerSpan = WarpTelemetry.StartProducerActivity(resolvedQueue, WarpTelemetryAttributes.OperationSend);
 
+        // ITimeoutMessage auto-schedules itself: a delay > 0 parks the row in Scheduled until
+        // ScheduledJobActivation flips it to Enqueued. Delay <= 0 falls through to immediate
+        // delivery (mirrors Schedule semantics elsewhere — past scheduleTime → Enqueued).
+        var (scheduleTime, state) = ResolveDelivery(message, now);
+
         var msg = new Job
         {
             Kind = JobKind.Message,
@@ -105,8 +110,8 @@ public class Publisher<TContext> : IPublisher
             Message = JsonSerializer.Serialize(message),
             Queue = resolvedQueue,
             CreateTime = now,
-            ScheduleTime = now,
-            CurrentState = State.Enqueued,
+            ScheduleTime = scheduleTime,
+            CurrentState = state,
             JobCount = 0,
             Metadata = SerializeMetadata(publishCtx.Metadata),
         };
@@ -326,5 +331,15 @@ public class Publisher<TContext> : IPublisher
     private static string? SerializeMetadata(Dictionary<string, object> metadata)
     {
         return metadata.Count > 0 ? JsonSerializer.Serialize(metadata) : null;
+    }
+
+    private static (DateTime ScheduleTime, State State) ResolveDelivery(IMessage message, DateTime now)
+    {
+        if (message is ITimeoutMessage timeout && timeout.Delay > TimeSpan.Zero)
+        {
+            return (now + timeout.Delay, State.Scheduled);
+        }
+
+        return (now, State.Enqueued);
     }
 }
