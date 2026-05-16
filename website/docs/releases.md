@@ -4,6 +4,36 @@ sidebar_position: 6
 
 # Releases
 
+## 0.14.1
+
+*2026-05-16*
+
+Two patch-level fixes to the dashboard surface. No public API changes.
+
+### Fixed: dashboard timestamps off by the client's UTC offset
+
+The dashboard rendered `Started`, `Heartbeat`, and other server/job timestamps in the client's local timezone but advertised them as the UTC moment — a server that started 5 minutes ago appeared as "about 2 hours ago" on a `UTC+2` client. The root cause was on the backend: SQL Server `datetime2` (and Postgres `timestamp` without timezone) columns carry no `DateTimeKind` info, so EF Core materialized values with `Kind=Unspecified`. `System.Text.Json` then serialized the resulting `DateTime` without a `Z` suffix, and the browser's `new Date(...)` parsed the unmarked string as local time.
+
+A new `ValueConverter` applied via `WarpModelCustomizer` stamps `Kind=Utc` on every `DateTime` / `DateTime?` property read from `Warp.Core`-assembly entities. The convention is assembly-scoped (not namespace-prefixed), so a user's entity sharing the same DbContext is never touched. Any property the user has already attached their own converter to is left alone.
+
+No action required on upgrade — the fix takes effect after a redeploy. Production code that already wrote `Kind=Utc` (everything routed through `TimeProvider.GetUtcNow().UtcDateTime` per [§5.7](https://moberghr.github.io/warp/docs/) and Warp itself) continues to behave identically.
+
+### Changed: addon-discovery probes consolidated into `/api/addons`
+
+The dashboard previously discovered opt-in addons by firing one `GET` against each addon's data route (`/api/concurrency`, `/api/ratelimits`, `/api/dashboard/push/probe`) and treating the 404 as the "addon not enabled" signal. That worked, but it surfaced three red 404s in DevTools every session and made the network tab noisy when triaging unrelated issues.
+
+`GET /api/addons` replaces all three with one always-200 response:
+
+```json
+{ "concurrency": true, "rateLimits": false, "push": true, "sagas": false }
+```
+
+The booleans are computed from DI service presence. The dashboard makes one round-trip per session, decides nav visibility from the flags, and uses `push` to gate the SignalR connect. A one-shot retry on transient failure keeps a single network blip from hiding all addon nav for the rest of the session.
+
+The legacy `/api/dashboard/push/probe` route was removed in this release. `/api/concurrency` and `/api/ratelimits` still 404 when the corresponding addon isn't registered — they're the data endpoints — but the bundled dashboard no longer probes them speculatively.
+
+External integrations that were polling `/api/dashboard/push/probe` should switch to `/api/addons` and read the `push` boolean.
+
 ## 0.14.0
 
 *2026-05-14*
