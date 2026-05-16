@@ -6,6 +6,7 @@ using Warp.Core.Concurrency;
 using Warp.Core.Enums;
 using Warp.Core.Models;
 using Warp.Core.RateLimit;
+using Warp.Core.Sagas;
 using Warp.Core.Services;
 using Warp.UI.DashboardPush;
 using Warp.UI.Extensions;
@@ -127,8 +128,23 @@ public static class WarpEndpoints
 
         apiGroup.MapGet("stats/counters/history", async ([FromServices] IDashboardStatsService statsService, [FromQuery] int? hours) => await statsService.GetCountersHistory(hours ?? 24));
 
-        apiGroup.MapGet("dashboard/push/probe", ([FromServices] IDashboardPushMarker? marker) =>
-            marker is null ? Results.NotFound() : Results.Ok(new { enabled = true }));
+        // Single discovery endpoint. The dashboard probes opt-in addons in one round-trip
+        // rather than firing a GET against each addon's data route and treating 404 as the
+        // signal. Always returns 200; per-addon flags reflect DI service presence. This
+        // replaced the per-addon hide-on-404 probes (e.g. dashboard/push/probe) that were
+        // removed when the dashboard switched to single-call discovery.
+        apiGroup.MapGet("addons", (
+            [FromServices] IConcurrencyLimitManager? concurrency,
+            [FromServices] IRateLimitManager? rateLimits,
+            [FromServices] IDashboardPushMarker? push,
+            [FromServices] ISagaQueryService? sagas) =>
+            Results.Ok(new WarpAddonsInfo
+            {
+                Concurrency = concurrency is not null,
+                RateLimits = rateLimits is not null,
+                Push = push is not null,
+                Sagas = sagas is not null,
+            }));
 
         apiGroup.MapGet("concurrency", async ([FromServices] IConcurrencyLimitManager? mgr, CancellationToken ct) =>
         {

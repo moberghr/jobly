@@ -25,7 +25,7 @@ builder.Services.AddWarp<AppDbContext>(opt =>
 });
 ```
 
-The hub is mounted at `${RoutePrefix}/api/hub` (default `/warp/api/hub`). The frontend probes `${RoutePrefix}/api/dashboard/push/probe` once at boot and falls back to 30 s polling when the addon is absent — `WarpDashboardHub` is not present, so the probe returns 404. Same hide-on-404 pattern as the concurrency admin nav.
+The hub is mounted at `${RoutePrefix}/api/hub` (default `/warp/api/hub`). The frontend reads `${RoutePrefix}/api/addons` once at boot and falls back to 30 s polling when `push: false` (i.e. `AddDashboardPush()` was not called). Same discovery endpoint reports concurrency / rate-limit / saga addon availability for nav visibility.
 
 ## What gets broadcast
 

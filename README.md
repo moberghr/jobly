@@ -434,7 +434,7 @@ opt.AddDashboardPush(cfg =>
 });
 ```
 
-**Hide-on-404 fallback**: the dashboard probes `GET /warp/api/dashboard/push/probe` once at boot. If `AddDashboardPush()` is not registered the endpoint returns 404 and the SPA keeps using its existing polling fallback (at the safety-net interval of 30 s — coarser than the previous 2–5 s, which is the intended cost of not opting in).
+**Addon discovery**: the dashboard reads `GET /warp/api/addons` once at boot. If `AddDashboardPush()` is not registered the response sets `push: false` and the SPA keeps using its existing polling fallback (at the safety-net interval of 30 s — coarser than the previous 2–5 s, which is the intended cost of not opting in).
 
 **Auth**: hub negotiate hits `WarpUIMiddleware`'s existing path-based auth (the hub URL contains `/api/`, so unauthenticated requests get a 401). No parallel auth code path — the same `IWarpAuthorizationFilter` (or built-in cookie login) gates the hub.
 
