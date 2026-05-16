@@ -1,17 +1,17 @@
 import { create } from 'zustand';
 import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr';
-import { probeDashboardPush, getHubUrl, type RealtimeEvent } from '@/api/realtime';
+import { getHubUrl, type RealtimeEvent } from '@/api/realtime';
 import { emit } from '@/lib/realtimeBus';
 import { useDashboardStore } from '@/stores/dashboard';
 import type { DashboardStatistics } from '@/types';
 
-export type RealtimeStatus = 'idle' | 'probing' | 'connecting' | 'connected' | 'reconnecting' | 'disabled';
+export type RealtimeStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disabled';
 
 interface RealtimeStore {
   status: RealtimeStatus;
   lastEventAt: number | null;
   connection: HubConnection | null;
-  probeAndConnect: () => Promise<void>;
+  connectIfEnabled: (pushEnabled: boolean) => Promise<void>;
   disconnect: () => Promise<void>;
 }
 
@@ -21,7 +21,7 @@ function bridgeEvent(connection: HubConnection, event: RealtimeEvent) {
   // Each HubConnection is a fresh object — bind unconditionally. A module-level
   // "already bridged" set was previously here as a guard, but that prevented
   // re-binding after onclose → reconnect cycles (the new connection had no
-  // handlers). Each probeAndConnect builds exactly one new connection and is
+  // handlers). Each connectIfEnabled builds exactly one new connection and is
   // the only call site, so binding is always exactly-once per instance.
   //
   // Server pushes the current DashboardStatistics DTO as the first argument when
@@ -43,7 +43,7 @@ export const useRealtimeStore = create<RealtimeStore>((set, get) => ({
   status: 'idle',
   lastEventAt: null,
   connection: null,
-  probeAndConnect: async () => {
+  connectIfEnabled: async (pushEnabled: boolean) => {
     if (bootInflight) {
       return bootInflight;
     }
@@ -53,15 +53,12 @@ export const useRealtimeStore = create<RealtimeStore>((set, get) => ({
       return;
     }
 
+    if (!pushEnabled) {
+      set({ status: 'disabled' });
+      return;
+    }
+
     bootInflight = (async () => {
-      set({ status: 'probing' });
-
-      const enabled = await probeDashboardPush();
-      if (!enabled) {
-        set({ status: 'disabled' });
-        return;
-      }
-
       set({ status: 'connecting' });
 
       const connection = new HubConnectionBuilder()
@@ -82,7 +79,7 @@ export const useRealtimeStore = create<RealtimeStore>((set, get) => ({
       connection.onclose(() => set({ status: 'disabled', connection: null }));
 
       // Wire the two event channels we care about. Idempotent — repeated calls to
-      // probeAndConnect (e.g. after login) reuse the existing bridge bindings.
+      // connectIfEnabled (e.g. after login) reuse the existing bridge bindings.
       bridgeEvent(connection, 'JobFinalized');
       bridgeEvent(connection, 'MessageEnqueued');
 

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Warp.Core;
+using Warp.Core.Data.Converters;
 
 namespace Warp.Tests;
 
@@ -31,5 +32,10 @@ public class TestContext : DbContext
         ServiceConfiguration.AddRateLimitOverrideEntity(modelBuilder, _schema);
         ServiceConfiguration.AddSagaStateEntity(modelBuilder, _schema);
         ServiceConfiguration.AddSagaJobLinkEntity(modelBuilder, _schema);
+
+        // Mirror what WarpModelCustomizer does in production. The unit-fixture path bypasses
+        // ReplaceService<IModelCustomizer> by building DbContextOptions directly, so we apply
+        // the convention here to keep fixture-backed tests aligned with real DI behavior.
+        modelBuilder.ApplyWarpUtcDateTimeConverters();
     }
 }

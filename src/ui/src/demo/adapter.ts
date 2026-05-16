@@ -41,8 +41,8 @@ export function createDemoAdapter(isLoginMode: boolean) {
       return rateLimitResult;
     }
 
-    // Sagas: demo mode shows the nav (hide-on-404 stays off) and returns mock data so the
-    // screenshots have content.
+    // Sagas: /addons reports sagas:true in demo mode (see routeGet), so the nav is visible
+    // and these routes return mock data for the screenshots.
     const sagaResult = routeSagas(method, url, config);
     if (sagaResult !== undefined) {
       return sagaResult;
@@ -303,6 +303,12 @@ function routeGet(url: string, params: Record<string, unknown>): unknown {
   // Extensions
   if (url === '/extensions') {
     return [{ name: 'retry', scriptUrl: '/_ext/retry/index.js', pages: [] }];
+  }
+
+  // Addons discovery — demo mode pretends every opt-in addon is wired so the screenshots
+  // have full nav. push:false keeps SignalR off in demo (no backend hub).
+  if (url === '/addons') {
+    return { concurrency: true, rateLimits: true, push: false, sagas: true };
   }
 
   // Dashboard

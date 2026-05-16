@@ -322,3 +322,10 @@ export interface SagaStats {
 export interface AuthStatus {
   authenticated: boolean;
 }
+
+export interface WarpAddonsInfo {
+  concurrency: boolean;
+  rateLimits: boolean;
+  push: boolean;
+  sagas: boolean;
+}

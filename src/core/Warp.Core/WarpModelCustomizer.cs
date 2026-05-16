@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Warp.Core.Data.Converters;
 
 namespace Warp.Core;
 
@@ -27,5 +28,7 @@ internal sealed class WarpModelCustomizer : RelationalModelCustomizer
                 configurator(modelBuilder, schema);
             }
         }
+
+        modelBuilder.ApplyWarpUtcDateTimeConverters();
     }
 }

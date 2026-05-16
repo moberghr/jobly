@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useDashboardStore } from '@/stores/dashboard';
 import * as LucideIcons from 'lucide-react';
@@ -73,52 +72,38 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   // own scoped views.
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
-  // Kick off the realtime probe + hub connection once the dashboard has
-  // mounted (and therefore subscribers like the bus listeners are already
-  // registered). Running this from main.tsx races React's useEffect timing
-  // and the post-connect drain emits to zero subscribers.
-  useEffect(() => {
-    void useRealtimeStore.getState().probeAndConnect();
-  }, []);
-
+  // One discovery call. Replaces three speculative hide-on-404 probes that previously
+  // showed as red 404s in DevTools. The result also drives the realtime hub connect
+  // decision, so the dashboard makes a single addon-status round-trip per session.
+  // A transient 5xx / network blip used to take down only one nav slot under the old
+  // per-probe design; with a single endpoint we retry once after a short delay so a
+  // momentary failure doesn't hide all addon nav and push for the rest of the session.
   useEffect(() => {
     let cancelled = false;
-    api
-      .listConcurrencyLimits()
-      .then(() => {
-        if (!cancelled) setConcurrencyAvailable(true);
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        if (axios.isAxiosError(e) && e.response?.status === 404) {
-          setConcurrencyAvailable(false);
-        } else {
-          // Non-404 errors (network, 500): keep hidden, don't surface noise.
-          setConcurrencyAvailable(false);
-        }
-      });
 
-    api
-      .listRateLimits()
-      .then(() => {
-        if (!cancelled) setRateLimitsAvailable(true);
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        if (axios.isAxiosError(e) && e.response?.status === 404) {
-          setRateLimitsAvailable(false);
-        } else {
-          setRateLimitsAvailable(false);
-        }
-      });
+    const fetchAddons = async () => {
+      try {
+        return await api.getAddons();
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 750));
+        return await api.getAddons();
+      }
+    };
 
-    api
-      .getSagaStats()
-      .then(() => {
-        if (!cancelled) setSagasAvailable(true);
+    fetchAddons()
+      .then((addons) => {
+        if (cancelled) return;
+        setConcurrencyAvailable(addons.concurrency);
+        setRateLimitsAvailable(addons.rateLimits);
+        setSagasAvailable(addons.sagas);
+        void useRealtimeStore.getState().connectIfEnabled(addons.push);
       })
       .catch(() => {
-        if (!cancelled) setSagasAvailable(false);
+        if (cancelled) return;
+        setConcurrencyAvailable(false);
+        setRateLimitsAvailable(false);
+        setSagasAvailable(false);
+        void useRealtimeStore.getState().connectIfEnabled(false);
       });
 
     return () => {
@@ -268,7 +253,7 @@ function RealtimeStatusIndicator({ status }: { status: ReturnType<typeof useReal
   if (status === 'disabled' && !import.meta.env.DEV) {
     return null;
   }
-  if (status === 'idle' || status === 'probing') {
+  if (status === 'idle') {
     return null;
   }
 
