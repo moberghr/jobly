@@ -38,14 +38,14 @@ public abstract class SagaIntegrationTestsBase : IntegrationTestBase
         await WaitForSagaRemoved(server, "O-1");
 
         // All three message-routed handler jobs ended in Completed state.
+        // WaitForSagaRemoved returns when the saga row is deleted inside the handler's
+        // SaveChanges, but the worker writes State.Completed for the handler-job in a
+        // separate UPDATE after the handler returns — poll for that transition rather
+        // than snapshot, otherwise the last child can still be Processing here.
         var jobIds = new[] { placed, payment, inventory };
         foreach (var jobId in jobIds)
         {
-            var children = await server.CreateContext().Set<Warp.Core.Entities.Job>()
-                .Where(x => x.ParentJobId == jobId)
-                .ToListAsync(Xunit.TestContext.Current.CancellationToken);
-            children.ShouldNotBeEmpty();
-            children.ShouldAllBe(c => c.CurrentState == Warp.Core.Enums.State.Completed);
+            await WaitForChildrenCompleted(server, jobId);
         }
     }
 
@@ -332,6 +332,31 @@ public abstract class SagaIntegrationTestsBase : IntegrationTestBase
         }
 
         throw new TimeoutException($"Saga '{correlationKey}' did not reach expected state (paymentCaptured={paymentCaptured}, inventoryReserved={inventoryReserved})");
+    }
+
+    private static async Task WaitForChildrenCompleted(WarpTestServer server, Guid parentJobId)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        List<Warp.Core.Entities.Job> children = [];
+        while (DateTime.UtcNow < deadline)
+        {
+            children = await server.CreateContext().Set<Warp.Core.Entities.Job>()
+                .AsNoTracking()
+                .Where(x => x.ParentJobId == parentJobId)
+                .ToListAsync(Xunit.TestContext.Current.CancellationToken);
+
+            if (children.Count > 0 && children.All(c => c.CurrentState == Warp.Core.Enums.State.Completed))
+            {
+                return;
+            }
+
+            await Task.Delay(100, Xunit.TestContext.Current.CancellationToken);
+        }
+
+        var snapshot = children.Count == 0
+            ? "<no children>"
+            : string.Join(", ", children.Select(c => $"{c.Id}={c.CurrentState}"));
+        throw new TimeoutException($"Children of {parentJobId} did not all reach Completed within 10s. States: {snapshot}");
     }
 
     private static async Task WaitForSagaRemoved(WarpTestServer server, string correlationKey)
