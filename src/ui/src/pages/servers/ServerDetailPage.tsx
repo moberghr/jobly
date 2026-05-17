@@ -15,7 +15,6 @@ import * as api from '@/api';
 const statusColors: Record<string, string> = {
   Completed: 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30',
   Failed: 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30',
-  Skipped: 'text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/30',
 };
 
 export default function ServerDetailPage() {
