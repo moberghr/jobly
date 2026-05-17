@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { useRealtimeStore } from '@/stores/realtime';
+import { startRealtimeFeed, stopRealtimeFeed } from '@/lib/realtimeFeed';
 import { config } from '@/config';
 import * as api from '@/api';
 import type { DashboardStatistics } from '@/types';
@@ -71,6 +72,16 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   // by the bridge still wakes other pages (jobs, counters, etc.) to refetch their
   // own scoped views.
   useEffect(() => { fetchStats(); }, [fetchStats]);
+
+  // The realtime chart binds to `useDashboardStore.realtimeData` as a pure
+  // renderer. The feed module owns the freshness source (SignalR push or 1 Hz
+  // poll) and the 1 Hz sampler that appends delta points. Running it here
+  // (rather than inside RealtimeChart) keeps the time-series accumulating
+  // while the user is on other dashboard pages.
+  useEffect(() => {
+    startRealtimeFeed();
+    return () => stopRealtimeFeed();
+  }, []);
 
   // One discovery call. Replaces three speculative hide-on-404 probes that previously
   // showed as red 404s in DevTools. The result also drives the realtime hub connect

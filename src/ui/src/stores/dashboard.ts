@@ -24,6 +24,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => {
   // Decoupled from fetchStats — that runs event-driven, possibly many times per
   // second, and using it for rate-delta would produce wildly varying y-values.
   let prevSampled: { succeeded: number; failed: number } | null = null;
+  let prevSampledAt: number | null = null;
 
   return {
     stats: null,
@@ -39,20 +40,37 @@ export const useDashboardStore = create<DashboardStore>((set, get) => {
         // Reset the rate-sample baseline so the next sample doesn't compute a
         // huge delta against stale pre-disconnect totals.
         prevSampled = null;
+        prevSampledAt = null;
       }
     },
     sampleRate: () => {
       const stats = get().stats;
       if (!stats) return;
 
+      const nowSec = Math.floor(Date.now() / 1000);
       const current = { succeeded: stats.totalSucceeded, failed: stats.totalFailed };
       const prev = prevSampled;
+      const lastAt = prevSampledAt;
       prevSampled = current;
+      prevSampledAt = nowSec;
 
-      if (!prev) return; // first sample establishes the baseline only
+      // Re-establish the baseline if this is the first sample or if the gap
+      // since the last sample is larger than the 1 Hz cadence allows. The
+      // sampler runs in MainLayout so it stays alive across page navigation,
+      // but browsers throttle setInterval in backgrounded tabs and freeze it
+      // during sleep — when the timer wakes, stats.totalSucceeded has grown
+      // and a single delta against the stale baseline would land as one
+      // instant spike. Also drop the accumulated window so the old points
+      // don't smooth-curve into the next real sample.
+      if (!prev || lastAt === null || nowSec - lastAt > 2) {
+        if (lastAt !== null && nowSec - lastAt > 2) {
+          set({ realtimeData: [] });
+        }
+        return;
+      }
 
       const newPoint: RealtimePoint = {
-        ts: Math.floor(Date.now() / 1000),
+        ts: nowSec,
         succeeded: Math.max(0, current.succeeded - prev.succeeded),
         failed: Math.max(0, current.failed - prev.failed),
       };
