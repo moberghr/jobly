@@ -10,7 +10,7 @@ type StateDef = {
 };
 
 const STATES: StateDef[] = [
-  { slug: 'enqueued',   label: 'Enqueued',   accent: 'text-warp-blue',   accentBg: 'bg-warp-blue-soft',   countKey: 'pending' },
+  { slug: 'enqueued',   label: 'Enqueued',   accent: 'text-warp-blue',   accentBg: 'bg-warp-blue-soft',   countKey: 'created' },
   { slug: 'scheduled',  label: 'Scheduled',  accent: 'text-warp-amber',  accentBg: 'bg-warp-amber-soft',  countKey: 'scheduled' },
   { slug: 'processing', label: 'Processing', accent: 'text-warp-purple', accentBg: 'bg-warp-purple-soft', countKey: 'processing' },
   { slug: 'completed',  label: 'Completed',  accent: 'text-warp-green',  accentBg: 'bg-warp-green-soft',  countKey: 'completed' },

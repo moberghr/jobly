@@ -5,8 +5,6 @@ import {
   Layers,
   Repeat,
   Server,
-  Zap,
-  Clock,
   Loader,
   KeyRound,
   Timer,
@@ -47,7 +45,7 @@ const builtInNavItems: WarpNavItem[] = [
     label: 'Jobs',
     icon: Briefcase,
     badges: (s) => {
-      const blue = nonZero(s?.pending);
+      const blue = nonZero(s?.created);
       const red = nonZero(s?.failed);
       const out: NavBadge[] = [];
       if (blue) out.push({ value: blue, kind: 'blue' });
@@ -61,7 +59,7 @@ const builtInNavItems: WarpNavItem[] = [
     label: 'Messages',
     icon: Mail,
     badges: (s) => {
-      const blue = nonZero(s?.messages);
+      const blue = nonZero(s?.messagesEnqueued);
       const red = nonZero(s?.messagesFailed);
       const out: NavBadge[] = [];
       if (blue) out.push({ value: blue, kind: 'blue' });
@@ -98,18 +96,6 @@ const builtInNavItems: WarpNavItem[] = [
 
       return blue ? [{ value: blue, kind: 'blue' }] : [];
     },
-  },
-  // 'Workers' has no dedicated list page yet — link to servers detail surface.
-  // Kept as a separate nav entry to match the V2 sidebar design.
-  {
-    to: '/servers',
-    label: 'Workers',
-    icon: Zap,
-  },
-  {
-    to: '/trace',
-    label: 'Trace',
-    icon: Clock,
   },
   {
     to: '/counters',
