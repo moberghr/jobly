@@ -16,6 +16,7 @@ import { StateBadge } from '@/components/StateBadge';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { shortType, shortId } from '@/utils/format';
+import { getStateTone } from '@/lib/styles';
 import { usePageStore } from '@/stores/page';
 import { useDashboardStore } from '@/stores/dashboard';
 import {
@@ -44,16 +45,6 @@ const SUBTEXT: Record<string, string> = {
   failed: 'Retries exhausted. Filter by type to bulk requeue or delete.',
   awaiting: 'Awaiting parent / dependency.',
   deleted: 'Soft-deleted; recoverable until cleanup.',
-};
-
-const STATE_TONE: Record<string, { text: string; bg: string }> = {
-  enqueued:   { text: 'text-state-enqueued',   bg: 'bg-state-enqueued-bg' },
-  scheduled:  { text: 'text-state-scheduled',  bg: 'bg-state-scheduled-bg' },
-  processing: { text: 'text-state-processing', bg: 'bg-state-processing-bg' },
-  completed:  { text: 'text-state-completed',  bg: 'bg-state-completed-bg' },
-  failed:     { text: 'text-state-failed',     bg: 'bg-state-failed-bg' },
-  awaiting:   { text: 'text-state-awaiting',   bg: 'bg-state-awaiting-bg' },
-  deleted:    { text: 'text-state-deleted',    bg: 'bg-state-deleted-bg' },
 };
 
 function capitalize(s: string): string {
@@ -286,7 +277,7 @@ export default function JobListPage() {
   }
 
   const stateLabel = resolvedState;
-  const tone = STATE_TONE[resolvedState] ?? STATE_TONE.enqueued;
+  const tone = getStateTone(resolvedState);
   const total = data.totalCount;
   const showingFrom = total === 0 ? 0 : page * PAGE_SIZE + 1;
   const showingTo = Math.min((page + 1) * PAGE_SIZE, total);

@@ -4,7 +4,8 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 30000,
   expect: { timeout: 10000 },
-  fullyParallel: false,
+  fullyParallel: true,
+  workers: process.env.CI ? 2 : undefined,
   use: {
     baseURL: 'http://localhost:5179',
     viewport: { width: 1280, height: 800 },
