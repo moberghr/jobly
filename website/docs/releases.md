@@ -4,6 +4,29 @@ sidebar_position: 6
 
 # Releases
 
+## 0.15.1
+
+*2026-05-18*
+
+One packaging fix to `Moberg.Warp.Core`. No public API changes.
+
+### Fixed: source generator missing from the NuGet package
+
+The mediator/job dispatch source generator (`Warp.SourceGenerator`) was wired up as a project-level analyzer in `Warp.Core.csproj` but never packed into `Moberg.Warp.Core.nupkg`. In-tree consumers (Warp's own tests, demos, benchmarks) reference Core via `<ProjectReference>` so the analyzer flowed through normally — masking the gap. Downstream NuGet consumers got the runtime DLL but no generator, so `[ModuleInitializer]`-driven `WarpGeneratedHandlerRegistry` registrations never ran. `AddWarpWorker` then registered nothing and the first `IMediator.Send(...)` threw `"No handler registered for {RequestType}"`.
+
+The bug has been present since handler auto-registration shipped in 0.10.0 (2026-04-27). It surfaced for consumers with more than a trivial number of handlers, where the manual `services.AddScoped<IRequestHandler<,>, ...>()` workaround stopped scaling.
+
+The fix is one block in `Warp.Core.csproj` mirroring what `Warp.Http.csproj` has had since day one — embed the generator DLL into `analyzers/dotnet/cs/`:
+
+```xml
+<ItemGroup>
+  <None Include="..\Warp.SourceGenerator\bin\$(Configuration)\netstandard2.0\Warp.SourceGenerator.dll"
+        Pack="true" PackagePath="analyzers/dotnet/cs/" Visible="false" />
+</ItemGroup>
+```
+
+No action required on upgrade beyond bumping the `Moberg.Warp.Core` version. Consumers that worked around the bug with reflection-based handler scanning can drop the workaround once on 0.15.1 — `AddWarpWorker` / `AddWarp` will pick handlers up automatically.
+
 ## 0.15.0
 
 *2026-05-17*

@@ -29,4 +29,13 @@
 		<ProjectReference Include="..\Warp.SourceGenerator\Warp.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 	</ItemGroup>
 
+	<!-- Embed the source generator DLL into the NuGet package as a Roslyn analyzer.
+	     Without this, NuGet consumers of Moberg.Warp.Core get the runtime library but not
+	     the mediator/job dispatch generation — WarpGeneratedHandlerRegistry stays empty
+	     and AddWarp registers nothing. Mirrors the same block in Warp.Http.csproj. -->
+	<ItemGroup>
+		<None Include="..\Warp.SourceGenerator\bin\$(Configuration)\netstandard2.0\Warp.SourceGenerator.dll"
+		      Pack="true" PackagePath="analyzers/dotnet/cs/" Visible="false" />
+	</ItemGroup>
+
 </Project>
