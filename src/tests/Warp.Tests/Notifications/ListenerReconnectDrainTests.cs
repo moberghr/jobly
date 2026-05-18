@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Shouldly;
 using Warp.Core.Enums;
 using Warp.Core.Notifications;
 using Warp.Tests.Fixtures;
@@ -64,25 +63,29 @@ public abstract class ListenerReconnectDrainTestsBase : IntegrationTestBase
                 services.AddSingleton<IWarpNotificationTransport>(transport);
             });
 
-        // Deterministic: wait until the listener has STARTED its second attempt. That proves
-        // the first attempt fully unwound (throw → log → backoff sleep → loop back), so the
-        // startup-drain has already fired and the dispatcher is no longer running a fresh poll.
-        // Any subsequent ListenAttempts increment from this point onward is a reconnect that
-        // happened AFTER our enqueue below.
+        // Wait until the listener has STARTED its second attempt — that proves the first
+        // attempt fully unwound (throw → log → backoff sleep → loop back) and the listener
+        // is actively reconnecting on failure. Subsequent drain iterations are what we rely
+        // on to deliver the job below.
         await transport.SecondAttemptStarted.WaitAsync(Xunit.TestContext.Current.CancellationToken);
-        var listenAttemptsBeforeEnqueue = transport.ListenAttempts;
 
         var publisher = server.CreatePublisher();
         var jobId = await publisher.Enqueue(new CounterRequest(), queue: queue);
         await publisher.SaveChangesAsync(Xunit.TestContext.Current.CancellationToken);
 
-        // The job must complete without polling, using only the reconnect-driven drain signal.
-        // Upper bound: one reconnect backoff (~1s) + fetch + handler. 4s gives CI headroom.
+        // The job must complete via the reconnect-driven DrainSignals path, not polling.
+        // PollingInterval / MaxPollingInterval are set to 30s above, so if polling ever
+        // delivers, the WaitForJobState below would only succeed at ~30s — well past this
+        // 4s budget. A pass within 4s is therefore proof that one of the listener's reconnect
+        // iterations fired a DrainSignals wake-up whose dispatcher poll observed our job.
+        //
+        // We deliberately do NOT assert `ListenAttempts > N` afterwards. DrainSignals only
+        // signals consumers — the dispatcher's actual DB poll runs on its own task and can
+        // land after the signal that triggered it. So a drain whose signal fires before our
+        // enqueue can still observe the enqueue when its poll task is scheduled. That makes
+        // "more attempts after enqueue" decoupled from "drain delivered" and produced a flaky
+        // assertion. Completion within the 4s budget is the actual invariant under test.
         await server.WaitForJobState(jobId, State.Completed, TimeSpan.FromSeconds(4));
-
-        transport.ListenAttempts.ShouldBeGreaterThan(
-            listenAttemptsBeforeEnqueue,
-            "Listener should have attempted at least one more reconnect after enqueue — that's the drain that delivered the job");
     }
 
     // Listener always throws, publisher is a no-op. Keeps the push side plausibly healthy
@@ -92,8 +95,6 @@ public abstract class ListenerReconnectDrainTestsBase : IntegrationTestBase
     {
         private readonly TaskCompletionSource _secondAttemptStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _listenAttempts;
-
-        public int ListenAttempts => _listenAttempts;
 
         // Fires when ListenAsync is entered for the SECOND time, i.e. after the first attempt
         // fully unwound through the reconnect-backoff sleep and the listener task looped back.
