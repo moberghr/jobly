@@ -36,14 +36,14 @@ public abstract class MultiServerTestsBase : IntegrationTestBase
         // Per-job assertions then confirm exactly one Processing log row per job — duplicate
         // claim by both servers would produce two.
         var barrier = new BarrierSignal();
-        Action<WarpWorkerBuilder<TestContext>> withBarrier = cfg =>
+        void WithBarrier(WarpWorkerBuilder<TestContext> cfg)
         {
             Configure3Workers(cfg);
             cfg.Services.AddSingleton(barrier);
-        };
+        }
 
-        await using var server1 = await WarpTestServer.StartAsync(Fixture, withBarrier);
-        await using var server2 = await WarpTestServer.StartAsync(Fixture, withBarrier);
+        await using var server1 = await WarpTestServer.StartAsync(Fixture, WithBarrier);
+        await using var server2 = await WarpTestServer.StartAsync(Fixture, WithBarrier);
 
         var publisher = server1.CreatePublisher();
         var job1Id = await publisher.Enqueue(new BarrierRequest());
@@ -257,14 +257,14 @@ public abstract class MultiServerTestsBase : IntegrationTestBase
         // before the pipeline runs (state is committed by the worker before pipeline behaviors
         // execute), and publishing job2 in that window races job1's mutex acquisition.
         var barrier = new BarrierSignal();
-        Action<WarpWorkerBuilder<TestContext>> withBarrier = cfg =>
+        void WithBarrier(WarpWorkerBuilder<TestContext> cfg)
         {
             Configure3Workers(cfg);
             cfg.Services.AddSingleton(barrier);
-        };
+        }
 
-        await using var server1 = await WarpTestServer.StartAsync(Fixture, withBarrier);
-        await using var server2 = await WarpTestServer.StartAsync(Fixture, withBarrier);
+        await using var server1 = await WarpTestServer.StartAsync(Fixture, WithBarrier);
+        await using var server2 = await WarpTestServer.StartAsync(Fixture, WithBarrier);
 
         // Job1 published via server1, holds the mutex while blocked at the barrier
         var publisher1 = server1.CreatePublisher();

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Warp.Core;
+using Warp.Core.BackgroundServices;
 using Warp.Core.Concurrency;
 using Warp.Core.Enums;
 using Warp.Core.Models;
@@ -137,13 +138,15 @@ public static class WarpEndpoints
             [FromServices] IConcurrencyLimitManager? concurrency,
             [FromServices] IRateLimitManager? rateLimits,
             [FromServices] IDashboardPushMarker? push,
-            [FromServices] ISagaQueryService? sagas) =>
+            [FromServices] ISagaQueryService? sagas,
+            [FromServices] IBackgroundServiceQueryService? services) =>
             Results.Ok(new WarpAddonsInfo
             {
                 Concurrency = concurrency is not null,
-                RateLimits = rateLimits is not null,
                 Push = push is not null,
+                RateLimits = rateLimits is not null,
                 Sagas = sagas is not null,
+                Services = services is not null,
             }));
 
         apiGroup.MapGet("concurrency", async ([FromServices] IConcurrencyLimitManager? mgr, CancellationToken ct) =>
@@ -452,6 +455,64 @@ public static class WarpEndpoints
             var removed = await svc.ForceComplete(id);
 
             return removed ? Results.NoContent() : Results.NotFound();
+        });
+
+        // Background services — endpoints return 404 when the addon isn't registered.
+        apiGroup.MapGet("services", async ([FromServices] IBackgroundServiceQueryService? svc, CancellationToken ct) =>
+        {
+            if (svc is null)
+            {
+                return Results.NotFound();
+            }
+
+            var list = await svc.ListAsync(ct);
+
+            return Results.Ok(list);
+        });
+
+        apiGroup.MapGet("services/{name}", async ([FromServices] IBackgroundServiceQueryService? svc, string name, CancellationToken ct) =>
+        {
+            if (svc is null)
+            {
+                return Results.NotFound();
+            }
+
+            var detail = await svc.GetAsync(name, ct);
+
+            return detail is null ? Results.NotFound() : Results.Ok(detail);
+        });
+
+        apiGroup.MapGet("services/{name}/logs", async (
+            [FromServices] IBackgroundServiceQueryService? svc,
+            string name,
+            [FromQuery] BackgroundServiceLogSource? source,
+            [FromQuery] int? level,
+            [FromQuery] long? fromId,
+            [FromQuery] int? limit,
+            CancellationToken ct) =>
+        {
+            if (svc is null)
+            {
+                return Results.NotFound();
+            }
+
+            var minLevel = level.HasValue ? (Microsoft.Extensions.Logging.LogLevel?)level.Value : null;
+            var effectiveLimit = Math.Min(limit ?? 100, 500);
+            var logs = await svc.GetLogsAsync(name, source, minLevel, fromId, effectiveLimit, ct);
+
+            return Results.Ok(logs);
+        });
+
+        apiGroup.MapGet("services/{name}/lease", async ([FromServices] IBackgroundServiceQueryService? svc, string name, CancellationToken ct) =>
+        {
+            if (svc is null)
+            {
+                return Results.NotFound();
+            }
+
+            var lease = await svc.GetLeaseAsync(name, ct);
+
+            return lease is null ? Results.NotFound() : Results.Ok(lease);
         });
 
         // Extension manifests

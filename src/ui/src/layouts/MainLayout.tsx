@@ -20,6 +20,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   const [rateLimitsAvailable, setRateLimitsAvailable] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sagasAvailable, setSagasAvailable] = useState(false);
+  const [servicesAvailable, setServicesAvailable] = useState(false);
 
   const title = usePageStore((s) => s.title);
   const subtitle = usePageStore((s) => s.subtitle);
@@ -74,6 +75,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
         setConcurrencyAvailable(addons.concurrency);
         setRateLimitsAvailable(addons.rateLimits);
         setSagasAvailable(addons.sagas);
+        setServicesAvailable(addons.services);
         void useRealtimeStore.getState().connectIfEnabled(addons.push);
       })
       .catch(() => {
@@ -81,6 +83,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
         setConcurrencyAvailable(false);
         setRateLimitsAvailable(false);
         setSagasAvailable(false);
+        setServicesAvailable(false);
         void useRealtimeStore.getState().connectIfEnabled(false);
       });
 
@@ -99,6 +102,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
     concurrencyAvailable,
     rateLimitsAvailable,
     sagasAvailable,
+    servicesAvailable,
   );
 
   return (

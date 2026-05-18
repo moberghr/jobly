@@ -24,6 +24,9 @@ const pages = [
   { name: '15-server-detail', path: `/servers/${DEMO_IDS.server1}` },
   { name: '17-counters', path: '/counters', fullPage: true },
   { name: '18-concurrency-limits', path: '/concurrency', fullPage: true },
+  { name: '19-services-list', path: '/services' },
+  { name: '20-services-detail-singleton', path: '/services/JobStatsLoggerService', fullPage: true },
+  { name: '21-services-detail-perserver', path: '/services/TickCounterService', fullPage: true },
 ];
 
 for (const pg of pages) {

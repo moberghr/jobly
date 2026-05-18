@@ -73,7 +73,7 @@ export default function DetailPage() {
   const isFailedJob = job.kind === 1 && job.currentState === State.Failed;
 
   if (isFailedJob) {
-    return <JobDetailBold job={job} />;
+    return <JobDetailBold job={job} handlerLogs={handlerLogs} />;
   }
 
   return (

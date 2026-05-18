@@ -4,7 +4,7 @@ import { Panel, PanelHeader, Eyebrow } from '@/components/v2/Panel';
 import { shortId, shortType } from '@/utils/format';
 import { useDeleteJob, useRequeueJob } from '@/api/hooks/useJobs';
 import type { UnifiedJobDetailModel, JobLogModel } from '@/types';
-import { AttemptTimelineRibbon } from './AttemptTimelineRibbon';
+import { JobLogs } from './JobLogs';
 
 function formatDuration(ms: number | null | undefined): string | null {
   if (ms == null) {
@@ -113,9 +113,10 @@ function shortenJobId(id: string): { short: string; tail: string } {
 
 interface JobDetailBoldProps {
   job: UnifiedJobDetailModel;
+  handlerLogs: JobLogModel[];
 }
 
-export function JobDetailBold({ job }: JobDetailBoldProps) {
+export function JobDetailBold({ job, handlerLogs }: JobDetailBoldProps) {
   const requeue = useRequeueJob();
   const deleteJob = useDeleteJob();
 
@@ -284,12 +285,10 @@ export function JobDetailBold({ job }: JobDetailBoldProps) {
         </div>
       </div>
 
-      {/* ATTEMPT TIMELINE */}
-      <AttemptTimelineRibbon logs={job.logs} totalDurationMs={elapsedMs} />
-
       {/* BODY GRID */}
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-[1.6fr_1fr]">
         <div className="flex flex-col gap-3.5">
+          {handlerLogs.length > 0 && <JobLogs jobId={job.id} logs={handlerLogs} />}
           <StackTraceCard
             exception={parsed}
             rawException={failedLog?.exception ?? null}

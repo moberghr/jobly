@@ -198,3 +198,12 @@ export const getExtensions = () =>
 // Auth — cookie-free probe so the SPA can render the login page without firing a 401 first.
 export const getAuthStatus = () =>
   api.get<AuthStatus>('/auth/status').then(r => r.data);
+
+// Background services
+export {
+  getBackgroundServices,
+  getBackgroundService,
+  getBackgroundServiceLease,
+  getBackgroundServiceLogs,
+} from './backgroundServices';
+export type { GetBackgroundServiceLogsOptions } from './backgroundServices';
