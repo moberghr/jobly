@@ -63,13 +63,18 @@ public abstract class HealthyResetTestsBase : IntegrationTestBase
 
         await WaitForObserverAsync(firstRestartingReached, "first Restarting transition", ct);
 
-        // Step 3: Supervisor has written Restarting and will park on Task.Delay(1s, _time, ct)
-        // after a few sync statements. PumpFakeTimeUntilAsync advances fake time in 1s steps
-        // until the next observer event fires, with Task.Delay(10ms) between advances so the
-        // supervisor's continuation gets real CPU on a contended runner rather than just being
-        // re-queued behind us. Bounded by a wall-clock deadline that throws with a clear message
-        // if the supervisor never reaches Running.
+        // Step 3: register BOTH the second Running waiter AND the second Restarting waiter
+        // BEFORE pumping fake time. The second-attempt service body releases FaultedGate and
+        // throws immediately (no gate), so under fast DB conditions (warm Postgres pool,
+        // sub-millisecond UPDATEs) the supervisor races through SetStatus(Running) →
+        // service.ExecuteAsync → RecordFault → SetStatus(Restarting) in well under the pump
+        // loop's 10ms Task.Delay tick. If we registered the Restarting waiter *after* the pump
+        // exits, the supervisor's SetStatus(Restarting) would fire OnStatusChanged with no
+        // matching waiter — TestStatusObserver does not buffer unmatched events, so the
+        // transition would be lost and the subsequent await would hang to the bounded-wait
+        // timeout. Registering both up-front closes the race regardless of DB latency.
         var secondRunningReached = observer.NextStatus(nameof(HealthyResetService), BackgroundServiceStatus.Running);
+        var secondRestartingReached = observer.NextStatus(nameof(HealthyResetService), BackgroundServiceStatus.Restarting);
 
         await PumpFakeTimeUntilAsync(
             time,
@@ -78,15 +83,13 @@ public abstract class HealthyResetTestsBase : IntegrationTestBase
             description: "second Running transition",
             ct: ct);
 
-        // Step 4: Second attempt is now Running. Register Restarting waiter for the second
-        // fault before waiting for FaultedGate.
-        var secondRestartingReached = observer.NextStatus(nameof(HealthyResetService), BackgroundServiceStatus.Restarting);
-
-        // Wait for the service to signal that it is about to throw on the second attempt.
+        // Step 4: Wait for the service to signal that it is about to throw on the second attempt.
         await state.FaultedGate.WaitAsync(ct);
 
         // Supervisor: RecordFault (RestartCount = 1, because HealthyReset cleared it to 0 after
         // the first fault), HealthyReset check (ranFor < 5 min → no reset), SetStatus(Restarting).
+        // The Restarting waiter was registered in step 3 so this completes regardless of how
+        // fast the supervisor got there.
         await WaitForObserverAsync(secondRestartingReached, "second Restarting transition", ct);
 
         // Step 5: Assert. RestartCount should be 1:
