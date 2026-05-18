@@ -21,4 +21,27 @@ public class WarpConfiguration
     /// exposed publicly so external addons (e.g. provider packages) can contribute too.
     /// </summary>
     public List<Action<ModelBuilder, string?>> EntityConfigurators { get; } = [];
+
+    /// <summary>
+    /// How long the host waits for each <c>WarpBackgroundService.ExecuteAsync</c> to return
+    /// after the cancellation token is signalled during graceful shutdown. Services that do not
+    /// observe cancellation are abandoned at process exit — same semantics as plain
+    /// <c>BackgroundService.StopAsync</c> with a timeout.
+    /// </summary>
+    public TimeSpan BackgroundServiceShutdownTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Global default for the maximum number of captured log rows retained per
+    /// <c>WarpBackgroundService</c> instance. Oldest rows are deleted by
+    /// <c>ExpirationCleanup</c> when the count exceeds this value. Per-service overrides
+    /// via <c>WarpBackgroundService.LogRetentionCountOverride</c> take precedence.
+    /// </summary>
+    public int BackgroundServiceLogRetentionCount { get; set; } = 1000;
+
+    /// <summary>
+    /// Global default for the maximum age of captured log rows. Rows older than this value
+    /// are deleted by <c>ExpirationCleanup</c>. Per-service overrides via
+    /// <c>WarpBackgroundService.LogRetentionAgeOverride</c> take precedence.
+    /// </summary>
+    public TimeSpan BackgroundServiceLogRetentionAge { get; set; } = TimeSpan.FromDays(7);
 }

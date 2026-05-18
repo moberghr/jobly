@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Warp.Core.Data.Entities;
 using Warp.Core.Data.Queries;
@@ -483,5 +484,123 @@ public static class ServiceConfiguration
         sagaState.HasIndex(p => p.CreatedAt);
 
         sagaState.Metadata.SetSchema(schema);
+    }
+
+    public static void AddBackgroundServiceDefinitionEntity(ModelBuilder modelBuilder, string? schema)
+    {
+        var def = modelBuilder.Entity<BackgroundServiceDefinition>();
+
+        def.Property(p => p.Name).HasMaxLength(256).IsRequired();
+        def.HasKey(p => p.Name);
+
+        def.Property(p => p.DeclaredScope).HasConversion<int>();
+        def.Property(p => p.FirstSeenAt);
+        def.Property(p => p.LastSeenAt);
+
+        def.Metadata.SetSchema(schema);
+    }
+
+    public static void AddBackgroundServiceInstanceEntity(ModelBuilder modelBuilder, string? schema)
+    {
+        var inst = modelBuilder.Entity<BackgroundServiceInstance>();
+
+        inst.HasKey(p => new { p.ServerId, p.ServiceName });
+
+        inst.Property(p => p.ServerId);
+        inst.Property(p => p.ServiceName).HasMaxLength(256).IsRequired();
+        inst.Property(p => p.DeclaredScope).HasConversion<int>();
+        inst.Property(p => p.Status).HasConversion<int>();
+        inst.Property(p => p.StartedAt);
+        inst.Property(p => p.LastHeartbeatAt);
+        inst.Property(p => p.LastError).HasMaxLength(4096);
+        inst.Property(p => p.LastErrorAt);
+        inst.Property(p => p.RestartCount);
+
+        // FK → Definition. Restrict: must delete instance before definition.
+        inst.HasOne<BackgroundServiceDefinition>()
+            .WithMany()
+            .HasForeignKey(p => p.ServiceName)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // FK → Server (nav property). Restrict: ServerCleanup and StopAsync explicitly
+        // delete the Instance rows before the Server row, so cascade would be redundant.
+        inst.HasOne(p => p.Server)
+            .WithMany()
+            .HasForeignKey(p => p.ServerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // ServerCleanup scans by ServerId to remove stale-server rows.
+        inst.HasIndex(p => p.ServerId);
+
+        inst.Metadata.SetSchema(schema);
+    }
+
+    public static void AddBackgroundServiceLeaseEntity(ModelBuilder modelBuilder, string? schema)
+    {
+        var lease = modelBuilder.Entity<BackgroundServiceLease>();
+
+        lease.Property(p => p.ServiceName).HasMaxLength(256).IsRequired();
+        lease.HasKey(p => p.ServiceName);
+
+        lease.Property(p => p.HolderServerId);
+        lease.Property(p => p.LeaseExpiresAt);
+
+        // FK → Definition. Restrict: must delete lease before definition.
+        lease.HasOne<BackgroundServiceDefinition>()
+            .WithMany()
+            .HasForeignKey(p => p.ServiceName)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // FK → Server via HolderServerId (nav: HolderServer). Restrict: same reasoning as Instance.
+        lease.HasOne(p => p.HolderServer)
+            .WithMany()
+            .HasForeignKey(p => p.HolderServerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // ServerCleanup scans by HolderServerId to release leases held by dead servers.
+        lease.HasIndex(p => p.HolderServerId);
+
+        lease.Metadata.SetSchema(schema);
+    }
+
+    public static void AddBackgroundServiceLogEntity(ModelBuilder modelBuilder, string? schema)
+    {
+        var log = modelBuilder.Entity<BackgroundServiceLog>();
+
+        log.Property(p => p.Id).ValueGeneratedOnAdd();
+        log.HasKey(p => p.Id);
+
+        log.Property(p => p.ServerId);
+        log.Property(p => p.ServiceName).HasMaxLength(256).IsRequired();
+        log.Property(p => p.Timestamp);
+        log.Property(p => p.Level).HasConversion<int>();
+        log.Property(p => p.Source).HasConversion<int>();
+        log.Property(p => p.Message).HasMaxLength(4096).IsRequired();
+        log.Property(p => p.ExceptionType).HasMaxLength(512);
+        log.Property(p => p.ExceptionMessage).HasMaxLength(4096);
+
+        // Cascade from Instance: when an instance row is removed, all its logs go with it.
+        // This is the ONLY cascade in the background-services feature.
+        log.HasOne<BackgroundServiceInstance>()
+            .WithMany()
+            .HasForeignKey(p => new { p.ServerId, p.ServiceName })
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // FK → Server via nav property. Restrict (same reasoning as Instance/Lease) —
+        // Logs are removed via the Instance cascade above before Server itself is deleted.
+        log.HasOne(p => p.Server)
+            .WithMany()
+            .HasForeignKey(p => p.ServerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Dashboard log-tail query: range scan for a specific instance, ordered newest-first.
+        log.HasIndex(p => new { p.ServerId, p.ServiceName, p.Id });
+
+        // Dashboard log-tail query filtered by service name only (cross-server view): range scan
+        // on ServiceName with descending Id so the DB can return the N newest rows without a sort.
+        log.HasIndex(p => new { p.ServiceName, p.Id })
+            .IsDescending(false, true);
+
+        log.Metadata.SetSchema(schema);
     }
 }

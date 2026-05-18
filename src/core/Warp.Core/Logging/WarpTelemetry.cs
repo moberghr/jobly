@@ -80,6 +80,26 @@ public static class WarpTelemetry
         unit: "{saga}",
         description: "Per-process net saga count (incremented on start, decremented on completion). Tag: saga_type. Same per-process semantics as warp.jobs.active and warp.mediator.in_flight: aggregate across worker replicas in your OTel backend (sum) to estimate cluster-wide live sagas. Note: a saga started by replica A and completed by replica B will show +1 on A and -1 on B; the per-replica gauge can therefore go negative under restart-heavy workloads where the start-increment was lost to a process restart. For an authoritative point-in-time count, query the dashboard's GET /api/sagas/stats endpoint (reads SagaState directly).");
 
+    public static readonly Counter<long> BackgroundServicesStarted = Meter.CreateCounter<long>(
+        "warp.background_services.started",
+        unit: "{start}",
+        description: "Total WarpBackgroundService ExecuteAsync invocations. Increments once per start attempt, including restarts after faults. Tag: service_name.");
+
+    public static readonly Counter<long> BackgroundServicesFaulted = Meter.CreateCounter<long>(
+        "warp.background_services.faulted",
+        unit: "{fault}",
+        description: "Total WarpBackgroundService faults (ExecuteAsync threw or returned without cancellation). Tags: service_name, exception_type.");
+
+    public static readonly Counter<long> BackgroundServicesLeaseLost = Meter.CreateCounter<long>(
+        "warp.background_services.lease_lost",
+        unit: "{event}",
+        description: "Total singleton WarpBackgroundService lease-loss events detected by Heartbeat. Tag: service_name.");
+
+    public static readonly Counter<long> BackgroundServicesRestarts = Meter.CreateCounter<long>(
+        "warp.background_services.restarts",
+        unit: "{restart}",
+        description: "Total WarpBackgroundService restart attempts (increments each time the supervisor enters the backoff-wait path after a fault). Tag: service_name.");
+
     /// <summary>
     /// Starts the consumer activity for handler execution when an <see cref="ActivityListener"/>
     /// is attached to the Warp source. Returns null when no listener is registered — workers

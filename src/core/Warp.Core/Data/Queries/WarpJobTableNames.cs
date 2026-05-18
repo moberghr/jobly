@@ -86,7 +86,81 @@ public sealed class WarpJobTableNames
 
     public required string WorkerGroupPausedAt { get; init; }
 
-    public static WarpJobTableNames FromModel(IModel model)
+    /// <summary>
+    /// Schema for <c>BackgroundServiceDefinition</c>, <c>BackgroundServiceInstance</c> and <c>BackgroundServiceLease</c>.
+    /// <c>null</c> when the BackgroundServices addon has not been registered in this deployment.
+    /// </summary>
+    public string? BackgroundServiceSchema { get; init; }
+
+    /// <summary>
+    /// Table name for <c>BackgroundServiceDefinition</c>.
+    /// <c>null</c> when the BackgroundServices addon has not been registered.
+    /// </summary>
+    public string? BackgroundServiceDefinitionTable { get; init; }
+
+    /// <summary>
+    /// <c>name</c> column (primary key) on <c>BackgroundServiceDefinition</c>.
+    /// <c>null</c> when the BackgroundServices addon has not been registered.
+    /// </summary>
+    public string? BackgroundServiceDefinitionName { get; init; }
+
+    /// <summary>
+    /// Table name for <c>BackgroundServiceInstance</c>.
+    /// <c>null</c> when the BackgroundServices addon has not been registered.
+    /// </summary>
+    public string? BackgroundServiceInstanceTable { get; init; }
+
+    /// <summary>
+    /// <c>server_id</c> column on <c>BackgroundServiceInstance</c>.
+    /// <c>null</c> when the BackgroundServices addon has not been registered.
+    /// </summary>
+    public string? BackgroundServiceInstanceServerId { get; init; }
+
+    /// <summary>
+    /// <c>last_heartbeat_at</c> column on <c>BackgroundServiceInstance</c>.
+    /// <c>null</c> when the BackgroundServices addon has not been registered.
+    /// </summary>
+    public string? BackgroundServiceInstanceLastHeartbeatAt { get; init; }
+
+    /// <summary>
+    /// Table name for <c>BackgroundServiceLease</c>.
+    /// <c>null</c> when the BackgroundServices addon has not been registered.
+    /// </summary>
+    public string? BackgroundServiceLeaseTable { get; init; }
+
+    /// <summary>
+    /// <c>holder_server_id</c> column on <c>BackgroundServiceLease</c>.
+    /// <c>null</c> when the BackgroundServices addon has not been registered.
+    /// </summary>
+    public string? BackgroundServiceLeaseHolderServerId { get; init; }
+
+    /// <summary>
+    /// <c>lease_expires_at</c> column on <c>BackgroundServiceLease</c>.
+    /// <c>null</c> when the BackgroundServices addon has not been registered.
+    /// </summary>
+    public string? BackgroundServiceLeaseExpiresAt { get; init; }
+
+    /// <summary>
+    /// <c>service_name</c> column on <c>BackgroundServiceLease</c>.
+    /// <c>null</c> when the BackgroundServices addon has not been registered.
+    /// </summary>
+    public string? BackgroundServiceLeaseServiceName { get; init; }
+
+    /// <summary>
+    /// Whether the BackgroundServices addon entities are present in the model.
+    /// </summary>
+    public bool HasBackgroundServiceTables =>
+        BackgroundServiceInstanceTable != null && BackgroundServiceLeaseTable != null;
+
+    /// <summary>
+    /// Lease TTL in seconds to use when renewing <c>BackgroundServiceLease</c> rows during
+    /// the heartbeat round-trip. Defaults to 30 (the spec default). Set by the provider
+    /// factory from <c>WarpWorkerConfiguration.BackgroundServiceLeaseTtl</c> when
+    /// the BackgroundServices addon is registered.
+    /// </summary>
+    public int LeaseTtlSeconds { get; init; } = 30;
+
+    public static WarpJobTableNames FromModel(IModel model, int leaseTtlSeconds = 30)
     {
         var entity = model.FindEntityType(typeof(Job))
             ?? throw new InvalidOperationException("Job entity not registered in the DbContext model.");
@@ -122,6 +196,42 @@ public sealed class WarpJobTableNames
 
             return prop.GetColumnName()
                 ?? throw new InvalidOperationException($"WorkerGroup.{propertyName} has no resolved column name.");
+        }
+
+        // BackgroundService addon entities are optional — only registered when
+        // AddBackgroundService<T> is called. Resolve their names if present; leave null otherwise.
+        var definitionEntity = model.FindEntityType(typeof(BackgroundServiceDefinition));
+        var instanceEntity = model.FindEntityType(typeof(BackgroundServiceInstance));
+        var leaseEntity = model.FindEntityType(typeof(BackgroundServiceLease));
+
+        string? DefinitionCol(string propertyName)
+        {
+            if (definitionEntity == null)
+            {
+                return null;
+            }
+
+            return definitionEntity.FindProperty(propertyName)?.GetColumnName();
+        }
+
+        string? InstanceCol(string propertyName)
+        {
+            if (instanceEntity == null)
+            {
+                return null;
+            }
+
+            return instanceEntity.FindProperty(propertyName)?.GetColumnName();
+        }
+
+        string? LeaseCol(string propertyName)
+        {
+            if (leaseEntity == null)
+            {
+                return null;
+            }
+
+            return leaseEntity.FindProperty(propertyName)?.GetColumnName();
         }
 
         return new WarpJobTableNames
@@ -165,6 +275,17 @@ public sealed class WarpJobTableNames
             CancellationMode = Col(nameof(Job.CancellationMode)),
             Metadata = Col(nameof(Job.Metadata)),
             ParentSpanId = Col(nameof(Job.ParentSpanId)),
+            BackgroundServiceSchema = instanceEntity?.GetSchema() ?? definitionEntity?.GetSchema(),
+            BackgroundServiceDefinitionTable = definitionEntity?.GetTableName(),
+            BackgroundServiceDefinitionName = DefinitionCol(nameof(BackgroundServiceDefinition.Name)),
+            BackgroundServiceInstanceTable = instanceEntity?.GetTableName(),
+            BackgroundServiceInstanceServerId = InstanceCol(nameof(BackgroundServiceInstance.ServerId)),
+            BackgroundServiceInstanceLastHeartbeatAt = InstanceCol(nameof(BackgroundServiceInstance.LastHeartbeatAt)),
+            BackgroundServiceLeaseTable = leaseEntity?.GetTableName(),
+            BackgroundServiceLeaseHolderServerId = LeaseCol(nameof(BackgroundServiceLease.HolderServerId)),
+            BackgroundServiceLeaseExpiresAt = LeaseCol(nameof(BackgroundServiceLease.LeaseExpiresAt)),
+            BackgroundServiceLeaseServiceName = LeaseCol(nameof(BackgroundServiceLease.ServiceName)),
+            LeaseTtlSeconds = leaseTtlSeconds,
         };
     }
 }

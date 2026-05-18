@@ -21,6 +21,13 @@ import type {
   RateLimitInfo,
 } from '@/types';
 import type { RealtimePoint } from '@/stores/dashboard';
+import type {
+  BackgroundServiceListItem,
+  BackgroundServiceDetail,
+  BackgroundServiceLeaseDto,
+  BackgroundServiceLogDto,
+} from '@/types/backgroundServices';
+import { ServiceScope, BackgroundServiceStatus, BackgroundServiceLogSource, LogLevel } from '@/types/backgroundServices';
 
 // ============================================================
 // Helpers
@@ -1079,6 +1086,221 @@ export const demoSagas = [
   { id: '44444444-4444-4444-4444-444444444444', type: 'Acme.Approvals.ApprovalSaga', correlationKey: 'doc-9923', createdAt: sagaMin(120), updatedAt: sagaMin(45) },
   { id: '55555555-5555-5555-5555-555555555555', type: 'Acme.Orders.OrderSaga', correlationKey: 'O-1038', createdAt: sagaMin(720), updatedAt: sagaMin(700) },
 ];
+
+// ============================================================
+// Background Services fixtures
+// ============================================================
+
+// Stable server IDs for the demo — distinct from dashboard server IDs so logs
+// look like they come from a different (worker) host pool.
+const BS_SERVER1_ID = uid(90001);
+const BS_SERVER2_ID = uid(90002);
+const BS_SERVER1_NAME = 'warp-demo-server';
+const BS_SERVER2_NAME = 'warp-demo-worker-2';
+
+export const demoBackgroundServices: BackgroundServiceListItem[] = [
+  {
+    name: 'JobStatsLoggerService',
+    scope: ServiceScope.Singleton,
+    runningCount: 1,
+    waitingCount: 1,
+    faultedCount: 0,
+    configurationMismatchCount: 0,
+    totalInstances: 2,
+    totalRestartCount: 1,
+    lastErrorType: null,
+  },
+  {
+    name: 'OutboxDrainerService',
+    scope: ServiceScope.Singleton,
+    runningCount: 1,
+    waitingCount: 0,
+    faultedCount: 0,
+    configurationMismatchCount: 0,
+    totalInstances: 1,
+    totalRestartCount: 0,
+    lastErrorType: null,
+  },
+  {
+    name: 'TickCounterService',
+    scope: ServiceScope.PerServer,
+    runningCount: 2,
+    waitingCount: 0,
+    faultedCount: 0,
+    configurationMismatchCount: 0,
+    totalInstances: 2,
+    totalRestartCount: 0,
+    lastErrorType: null,
+  },
+];
+
+export const demoBackgroundServiceDetails: Record<string, BackgroundServiceDetail> = {
+  TickCounterService: {
+    name: 'TickCounterService',
+    declaredScope: ServiceScope.PerServer,
+    firstSeenAt: ago(60 * 30),
+    lastSeenAt: ago(4),
+    instances: [
+      {
+        serverId: BS_SERVER1_ID,
+        serverName: BS_SERVER1_NAME,
+        serviceName: 'TickCounterService',
+        declaredScope: ServiceScope.PerServer,
+        status: BackgroundServiceStatus.Running,
+        startedAt: ago(60 * 30),
+        lastHeartbeatAt: ago(4),
+        lastError: null,
+        lastErrorAt: null,
+        restartCount: 0,
+      },
+      {
+        serverId: BS_SERVER2_ID,
+        serverName: BS_SERVER2_NAME,
+        serviceName: 'TickCounterService',
+        declaredScope: ServiceScope.PerServer,
+        status: BackgroundServiceStatus.Running,
+        startedAt: ago(60 * 25),
+        lastHeartbeatAt: ago(6),
+        lastError: null,
+        lastErrorAt: null,
+        restartCount: 0,
+      },
+    ],
+  },
+  JobStatsLoggerService: {
+    name: 'JobStatsLoggerService',
+    declaredScope: ServiceScope.Singleton,
+    firstSeenAt: ago(60 * 45),
+    lastSeenAt: ago(2),
+    instances: [
+      {
+        serverId: BS_SERVER1_ID,
+        serverName: BS_SERVER1_NAME,
+        serviceName: 'JobStatsLoggerService',
+        declaredScope: ServiceScope.Singleton,
+        status: BackgroundServiceStatus.Running,
+        startedAt: ago(60 * 45),
+        lastHeartbeatAt: ago(2),
+        lastError: null,
+        lastErrorAt: null,
+        restartCount: 0,
+      },
+      {
+        serverId: BS_SERVER2_ID,
+        serverName: BS_SERVER2_NAME,
+        serviceName: 'JobStatsLoggerService',
+        declaredScope: ServiceScope.Singleton,
+        status: BackgroundServiceStatus.Waiting,
+        startedAt: ago(60 * 40),
+        lastHeartbeatAt: ago(7),
+        lastError: 'System.InvalidOperationException: Stats DB context returned null for aggregation window 2026-05-18T03:00:00Z.\n   at Acme.BackgroundServices.JobStatsLoggerService.LogAsync(CancellationToken ct)\n   at Warp.Core.BackgroundServices.WarpBackgroundService.ExecuteAsync(CancellationToken ct)',
+        lastErrorAt: ago(60 * 38),
+        restartCount: 1,
+      },
+    ],
+  },
+  OutboxDrainerService: {
+    name: 'OutboxDrainerService',
+    declaredScope: ServiceScope.Singleton,
+    firstSeenAt: ago(60 * 120),
+    lastSeenAt: ago(3),
+    instances: [
+      {
+        serverId: BS_SERVER1_ID,
+        serverName: BS_SERVER1_NAME,
+        serviceName: 'OutboxDrainerService',
+        declaredScope: ServiceScope.Singleton,
+        status: BackgroundServiceStatus.Running,
+        startedAt: ago(60 * 120),
+        lastHeartbeatAt: ago(3),
+        lastError: null,
+        lastErrorAt: null,
+        restartCount: 0,
+      },
+    ],
+  },
+};
+
+export const demoBackgroundServiceLeases: Record<string, BackgroundServiceLeaseDto> = {
+  JobStatsLoggerService: {
+    serviceName: 'JobStatsLoggerService',
+    holderServerId: BS_SERVER1_ID,
+    holderServerName: BS_SERVER1_NAME,
+    leaseExpiresAt: future(25),
+  },
+  OutboxDrainerService: {
+    serviceName: 'OutboxDrainerService',
+    holderServerId: BS_SERVER1_ID,
+    holderServerName: BS_SERVER1_NAME,
+    leaseExpiresAt: future(18),
+  },
+};
+
+// Logs per service — IDs are sequential integers, newest-first (highest id = most recent).
+// TickCounterService logs
+const tickLogs: BackgroundServiceLogDto[] = [
+  { id: 1030, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'TickCounterService', timestamp: ago(8), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'Tick #18421 — enqueued: 4, processing: 2', exceptionType: null, exceptionMessage: null },
+  { id: 1029, serverId: BS_SERVER2_ID, serverName: BS_SERVER2_NAME, serviceName: 'TickCounterService', timestamp: ago(12), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'Tick #18421 — enqueued: 3, processing: 1', exceptionType: null, exceptionMessage: null },
+  { id: 1028, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'TickCounterService', timestamp: ago(18), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'Tick #18420 — enqueued: 6, processing: 3', exceptionType: null, exceptionMessage: null },
+  { id: 1027, serverId: BS_SERVER2_ID, serverName: BS_SERVER2_NAME, serviceName: 'TickCounterService', timestamp: ago(22), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'Tick #18420 — enqueued: 5, processing: 2', exceptionType: null, exceptionMessage: null },
+  { id: 1026, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'TickCounterService', timestamp: ago(38), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'Tick #18419 — enqueued: 2, processing: 0', exceptionType: null, exceptionMessage: null },
+  { id: 1025, serverId: BS_SERVER2_ID, serverName: BS_SERVER2_NAME, serviceName: 'TickCounterService', timestamp: ago(42), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'Tick #18419 — enqueued: 1, processing: 0', exceptionType: null, exceptionMessage: null },
+  { id: 1002, serverId: BS_SERVER2_ID, serverName: BS_SERVER2_NAME, serviceName: 'TickCounterService', timestamp: ago(60 * 25 + 2), level: LogLevel.Information, source: BackgroundServiceLogSource.Lifecycle, message: 'Service started', exceptionType: null, exceptionMessage: null },
+  { id: 1001, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'TickCounterService', timestamp: ago(60 * 30 + 1), level: LogLevel.Information, source: BackgroundServiceLogSource.Lifecycle, message: 'Service started', exceptionType: null, exceptionMessage: null },
+];
+
+// JobStatsLoggerService logs
+const statsLogs: BackgroundServiceLogDto[] = [
+  { id: 2040, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'JobStatsLoggerService', timestamp: ago(5), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'Stats snapshot — succeeded: 847, failed: 3, avg_duration_ms: 312', exceptionType: null, exceptionMessage: null },
+  { id: 2039, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'JobStatsLoggerService', timestamp: ago(35), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'Stats snapshot — succeeded: 821, failed: 2, avg_duration_ms: 298', exceptionType: null, exceptionMessage: null },
+  { id: 2038, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'JobStatsLoggerService', timestamp: ago(65), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'Stats snapshot — succeeded: 794, failed: 2, avg_duration_ms: 304', exceptionType: null, exceptionMessage: null },
+  { id: 2037, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'JobStatsLoggerService', timestamp: ago(60 * 3), level: LogLevel.Information, source: BackgroundServiceLogSource.Lifecycle, message: 'Lease acquired — holder: warp-demo-server, expires in 30s', exceptionType: null, exceptionMessage: null },
+  { id: 2036, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'JobStatsLoggerService', timestamp: ago(60 * 3 + 2), level: LogLevel.Information, source: BackgroundServiceLogSource.Lifecycle, message: 'Service started', exceptionType: null, exceptionMessage: null },
+  { id: 2035, serverId: BS_SERVER2_ID, serverName: BS_SERVER2_NAME, serviceName: 'JobStatsLoggerService', timestamp: ago(60 * 38 + 5), level: LogLevel.Warning, source: BackgroundServiceLogSource.Lifecycle, message: 'Service restarting after fault (attempt 1)', exceptionType: null, exceptionMessage: null },
+  { id: 2034, serverId: BS_SERVER2_ID, serverName: BS_SERVER2_NAME, serviceName: 'JobStatsLoggerService', timestamp: ago(60 * 38), level: LogLevel.Error, source: BackgroundServiceLogSource.Lifecycle, message: 'Unhandled exception — service will restart', exceptionType: 'System.InvalidOperationException', exceptionMessage: 'System.InvalidOperationException: Stats DB context returned null for aggregation window 2026-05-18T03:00:00Z.\n   at Acme.BackgroundServices.JobStatsLoggerService.LogAsync(CancellationToken ct)\n   at Warp.Core.BackgroundServices.WarpBackgroundService.ExecuteAsync(CancellationToken ct)' },
+  { id: 2033, serverId: BS_SERVER2_ID, serverName: BS_SERVER2_NAME, serviceName: 'JobStatsLoggerService', timestamp: ago(60 * 40 + 3), level: LogLevel.Information, source: BackgroundServiceLogSource.Lifecycle, message: 'Service started (waiting for lease)', exceptionType: null, exceptionMessage: null },
+  { id: 2032, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'JobStatsLoggerService', timestamp: ago(60 * 45 + 2), level: LogLevel.Information, source: BackgroundServiceLogSource.Lifecycle, message: 'Service started', exceptionType: null, exceptionMessage: null },
+  { id: 2031, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'JobStatsLoggerService', timestamp: ago(60 * 45 + 1), level: LogLevel.Information, source: BackgroundServiceLogSource.Lifecycle, message: 'Lease acquired — holder: warp-demo-server, expires in 30s', exceptionType: null, exceptionMessage: null },
+];
+
+// OutboxDrainerService logs
+const outboxLogs: BackgroundServiceLogDto[] = [
+  { id: 3020, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'OutboxDrainerService', timestamp: ago(10), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'Drained 3 outbox messages', exceptionType: null, exceptionMessage: null },
+  { id: 3019, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'OutboxDrainerService', timestamp: ago(20), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'No outbox messages to drain', exceptionType: null, exceptionMessage: null },
+  { id: 3018, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'OutboxDrainerService', timestamp: ago(30), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'Drained 1 outbox message', exceptionType: null, exceptionMessage: null },
+  { id: 3017, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'OutboxDrainerService', timestamp: ago(40), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'No outbox messages to drain', exceptionType: null, exceptionMessage: null },
+  { id: 3016, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'OutboxDrainerService', timestamp: ago(50), level: LogLevel.Information, source: BackgroundServiceLogSource.User, message: 'Drained 7 outbox messages', exceptionType: null, exceptionMessage: null },
+  { id: 3015, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'OutboxDrainerService', timestamp: ago(65), level: LogLevel.Warning, source: BackgroundServiceLogSource.User, message: 'Drain latency exceeded 200ms (observed 347ms) — consider increasing drain frequency', exceptionType: null, exceptionMessage: null },
+  { id: 3002, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'OutboxDrainerService', timestamp: ago(60 * 120 + 2), level: LogLevel.Information, source: BackgroundServiceLogSource.Lifecycle, message: 'Lease acquired — holder: warp-demo-server, expires in 30s', exceptionType: null, exceptionMessage: null },
+  { id: 3001, serverId: BS_SERVER1_ID, serverName: BS_SERVER1_NAME, serviceName: 'OutboxDrainerService', timestamp: ago(60 * 120 + 1), level: LogLevel.Information, source: BackgroundServiceLogSource.Lifecycle, message: 'Service started', exceptionType: null, exceptionMessage: null },
+];
+
+const ALL_BS_LOGS: Record<string, BackgroundServiceLogDto[]> = {
+  TickCounterService: tickLogs,
+  JobStatsLoggerService: statsLogs,
+  OutboxDrainerService: outboxLogs,
+};
+
+export function getBackgroundServiceLogs(
+  name: string,
+  source?: number,
+  level?: number,
+  fromId?: number,
+): BackgroundServiceLogDto[] {
+  const all = ALL_BS_LOGS[name] ?? [];
+  let filtered = all;
+  if (source !== undefined && source !== 0) {
+    filtered = filtered.filter((l) => l.source === source);
+  }
+  if (level !== undefined && level !== -1) {
+    filtered = filtered.filter((l) => l.level >= level);
+  }
+  if (fromId !== undefined && fromId > 0) {
+    filtered = filtered.filter((l) => l.id > fromId);
+  }
+
+  return filtered;
+}
 
 export const demoSagaActivity = [
   {

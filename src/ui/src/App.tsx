@@ -14,6 +14,8 @@ import ConcurrencyLimitsPage from '@/pages/concurrency/ConcurrencyLimitsPage';
 import RateLimitsPage from '@/pages/ratelimits/RateLimitsPage';
 import SagasListPage from '@/pages/sagas/SagasListPage';
 import SagaDetailPage from '@/pages/sagas/SagaDetailPage';
+import BackgroundServicesList from '@/pages/BackgroundServices/List';
+import BackgroundServiceDetail from '@/pages/BackgroundServices/Detail';
 import WorkerDetailPage from '@/pages/workers/WorkerDetailPage';
 import TracePage from '@/pages/trace/TracePage';
 import DetailPage from '@/pages/detail/DetailPage';
@@ -115,6 +117,8 @@ function App() {
           <Route path="/ratelimits" element={<RateLimitsPage />} />
           <Route path="/sagas/:id" element={<SagaDetailPage />} />
           <Route path="/sagas" element={<SagasListPage />} />
+          <Route path="/services/:name" element={<BackgroundServiceDetail />} />
+          <Route path="/services" element={<BackgroundServicesList />} />
 
           {/* Extension pages */}
           {extensionPages.map((page) => (
