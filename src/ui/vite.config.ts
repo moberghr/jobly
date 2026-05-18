@@ -60,7 +60,10 @@ export default defineConfig(({ mode }) => {
       ? {}
       : {
           proxy: {
-            '/warp': 'http://localhost:5104',
+            '/warp': {
+              target: 'http://localhost:5104',
+              ws: true,
+            },
           },
         },
   }

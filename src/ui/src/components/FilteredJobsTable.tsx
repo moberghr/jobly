@@ -37,10 +37,12 @@ import { ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react';
 
 const stateItems = [
   { key: 'awaiting', label: 'Awaiting', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' },
+  { key: 'scheduled', label: 'Scheduled', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300' },
   { key: 'enqueued', label: 'Enqueued', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
   { key: 'processing', label: 'Processing', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
   { key: 'completed', label: 'Completed', color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
   { key: 'failed', label: 'Failed', color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
+  { key: 'deleted', label: 'Deleted', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' },
 ];
 
 interface FilteredJobsTableProps {

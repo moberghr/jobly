@@ -104,7 +104,7 @@ app.MapWarpHttp();
 // Seed endpoint — creates a realistic demo workload
 var seedQueues = new[] { "a-critical", "b-default", "c-low" };
 
-app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher, IRecurringJobPublisher recurringPublisher, TestContext context) =>
+app.MapGet("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher, IRecurringJobPublisher recurringPublisher, TestContext context) =>
 {
     var random = new Random();
     var queues = seedQueues;
@@ -608,8 +608,7 @@ async Task Migrate()
 {
     await using var scope = app!.Services.CreateAsyncScope();
     var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
-    await ctx.Database.EnsureDeletedAsync();
-    await ctx.Database.EnsureCreatedAsync();
+    await ctx.Database.MigrateAsync();
 }
 
 internal class DemoCredentialValidator : IWarpCredentialValidator

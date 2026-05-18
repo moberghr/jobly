@@ -128,7 +128,7 @@ export default function JobListPage() {
       return;
     }
 
-    const subtitle = `${stats.failed} failed · ${stats.processing} processing · ${stats.pending} enqueued`;
+    const subtitle = `${stats.failed} failed · ${stats.processing} processing · ${stats.created} enqueued`;
     usePageStore.getState().set({ title: 'Jobs', subtitle });
   }, [stats]);
   useEffect(() => () => usePageStore.getState().reset(), []);
