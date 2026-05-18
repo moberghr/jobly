@@ -21,6 +21,7 @@ public sealed class ServerTaskSignals<TContext>
 {
     private readonly List<Action> _jobFinalizedWakers = [];
     private readonly List<Action> _messageEnqueuedWakers = [];
+    private readonly List<Action<string>> _backgroundServiceLeaseLostWakers = [];
     private readonly Lock _gate = new();
 
     /// <summary>
@@ -47,6 +48,22 @@ public sealed class ServerTaskSignals<TContext>
         _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, "Unknown server-task signal channel."),
     };
 
+    /// <summary>
+    /// Called by <c>Heartbeat</c> when a singleton lease held by this server was not renewed
+    /// (row deleted, holder cleared, or expired between beats). Wakes all subscribers with the
+    /// affected <paramref name="serviceName"/> so per-service CTSs can be cancelled immediately.
+    /// </summary>
+    public void PublishBackgroundServiceLeaseLost(string serviceName) =>
+        FireWithPayload(_backgroundServiceLeaseLostWakers, serviceName);
+
+    /// <summary>
+    /// Subscribe <paramref name="onLost"/> to the <c>BackgroundServiceLeaseLost</c> channel.
+    /// The subscriber receives the service name whose lease was lost. Dispose the returned
+    /// handle to unregister.
+    /// </summary>
+    public IDisposable SubscribeBackgroundServiceLeaseLost(Action<string> onLost) =>
+        SubscribeWithPayload(_backgroundServiceLeaseLostWakers, onLost);
+
     private Subscription Subscribe(List<Action> list, Action wake)
     {
         lock (_gate)
@@ -55,6 +72,16 @@ public sealed class ServerTaskSignals<TContext>
         }
 
         return new Subscription(list, wake, _gate);
+    }
+
+    private PayloadSubscription<string> SubscribeWithPayload(List<Action<string>> list, Action<string> wake)
+    {
+        lock (_gate)
+        {
+            list.Add(wake);
+        }
+
+        return new PayloadSubscription<string>(list, wake, _gate);
     }
 
     private void Fire(List<Action> list)
@@ -71,6 +98,20 @@ public sealed class ServerTaskSignals<TContext>
         }
     }
 
+    private void FireWithPayload(List<Action<string>> list, string payload)
+    {
+        Action<string>[] snapshot;
+        lock (_gate)
+        {
+            snapshot = [.. list];
+        }
+
+        foreach (var waker in snapshot)
+        {
+            waker(payload);
+        }
+    }
+
     private sealed class Subscription : IDisposable
     {
         private readonly List<Action> _list;
@@ -78,6 +119,35 @@ public sealed class ServerTaskSignals<TContext>
         private Action? _wake;
 
         public Subscription(List<Action> list, Action wake, Lock gate)
+        {
+            _list = list;
+            _gate = gate;
+            _wake = wake;
+        }
+
+        public void Dispose()
+        {
+            if (_wake is null)
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                _list.Remove(_wake);
+            }
+
+            _wake = null;
+        }
+    }
+
+    private sealed class PayloadSubscription<T> : IDisposable
+    {
+        private readonly List<Action<T>> _list;
+        private readonly Lock _gate;
+        private Action<T>? _wake;
+
+        public PayloadSubscription(List<Action<T>> list, Action<T> wake, Lock gate)
         {
             _list = list;
             _gate = gate;

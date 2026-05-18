@@ -4,6 +4,120 @@ sidebar_position: 6
 
 # Releases
 
+## 0.15.1
+
+*2026-05-18*
+
+One packaging fix to `Moberg.Warp.Core`. No public API changes.
+
+### Fixed: source generator missing from the NuGet package
+
+The mediator/job dispatch source generator (`Warp.SourceGenerator`) was wired up as a project-level analyzer in `Warp.Core.csproj` but never packed into `Moberg.Warp.Core.nupkg`. In-tree consumers (Warp's own tests, demos, benchmarks) reference Core via `<ProjectReference>` so the analyzer flowed through normally — masking the gap. Downstream NuGet consumers got the runtime DLL but no generator, so `[ModuleInitializer]`-driven `WarpGeneratedHandlerRegistry` registrations never ran. `AddWarpWorker` then registered nothing and the first `IMediator.Send(...)` threw `"No handler registered for {RequestType}"`.
+
+The bug has been present since handler auto-registration shipped in 0.10.0 (2026-04-27). It surfaced for consumers with more than a trivial number of handlers, where the manual `services.AddScoped<IRequestHandler<,>, ...>()` workaround stopped scaling.
+
+The fix is one block in `Warp.Core.csproj` mirroring what `Warp.Http.csproj` has had since day one — embed the generator DLL into `analyzers/dotnet/cs/`:
+
+```xml
+<ItemGroup>
+  <None Include="..\Warp.SourceGenerator\bin\$(Configuration)\netstandard2.0\Warp.SourceGenerator.dll"
+        Pack="true" PackagePath="analyzers/dotnet/cs/" Visible="false" />
+</ItemGroup>
+```
+
+No action required on upgrade beyond bumping the `Moberg.Warp.Core` version. Consumers that worked around the bug with reflection-based handler scanning can drop the workaround once on 0.15.1 — `AddWarpWorker` / `AddWarp` will pick handlers up automatically.
+
+## 0.15.0
+
+*2026-05-17*
+
+One new opt-in addon — `WarpBackgroundService` — dashboard-visible analog of .NET's `BackgroundService` that runs outside the worker pool. No breaking changes; no public API removals.
+
+### New: `WarpBackgroundService` addon
+
+Opt-in via `opt.AddBackgroundService<T>()`. Lets you register a long-lived background loop that Warp manages — restart-with-backoff, optional cluster-singleton coordination via lease, captured `ILogger<T>` output in the dashboard. Migration from plain `BackgroundService` is one line — replace the base class.
+
+```csharp
+public sealed class KafkaDrainService : WarpBackgroundService
+{
+    private readonly IServiceScopeFactory _scopes;
+    private readonly ILogger<KafkaDrainService> _logger;
+
+    public KafkaDrainService(IServiceScopeFactory scopes, ILogger<KafkaDrainService> logger)
+    {
+        _scopes = scopes;
+        _logger = logger;
+    }
+
+    public override ServiceScope Scope => ServiceScope.Singleton;
+
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            using var scope = _scopes.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // ... drain a batch, commit offsets, etc.
+            _logger.LogInformation("Drained {Count} messages", count);
+            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+        }
+    }
+}
+
+services.AddWarpWorker<AppDbContext>(opt =>
+{
+    opt.UsePostgreSql();
+    opt.AddBackgroundService<KafkaDrainService>();
+});
+```
+
+**Scope:**
+
+- `ServiceScope.PerServer` (default) — every server with the service compiled in runs an independent instance. Matches plain `BackgroundService` semantics.
+- `ServiceScope.Singleton` — exactly one instance across the cluster, coordinated by a lease in `background_service_lease`. The lease has a 30 s TTL, renewed every 3 s on the existing `Heartbeat` server task. On hard-kill, failover takes ≤ 30 s; on graceful shutdown, the holder deletes the lease row before exit so a waiter acquires immediately.
+
+**Lifecycle is always-on:** if `ExecuteAsync` throws — or returns without the cancellation token being signalled — the supervisor records the fault, applies exponential backoff (1 → 2 → 4 → 8 → 16 → 30 s, capped), and re-invokes. A successful run of ≥ 5 minutes resets the counter. There is no stop button in v1 — to disable a service you remove the registration and redeploy.
+
+**Log capture out of the box:** a per-instance `ILoggerProvider` is wired up automatically; user `ILogger<TService>` calls flow into both the normal log stack AND a `background_service_log` table that the dashboard renders. Volume guardrails: level filter (`MinLogLevel` defaults to `Information`, override per-service), 100 entries/sec rate cap with a 10 s drop window, 4 KB message truncation, retention of 1 000 rows per instance / 7 days (both global-configurable). Lifecycle events (`Started`, `LeaseAcquired`, `LeaseLost`, `Faulted`, `Restarting`, `Stopped`, `ConfigurationMismatch`) share the same table with `Source = Lifecycle`.
+
+**Configuration-mismatch detection:** each server stamps its declared `Scope` onto its instance row. If a rolling deploy ships a version where `Scope` changed (e.g., `PerServer → Singleton`), the new instances detect the disagreement against the existing `background_service_definition` row, write `Status = ConfigurationMismatch`, and refuse to run user code until the deploy completes. The dashboard surfaces the mismatch loudly so split-brain across the transition window is impossible.
+
+**Dashboard:** new `/warp/services` nav, gated by the existing `/api/addons` discovery flag (`services: true`). List view aggregates per service name; detail view shows per-instance tabs with status, captured exception, lease panel (singleton only) with TTL countdown, and a log tail filterable by source and level.
+
+**Lifetime contract:** registered as singleton. Inject `IServiceScopeFactory` and create scopes per work unit — same pattern recommended for plain `BackgroundService`. `ValidateScopes = true` in Development catches the captive-scoped-dependency foot-gun (e.g., taking `DbContext` directly in the ctor) at startup.
+
+**Telemetry:** four OTel counters — `warp.background_services.started`, `warp.background_services.faulted` (tagged `service_name` + `exception_type`), `warp.background_services.restarts`, `warp.background_services.lease_lost`.
+
+### Schema change
+
+If you manage your Warp migrations manually, opt-in users will need to add four new tables and two indexes (note the second index is the one for the cross-server dashboard log tail — easy to miss):
+
+```sql
+CREATE TABLE warp.background_service_definition (...);
+CREATE TABLE warp.background_service_instance   (...);
+CREATE TABLE warp.background_service_lease      (...);
+CREATE TABLE warp.background_service_log        (...);
+
+CREATE INDEX ix_background_service_log_per_instance
+    ON warp.background_service_log (server_id, service_name, id);
+CREATE INDEX ix_background_service_log_by_service
+    ON warp.background_service_log (service_name, id DESC);
+```
+
+EF Core auto-migration produces these from the model when `opt.AddBackgroundService<T>()` triggers the entity configurators. Deployments that do **not** call `AddBackgroundService<T>()` see no schema change — the entities are absent from the model and the cleanup tasks (`ExpirationCleanup`, `ServerCleanup`, `WarpServerRegistration.StopAsync`) guard with `Model.FindEntityType(...) != null` before touching them.
+
+### Stats
+
+- ~9 500 lines of source + tests across 106 files
+- 1 931 tests (PostgreSQL + SQL Server) — zero skipped, zero failures
+- Full feature documentation at `features/background-services.md`
+
+### Links
+
+- [GitHub Release](https://github.com/moberghr/warp/releases/tag/0.15.0)
+
+---
+
 ## 0.14.1
 
 *2026-05-16*

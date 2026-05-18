@@ -93,7 +93,7 @@ export function StatCard({
         <div className="flex items-end justify-between">
           <span
             className={cn(
-              'mono font-display text-[30px] font-semibold leading-none tracking-[-0.5px]',
+              'font-display tabular-nums text-[30px] font-semibold leading-none tracking-[-0.5px]',
               accentClass ?? 'text-foreground',
             )}
           >

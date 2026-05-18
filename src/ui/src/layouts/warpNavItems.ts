@@ -9,6 +9,7 @@ import {
   KeyRound,
   Timer,
   GitBranch,
+  Activity,
   Puzzle,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
@@ -73,7 +74,7 @@ const builtInNavItems: WarpNavItem[] = [
     label: 'Batches',
     icon: Layers,
     badges: (s) => {
-      const blue = nonZero(s?.batches);
+      const blue = nonZero(s?.batchesProcessing);
       const red = nonZero(s?.batchesFailed);
       const out: NavBadge[] = [];
       if (blue) out.push({ value: blue, kind: 'blue' });
@@ -119,6 +120,11 @@ const sagasNavItem: WarpNavItem = {
   label: 'Sagas',
   icon: GitBranch,
 };
+const servicesNavItem: WarpNavItem = {
+  to: '/services',
+  label: 'Services',
+  icon: Activity,
+};
 
 function resolveIcon(name?: string): React.ComponentType<{ className?: string }> {
   if (!name) {
@@ -139,12 +145,14 @@ export function buildWarpNavItems(
   concurrencyAvailable: boolean,
   rateLimitsAvailable: boolean,
   sagasAvailable: boolean = false,
+  servicesAvailable: boolean = false,
 ): WarpNavItem[] {
   return [
     ...builtInNavItems,
     ...(concurrencyAvailable ? [concurrencyNavItem] : []),
     ...(rateLimitsAvailable ? [rateLimitsNavItem] : []),
     ...(sagasAvailable ? [sagasNavItem] : []),
+    ...(servicesAvailable ? [servicesNavItem] : []),
     ...extensions.flatMap((ext) =>
       ext.pages.map((page) => ({
         to: page.path,

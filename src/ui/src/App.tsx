@@ -17,6 +17,8 @@ const ConcurrencyLimitsPage = lazy(() => import('@/pages/concurrency/Concurrency
 const RateLimitsPage = lazy(() => import('@/pages/ratelimits/RateLimitsPage'));
 const SagasListPage = lazy(() => import('@/pages/sagas/SagasListPage'));
 const SagaDetailPage = lazy(() => import('@/pages/sagas/SagaDetailPage'));
+const BackgroundServicesList = lazy(() => import('@/pages/BackgroundServices/List'));
+const BackgroundServiceDetail = lazy(() => import('@/pages/BackgroundServices/Detail'));
 const WorkerDetailPage = lazy(() => import('@/pages/workers/WorkerDetailPage'));
 const TracePage = lazy(() => import('@/pages/trace/TracePage'));
 const DetailPage = lazy(() => import('@/pages/detail/DetailPage'));
@@ -124,6 +126,8 @@ function AppRoutes() {
           <Route path="/ratelimits" element={<RateLimitsPage />} />
           <Route path="/sagas/:id" element={<SagaDetailPage />} />
           <Route path="/sagas" element={<SagasListPage />} />
+          <Route path="/services/:name" element={<BackgroundServiceDetail />} />
+          <Route path="/services" element={<BackgroundServicesList />} />
 
           {extensionPages.map((page) => (
             <Route

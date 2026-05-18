@@ -1,6 +1,7 @@
 import type { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import * as data from './data';
 import type { ConcurrencyLimitInfo, RateLimitInfo, SagaDetail, SagaStats } from '@/types';
+import type { BackgroundServiceLeaseDto } from '@/types/backgroundServices';
 
 // Mutable copy so demo upsert/delete feel real across the session.
 const concurrencyLimits: ConcurrencyLimitInfo[] = [...data.demoConcurrencyLimits];
@@ -28,6 +29,12 @@ export function createDemoAdapter(isLoginMode: boolean) {
       return Promise.reject({
         response: { status: 401, statusText: 'Unauthorized', data: {}, headers: {}, config },
       });
+    }
+
+    // Background services
+    const bgServicesResult = routeBackgroundServices(method, url, config);
+    if (bgServicesResult !== undefined) {
+      return bgServicesResult;
     }
 
     // Concurrency limits: handle CRUD against the local mutable list.
@@ -128,6 +135,61 @@ function routeSagas(
   }
   if (method === 'delete' && detailMatch && !RESERVED.has(detailMatch[1])) {
     return resolve({}, config);
+  }
+
+  return undefined;
+}
+
+function routeBackgroundServices(
+  method: string,
+  url: string,
+  config: InternalAxiosRequestConfig,
+): Promise<AxiosResponse> | undefined {
+  if (!url.startsWith('/services')) {
+    return undefined;
+  }
+
+  const params: Record<string, unknown> = config.params ?? {};
+
+  // GET /services — list
+  if (method === 'get' && (url === '/services' || url.startsWith('/services?'))) {
+    return resolve(data.demoBackgroundServices, config);
+  }
+
+  // GET /services/{name}/lease
+  const leaseMatch = url.match(/^\/services\/([^/?]+)\/lease$/);
+  if (method === 'get' && leaseMatch) {
+    const name = decodeURIComponent(leaseMatch[1]);
+    const lease: BackgroundServiceLeaseDto | undefined = data.demoBackgroundServiceLeases[name];
+    if (!lease) {
+      return Promise.reject({ response: { status: 404, statusText: 'Not Found', data: {}, headers: {}, config } });
+    }
+
+    return resolve(lease, config);
+  }
+
+  // GET /services/{name}/logs
+  const logsMatch = url.match(/^\/services\/([^/?]+)\/logs$/);
+  if (method === 'get' && logsMatch) {
+    const name = decodeURIComponent(logsMatch[1]);
+    const source = params.source !== undefined ? Number(params.source) : undefined;
+    const level = params.level !== undefined ? Number(params.level) : undefined;
+    const fromId = params.fromId !== undefined ? Number(params.fromId) : undefined;
+    const logs = data.getBackgroundServiceLogs(name, source, level, fromId);
+
+    return resolve(logs, config);
+  }
+
+  // GET /services/{name} — detail
+  const detailMatch = url.match(/^\/services\/([^/?]+)$/);
+  if (method === 'get' && detailMatch) {
+    const name = decodeURIComponent(detailMatch[1]);
+    const detail = data.demoBackgroundServiceDetails[name];
+    if (!detail) {
+      return Promise.reject({ response: { status: 404, statusText: 'Not Found', data: {}, headers: {}, config } });
+    }
+
+    return resolve(detail, config);
   }
 
   return undefined;
@@ -308,7 +370,7 @@ function routeGet(url: string, params: Record<string, unknown>): unknown {
   // Addons discovery — demo mode pretends every opt-in addon is wired so the screenshots
   // have full nav. push:false keeps SignalR off in demo (no backend hub).
   if (url === '/addons') {
-    return { concurrency: true, rateLimits: true, push: false, sagas: true };
+    return { concurrency: true, rateLimits: true, push: false, sagas: true, services: true };
   }
 
   // Dashboard

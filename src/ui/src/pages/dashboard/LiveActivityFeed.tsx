@@ -62,7 +62,7 @@ export function LiveActivityFeed() {
           <span className="text-[11px] text-text-mute">last 10 events</span>
         </div>
         <Link
-          to="/jobs"
+          to="/jobs/enqueued"
           className="mono text-[11px] text-text-dim hover:text-foreground"
         >
           view all →

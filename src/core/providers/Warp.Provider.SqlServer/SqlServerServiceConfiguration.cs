@@ -2,10 +2,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Warp.Core;
 using Warp.Core.Data;
 using Warp.Core.Data.Queries;
 using Warp.Core.Notifications;
+using Warp.Worker;
 
 namespace Warp.Provider.SqlServer;
 
@@ -23,7 +25,13 @@ public static class SqlServerServiceConfiguration
         {
             using var scope = sp.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<TContext>();
-            var names = WarpJobTableNames.FromModel(context.Model);
+
+            // Propagate the configured lease TTL so the heartbeat SQL renewal window matches
+            // what SingletonServiceStrategy uses when it first acquires the lease.
+            var workerConfig = sp.GetService<IOptions<WarpWorkerConfiguration>>();
+            var leaseTtl = workerConfig?.Value.BackgroundServiceLeaseTtl ?? TimeSpan.FromSeconds(30);
+            var names = WarpJobTableNames.FromModel(context.Model, (int)leaseTtl.TotalSeconds);
+
             return new SqlServerWarpSqlQueries<TContext>(names);
         });
 

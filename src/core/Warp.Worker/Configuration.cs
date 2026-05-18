@@ -226,6 +226,20 @@ public class WarpWorkerConfiguration : WarpConfiguration
     /// </summary>
     public TimeSpan CompletionFlushInterval { get; set; } = TimeSpan.FromMilliseconds(100);
 
+    /// <summary>
+    /// TTL applied to <c>BackgroundServiceLease</c> rows when a singleton service acquires
+    /// the cluster lease. <c>null</c> falls back to 30 seconds. The lease must be renewed
+    /// every <see cref="HealthCheckInterval"/> by the <c>Heartbeat</c> server task; the TTL
+    /// should be at least 3× the heartbeat cadence to tolerate transient DB blips.
+    /// </summary>
+    public TimeSpan? BackgroundServiceLeaseTtl { get; set; }
+
+    /// <summary>
+    /// How long the supervisor waits between <c>TryAcquireAsync</c> attempts when a singleton
+    /// service finds its lease held by another server. <c>null</c> falls back to 15 seconds.
+    /// </summary>
+    public TimeSpan? BackgroundServiceAcquirePollInterval { get; set; }
+
     internal List<WorkerGroupConfiguration> ExplicitWorkerGroups { get; } = [];
 
     /// <summary>

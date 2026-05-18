@@ -96,7 +96,7 @@ const config: Config = {
   themeConfig: {
     image: 'img/screenshots/01-dashboard.png',
     colorMode: {
-      respectPrefersColorScheme: true,
+      respectPrefersColorScheme: false,
       disableSwitch: false,
     },
     docs: {

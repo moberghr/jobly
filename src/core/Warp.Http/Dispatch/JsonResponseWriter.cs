@@ -51,13 +51,7 @@ public static class JsonResponseWriter
         var value = await JsonSerializer.DeserializeAsync<TRequest>(
             context.Request.Body,
             jsonOptions.SerializerOptions,
-            cancellationToken).ConfigureAwait(false);
-
-        if (value is null)
-        {
-            throw new BadHttpRequestException("Request body could not be deserialized to " + typeof(TRequest).Name + ".");
-        }
-
+            cancellationToken).ConfigureAwait(false) ?? throw new BadHttpRequestException("Request body could not be deserialized to " + typeof(TRequest).Name + ".");
         return value;
     }
 }

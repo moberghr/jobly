@@ -6,9 +6,11 @@ public sealed class WarpAddonsInfo
 {
     public bool Concurrency { get; init; }
 
-    public bool RateLimits { get; init; }
-
     public bool Push { get; init; }
 
+    public bool RateLimits { get; init; }
+
     public bool Sagas { get; init; }
+
+    public bool Services { get; init; }
 }
