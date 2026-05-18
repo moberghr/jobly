@@ -13,12 +13,9 @@ namespace Warp.Tests.Worker;
 // Bookkeeping-overhead regressions:
 //   1. GetIntervalAsync caches the interval_seconds DB read for ~1 minute so each task
 //      iteration doesn't issue a fresh SELECT when nothing has changed.
-//   2. TryUpdateServerTaskAsync coalesces consecutive "Skipped" updates so an idle task
-//      (e.g. MessageRouter polling for messages that never arrive) doesn't UPDATE the
-//      server_task row every loop. State transitions (Completed/Failed) always flush.
-//
-// Both behaviors are observable via the cached fields exposed for test inspection. Real-
-// world impact (DB query count under load) is covered indirectly by integration suites.
+//   2. TryUpdateServerTaskAsync flushes every call — operators want LastRun to reflect
+//      "the task is alive right now", not "the task last did real work N minutes ago".
+//      ExpirationCleanup keeps server_log rows bounded (interval × 300s retention).
 [GenerateDatabaseTests]
 public abstract class ServerTaskLoopBookkeepingTestsBase : IAsyncLifetime
 {
@@ -81,69 +78,41 @@ public abstract class ServerTaskLoopBookkeepingTestsBase : IAsyncLifetime
     }
 
     [TimedFact]
-    public async Task TryUpdateServerTaskAsync_ConsecutiveSkipped_CoalescesToOneUpdate()
+    public async Task TryUpdateServerTaskAsync_ConsecutiveCalls_AlwaysFlush()
     {
         var serverTaskId = await SeedServerTaskAsync(intervalSeconds: 1.0);
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
         var loop = BuildLoop(time);
         loop.SetServerTaskIdForTest(serverTaskId);
 
-        // First Skipped — must flush so the dashboard sees the task is alive at all.
-        await loop.TryUpdateServerTaskAsync("Skipped", null, 100);
+        await loop.TryUpdateServerTaskAsync("Completed", null, 100);
         var afterFirst = await ReadAsync(serverTaskId);
-        afterFirst.LastStatus.ShouldBe("Skipped");
+        afterFirst.LastStatus.ShouldBe("Completed");
         afterFirst.LastDurationMs.ShouldBe(100);
 
-        // Out-of-band poison: if the next call DOES UPDATE, LastDurationMs gets overwritten.
-        await using (var ctx = _fixture.CreateContext())
-        {
-            await ctx.Set<ServerTask>()
-                .Where(x => x.Id == serverTaskId)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.LastDurationMs, -1.0));
-        }
-
-        // Second Skipped within the 30s throttle window — should be a no-op write.
-        time.Advance(TimeSpan.FromSeconds(5));
-        await loop.TryUpdateServerTaskAsync("Skipped", null, 200);
+        // Second call with no time elapsed — must still flush. Operators want LastRun
+        // to track "the task is alive right now", not "last did real work N minutes ago".
+        await loop.TryUpdateServerTaskAsync("Completed", null, 200);
         var afterSecond = await ReadAsync(serverTaskId);
-        afterSecond.LastDurationMs.ShouldBe(-1.0, "second Skipped should not have UPDATEd");
+        afterSecond.LastDurationMs.ShouldBe(200);
     }
 
     [TimedFact]
-    public async Task TryUpdateServerTaskAsync_StatusTransitionToSkipped_AlwaysFlushes()
+    public async Task RunOneIterationAsync_TaskReturnsNull_WritesCompletedStatus()
     {
+        // Regression: idle iterations used to write "Skipped" with a 5-min UPDATE throttle.
+        // Now every iteration writes "Completed" so the dashboard reflects liveness.
         var serverTaskId = await SeedServerTaskAsync(intervalSeconds: 1.0);
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
         var loop = BuildLoop(time);
         loop.SetServerTaskIdForTest(serverTaskId);
 
-        // Completed → Skipped is a state transition and must flush even though both calls
-        // are close together. The throttle only coalesces *consecutive* Skipped pairs.
-        await loop.TryUpdateServerTaskAsync("Completed", "did work", 50);
-        time.Advance(TimeSpan.FromSeconds(1));
-        await loop.TryUpdateServerTaskAsync("Skipped", null, 100);
+        var didWork = await loop.RunOneIterationAsync(CancellationToken.None);
 
+        didWork.ShouldBeFalse("null message means no work, so RerunImmediately must not tight-loop");
         var row = await ReadAsync(serverTaskId);
-        row.LastStatus.ShouldBe("Skipped");
-        row.LastDurationMs.ShouldBe(100);
-    }
-
-    [TimedFact]
-    public async Task TryUpdateServerTaskAsync_SkippedAfterThrottleWindow_Flushes()
-    {
-        var serverTaskId = await SeedServerTaskAsync(intervalSeconds: 1.0);
-        var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
-        var loop = BuildLoop(time);
-        loop.SetServerTaskIdForTest(serverTaskId);
-
-        await loop.TryUpdateServerTaskAsync("Skipped", null, 100);
-
-        // Advance past the 5min throttle window.
-        time.Advance(TimeSpan.FromMinutes(6));
-        await loop.TryUpdateServerTaskAsync("Skipped", null, 200);
-
-        var row = await ReadAsync(serverTaskId);
-        row.LastDurationMs.ShouldBe(200, "Skipped past the throttle window must flush");
+        row.LastStatus.ShouldBe("Completed");
+        row.LastMessage.ShouldBeNull();
     }
 
     private async Task<int> SeedServerTaskAsync(double intervalSeconds)
@@ -178,9 +147,11 @@ public abstract class ServerTaskLoopBookkeepingTestsBase : IAsyncLifetime
 
     private ServerTaskLoop<TestContext> BuildLoop(TimeProvider time)
     {
+        var stub = new StubTask();
+
         return new ServerTaskLoop<TestContext>(
-            new StubTask(),
-            new FixtureScopeFactory(_fixture),
+            stub,
+            new FixtureScopeFactory(_fixture, stub),
             new NoopLockProvider(),
             time,
             Guid.NewGuid(),
@@ -212,34 +183,58 @@ public abstract class ServerTaskLoopBookkeepingTestsBase : IAsyncLifetime
     private sealed class FixtureScopeFactory : IServiceScopeFactory
     {
         private readonly IDatabaseFixture _fixture;
+        private readonly IServerTask _task;
 
-        public FixtureScopeFactory(IDatabaseFixture fixture) => _fixture = fixture;
+        public FixtureScopeFactory(IDatabaseFixture fixture, IServerTask task)
+        {
+            _fixture = fixture;
+            _task = task;
+        }
 
-        public IServiceScope CreateScope() => new FixtureScope(_fixture);
+        public IServiceScope CreateScope() => new FixtureScope(_fixture, _task);
 
-        private sealed class FixtureScope : IServiceScope
+        private sealed class FixtureScope : IServiceScope, IAsyncDisposable
         {
             private readonly TestContext _context;
 
-            public FixtureScope(IDatabaseFixture fixture)
+            public FixtureScope(IDatabaseFixture fixture, IServerTask task)
             {
                 _context = fixture.CreateContext();
-                ServiceProvider = new ContextProvider(_context);
+                ServiceProvider = new ContextProvider(_context, task);
             }
 
             public IServiceProvider ServiceProvider { get; }
 
             public void Dispose() => _context.Dispose();
+
+            public ValueTask DisposeAsync() => _context.DisposeAsync();
         }
 
         private sealed class ContextProvider : IServiceProvider
         {
             private readonly TestContext _context;
+            private readonly IServerTask _task;
 
-            public ContextProvider(TestContext context) => _context = context;
+            public ContextProvider(TestContext context, IServerTask task)
+            {
+                _context = context;
+                _task = task;
+            }
 
-            public object? GetService(Type serviceType) =>
-                serviceType == typeof(TestContext) ? _context : null;
+            public object? GetService(Type serviceType)
+            {
+                if (serviceType == typeof(TestContext))
+                {
+                    return _context;
+                }
+
+                if (serviceType == typeof(IEnumerable<IServerTask>))
+                {
+                    return new[] { _task };
+                }
+
+                return null;
+            }
         }
     }
 

@@ -19,13 +19,6 @@ file static class ServerTaskLoopConstants
     // and the DB value almost never changes — recovering the cost matters more than
     // catching dashboard edits within the second.
     public static readonly TimeSpan IntervalCacheLifetime = TimeSpan.FromMinutes(1);
-
-    // Throttle UPDATE server_task writes when the task keeps returning "Skipped". State
-    // transitions (Completed/Failed/back-to-Skipped-after-work) always flush, so dashboard
-    // "last did real work" stays current. A long idle task's LastRun ages up to 5 minutes —
-    // operators can still see the parent Server's Heartbeat (every 3s) to confirm the
-    // process is alive.
-    public static readonly TimeSpan SkippedUpdateThrottle = TimeSpan.FromMinutes(5);
 }
 
 /// <summary>
@@ -58,9 +51,6 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
     private TimeSpan? _cachedInterval;
     private DateTimeOffset _intervalCachedAt = DateTimeOffset.MinValue;
     private bool _intervalCacheValid;
-
-    private string? _lastUpdateStatus;
-    private DateTimeOffset _lastUpdateAt = DateTimeOffset.MinValue;
 
     public ServerTaskLoop(
         IServerTask template,
@@ -208,7 +198,8 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
     /// outer loop can re-run immediately if <see cref="IServerTask.RerunImmediately"/> is set),
     /// <c>false</c> otherwise.
     /// </summary>
-    private async Task<bool> RunOneIterationAsync(CancellationToken ct)
+    // Internal for tests: lets tests drive a single iteration with full bookkeeping.
+    internal async Task<bool> RunOneIterationAsync(CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
         using var taskSpan = WarpTelemetry.StartServerTaskActivity(_name);
@@ -229,21 +220,18 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
                 return false;
             }
 
-            if (message == null)
+            if (message != null)
             {
-                await TryUpdateServerTaskAsync("Skipped", null, elapsed);
-
-                return false;
+                taskSpan?.SetTag(WarpTelemetryAttributes.WarpTaskMessage, message);
             }
 
-            taskSpan?.SetTag(WarpTelemetryAttributes.WarpTaskMessage, message);
             await TryUpdateServerTaskAsync("Completed", message, elapsed);
             if (_logOnSuccess)
             {
                 await TryWriteServerLogAsync("Completed", message, elapsed);
             }
 
-            return true;
+            return message != null;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -400,9 +388,6 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
     // Internal for tests: lets tests seed _serverTaskId without running EnsureRegisteredAsync.
     internal void SetServerTaskIdForTest(int id) => _serverTaskId = id;
 
-    // Internal for tests: lets tests inspect the throttle state directly.
-    internal string? LastUpdateStatusForTest => _lastUpdateStatus;
-
     private async Task WaitForNextRunAsync(TimeSpan interval, CancellationToken ct)
     {
         try
@@ -435,25 +420,12 @@ internal sealed class ServerTaskLoop<TContext> : IDisposable
                 .SetProperty(x => x.LastDurationMs, durationMs));
     }
 
-    // Internal for tests: exercises the throttle directly without driving the full RunAsync loop.
+    // Internal for tests: exercises the wrapper directly without driving the full RunAsync loop.
     internal async Task TryUpdateServerTaskAsync(string status, string? message, double durationMs)
     {
-        // Coalesce a run of Skipped updates: when the task has had nothing to do for a while,
-        // there's no operator value in refreshing LastRun every iteration. State transitions
-        // (Completed, Failed, or first Skipped after work) always flush so the dashboard
-        // reflects real activity promptly.
-        if (string.Equals(status, "Skipped", StringComparison.Ordinal)
-            && string.Equals(_lastUpdateStatus, "Skipped", StringComparison.Ordinal)
-            && _time.GetUtcNow() - _lastUpdateAt < ServerTaskLoopConstants.SkippedUpdateThrottle)
-        {
-            return;
-        }
-
         try
         {
             await UpdateServerTaskAsync(status, message, durationMs);
-            _lastUpdateStatus = status;
-            _lastUpdateAt = _time.GetUtcNow();
         }
         catch (Exception ex)
         {
