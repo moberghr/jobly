@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Panel, PanelHeader } from '@/components/v2/Panel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/Pagination';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
+import { usePageStore } from '@/stores/page';
 import { shortId, formatBytes, serverStatusDotColor, isServerStale } from '@/utils/format';
 import { ChevronDown, ChevronRight, RefreshCw, Pause, Play } from 'lucide-react';
 import type { WorkerModel, ServerTaskSummary } from '@/types';
@@ -37,71 +37,99 @@ export default function ServerDetailPage() {
   const pause = usePauseServer();
   const resume = useResumeServer();
 
-  const refetchAll = () => {
-    qc.invalidateQueries({ queryKey: queryScopes.servers });
-  };
+  const server = serverQuery.data;
+
+  useEffect(() => {
+    if (!server) {
+      usePageStore.getState().set({ title: 'Server', subtitle: undefined });
+      return;
+    }
+
+    const refetchAll = () => {
+      qc.invalidateQueries({ queryKey: queryScopes.servers });
+    };
+
+    const handleTogglePause = () => {
+      if (!id) return;
+      if (server.pausedAt) {
+        resume.mutate(id);
+      } else {
+        pause.mutate(id);
+      }
+    };
+
+    usePageStore.getState().set({
+      title: server.serverName,
+      subtitle: `${server.serviceCount} worker${server.serviceCount === 1 ? '' : 's'}`,
+      right: (
+        <div className="flex items-center gap-2">
+          {server.pausedAt && <Badge variant="outline" className="text-amber-600 border-amber-300">Paused</Badge>}
+          {isServerStale(server.lastHeartbeatTime) && <Badge variant="outline" className="text-red-600 border-red-300">Inactive</Badge>}
+          <button onClick={refetchAll} className="p-2 rounded-md hover:bg-panel-2 text-text-mute" title="Refresh">
+            <RefreshCw className="h-4 w-4" />
+          </button>
+          <Button variant="outline" size="sm" onClick={handleTogglePause} title={server.pausedAt ? 'Resume server' : 'Pause server'}>
+            {server.pausedAt ? <><Play className="h-4 w-4 mr-1" /> Resume</> : <><Pause className="h-4 w-4 mr-1" /> Pause</>}
+          </Button>
+        </div>
+      ),
+    });
+  }, [server, id, pause, resume, qc]);
+
+  useEffect(() => {
+    return () => usePageStore.getState().reset();
+  }, []);
 
   if (serverQuery.error) return <ErrorState message={(serverQuery.error as Error).message} />;
-  if (!serverQuery.data) return <LoadingState />;
+  if (!server) return <LoadingState />;
 
-  const server = serverQuery.data;
   const tasks = tasksQuery.data ?? [];
 
-  const handleTogglePause = () => {
-    if (!id) return;
-    if (server.pausedAt) {
-      resume.mutate(id);
-    } else {
-      pause.mutate(id);
-    }
-  };
+  // Group by workerGroupId when available, fall back to queues|pollingMs
+  const groups = new Map<string, WorkerModel[]>();
+  for (const w of server.workers) {
+    const key = w.workerGroupId ?? `${w.queues ?? 'default'}|${w.pollingIntervalMs ?? 1000}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(w);
+  }
 
   return (
-    <div>
-      <div className="flex items-center gap-4 mb-6">
+    <div className="flex flex-col gap-3 p-5">
+      <div className="flex items-center gap-2 text-[12.5px] text-text-mute">
         <span className={`inline-block w-3 h-3 rounded-full ${serverStatusDotColor(server.lastHeartbeatTime, server.pausedAt)}`} />
-        <h1 className="text-2xl font-bold">{server.serverName}</h1>
-        {server.pausedAt && <Badge variant="outline" className="text-amber-600 border-amber-300">Paused</Badge>}
-        {isServerStale(server.lastHeartbeatTime) && <Badge variant="outline" className="text-red-600 border-red-300">Inactive</Badge>}
-        <button onClick={refetchAll} className="p-2 rounded-md hover:bg-accent text-muted-foreground" title="Refresh">
-          <RefreshCw className="h-4 w-4" />
-        </button>
-        <Button variant="outline" size="sm" onClick={handleTogglePause} title={server.pausedAt ? 'Resume server' : 'Pause server'}>
-          {server.pausedAt ? <><Play className="h-4 w-4 mr-1" /> Resume</> : <><Pause className="h-4 w-4 mr-1" /> Pause</>}
-        </Button>
+        <RelativeTime date={server.lastHeartbeatTime} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Details */}
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Details</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div><span className="text-muted-foreground">Workers:</span> {server.serviceCount}</div>
-            <div><span className="text-muted-foreground">CPU:</span> {server.cpuUsagePercent != null ? `${server.cpuUsagePercent}%` : 'N/A'}</div>
-            <div><span className="text-muted-foreground">Memory:</span> {server.memoryWorkingSetBytes != null ? formatBytes(server.memoryWorkingSetBytes) : 'N/A'}</div>
-            <div><span className="text-muted-foreground">Started:</span> <RelativeTime date={server.startedTime} /></div>
-            <div><span className="text-muted-foreground">Heartbeat:</span> <RelativeTime date={server.lastHeartbeatTime} /></div>
+      <Panel>
+        <PanelHeader eyebrow="Details" />
+        <div className="px-4 py-3">
+          <dl className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-2 text-[13px]">
+            <dt className="warp-eyebrow text-text-mute">Workers</dt>
+            <dd className="font-mono">{server.serviceCount}</dd>
+            <dt className="warp-eyebrow text-text-mute">CPU</dt>
+            <dd className="font-mono">{server.cpuUsagePercent != null ? `${server.cpuUsagePercent}%` : 'N/A'}</dd>
+            <dt className="warp-eyebrow text-text-mute">Memory</dt>
+            <dd className="font-mono">{server.memoryWorkingSetBytes != null ? formatBytes(server.memoryWorkingSetBytes) : 'N/A'}</dd>
+            <dt className="warp-eyebrow text-text-mute">Started</dt>
+            <dd><RelativeTime date={server.startedTime} /></dd>
+            <dt className="warp-eyebrow text-text-mute">Heartbeat</dt>
+            <dd><RelativeTime date={server.lastHeartbeatTime} /></dd>
             {server.pausedAt && (
-              <div><span className="text-muted-foreground">Paused since:</span> <RelativeTime date={server.pausedAt} /></div>
+              <>
+                <dt className="warp-eyebrow text-text-mute">Paused since</dt>
+                <dd><RelativeTime date={server.pausedAt} /></dd>
+              </>
             )}
-            <div><span className="text-muted-foreground">ID:</span> <span className="font-mono text-xs">{server.id}</span></div>
-          </CardContent>
-        </Card>
+            <dt className="warp-eyebrow text-text-mute">ID</dt>
+            <dd className="font-mono text-xs">{server.id}</dd>
+          </dl>
+        </div>
+      </Panel>
 
-      </div>
-
-      {/* Worker Groups */}
-      <h2 className="text-lg font-semibold mb-3">Worker Groups</h2>
-      {(() => {
-        // Group by workerGroupId when available, fall back to queues|pollingMs
-        const groups = new Map<string, WorkerModel[]>();
-        for (const w of server.workers) {
-          const key = w.workerGroupId ?? `${w.queues ?? 'default'}|${w.pollingIntervalMs ?? 1000}`;
-          if (!groups.has(key)) groups.set(key, []);
-          groups.get(key)!.push(w);
-        }
-        return groups.size > 0 ? (
-          <div className="space-y-2 mb-6">
+      <Panel>
+        <PanelHeader eyebrow="Worker groups" />
+        {groups.size > 0 ? (
+          <div className="flex flex-col gap-2 p-3">
             {Array.from(groups.entries()).map(([key, workers]) => {
               const queues = workers[0].queues ?? 'default';
               const pollingMs = workers[0].pollingIntervalMs ?? 1000;
@@ -122,25 +150,22 @@ export default function ServerDetailPage() {
             })}
           </div>
         ) : (
-          <Card className="mb-6">
-            <CardContent className="py-6 text-center text-muted-foreground text-sm">No workers registered</CardContent>
-          </Card>
-        );
-      })()}
+          <div className="py-10 text-center text-[13px] text-text-mute">No workers registered</div>
+        )}
+      </Panel>
 
-      {/* Task Sections */}
-      <h2 className="text-lg font-semibold mb-3">Server Tasks</h2>
-      {tasks.length === 0 ? (
-        <Card>
-          <CardContent className="py-6 text-center text-muted-foreground text-sm">No task logs yet</CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {tasks.map((task) => (
-            <TaskSection key={task.taskName} serverId={server.id} task={task} />
-          ))}
-        </div>
-      )}
+      <Panel>
+        <PanelHeader eyebrow="Server tasks" />
+        {tasks.length === 0 ? (
+          <div className="py-10 text-center text-[13px] text-text-mute">No task logs yet</div>
+        ) : (
+          <div className="flex flex-col gap-2 p-3">
+            {tasks.map((task) => (
+              <TaskSection key={task.taskName} serverId={server.id} task={task} />
+            ))}
+          </div>
+        )}
+      </Panel>
     </div>
   );
 }
@@ -168,9 +193,9 @@ function WorkerGroupSection({ queues, pollingMs, workers, activeCount, groupId, 
   };
 
   return (
-    <Card>
+    <Panel className="overflow-hidden">
       <button
-        className="w-full text-left px-4 py-3 hover:bg-accent/50 rounded-t-lg transition-colors"
+        className="w-full text-left px-4 py-3 hover:bg-panel-2/60 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-3">
@@ -183,8 +208,8 @@ function WorkerGroupSection({ queues, pollingMs, workers, activeCount, groupId, 
               {activeCount} active
             </span>
           )}
-          <span className="text-xs text-muted-foreground">·</span>
-          <span className="text-xs text-muted-foreground">Polling: {pollingMs >= 1000 ? `${(pollingMs / 1000).toFixed(pollingMs % 1000 === 0 ? 0 : 1)}s` : `${pollingMs}ms`}</span>
+          <span className="text-xs text-text-mute">·</span>
+          <span className="text-xs text-text-mute">Polling: {pollingMs >= 1000 ? `${(pollingMs / 1000).toFixed(pollingMs % 1000 === 0 ? 0 : 1)}s` : `${pollingMs}ms`}</span>
           <span className="ml-auto">
             {groupId && (
               <Button
@@ -199,45 +224,45 @@ function WorkerGroupSection({ queues, pollingMs, workers, activeCount, groupId, 
             )}
           </span>
         </div>
-        <div className="ml-7 mt-1 text-xs text-muted-foreground">
+        <div className="ml-7 mt-1 text-xs text-text-mute">
           Queues: <span className="font-mono">{queues}</span>
           {groupPausedAt && <span className="ml-3">· Paused since <RelativeTime date={groupPausedAt} /></span>}
         </div>
       </button>
 
       {expanded && (
-        <CardContent className="pt-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Worker ID</TableHead>
-                <TableHead>Current Job</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        <div className="overflow-x-auto border-t border-border">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-panel-2 border-b border-border">
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Worker ID</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Current job</th>
+              </tr>
+            </thead>
+            <tbody>
               {workers.map((w) => (
-                <TableRow key={w.workerId}>
-                  <TableCell className="font-mono text-xs">
+                <tr key={w.workerId} className="border-b border-border last:border-b-0 hover:bg-panel-2/60">
+                  <td className="px-3.5 py-2 font-mono text-[12.5px]">
                     <Link to={`/workers/${w.workerId}`} className="text-primary hover:underline">
                       {shortId(w.workerId)}
                     </Link>
-                  </TableCell>
-                  <TableCell>
+                  </td>
+                  <td className="px-3.5 py-2 text-[12.5px]">
                     {w.currentJobId ? (
-                      <Link to={`/detail/${w.currentJobId}`} className="text-primary hover:underline text-xs font-mono">
+                      <Link to={`/detail/${w.currentJobId}`} className="text-primary hover:underline font-mono">
                         {shortId(w.currentJobId)}
                       </Link>
                     ) : (
-                      <span className="text-muted-foreground text-sm">Idle</span>
+                      <span className="text-text-mute">Idle</span>
                     )}
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
-        </CardContent>
+            </tbody>
+          </table>
+        </div>
       )}
-    </Card>
+    </Panel>
   );
 }
 
@@ -248,21 +273,21 @@ function TaskSection({ serverId, task }: { serverId: string; task: ServerTaskSum
   const logs = logsQuery.data ?? null;
 
   return (
-    <Card>
+    <Panel className="overflow-hidden">
       <button
-        className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-accent/50 rounded-t-lg transition-colors"
+        className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-panel-2/60 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-3 min-w-0">
           {expanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
           <span className="font-medium text-sm">{task.taskName}</span>
           {task.lastStatus && (
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[task.lastStatus] ?? 'text-muted-foreground'}`}>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[task.lastStatus] ?? 'text-text-mute'}`}>
               {task.lastStatus}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-4 text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+        <div className="flex items-center gap-4 text-xs text-text-mute shrink-0 whitespace-nowrap">
           {task.intervalSeconds != null ? (
             <span>every {task.intervalSeconds}s</span>
           ) : (
@@ -274,45 +299,47 @@ function TaskSection({ serverId, task }: { serverId: string; task: ServerTaskSum
       </button>
 
       {expanded && (
-        <CardContent className="pt-0">
+        <div className="border-t border-border">
           {task.lastMessage && (
-            <p className="text-sm text-muted-foreground mb-3">{task.lastMessage}</p>
+            <p className="px-4 pt-3 text-sm text-text-mute">{task.lastMessage}</p>
           )}
           {logs && logs.items.length > 0 ? (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Message</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Time</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {logs.items.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[log.status] ?? 'text-muted-foreground'}`}>
-                          {log.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">{log.message ?? '-'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{log.durationMs != null ? `${log.durationMs.toFixed(0)}ms` : '-'}</TableCell>
-                      <TableCell className="text-sm"><RelativeTime date={log.timestamp} /></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-panel-2 border-b border-border">
+                      <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Status</th>
+                      <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Message</th>
+                      <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Duration</th>
+                      <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.items.map((log) => (
+                      <tr key={log.id} className="border-b border-border last:border-b-0 hover:bg-panel-2/60">
+                        <td className="px-3.5 py-2 text-[12.5px]">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[log.status] ?? 'text-text-mute'}`}>
+                            {log.status}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-2 text-[12.5px] text-text-mute max-w-[300px] truncate">{log.message ?? '-'}</td>
+                        <td className="px-3.5 py-2 text-[12.5px] text-text-mute">{log.durationMs != null ? `${log.durationMs.toFixed(0)}ms` : '-'}</td>
+                        <td className="px-3.5 py-2 text-[12.5px]"><RelativeTime date={log.timestamp} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               {logs.pageCount > 1 && (
                 <Pagination page={page} pageCount={logs.pageCount} onPageChange={setPage} />
               )}
             </>
           ) : (
-            <p className="text-muted-foreground text-sm py-2 text-center">{logs ? 'No logs yet' : 'Loading...'}</p>
+            <p className="text-text-mute text-sm py-2 text-center">{logs ? 'No logs yet' : 'Loading...'}</p>
           )}
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </Panel>
   );
 }

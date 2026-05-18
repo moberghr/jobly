@@ -1,5 +1,5 @@
 import { Skeleton } from '@/components/ui/skeleton';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Panel } from '@/components/v2/Panel';
 
 interface TableSkeletonProps {
   rows?: number;
@@ -11,27 +11,31 @@ export function TableSkeleton({ rows = 8, columns, headers }: TableSkeletonProps
   const colCount = headers?.length ?? columns ?? 5;
 
   return (
-    <div className="rounded-md border overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {Array.from({ length: colCount }).map((_, i) => (
-              <TableHead key={i}>{headers?.[i] ?? ''}</TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {Array.from({ length: rows }).map((_, r) => (
-            <TableRow key={r}>
-              {Array.from({ length: colCount }).map((__, c) => (
-                <TableCell key={c}>
-                  <Skeleton className="h-4 w-full max-w-[140px]" />
-                </TableCell>
+    <Panel className="overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-panel-2 border-b border-border">
+              {Array.from({ length: colCount }).map((_, i) => (
+                <th key={i} className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">
+                  {headers?.[i] ?? ''}
+                </th>
               ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: rows }).map((_, r) => (
+              <tr key={r} className="border-b border-border last:border-b-0">
+                {Array.from({ length: colCount }).map((__, c) => (
+                  <td key={c} className="px-3.5 py-2">
+                    <Skeleton className="h-4 w-full max-w-[140px]" />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
   );
 }

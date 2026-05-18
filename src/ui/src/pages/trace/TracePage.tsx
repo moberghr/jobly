@@ -1,5 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Panel } from '@/components/v2/Panel';
+import { usePageStore } from '@/stores/page';
 import {
   ReactFlow,
   Controls,
@@ -28,9 +30,9 @@ const GROUP_PADDING = 30;
 const CHILD_GAP = 16;
 
 function kindIcon(kind: number) {
-  if (kind === 3) return <Layers className="h-4 w-4 text-muted-foreground" />;
-  if (kind === 2) return <Mail className="h-4 w-4 text-muted-foreground" />;
-  return <Briefcase className="h-4 w-4 text-muted-foreground" />;
+  if (kind === 3) return <Layers className="h-4 w-4 text-text-mute" />;
+  if (kind === 2) return <Mail className="h-4 w-4 text-text-mute" />;
+  return <Briefcase className="h-4 w-4 text-text-mute" />;
 }
 
 function kindLabel(kind: number) {
@@ -53,20 +55,20 @@ function TraceNode({ data }: NodeProps) {
   const highlighted = job.highlighted;
   return (
     <div
-      className={`border rounded-lg px-3 py-2 shadow-sm cursor-pointer hover:border-primary transition-colors ${highlighted ? 'ring-2 ring-primary border-primary bg-primary/10' : 'bg-card'}`}
+      className={`border border-border rounded-lg px-3 py-2 shadow-sm cursor-pointer hover:border-primary transition-colors ${highlighted ? 'ring-2 ring-primary border-primary bg-primary/10' : 'bg-panel'}`}
       style={{ width: NODE_WIDTH, minHeight: NODE_HEIGHT }}
       onClick={() => navigate(`/detail/${job.id}`)}
     >
       <Handle type="target" position={Position.Left} className="!bg-transparent !border-0 !w-0 !h-0" />
       <div className="flex items-center gap-2 mb-1">
         {kindIcon(job.kind)}
-        <span className="text-xs text-muted-foreground">{kindLabel(job.kind)}</span>
-        <span className="text-xs font-mono text-muted-foreground ml-auto">{shortId(job.id)}</span>
+        <span className="text-xs text-text-mute">{kindLabel(job.kind)}</span>
+        <span className="text-xs font-mono text-text-mute ml-auto">{shortId(job.id)}</span>
       </div>
       <div className="text-sm font-medium truncate">{shortType(job.type)}</div>
       <div className="flex items-center gap-2 mt-1">
         <StateBadge state={job.currentState} />
-        {job.handlerType && <span className="text-xs text-muted-foreground truncate">{shortType(job.handlerType)}</span>}
+        {job.handlerType && <span className="text-xs text-text-mute truncate">{shortType(job.handlerType)}</span>}
       </div>
       <Handle type="source" position={Position.Right} className="!bg-transparent !border-0 !w-0 !h-0" />
     </div>
@@ -78,12 +80,12 @@ function GroupNode({ data }: NodeProps) {
   const d = data as unknown as { label: string; id: string; kind: number; state: State; highlighted?: boolean };
   return (
     <div
-      className={`border-2 border-dashed border-muted-foreground/30 rounded-xl ${d.highlighted ? 'border-primary bg-primary/5' : ''}`}
+      className={`border-2 border-dashed border-border rounded-xl ${d.highlighted ? 'border-primary bg-primary/5' : ''}`}
       style={{ width: '100%', height: '100%', position: 'relative' }}
     >
       <Handle type="target" position={Position.Left} className="!bg-transparent !border-0 !w-0 !h-0" />
       <span
-        className="absolute -top-3 left-3 bg-card px-2 text-xs font-medium cursor-pointer text-primary hover:underline whitespace-nowrap flex items-center gap-1"
+        className="absolute -top-3 left-3 bg-panel px-2 text-xs font-medium cursor-pointer text-primary hover:underline whitespace-nowrap flex items-center gap-1"
         onClick={() => navigate(`/detail/${d.id}`)}
       >
         {kindIcon(d.kind)} {d.label} <StateBadge state={d.state} />
@@ -359,16 +361,23 @@ export default function TracePage() {
     };
   }, [nodes, edges, hoveredEdge]);
 
+  useEffect(() => {
+    usePageStore.getState().set({
+      title: 'Trace',
+      subtitle: traceIdDisplay ? `${traceIdDisplay} · ${jobs?.length ?? 0} jobs` : undefined,
+    });
+  }, [traceIdDisplay, jobs?.length]);
+
+  useEffect(() => {
+    return () => usePageStore.getState().reset();
+  }, []);
+
   if (error) return <ErrorState message={(error as Error).message} />;
   if (!jobs) return <LoadingState />;
 
   return (
-    <div>
-      <div className="flex items-center gap-4 mb-4">
-        <h1 className="text-2xl font-bold">Trace <span className="font-mono text-lg">{traceIdDisplay}</span></h1>
-        <span className="text-sm text-muted-foreground">{jobs.length} jobs</span>
-      </div>
-      <div className="rounded-md border bg-card" style={{ height: 'calc(100vh - 12rem)' }}>
+    <div className="flex flex-col gap-3 p-5">
+      <Panel style={{ height: 'calc(100vh - 12rem)' }} className="overflow-hidden">
         <ReactFlow
           nodes={styledNodes}
           edges={styledEdges}
@@ -385,16 +394,16 @@ export default function TracePage() {
           onPaneClick={() => setHoveredEdge(null)}
           proOptions={{ hideAttribution: true }}
         >
-          <Controls className="!bg-card !border !border-border !shadow-sm [&>button]:!bg-card [&>button]:!border-border [&>button]:!fill-foreground [&>button:hover]:!bg-accent" />
+          <Controls className="!bg-panel-2 !border !border-border !shadow-sm [&>button]:!bg-panel-2 [&>button]:!border-border [&>button]:!fill-foreground [&>button:hover]:!bg-panel-2/60" />
           <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-          <div className="absolute top-3 right-3 bg-card border rounded-lg px-4 py-3 text-xs space-y-2 shadow-sm z-10">
-            <div className="font-medium text-sm mb-2">Legend</div>
+          <div className="absolute top-3 right-3 bg-panel-2 border border-border rounded-lg px-4 py-3 text-xs space-y-2 shadow-sm z-10">
+            <div className="warp-eyebrow text-text-mute mb-2">Legend</div>
             <div className="flex items-center gap-2">
-              <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+              <Briefcase className="h-3.5 w-3.5 text-text-mute" />
               <span>Job</span>
-              <Mail className="h-3.5 w-3.5 text-muted-foreground ml-3" />
+              <Mail className="h-3.5 w-3.5 text-text-mute ml-3" />
               <span>Message</span>
-              <Layers className="h-3.5 w-3.5 text-muted-foreground ml-3" />
+              <Layers className="h-3.5 w-3.5 text-text-mute ml-3" />
               <span>Batch</span>
             </div>
             <div className="flex items-center gap-2">
@@ -402,16 +411,16 @@ export default function TracePage() {
               <span>Continuation</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-0 border-t border-dashed border-muted-foreground" />
+              <div className="w-8 h-0 border-t border-dashed border-text-mute" />
               <span>Spawned by</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-4 border-2 border-dashed border-muted-foreground/30 rounded" />
+              <div className="w-8 h-4 border-2 border-dashed border-border rounded" />
               <span>Batch or Message</span>
             </div>
           </div>
         </ReactFlow>
-      </div>
+      </Panel>
     </div>
   );
 }

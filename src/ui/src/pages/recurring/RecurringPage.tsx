@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Panel } from '@/components/v2/Panel';
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/Pagination';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
+import { usePageStore } from '@/stores/page';
 import {
   useRecurringList,
   useEnableRecurringJob,
@@ -24,77 +25,84 @@ export default function RecurringPage() {
   const triggerJob = useTriggerRecurringJob();
   const deleteJob = useDeleteRecurringJob();
 
+  useEffect(() => {
+    usePageStore.getState().set({ title: 'Recurring Jobs' });
+    return () => usePageStore.getState().reset();
+  }, []);
+
   if (query.error) return <ErrorState message={(query.error as Error).message} />;
   if (!query.data) return <LoadingState />;
 
   const data = query.data;
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">Recurring Jobs</h1>
-
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Cron</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Next Execution</TableHead>
-              <TableHead>Last Execution</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                  No recurring jobs found
-                </TableCell>
-              </TableRow>
-            ) : (
-              data.items.map((rj) => (
-                <TableRow key={rj.id}>
-                  <TableCell className="font-medium"><Link to={`/recurring/${rj.id}`} className="text-primary hover:underline">{rj.name}</Link></TableCell>
-                  <TableCell className="font-mono text-xs">{rj.cron}</TableCell>
-                  <TableCell>{rj.type.split(',')[0].split('.').pop()}</TableCell>
-                  <TableCell>
-                    {rj.disabledAt ? (
-                      <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">Disabled</span>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">Enabled</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {rj.nextExecution ? <RelativeTime date={rj.nextExecution} /> : 'N/A'}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {rj.lastExecution ? <RelativeTime date={rj.lastExecution} /> : 'Never'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {rj.disabledAt ? (
-                      <Button variant="ghost" size="sm" onClick={() => enableJob.mutate(rj.id)}>
-                        Enable
+    <div className="flex flex-col gap-3 p-5">
+      <Panel className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-panel-2 border-b border-border">
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Name</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Cron</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Type</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Status</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Next Execution</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Last Execution</th>
+                <th className="warp-eyebrow text-right px-3.5 py-2.5 text-text-mute font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-3.5 py-8 text-center text-[12.5px] text-text-mute">
+                    No recurring jobs found
+                  </td>
+                </tr>
+              ) : (
+                data.items.map((rj) => (
+                  <tr key={rj.id} className="border-b border-border last:border-b-0 hover:bg-panel-2/60">
+                    <td className="px-3.5 py-2 text-[12.5px] font-medium">
+                      <Link to={`/recurring/${rj.id}`} className="text-primary hover:underline">{rj.name}</Link>
+                    </td>
+                    <td className="px-3.5 py-2 font-mono text-[12.5px]">{rj.cron}</td>
+                    <td className="px-3.5 py-2 text-[12.5px]">{rj.type.split(',')[0].split('.').pop()}</td>
+                    <td className="px-3.5 py-2 text-[12.5px]">
+                      {rj.disabledAt ? (
+                        <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">Disabled</span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">Enabled</span>
+                      )}
+                    </td>
+                    <td className="px-3.5 py-2 text-[12.5px]">
+                      {rj.nextExecution ? <RelativeTime date={rj.nextExecution} /> : 'N/A'}
+                    </td>
+                    <td className="px-3.5 py-2 text-[12.5px] text-text-mute">
+                      {rj.lastExecution ? <RelativeTime date={rj.lastExecution} /> : 'Never'}
+                    </td>
+                    <td className="px-3.5 py-2 text-right text-[12.5px]">
+                      {rj.disabledAt ? (
+                        <Button variant="ghost" size="sm" onClick={() => enableJob.mutate(rj.id)}>
+                          Enable
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="sm" onClick={() => disableJob.mutate(rj.id)}>
+                          Disable
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => triggerJob.mutate(rj.id)}>
+                        Trigger
                       </Button>
-                    ) : (
-                      <Button variant="ghost" size="sm" onClick={() => disableJob.mutate(rj.id)}>
-                        Disable
+                      <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteJob.mutate(rj.id)}>
+                        Remove
                       </Button>
-                    )}
-                    <Button variant="ghost" size="sm" onClick={() => triggerJob.mutate(rj.id)}>
-                      Trigger
-                    </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteJob.mutate(rj.id)}>
-                      Remove
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
 
       <Pagination page={page} pageCount={data.pageCount} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} />
     </div>

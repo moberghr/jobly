@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { Card, CardContent } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Panel } from '@/components/v2/Panel';
 import { Pagination } from '@/components/Pagination';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import { useRefreshKey } from '@/hooks/useRefreshKey';
 import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
+import { usePageStore } from '@/stores/page';
 import type { SagaListItem, SagaStats, PagedList } from '@/types';
 import * as api from '@/api';
 
@@ -23,6 +23,11 @@ export default function SagasListPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
   const refreshKey = useRefreshKey();
+
+  useEffect(() => {
+    usePageStore.getState().set({ title: 'Sagas' });
+    return () => usePageStore.getState().reset();
+  }, []);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -57,13 +62,12 @@ export default function SagasListPage() {
 
   if (unavailable) {
     return (
-      <div>
-        <h1 className="text-2xl font-bold mb-4">Sagas</h1>
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Sagas addon is not registered. Call <code className="font-mono text-xs">opt.AddSagas()</code> in your Warp configuration to enable.
-          </CardContent>
-        </Card>
+      <div className="flex flex-col gap-3 p-5">
+        <Panel>
+          <div className="py-8 text-center text-[13px] text-text-mute">
+            Sagas addon is not registered. Call <code className="font-mono text-xs text-text-default">opt.AddSagas()</code> in your Warp configuration to enable.
+          </div>
+        </Panel>
       </div>
     );
   }
@@ -72,33 +76,31 @@ export default function SagasListPage() {
   if (!data) return <LoadingState />;
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">Sagas</h1>
-
+    <div className="flex flex-col gap-3 p-5">
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <Card>
-            <CardContent className="py-4">
-              <div className="text-sm text-muted-foreground">Live sagas</div>
-              <div className="text-2xl font-bold">{stats.liveSagas}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-4">
-              <div className="text-sm text-muted-foreground">Started today</div>
-              <div className="text-2xl font-bold">{stats.startedToday}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-4">
-              <div className="text-sm text-muted-foreground">Types in use</div>
-              <div className="text-2xl font-bold">{types.length}</div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Panel>
+            <div className="px-4 py-3">
+              <div className="text-[12px] text-text-mute">Live sagas</div>
+              <div className="font-display text-[22px] font-semibold tracking-tight tabular-nums">{stats.liveSagas}</div>
+            </div>
+          </Panel>
+          <Panel>
+            <div className="px-4 py-3">
+              <div className="text-[12px] text-text-mute">Started today</div>
+              <div className="font-display text-[22px] font-semibold tracking-tight tabular-nums">{stats.startedToday}</div>
+            </div>
+          </Panel>
+          <Panel>
+            <div className="px-4 py-3">
+              <div className="text-[12px] text-text-mute">Types in use</div>
+              <div className="font-display text-[22px] font-semibold tracking-tight tabular-nums">{types.length}</div>
+            </div>
+          </Panel>
         </div>
       )}
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2">
         <select
           className="border rounded-md px-2 py-1 text-sm bg-background"
           value={typeFilter}
@@ -116,40 +118,42 @@ export default function SagasListPage() {
         />
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Type</TableHead>
-              <TableHead>Correlation key</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead>Created</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                  No sagas found
-                </TableCell>
-              </TableRow>
-            ) : (
-              data.items.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium">{shortName(s.type)}</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    <Link to={`/sagas/${s.id}`} className="text-primary hover:underline">
-                      {s.correlationKey}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-sm"><RelativeTime date={s.updatedAt} /></TableCell>
-                  <TableCell className="text-sm text-muted-foreground"><RelativeTime date={s.createdAt} /></TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <Panel className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-panel-2 border-b border-border">
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Type</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Correlation key</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Updated</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-3.5 py-8 text-center text-[12.5px] text-text-mute">
+                    No sagas found
+                  </td>
+                </tr>
+              ) : (
+                data.items.map((s) => (
+                  <tr key={s.id} className="border-b border-border last:border-b-0 hover:bg-panel-2/60">
+                    <td className="px-3.5 py-2 text-[12.5px] font-medium">{shortName(s.type)}</td>
+                    <td className="px-3.5 py-2 font-mono text-[12.5px]">
+                      <Link to={`/sagas/${s.id}`} className="text-primary hover:underline">
+                        {s.correlationKey}
+                      </Link>
+                    </td>
+                    <td className="px-3.5 py-2 text-[12.5px]"><RelativeTime date={s.updatedAt} /></td>
+                    <td className="px-3.5 py-2 text-[12.5px] text-text-mute"><RelativeTime date={s.createdAt} /></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
 
       <Pagination
         page={page}

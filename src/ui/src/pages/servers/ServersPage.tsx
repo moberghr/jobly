@@ -1,10 +1,12 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Panel, PanelHeader } from '@/components/v2/Panel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatBytes, serverStatusDotColor, isServerStale } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
+import { usePageStore } from '@/stores/page';
 import { Pause, Play } from 'lucide-react';
 import type { ServerModel } from '@/types';
 import { useServers, usePauseServer, useResumeServer } from '@/api/hooks/useServers';
@@ -13,6 +15,14 @@ export default function ServersPage() {
   const query = useServers();
   const pause = usePauseServer();
   const resume = useResumeServer();
+
+  useEffect(() => {
+    usePageStore.getState().set({
+      title: 'Servers',
+      subtitle: 'Connected worker servers and their status',
+    });
+    return () => usePageStore.getState().reset();
+  }, []);
 
   const handleTogglePause = (server: ServerModel) => {
     if (server.pausedAt) {
@@ -28,49 +38,47 @@ export default function ServersPage() {
   const servers = query.data;
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">Servers</h1>
-
+    <div className="flex flex-col gap-3 p-5">
       {servers.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
+        <Panel>
+          <div className="py-10 text-center text-[13px] text-text-mute">
             No servers connected
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       ) : (
-        <div className="space-y-4">
-          {servers.map((server) => (
-            <Card key={server.id}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <span className={`inline-block w-2 h-2 rounded-full ${serverStatusDotColor(server.lastHeartbeatTime, server.pausedAt)}`} />
-                    <Link to={`/servers/${server.id}`} className="text-primary hover:underline">
-                      {server.serverName}
-                    </Link>
-                    {server.pausedAt && <Badge variant="outline" className="text-amber-600 border-amber-300">Paused</Badge>}
-                    {isServerStale(server.lastHeartbeatTime) && <Badge variant="outline" className="text-red-600 border-red-300">Inactive</Badge>}
-                  </CardTitle>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>{server.serviceCount} workers</span>
-                    <span>CPU: {server.cpuUsagePercent != null ? `${server.cpuUsagePercent}%` : 'N/A'}</span>
-                    <span>Mem: {server.memoryWorkingSetBytes != null ? formatBytes(server.memoryWorkingSetBytes) : 'N/A'}</span>
-                    <span>Started <RelativeTime date={server.startedTime} /></span>
-                    <span>Heartbeat <RelativeTime date={server.lastHeartbeatTime} /></span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => { e.preventDefault(); handleTogglePause(server); }}
-                      title={server.pausedAt ? 'Resume server' : 'Pause server'}
-                    >
-                      {server.pausedAt ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-                    </Button>
-                  </div>
+        servers.map((server) => (
+          <Panel key={server.id}>
+            <PanelHeader
+              eyebrow={
+                <span className="flex items-center gap-2">
+                  <span className={`inline-block w-2 h-2 rounded-full ${serverStatusDotColor(server.lastHeartbeatTime, server.pausedAt)}`} />
+                  <Link to={`/servers/${server.id}`} className="text-primary hover:underline normal-case tracking-normal text-[13px] font-medium">
+                    {server.serverName}
+                  </Link>
+                  {server.pausedAt && <Badge variant="outline" className="text-amber-600 border-amber-300">Paused</Badge>}
+                  {isServerStale(server.lastHeartbeatTime) && <Badge variant="outline" className="text-red-600 border-red-300">Inactive</Badge>}
+                </span>
+              }
+              action={
+                <div className="flex items-center gap-4 text-[12.5px] text-text-mute">
+                  <span>{server.serviceCount} workers</span>
+                  <span>CPU: {server.cpuUsagePercent != null ? `${server.cpuUsagePercent}%` : 'N/A'}</span>
+                  <span>Mem: {server.memoryWorkingSetBytes != null ? formatBytes(server.memoryWorkingSetBytes) : 'N/A'}</span>
+                  <span>Started <RelativeTime date={server.startedTime} /></span>
+                  <span>Heartbeat <RelativeTime date={server.lastHeartbeatTime} /></span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => { e.preventDefault(); handleTogglePause(server); }}
+                    title={server.pausedAt ? 'Resume server' : 'Pause server'}
+                  >
+                    {server.pausedAt ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                  </Button>
                 </div>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
+              }
+            />
+          </Panel>
+        ))
       )}
     </div>
   );

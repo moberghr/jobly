@@ -13,17 +13,10 @@ import {
   type RowSelectionState,
 } from '@tanstack/react-table';
 import { toast } from 'sonner';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Panel } from '@/components/v2/Panel';
 import { StateBadge } from '@/components/StateBadge';
 import { Pagination } from '@/components/Pagination';
 import { shortType, shortId } from '@/utils/format';
@@ -36,13 +29,13 @@ import { queryScopes } from '@/lib/queryClient';
 import { ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react';
 
 const stateItems = [
-  { key: 'awaiting', label: 'Awaiting', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' },
-  { key: 'scheduled', label: 'Scheduled', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300' },
-  { key: 'enqueued', label: 'Enqueued', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
-  { key: 'processing', label: 'Processing', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
-  { key: 'completed', label: 'Completed', color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
-  { key: 'failed', label: 'Failed', color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
-  { key: 'deleted', label: 'Deleted', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' },
+  { key: 'awaiting', label: 'Awaiting' },
+  { key: 'scheduled', label: 'Scheduled' },
+  { key: 'enqueued', label: 'Enqueued' },
+  { key: 'processing', label: 'Processing' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'failed', label: 'Failed' },
+  { key: 'deleted', label: 'Deleted' },
 ];
 
 interface FilteredJobsTableProps {
@@ -145,7 +138,7 @@ export function FilteredJobsTable({ title, parentId, parentKind, fetchJobs, fetc
       accessorKey: 'createTime',
       header: 'Created',
       cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
+        <span className="text-[12.5px] text-text-mute">
           <RelativeTime date={row.original.createTime} />
         </span>
       ),
@@ -159,9 +152,9 @@ export function FilteredJobsTable({ title, parentId, parentKind, fetchJobs, fetc
       },
       cell: ({ row }) => (
         <div>
-          <div className="text-sm">{shortType(row.original.type)}</div>
+          <div className="text-[12.5px]">{shortType(row.original.type)}</div>
           {row.original.handlerType && (
-            <div className="text-xs text-muted-foreground">{shortType(row.original.handlerType)}</div>
+            <div className="text-[11px] text-text-mute">{shortType(row.original.handlerType)}</div>
           )}
         </div>
       ),
@@ -171,7 +164,7 @@ export function FilteredJobsTable({ title, parentId, parentKind, fetchJobs, fetc
       header: 'Id',
       enableSorting: false,
       cell: ({ row }) => (
-        <Link to={`/detail/${row.original.id}`} className="text-primary hover:underline font-mono text-xs">
+        <Link to={`/detail/${row.original.id}`} className="text-foreground hover:underline font-mono text-[11px]">
           {shortId(row.original.id)}
         </Link>
       ),
@@ -252,13 +245,13 @@ export function FilteredJobsTable({ title, parentId, parentKind, fetchJobs, fetc
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <h2 className="text-lg font-semibold">{title}</h2>
+        <h2 className="font-display text-[16px] font-semibold tracking-tight">{title}</h2>
         {Object.keys(counts).length > 0 && (
-          <span className="text-sm text-muted-foreground">({Object.values(counts).reduce((a, b) => a + b, 0)})</span>
+          <span className="text-[12.5px] text-text-mute">({Object.values(counts).reduce((a, b) => a + b, 0)})</span>
         )}
       </div>
       {countsError && (
-        <div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-1.5 mb-2">
+        <div className="text-[11px] text-warp-red bg-warp-red/10 border border-warp-red/20 rounded-md px-3 py-1.5 mb-2">
           Unable to refresh counts — showing last known data
         </div>
       )}
@@ -278,15 +271,15 @@ export function FilteredJobsTable({ title, parentId, parentKind, fetchJobs, fetc
                     setPage(0);
                   }
                 }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors text-left ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-[13px] transition-colors text-left ${
                   isActive
-                    ? 'bg-accent text-accent-foreground font-medium'
-                    : 'text-muted-foreground hover:bg-accent/50'
+                    ? 'bg-panel-2 text-foreground font-medium'
+                    : 'text-text-mute hover:bg-panel-2/60'
                 }`}
               >
                 <span>{item.label}</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  (counts[item.key] ?? 0) > 0 ? item.color : 'text-muted-foreground/50'
+                <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium tabular-nums ${
+                  (counts[item.key] ?? 0) > 0 ? `text-state-${item.key} bg-state-${item.key}-bg` : 'text-text-mute/50'
                 }`}>
                   {counts[item.key] ?? 0}
                 </span>
@@ -317,61 +310,70 @@ export function FilteredJobsTable({ title, parentId, parentKind, fetchJobs, fetc
                 )}
               </div>
 
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    {table.getHeaderGroups().map((hg) => (
-                      <TableRow key={hg.id}>
-                        {hg.headers.map((header) => {
-                          const canSort = header.column.getCanSort();
-                          const sorted = header.column.getIsSorted();
-                          return (
-                            <TableHead key={header.id}>
-                              {header.isPlaceholder ? null : canSort ? (
-                                <button
-                                  type="button"
-                                  onClick={header.column.getToggleSortingHandler()}
-                                  className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-                                >
-                                  {flexRender(header.column.columnDef.header, header.getContext())}
-                                  {sorted === 'asc' ? <ChevronUp className="h-3 w-3" /> : sorted === 'desc' ? <ChevronDown className="h-3 w-3" /> : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
-                                </button>
-                              ) : (
-                                flexRender(header.column.columnDef.header, header.getContext())
-                              )}
-                            </TableHead>
-                          );
-                        })}
-                      </TableRow>
-                    ))}
-                  </TableHeader>
-                  <TableBody>
-                    {table.getRowModel().rows.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={columns.length} className="text-center text-muted-foreground py-8">
-                          No jobs match the current filter.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      table.getRowModel().rows.map((row) => (
-                        <TableRow key={row.id} data-state={row.getIsSelected() ? 'selected' : undefined}>
-                          {row.getVisibleCells().map((cell) => (
-                            <TableCell key={cell.id}>
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+              <Panel className="overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      {table.getHeaderGroups().map((hg) => (
+                        <tr key={hg.id} className="bg-panel-2 border-b border-border">
+                          {hg.headers.map((header) => {
+                            const canSort = header.column.getCanSort();
+                            const sorted = header.column.getIsSorted();
+                            return (
+                              <th
+                                key={header.id}
+                                className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold"
+                              >
+                                {header.isPlaceholder ? null : canSort ? (
+                                  <button
+                                    type="button"
+                                    onClick={header.column.getToggleSortingHandler()}
+                                    className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                                  >
+                                    {flexRender(header.column.columnDef.header, header.getContext())}
+                                    {sorted === 'asc' ? <ChevronUp className="h-3 w-3" /> : sorted === 'desc' ? <ChevronDown className="h-3 w-3" /> : <ChevronsUpDown className="h-3 w-3 opacity-40" />}
+                                  </button>
+                                ) : (
+                                  flexRender(header.column.columnDef.header, header.getContext())
+                                )}
+                              </th>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </thead>
+                    <tbody>
+                      {table.getRowModel().rows.length === 0 ? (
+                        <tr>
+                          <td colSpan={columns.length} className="text-center text-text-mute py-8 text-[13px]">
+                            No jobs match the current filter.
+                          </td>
+                        </tr>
+                      ) : (
+                        table.getRowModel().rows.map((row) => (
+                          <tr
+                            key={row.id}
+                            data-state={row.getIsSelected() ? 'selected' : undefined}
+                            className="border-b border-border last:border-b-0 hover:bg-panel-2/60 data-[state=selected]:bg-panel-2"
+                          >
+                            {row.getVisibleCells().map((cell) => (
+                              <td key={cell.id} className="px-3.5 py-2 text-[12.5px]">
+                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              </td>
+                            ))}
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </Panel>
               {data.pageCount > 1 && (
                 <Pagination page={page} pageCount={data.pageCount} onPageChange={setPage} />
               )}
             </>
           ) : data ? (
-            <div className="text-sm text-muted-foreground py-4 text-center">
+            <div className="text-[13px] text-text-mute py-4 text-center">
               No jobs found
             </div>
           ) : (
@@ -392,10 +394,10 @@ interface BulkActionBarProps {
 
 function BulkActionBar({ selectedCount, onRequeue, onDelete, onClear }: BulkActionBarProps) {
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md">
-      <span className="text-sm font-medium">{selectedCount} selected</span>
+    <div className="flex items-center gap-2 px-3 py-1.5 bg-panel-2 border border-border rounded-md">
+      <span className="text-[12.5px] font-medium">{selectedCount} selected</span>
       <Button variant="outline" size="sm" onClick={onRequeue}>Requeue selected</Button>
-      <Button variant="outline" size="sm" className="text-destructive" onClick={onDelete}>Delete selected</Button>
+      <Button variant="outline" size="sm" className="text-warp-red" onClick={onDelete}>Delete selected</Button>
       <Button variant="ghost" size="sm" onClick={onClear}>Clear</Button>
     </div>
   );

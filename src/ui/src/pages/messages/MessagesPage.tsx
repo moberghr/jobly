@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Panel } from '@/components/v2/Panel';
 import { StateBadge } from '@/components/StateBadge';
 import { Pagination } from '@/components/Pagination';
 import { shortType, shortId } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
+import { usePageStore } from '@/stores/page';
 import { useMessagesList } from '@/api/hooks/useMessages';
 
 export default function MessagesPage() {
@@ -18,58 +19,62 @@ export default function MessagesPage() {
 
   const query = useMessagesList(state, page, pageSize);
 
+  useEffect(() => {
+    const title = state ? `${state.charAt(0).toUpperCase() + state.slice(1)} Messages` : 'Messages';
+    const subtitle = query.data ? `${query.data.totalCount} total` : undefined;
+    usePageStore.getState().set({ title, subtitle });
+    return () => usePageStore.getState().reset();
+  }, [state, query.data]);
+
   if (query.error) return <ErrorState message={(query.error as Error).message} />;
   if (!query.data) return <LoadingState />;
 
   const data = query.data;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">{state ? `${state.charAt(0).toUpperCase() + state.slice(1)} Messages` : 'Messages'}</h1>
-        <span className="text-sm text-muted-foreground">{data.totalCount} total</span>
-      </div>
-
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[100px]">ID</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Queue</TableHead>
-              <TableHead>State</TableHead>
-              <TableHead>Jobs</TableHead>
-              <TableHead>Created</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  No messages found
-                </TableCell>
-              </TableRow>
-            ) : (
-              data.items.map((msg) => (
-                <TableRow key={msg.id}>
-                  <TableCell className="font-mono text-xs">
-                    <Link to={`/detail/${msg.id}`} className="text-primary hover:underline">
-                      {shortId(msg.id)}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{msg.type ? shortType(msg.type) : '—'}</TableCell>
-                  <TableCell>{msg.queue ?? '—'}</TableCell>
-                  <TableCell><StateBadge state={msg.currentState} /></TableCell>
-                  <TableCell>{msg.totalJobs}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    <RelativeTime date={msg.createTime} />
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+    <div className="flex flex-col gap-3 p-5">
+      <Panel className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-panel-2 border-b border-border">
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold w-[100px]">ID</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Type</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Queue</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">State</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Jobs</th>
+                <th className="warp-eyebrow text-left px-3.5 py-2.5 text-text-mute font-semibold">Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-3.5 py-8 text-center text-[12.5px] text-text-mute">
+                    No messages found
+                  </td>
+                </tr>
+              ) : (
+                data.items.map((msg) => (
+                  <tr key={msg.id} className="border-b border-border last:border-b-0 hover:bg-panel-2/60">
+                    <td className="px-3.5 py-2 font-mono text-[12.5px]">
+                      <Link to={`/detail/${msg.id}`} className="text-primary hover:underline">
+                        {shortId(msg.id)}
+                      </Link>
+                    </td>
+                    <td className="px-3.5 py-2 text-[12.5px]">{msg.type ? shortType(msg.type) : '—'}</td>
+                    <td className="px-3.5 py-2 text-[12.5px]">{msg.queue ?? '—'}</td>
+                    <td className="px-3.5 py-2 text-[12.5px]"><StateBadge state={msg.currentState} /></td>
+                    <td className="px-3.5 py-2 text-[12.5px]">{msg.totalJobs}</td>
+                    <td className="px-3.5 py-2 text-[12.5px] text-text-mute">
+                      <RelativeTime date={msg.createTime} />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
 
       <Pagination page={page} pageCount={data.pageCount} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} />
     </div>

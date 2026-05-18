@@ -1,22 +1,22 @@
 import { AlertTriangle } from 'lucide-react';
 import type { FallbackProps } from 'react-error-boundary';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Panel } from '@/components/v2/Panel';
 
 export function RootErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
   const message = error instanceof Error ? error.message : String(error);
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-      <Card className="max-w-lg w-full">
-        <CardContent className="py-10 text-center space-y-4">
-          <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
+      <Panel className="max-w-lg w-full">
+        <div className="py-10 px-6 text-center space-y-4">
+          <AlertTriangle className="h-12 w-12 text-warp-red mx-auto" />
           <div className="space-y-1">
-            <p className="text-lg font-semibold">Something went wrong</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-[15px] font-semibold">Something went wrong</p>
+            <p className="text-[13px] text-text-mute">
               The dashboard hit an unexpected error. Reloading usually fixes it.
             </p>
           </div>
-          <pre className="text-xs text-left bg-muted rounded p-3 overflow-auto max-h-40">
+          <pre className="text-[11px] text-left bg-panel-2 rounded p-3 overflow-auto max-h-40">
             {message}
           </pre>
           <div className="flex gap-2 justify-center">
@@ -25,8 +25,8 @@ export function RootErrorFallback({ error, resetErrorBoundary }: FallbackProps) 
             </Button>
             <Button onClick={() => window.location.reload()}>Reload page</Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     </div>
   );
 }
