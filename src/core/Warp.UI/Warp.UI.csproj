@@ -9,8 +9,15 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<EmbeddedResource Include="dist/**/*" />
 		<EmbeddedResource Include="Extensions/Retry/dist/**/*" />
+	</ItemGroup>
+
+	<!-- VS builds skip BuildUI, so they need the dist glob resolved at
+	     project-load. CLI builds (Condition != VS) skip this include and
+	     instead let the BuildUI target include the freshly-built dist after
+	     npm runs — that avoids stale Vite content-hash filenames. -->
+	<ItemGroup Condition="'$(BuildingInsideVisualStudio)' == 'true'">
+		<EmbeddedResource Include="dist/**/*" />
 	</ItemGroup>
 
 	<!-- Rebuild React UI before embedding. Auto-bootstraps node_modules on first build
@@ -21,6 +28,12 @@
 
 	<Target Name="BuildUI" BeforeTargets="BeforeBuild" Condition="'$(BuildingInsideVisualStudio)' != 'true'">
 		<Exec Command="npm run build" WorkingDirectory="$(ProjectDir)..\..\ui" />
+		<!-- Include dist after Vite rebuilds. Vite emits content-hashed
+		     filenames that change with every build; resolving the glob here
+		     (target execution time, post-npm) captures the fresh names. -->
+		<ItemGroup>
+			<EmbeddedResource Include="dist/**/*" />
+		</ItemGroup>
 	</Target>
 
 	<ItemGroup>
