@@ -99,6 +99,36 @@ public interface IWarpSqlQueries<TContext>
         CancellationToken ct);
 
     /// <summary>
+    /// Acquires a row-level write lock on the <c>BackgroundServiceLease</c> row for
+    /// <paramref name="serviceName"/> within the caller's open transaction, and returns it as
+    /// a tracked entity (or <c>null</c> when no row exists yet). Uses <c>FOR UPDATE</c> (PG) /
+    /// <c>WITH (UPDLOCK, ROWLOCK)</c> (SQL Server) so concurrent callers serialise without
+    /// a TOCTOU window between the SELECT and the caller's subsequent INSERT/UPDATE.
+    /// <para>
+    /// Caller must have started a transaction before calling this method.
+    /// </para>
+    /// </summary>
+    Task<BackgroundServiceLease?> LockLeaseByServiceNameAsync(
+        TContext context,
+        string serviceName,
+        CancellationToken ct);
+
+    /// <summary>
+    /// Acquires a row-level write lock on the <c>BackgroundServiceDefinition</c> row for
+    /// <paramref name="serviceName"/> within the caller's open transaction, and returns it as
+    /// a tracked entity (or <c>null</c> when no row exists yet). Uses <c>FOR UPDATE</c> (PG) /
+    /// <c>WITH (UPDLOCK, ROWLOCK)</c> (SQL Server) so concurrent callers serialise without
+    /// a TOCTOU window between the SELECT and the caller's subsequent INSERT/UPDATE.
+    /// <para>
+    /// Caller must have started a transaction before calling this method.
+    /// </para>
+    /// </summary>
+    Task<BackgroundServiceDefinition?> LockDefinitionByServiceNameAsync(
+        TContext context,
+        string serviceName,
+        CancellationToken ct);
+
+    /// <summary>
     /// Runs <paramref name="work"/> inside a transaction under a transaction-scoped advisory
     /// lock keyed by <paramref name="lockKey"/>. PG uses <c>pg_try_advisory_xact_lock</c>; SQL
     /// Server uses <c>sp_getapplock</c> with <c>@LockOwner='Transaction'</c>. The lock auto-

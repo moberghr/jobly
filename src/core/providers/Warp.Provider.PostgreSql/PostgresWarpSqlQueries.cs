@@ -24,6 +24,8 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
     private readonly string _lockAllServersSql;
     private readonly string _heartbeatSql;
     private readonly string _activateScheduledJobsSql;
+    private readonly string? _lockLeaseByServiceNameSql;
+    private readonly string? _lockDefinitionByServiceNameSql;
 
     public PostgresWarpSqlQueries(WarpJobTableNames names)
     {
@@ -80,12 +82,53 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
             SELECT * FROM {serverTable}
             FOR NO KEY UPDATE";
 
-        // CTE+LEFT JOIN folds three queries (UPDATE server, SELECT server.paused_at,
-        // SELECT worker_group.id+paused_at) into ONE round-trip. The CTE runs the UPDATE and
-        // returns the post-update server row; the outer SELECT joins worker_group for this
-        // server. Cardinality: 0 rows if the server doesn't exist; max(1, # groups) rows
-        // otherwise (LEFT JOIN keeps the server row even with zero groups, with group_id = NULL).
-        _heartbeatSql = $@"
+        // CTE+LEFT JOIN folds the heartbeat UPDATE, the server paused_at read, AND the
+        // worker_group pause-state read into ONE round-trip. When the BackgroundServices addon
+        // is registered, two extra CTE members piggyback on the same round-trip:
+        //   • instance_bump — refreshes last_heartbeat_at on all instance rows for @me
+        //   • lease_renewed — extends lease_expires_at on active leases held by @me and
+        //                      returns the renewed service names so the Heartbeat task can
+        //                      detect lost leases (held last beat but not in this set).
+        // The TTL is baked in at construction time (from WarpJobTableNames.LeaseTtlSeconds) so
+        // no extra runtime parameter is needed — the interface signature stays unchanged.
+        // When the addon is absent, the extra CTEs are omitted and the result has no extra column.
+        if (_n.HasBackgroundServiceTables)
+        {
+            var instanceTable = QualifiedBackgroundServiceInstanceTable();
+            var leaseTable = QualifiedBackgroundServiceLeaseTable();
+            var ttlSeconds = _n.LeaseTtlSeconds;
+
+            _heartbeatSql = $@"
+            WITH heartbeat AS (
+                UPDATE {serverTable}
+                SET ""{_n.ServerLastHeartbeatTime}"" = {{1}},
+                    ""{_n.ServerMemoryWorkingSetBytes}"" = COALESCE({{2}}, ""{_n.ServerMemoryWorkingSetBytes}""),
+                    ""{_n.ServerCpuUsagePercent}"" = COALESCE({{3}}, ""{_n.ServerCpuUsagePercent}"")
+                WHERE ""{_n.ServerId}"" = {{0}}
+                RETURNING ""{_n.ServerId}"" AS id, ""{_n.ServerPausedAt}"" AS paused_at
+            ),
+            instance_bump AS (
+                UPDATE {instanceTable}
+                SET ""{_n.BackgroundServiceInstanceLastHeartbeatAt}"" = {{1}}
+                WHERE ""{_n.BackgroundServiceInstanceServerId}"" = {{0}}
+            ),
+            lease_renewed AS (
+                UPDATE {leaseTable}
+                SET ""{_n.BackgroundServiceLeaseExpiresAt}"" = {{1}} + interval '{ttlSeconds} seconds'
+                WHERE ""{_n.BackgroundServiceLeaseHolderServerId}"" = {{0}}
+                  AND ""{_n.BackgroundServiceLeaseExpiresAt}"" > {{1}}
+                RETURNING ""{_n.BackgroundServiceLeaseServiceName}"" AS service_name
+            )
+            SELECT h.paused_at AS server_paused_at,
+                   w.""{_n.WorkerGroupId}"" AS group_id,
+                   w.""{_n.WorkerGroupPausedAt}"" AS group_paused_at,
+                   (SELECT array_agg(service_name) FROM lease_renewed) AS renewed_leases
+            FROM heartbeat h
+            LEFT JOIN {QualifiedWorkerGroupTable()} w ON w.""{_n.WorkerGroupServerId}"" = h.id";
+        }
+        else
+        {
+            _heartbeatSql = $@"
             WITH heartbeat AS (
                 UPDATE {serverTable}
                 SET ""{_n.ServerLastHeartbeatTime}"" = {{1}},
@@ -99,6 +142,7 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
                    w.""{_n.WorkerGroupPausedAt}"" AS group_paused_at
             FROM heartbeat h
             LEFT JOIN {QualifiedWorkerGroupTable()} w ON w.""{_n.WorkerGroupServerId}"" = h.id";
+        }
 
         // Atomic activation: UPDATE ... RETURNING queue flips due rows AND streams back the
         // queue names so the caller can fire one JobEnqueued notification per distinct queue.
@@ -109,6 +153,24 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
             WHERE ""{_n.CurrentState}"" = {(int)State.Scheduled}
               AND ""{_n.ScheduleTime}"" <= {{0}}
             RETURNING ""{_n.Queue}""";
+
+        // BackgroundService row-lock queries — only built when the addon is registered.
+        // FOR UPDATE (no SKIP LOCKED) so concurrent callers block and serialise, eliminating
+        // the TOCTOU window between SELECT and the caller's INSERT/UPDATE (§1.4).
+        if (_n.HasBackgroundServiceTables)
+        {
+            var leaseTable = QualifiedBackgroundServiceLeaseTable();
+            _lockLeaseByServiceNameSql = $@"
+                SELECT * FROM {leaseTable}
+                WHERE ""{_n.BackgroundServiceLeaseServiceName}"" = {{0}}
+                FOR NO KEY UPDATE";
+
+            var defTable = QualifiedBackgroundServiceDefinitionTable();
+            _lockDefinitionByServiceNameSql = $@"
+                SELECT * FROM {defTable}
+                WHERE ""{_n.BackgroundServiceDefinitionName}"" = {{0}}
+                FOR NO KEY UPDATE";
+        }
     }
 
     public async Task<List<Job>> ClaimEnqueuedJobsAsync(
@@ -163,9 +225,12 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
         double? cpuPercent,
         CancellationToken ct)
     {
-        // Raw ADO.NET: the CTE+JOIN returns a flat (server_paused_at, group_id, group_paused_at)
-        // shape that doesn't match any single EF entity. Issuing the command directly avoids
-        // contorting EF Core into materializing this composite result.
+        // Raw ADO.NET: the CTE+JOIN returns a flat (server_paused_at, group_id, group_paused_at
+        // [, renewed_leases]) shape that doesn't match any single EF entity. Issuing the command
+        // directly avoids contorting EF Core into materializing this composite result.
+        // When the BackgroundServices addon is registered, the SQL also updates instance
+        // last_heartbeat_at and renews held leases in the same round-trip (TTL baked in at
+        // construction time from WarpJobTableNames.LeaseTtlSeconds).
         var conn = context.Database.GetDbConnection();
         var openedHere = conn.State != System.Data.ConnectionState.Open;
         if (openedHere)
@@ -191,6 +256,7 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             DateTime? serverPausedAt = null;
             var groupPaused = new Dictionary<Guid, bool>();
+            var renewedLeases = new List<string>();
             var anyRow = false;
             while (await reader.ReadAsync(ct))
             {
@@ -207,9 +273,21 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
                     var groupIsPaused = !await reader.IsDBNullAsync(2, ct);
                     groupPaused[groupId] = groupIsPaused;
                 }
+
+                // Column 3 (renewed_leases array) is present only when the BackgroundServices
+                // addon is registered. When present it is NULL when no leases were renewed this beat.
+                if (_n.HasBackgroundServiceTables && !await reader.IsDBNullAsync(3, ct))
+                {
+                    // Npgsql returns a PostgreSQL array column as string[] when the element type is text.
+                    var raw = reader.GetValue(3);
+                    if (raw is string[] names)
+                    {
+                        renewedLeases.AddRange(names);
+                    }
+                }
             }
 
-            return anyRow ? new HeartbeatResult(serverPausedAt, groupPaused) : null;
+            return anyRow ? new HeartbeatResult(serverPausedAt, groupPaused, renewedLeases) : null;
         }
         finally
         {
@@ -341,5 +419,56 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
         return string.IsNullOrEmpty(_n.WorkerGroupSchema)
             ? $"\"{_n.WorkerGroupTable}\""
             : $"\"{_n.WorkerGroupSchema}\".\"{_n.WorkerGroupTable}\"";
+    }
+
+    private string QualifiedBackgroundServiceInstanceTable()
+    {
+        return string.IsNullOrEmpty(_n.BackgroundServiceSchema)
+            ? $"\"{_n.BackgroundServiceInstanceTable}\""
+            : $"\"{_n.BackgroundServiceSchema}\".\"{_n.BackgroundServiceInstanceTable}\"";
+    }
+
+    private string QualifiedBackgroundServiceLeaseTable()
+    {
+        return string.IsNullOrEmpty(_n.BackgroundServiceSchema)
+            ? $"\"{_n.BackgroundServiceLeaseTable}\""
+            : $"\"{_n.BackgroundServiceSchema}\".\"{_n.BackgroundServiceLeaseTable}\"";
+    }
+
+    private string QualifiedBackgroundServiceDefinitionTable()
+    {
+        return string.IsNullOrEmpty(_n.BackgroundServiceSchema)
+            ? $"\"{_n.BackgroundServiceDefinitionTable}\""
+            : $"\"{_n.BackgroundServiceSchema}\".\"{_n.BackgroundServiceDefinitionTable}\"";
+    }
+
+    public async Task<BackgroundServiceLease?> LockLeaseByServiceNameAsync(
+        TContext context,
+        string serviceName,
+        CancellationToken ct)
+    {
+        if (_lockLeaseByServiceNameSql == null)
+        {
+            throw new InvalidOperationException("BackgroundServices addon is not registered in this deployment.");
+        }
+
+        return await context.Set<BackgroundServiceLease>()
+            .FromSqlRaw(_lockLeaseByServiceNameSql, serviceName)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<BackgroundServiceDefinition?> LockDefinitionByServiceNameAsync(
+        TContext context,
+        string serviceName,
+        CancellationToken ct)
+    {
+        if (_lockDefinitionByServiceNameSql == null)
+        {
+            throw new InvalidOperationException("BackgroundServices addon is not registered in this deployment.");
+        }
+
+        return await context.Set<BackgroundServiceDefinition>()
+            .FromSqlRaw(_lockDefinitionByServiceNameSql, serviceName)
+            .FirstOrDefaultAsync(ct);
     }
 }

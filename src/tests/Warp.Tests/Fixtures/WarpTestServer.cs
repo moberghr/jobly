@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using Warp.Core;
+using Warp.Core.BackgroundServices;
 using Warp.Core.CircuitBreaker;
 using Warp.Core.Concurrency;
 using Warp.Core.Data.Entities;
@@ -314,6 +316,49 @@ public class WarpTestServer : IAsyncDisposable
         return new WarpTestServer(host, fixture, jobLogObserver);
     }
 
+    /// <summary>
+    /// Starts a test server with a <see cref="FakeTimeProvider"/> injected as the
+    /// <see cref="TimeProvider"/> singleton. Because fake-time advances also age out
+    /// <c>LastKeepAlive</c> and <c>LastHeartbeatTime</c>, the following background tasks are
+    /// fully disabled so a time jump doesn't trigger spurious side-effects:
+    /// <list type="bullet">
+    ///   <item><c>StaleJobRecovery</c> (disabled via <c>StaleJobRecoveryInterval = null</c>)</item>
+    ///   <item><c>ServerCleanup</c> (disabled via <c>ServerCleanupInterval = null</c>) — prevents
+    ///     cascade-delete of <c>BackgroundServiceInstance</c> / <c>BackgroundServiceLease</c> rows
+    ///     when fake time is advanced past <c>HealthCheckTimeout</c></item>
+    ///   <item><c>Heartbeat</c> (disabled via <c>HealthCheckInterval = null</c>)</item>
+    /// </list>
+    /// <c>InvisibilityTimeout</c> and <c>HealthCheckTimeout</c> are set to 365 days so that even
+    /// if a residual server-task poll fires, no stale-detection logic triggers.
+    /// <para>
+    /// Call <c>time.Advance(TimeSpan)</c> in the test to drive supervisor or timeout-pipeline
+    /// timing forward without any real wall-clock dependency.
+    /// </para>
+    /// </summary>
+    public static Task<WarpTestServer> StartWithFakeTime(
+        IDatabaseFixture fixture,
+        FakeTimeProvider time,
+        Action<WarpWorkerBuilder<TestContext>>? configure = null,
+        Action<IServiceCollection>? configureServices = null)
+    {
+        return StartAsync(
+            fixture,
+            configure: cfg =>
+            {
+                cfg.StaleJobRecoveryInterval = null;
+                cfg.InvisibilityTimeout = TimeSpan.FromDays(365);
+                cfg.ServerCleanupInterval = null;
+                cfg.HealthCheckInterval = null;
+                cfg.HealthCheckTimeout = TimeSpan.FromDays(365);
+                configure?.Invoke(cfg);
+            },
+            configureServices: services =>
+            {
+                services.AddSingleton<TimeProvider>(time);
+                configureServices?.Invoke(services);
+            });
+    }
+
     public async Task WaitForJobState(Guid jobId, State state, TimeSpan? timeout = null)
     {
         // Default 5s — with idle backoff disabled (see WarpTestServer.StartAsync), worker
@@ -455,6 +500,104 @@ public class WarpTestServer : IAsyncDisposable
             .Where(x => x.Id == jobId)
             .AsNoTracking()
             .FirstAsync(Xunit.TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    /// Polls until the <c>BackgroundServiceInstance</c> row for <paramref name="serviceName"/>
+    /// on this server has the expected <paramref name="status"/>, or throws
+    /// <see cref="TimeoutException"/> if not reached within <paramref name="timeout"/>.
+    /// Use instead of <c>Task.Delay</c> for deterministic state-transition assertions.
+    /// </summary>
+    public async Task WaitForBackgroundServiceState(
+        string serviceName,
+        BackgroundServiceStatus status,
+        TimeSpan? timeout = null)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(8);
+        var deadline = DateTime.UtcNow + effectiveTimeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var ctx = CreateContext();
+            var current = await ctx.Set<BackgroundServiceInstance>()
+                .Where(x => x.ServerId == ServerId)
+                .Where(x => x.ServiceName == serviceName)
+                .Select(x => (BackgroundServiceStatus?)x.Status)
+                .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
+
+            if (current == status)
+            {
+                return;
+            }
+
+            await Task.Delay(50, Xunit.TestContext.Current.CancellationToken);
+        }
+
+        var ctx2 = CreateContext();
+        var finalStatus = await ctx2.Set<BackgroundServiceInstance>()
+            .Where(x => x.ServerId == ServerId)
+            .Where(x => x.ServiceName == serviceName)
+            .Select(x => (BackgroundServiceStatus?)x.Status)
+            .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
+
+        throw new TimeoutException(
+            $"BackgroundService '{serviceName}' on server {ServerId} did not reach status {status} within {effectiveTimeout}. " +
+            $"Current status: {finalStatus?.ToString() ?? "row not found"}");
+    }
+
+    /// <summary>
+    /// Polls until the <c>BackgroundServiceInstance</c> row for <paramref name="serviceName"/>
+    /// on this server no longer exists, or throws <see cref="TimeoutException"/>.
+    /// Use instead of <c>Task.Delay</c> when asserting graceful-shutdown row deletion.
+    /// </summary>
+    public async Task WaitForBackgroundServiceDeleted(string serviceName, TimeSpan? timeout = null)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(8);
+        var deadline = DateTime.UtcNow + effectiveTimeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var ctx = CreateContext();
+            var exists = await ctx.Set<BackgroundServiceInstance>()
+                .Where(x => x.ServerId == ServerId)
+                .Where(x => x.ServiceName == serviceName)
+                .AnyAsync(Xunit.TestContext.Current.CancellationToken);
+
+            if (!exists)
+            {
+                return;
+            }
+
+            await Task.Delay(50, Xunit.TestContext.Current.CancellationToken);
+        }
+
+        throw new TimeoutException(
+            $"BackgroundService '{serviceName}' instance row on server {ServerId} was not deleted within {effectiveTimeout}");
+    }
+
+    /// <summary>
+    /// Polls the provided <paramref name="condition"/> at a tight cadence until it returns
+    /// <see langword="true"/> or <paramref name="timeout"/> expires.
+    /// Use for predicate checks that have no dedicated signal (e.g. DB log-row accumulation).
+    /// Note: a signal-driven approach is preferred where available — this is a fallback for
+    /// cases where the collector flush completes asynchronously without a test-visible signal.
+    /// </summary>
+    public static async Task WaitUntil(
+        Func<Task<bool>> condition,
+        TimeSpan? timeout = null,
+        CancellationToken ct = default)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(10);
+        var deadline = DateTime.UtcNow + effectiveTimeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await condition())
+            {
+                return;
+            }
+
+            await Task.Delay(50, ct);
+        }
+
+        throw new TimeoutException($"Condition was not satisfied within {effectiveTimeout}");
     }
 
     public async ValueTask DisposeAsync()

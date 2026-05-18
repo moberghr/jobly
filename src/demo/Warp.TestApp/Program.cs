@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Warp.Core;
+using Warp.Core.BackgroundServices;
 using Warp.Core.Concurrency;
 using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
@@ -11,6 +12,7 @@ using Warp.Core.Sagas;
 using Warp.Http;
 using Warp.Provider.PostgreSql;
 using Warp.Test.Shared;
+using Warp.Test.Shared.Handlers.BackgroundServices;
 using Warp.Test.Shared.Handlers.Sagas;
 using Warp.UI;
 using Warp.UI.DashboardPush;
@@ -73,6 +75,13 @@ builder.Services.AddWarpWorker<TestContext>(options =>
         group.Queues = ["reports", "analytics"];
         group.PollingInterval = TimeSpan.FromSeconds(5);
     });
+
+    // Demo background services — visible under /warp/services on the dashboard. The first
+    // service runs once on every host (per-server scope). The second uses singleton scope —
+    // one host across the cluster holds the lease and reports job stats every 10 seconds.
+    // Watch the lease panel on the detail page to see which host currently holds it.
+    options.AddBackgroundService<TestContext, TickCounterService>();
+    options.AddBackgroundService<TestContext, JobStatsLoggerService>();
 });
 builder.Services.AddSagaHandler<OrderSagaWorkflow>();
 
@@ -599,7 +608,14 @@ async Task Migrate()
 {
     await using var scope = app!.Services.CreateAsyncScope();
     var ctx = scope.ServiceProvider.GetRequiredService<TestContext>();
-    await ctx.Database.EnsureDeletedAsync();
+
+    // Set WARP_DEMO_PRESERVE_DB=1 to skip the wipe (useful for multi-host demos where
+    // another worker already has registered state in the DB).
+    if (!string.Equals(Environment.GetEnvironmentVariable("WARP_DEMO_PRESERVE_DB"), "1", StringComparison.Ordinal))
+    {
+        await ctx.Database.EnsureDeletedAsync();
+    }
+
     await ctx.Database.EnsureCreatedAsync();
 }
 

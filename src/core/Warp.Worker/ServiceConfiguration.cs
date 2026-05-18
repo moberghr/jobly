@@ -5,8 +5,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Warp.Core;
+using Warp.Core.BackgroundServices;
 using Warp.Core.Events;
 using Warp.Core.Logging;
+using Warp.Worker.BackgroundServices;
 using Warp.Worker.Services;
 
 namespace Warp.Worker;
@@ -69,9 +71,18 @@ public static class ServiceConfiguration
         // Warp.Provider.SqlServer) via their UsePostgreSql / UseSqlServer builder extensions.
         // If the user never calls one, IWarpLockProvider resolution fails fast the first time
         // a lock is requested.
+        // Background-service coordination services. Registered here because the implementations
+        // inject IOptions<WarpWorkerConfiguration> (for ServerId) which lives in Warp.Worker.
+        // Interfaces are defined in Warp.Core.BackgroundServices; these TryAddScoped registrations
+        // are idempotent — a second AddWarpWorker<TContext> call skips them.
+        services.TryAddScoped<IBackgroundServiceStateService, BackgroundServiceStateService<TContext>>();
+        services.TryAddScoped<IBackgroundServiceLeaseCoordinator, BackgroundServiceLeaseCoordinator<TContext>>();
+        services.TryAddScoped<IBackgroundServiceLogStore, BackgroundServiceLogStore<TContext>>();
+
         services.AddSingleton<ServerRegistrationState>();
         services.AddSingleton<ServerTaskSignals<TContext>>();
         services.AddSingleton<ProcessCpuTracker>();
+        services.AddSingleton<HeartbeatLeaseTracker>();
         services.AddScoped<IServerTask, Heartbeat<TContext>>();
         services.AddScoped<IServerTask, ServerCleanup<TContext>>();
         services.AddScoped<IServerTask, StaleJobRecovery<TContext>>();
@@ -85,6 +96,22 @@ public static class ServiceConfiguration
         services.AddHostedService<WarpDispatcherHost<TContext>>();
         services.AddHostedService<WarpSingleWorkerHost<TContext>>();
         services.AddHostedService<ServerTaskHost<TContext>>();
+
+        // BackgroundServiceHost is registered only once per TContext. Multiple
+        // AddWarpWorker<TContext> calls (e.g. via AddBackgroundService inside tests) are
+        // safe — the guard prevents duplicate hosted-service registrations.
+        if (!services.Any(d =>
+                d.ServiceType == typeof(IHostedService)
+                && d.ImplementationType == typeof(BackgroundServiceHost<TContext>)))
+        {
+            services.AddHostedService<BackgroundServiceHost<TContext>>();
+        }
+
+        // The null observer is the production default — no-op singleton so that
+        // BackgroundServiceHost can always resolve IBackgroundServiceStatusObserver
+        // regardless of whether AddBackgroundService has been called. Tests replace it with
+        // a TestStatusObserver registered AFTER AddWarpWorker (the last AddSingleton wins).
+        services.TryAddSingleton<IBackgroundServiceStatusObserver, NullBackgroundServiceStatusObserver>();
 
         return services;
     }

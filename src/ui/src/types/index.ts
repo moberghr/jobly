@@ -328,4 +328,17 @@ export interface WarpAddonsInfo {
   rateLimits: boolean;
   push: boolean;
   sagas: boolean;
+  services: boolean;
 }
+
+export type {
+  ServiceScope,
+  BackgroundServiceStatus,
+  BackgroundServiceLogSource,
+  LogLevel,
+  BackgroundServiceListItem,
+  BackgroundServiceInstance,
+  BackgroundServiceDetail,
+  BackgroundServiceLeaseDto,
+  BackgroundServiceLogDto,
+} from './backgroundServices';

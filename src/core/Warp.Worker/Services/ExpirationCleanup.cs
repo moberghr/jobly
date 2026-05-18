@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Warp.Core.BackgroundServices;
 using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
 
@@ -16,15 +17,18 @@ public sealed class ExpirationCleanup<TContext> : IServerTask
     private readonly TContext _context;
     private readonly TimeProvider _time;
     private readonly WarpWorkerConfiguration _configuration;
+    private readonly IEnumerable<WarpBackgroundService> _backgroundServices;
 
     public ExpirationCleanup(
         TContext context,
         TimeProvider time,
-        IOptions<WarpWorkerConfiguration> configuration)
+        IOptions<WarpWorkerConfiguration> configuration,
+        IEnumerable<WarpBackgroundService>? backgroundServices = null)
     {
         _context = context;
         _time = time;
         _configuration = configuration.Value;
+        _backgroundServices = backgroundServices ?? [];
     }
 
     public string Name => "ExpirationCleanup";
@@ -41,6 +45,7 @@ public sealed class ExpirationCleanup<TContext> : IServerTask
             : 0;
 
         await CleanupRecurringJobLogsAsync(ct);
+        await CleanupBackgroundServiceLogsAsync(ct);
 
         var total = timeExpired + countCleaned;
         if (total == 0)
@@ -200,6 +205,107 @@ public sealed class ExpirationCleanup<TContext> : IServerTask
 
             await _context.Set<RecurringJobLog>()
                 .Where(l => l.RecurringJobId == recurringJobId && !idsToKeep.Contains(l.Id))
+                .ExecuteDeleteAsync(ct);
+        }
+    }
+
+    internal async Task CleanupBackgroundServiceLogsAsync(CancellationToken ct)
+    {
+        // BackgroundServiceLog is only in the model when AddBackgroundService<T>() was called.
+        // Deployments without the addon must not throw — skip silently.
+        if (_context.Model.FindEntityType(typeof(BackgroundServiceLog)) == null)
+        {
+            return;
+        }
+
+        var globalRetentionCount = _configuration.BackgroundServiceLogRetentionCount;
+        var globalRetentionAge = _configuration.BackgroundServiceLogRetentionAge;
+        var now = _time.GetUtcNow().UtcDateTime;
+
+        // Build per-service retention overrides keyed by Name. When a service supplies
+        // an override, it takes precedence over the global WarpWorkerConfiguration value.
+        var perServiceCount = new Dictionary<string, int>(StringComparer.Ordinal);
+        var perServiceAge = new Dictionary<string, TimeSpan>(StringComparer.Ordinal);
+
+        foreach (var service in _backgroundServices)
+        {
+            if (service.LogRetentionCountOverride.HasValue)
+            {
+                perServiceCount[service.Name] = service.LogRetentionCountOverride.Value;
+            }
+
+            if (service.LogRetentionAgeOverride.HasValue)
+            {
+                perServiceAge[service.Name] = service.LogRetentionAgeOverride.Value;
+            }
+        }
+
+        // Find all (ServerId, ServiceName) pairs that have any rows. We filter by count
+        // inside the loop using the resolved per-service retention value.
+        var allInstances = await _context.Set<BackgroundServiceLog>()
+            .GroupBy(l => new { l.ServerId, l.ServiceName })
+            .Select(g => new { g.Key.ServerId, g.Key.ServiceName, Count = g.Count() })
+            .ToListAsync(ct);
+
+        foreach (var instance in allInstances)
+        {
+            var retentionCount = perServiceCount.TryGetValue(instance.ServiceName, out var overrideCount)
+                ? overrideCount
+                : globalRetentionCount;
+
+            if (instance.Count <= retentionCount)
+            {
+                continue;
+            }
+
+            // Find the Id of the Nth-most-recent entry (1-based: retain top retentionCount rows).
+            var cutoffId = await _context.Set<BackgroundServiceLog>()
+                .Where(l => l.ServerId == instance.ServerId)
+                .Where(l => l.ServiceName == instance.ServiceName)
+                .OrderByDescending(l => l.Id)
+                .Skip(retentionCount)
+                .Select(l => l.Id)
+                .FirstOrDefaultAsync(ct);
+
+            if (cutoffId != 0)
+            {
+                await _context.Set<BackgroundServiceLog>()
+                    .Where(l => l.ServerId == instance.ServerId)
+                    .Where(l => l.ServiceName == instance.ServiceName)
+                    .Where(l => l.Id <= cutoffId)
+                    .ExecuteDeleteAsync(ct);
+            }
+        }
+
+        // Age-based sweep — per-service age override applies when present; otherwise falls
+        // back to the global retention age. Runs independently of the count cap.
+        var serviceNamesWithAgeOverride = perServiceAge.Keys.ToList();
+
+        if (serviceNamesWithAgeOverride.Count > 0)
+        {
+            // Delete rows for services without an age override using the global cutoff.
+            var globalAgeCutoff = now.Subtract(globalRetentionAge);
+            await _context.Set<BackgroundServiceLog>()
+                .Where(l => !serviceNamesWithAgeOverride.Contains(l.ServiceName))
+                .Where(l => l.Timestamp < globalAgeCutoff)
+                .ExecuteDeleteAsync(ct);
+
+            // For each service with an age override, apply its specific cutoff.
+            foreach (var (serviceName, overrideAge) in perServiceAge)
+            {
+                var overrideAgeCutoff = now.Subtract(overrideAge);
+                await _context.Set<BackgroundServiceLog>()
+                    .Where(l => l.ServiceName == serviceName)
+                    .Where(l => l.Timestamp < overrideAgeCutoff)
+                    .ExecuteDeleteAsync(ct);
+            }
+        }
+        else
+        {
+            // No age overrides — single sweep with the global cutoff.
+            var ageCutoff = now.Subtract(globalRetentionAge);
+            await _context.Set<BackgroundServiceLog>()
+                .Where(l => l.Timestamp < ageCutoff)
                 .ExecuteDeleteAsync(ct);
         }
     }
