@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ReactFlow,
@@ -20,7 +20,7 @@ import { LoadingState, ErrorState } from '@/components/PageState';
 import { Briefcase, Mail, Layers } from 'lucide-react';
 import type { State } from '@/types';
 import type { TraceJobModel } from '@/types';
-import * as api from '@/api';
+import { useTrace } from '@/api/hooks/useTrace';
 
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 72;
@@ -298,8 +298,6 @@ function buildGraph(jobs: TraceJobModel[], highlightId?: string): { nodes: Node[
 
 export default function TracePage() {
   const { traceId: rawTraceId, highlightId } = useParams<{ traceId: string; highlightId?: string }>();
-  const [jobs, setJobs] = useState<TraceJobModel[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
 
   // Normalize: accept both "4bf92f3577b34da6a3ce929d0e0e4736" and "4bf92f35-77b3-4da6-a3ce-929d0e0e4736"
@@ -310,11 +308,9 @@ export default function TracePage() {
   // Display without dashes (W3C format)
   const traceIdDisplay = traceId?.replace(/-/g, '') ?? '';
 
-  useEffect(() => {
-    if (traceId) {
-      api.getTraceTree(traceId).then(setJobs).catch(() => setError('Unable to load trace'));
-    }
-  }, [traceId]);
+  const query = useTrace(traceId);
+  const jobs: TraceJobModel[] | null = query.data ?? null;
+  const error = query.error;
 
   const { nodes, edges } = useMemo(() => {
     if (!jobs || jobs.length === 0) return { nodes: [], edges: [] };
@@ -363,7 +359,7 @@ export default function TracePage() {
     };
   }, [nodes, edges, hoveredEdge]);
 
-  if (error) return <ErrorState message={error} />;
+  if (error) return <ErrorState message={(error as Error).message} />;
   if (!jobs) return <LoadingState />;
 
   return (

@@ -17,7 +17,9 @@ interface DashboardStore {
   sampleRate: () => void;
 }
 
-const WINDOW_SIZE = 60;
+// Buffer up to 1 hour of per-second samples so RealtimeChart can render any
+// window between 1m and 1h without losing historical data.
+const WINDOW_SIZE = 3600;
 
 export const useDashboardStore = create<DashboardStore>((set, get) => {
   // Tracks the totalSucceeded/totalFailed values at the last *rate sample*.

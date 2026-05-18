@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,60 +9,51 @@ import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
-import type { RecurringJobDetailModel, RecurringJobHistoryModel, PagedList } from '@/types';
-import * as api from '@/api';
+import {
+  useRecurringDetail,
+  useRecurringJobs,
+  useEnableRecurringJob,
+  useDisableRecurringJob,
+  useTriggerRecurringJob,
+  useDeleteRecurringJob,
+} from '@/api/hooks/useRecurring';
 
 export default function RecurringDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [detail, setDetail] = useState<RecurringJobDetailModel | null>(null);
-  const [jobs, setJobs] = useState<PagedList<RecurringJobHistoryModel> | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const numericId = id !== undefined ? Number(id) : undefined;
+
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
 
-  useEffect(() => {
-    if (id) {
-      api.getRecurringJobById(Number(id)).then(setDetail).catch(() => setError('Unable to load recurring job'));
-    }
-  }, [id]);
+  const detailQuery = useRecurringDetail(numericId);
+  const jobsQuery = useRecurringJobs(numericId, page, pageSize);
 
-  const fetchJobs = useCallback(async () => {
-    if (id) {
-      try {
-        const result = await api.getRecurringJobJobs(Number(id), page, pageSize);
-        setJobs(result);
-      } catch {
-        // Jobs loading failure is non-critical
-      }
-    }
-  }, [id, page, pageSize]);
+  const enableJob = useEnableRecurringJob();
+  const disableJob = useDisableRecurringJob();
+  const triggerJob = useTriggerRecurringJob();
+  const deleteJob = useDeleteRecurringJob();
 
-  useEffect(() => { fetchJobs(); }, [fetchJobs]);
+  if (detailQuery.error) return <ErrorState message={(detailQuery.error as Error).message} />;
+  if (!detailQuery.data) return <LoadingState />;
 
-  if (error) return <ErrorState message={error} />;
-  if (!detail) return <LoadingState />;
+  const detail = detailQuery.data;
+  const jobs = jobsQuery.data ?? null;
 
-  const handleToggleEnabled = async () => {
+  const handleToggleEnabled = () => {
     if (detail.disabledAt) {
-      await api.enableRecurringJob(detail.id);
+      enableJob.mutate(detail.id);
     } else {
-      await api.disableRecurringJob(detail.id);
+      disableJob.mutate(detail.id);
     }
-    const updated = await api.getRecurringJobById(detail.id);
-    setDetail(updated);
   };
 
-  const handleTrigger = async () => {
-    await api.triggerRecurringJob(detail.id);
-    const updated = await api.getRecurringJobById(detail.id);
-    setDetail(updated);
-    fetchJobs();
+  const handleTrigger = () => {
+    triggerJob.mutate(detail.id);
   };
 
-  const handleDelete = async () => {
-    await api.deleteRecurringJob(detail.id);
-    navigate('/recurring');
+  const handleDelete = () => {
+    deleteJob.mutate(detail.id, { onSuccess: () => navigate('/recurring') });
   };
 
   return (

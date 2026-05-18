@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,8 +8,7 @@ import { LoadingState, ErrorState } from '@/components/PageState';
 import { Badge } from '@/components/ui/badge';
 import { shortId, shortType } from '@/utils/format';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
-import type { WorkerDetailModel, WorkerJobLogModel, PagedList } from '@/types';
-import * as api from '@/api';
+import { useWorkerDetail, useWorkerLogs } from '@/api/hooks/useServers';
 
 const eventColors: Record<string, string> = {
   Processing: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
@@ -28,32 +27,18 @@ const levelColors: Record<string, string> = {
 
 export default function WorkerDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [worker, setWorker] = useState<WorkerDetailModel | null>(null);
-  const [data, setData] = useState<PagedList<WorkerJobLogModel> | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
 
-  useEffect(() => {
-    if (!id) return;
-    api.getWorkerById(id).then(setWorker).catch(() => {});
-  }, [id]);
+  const workerQuery = useWorkerDetail(id);
+  const logsQuery = useWorkerLogs(id, page, pageSize);
 
-  const fetchData = useCallback(async () => {
-    if (!id) return;
-    try {
-      const result = await api.getWorkerJobLogs(id, page, pageSize);
-      setData(result);
-      setError(null);
-    } catch {
-      setError('Unable to load worker logs');
-    }
-  }, [id, page, pageSize]);
+  const worker = workerQuery.data ?? null;
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  if (logsQuery.error) return <ErrorState message={(logsQuery.error as Error).message} />;
+  if (!logsQuery.data) return <LoadingState />;
 
-  if (error) return <ErrorState message={error} />;
-  if (!data) return <LoadingState />;
+  const data = logsQuery.data;
 
   return (
     <div>
