@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -56,11 +57,21 @@ export default defineConfig(({ mode }) => {
       outDir: '../core/Warp.UI/dist',
       emptyOutDir: true,
     },
+    test: {
+      environment: 'jsdom',
+      globals: true,
+      setupFiles: ['./src/test/setup.ts'],
+      include: ['src/**/*.{test,spec}.{ts,tsx}'],
+      css: false,
+    },
     server: isDemo
       ? {}
       : {
           proxy: {
-            '/warp': 'http://localhost:5104',
+            '/warp': {
+              target: 'http://localhost:5104',
+              ws: true,
+            },
           },
         },
   }

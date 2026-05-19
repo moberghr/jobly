@@ -147,7 +147,9 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             .Select(x => new { x.CurrentWorkerId, x.Id, x.Type })
             .ToListAsync();
 
-        var jobByWorker = processingJobs.ToDictionary(j => j.CurrentWorkerId!.Value);
+        var jobByWorker = processingJobs
+            .GroupBy(j => j.CurrentWorkerId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
 
         var workersByServer = workers
             .GroupBy(w => w.ServerId)
@@ -205,7 +207,9 @@ public class DashboardStatsService<TContext> : IDashboardStatsService
             .Select(x => new { x.CurrentWorkerId, x.Id, x.Type })
             .ToListAsync();
 
-        var jobByWorker = processingJobs.ToDictionary(j => j.CurrentWorkerId!.Value);
+        var jobByWorker = processingJobs
+            .GroupBy(j => j.CurrentWorkerId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
 
         return new ServerModel
         {

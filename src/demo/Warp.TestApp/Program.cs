@@ -21,7 +21,16 @@ using Warp.UI.Extensions.Retry;
 using Warp.UI.UIMiddleware;
 using Warp.Worker;
 
-var builder = WebApplication.CreateBuilder(args);
+// Pin the content root to the dll's location so the app boots from any cwd
+// (Rider debugger, raw `dotnet path/to.dll`, Docker). Without this, ASP.NET
+// defaults to `Directory.GetCurrentDirectory()` and appsettings.json silently
+// resolves to empty, which makes the first Npgsql call throw "ConnectionString
+// has not been initialized" before any logs are emitted.
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory,
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -104,7 +113,7 @@ app.MapWarpHttp();
 // Seed endpoint — creates a realistic demo workload
 var seedQueues = new[] { "a-critical", "b-default", "c-low" };
 
-app.MapPost("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher, IRecurringJobPublisher recurringPublisher, TestContext context) =>
+app.MapGet("/seed", async (IPublisher publisher, IBatchPublisher batchPublisher, IRecurringJobPublisher recurringPublisher, TestContext context) =>
 {
     var random = new Random();
     var queues = seedQueues;

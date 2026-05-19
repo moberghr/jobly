@@ -1,34 +1,40 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ErrorBoundary } from 'react-error-boundary';
 import MainLayout from '@/layouts/MainLayout';
-import DashboardPage from '@/pages/dashboard/DashboardPage';
-import JobListPage from '@/pages/jobs/JobListPage';
-import MessagesPage from '@/pages/messages/MessagesPage';
-import BatchesPage from '@/pages/batches/BatchesPage';
-import RecurringPage from '@/pages/recurring/RecurringPage';
-import RecurringDetailPage from '@/pages/recurring/RecurringDetailPage';
-import ServersPage from '@/pages/servers/ServersPage';
-import ServerDetailPage from '@/pages/servers/ServerDetailPage';
-import CountersPage from '@/pages/counters/CountersPage';
-import ConcurrencyLimitsPage from '@/pages/concurrency/ConcurrencyLimitsPage';
-import RateLimitsPage from '@/pages/ratelimits/RateLimitsPage';
-import SagasListPage from '@/pages/sagas/SagasListPage';
-import SagaDetailPage from '@/pages/sagas/SagaDetailPage';
-import BackgroundServicesList from '@/pages/BackgroundServices/List';
-import BackgroundServiceDetail from '@/pages/BackgroundServices/Detail';
-import WorkerDetailPage from '@/pages/workers/WorkerDetailPage';
-import TracePage from '@/pages/trace/TracePage';
-import DetailPage from '@/pages/detail/DetailPage';
-import LoginPage from '@/pages/auth/LoginPage';
-import ExtensionPage from '@/extensions/ExtensionPage';
+
+const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
+const JobListPage = lazy(() => import('@/pages/jobs/JobListPage'));
+const MessagesPage = lazy(() => import('@/pages/messages/MessagesPage'));
+const BatchesPage = lazy(() => import('@/pages/batches/BatchesPage'));
+const RecurringPage = lazy(() => import('@/pages/recurring/RecurringPage'));
+const RecurringDetailPage = lazy(() => import('@/pages/recurring/RecurringDetailPage'));
+const ServersPage = lazy(() => import('@/pages/servers/ServersPage'));
+const ServerDetailPage = lazy(() => import('@/pages/servers/ServerDetailPage'));
+const CountersPage = lazy(() => import('@/pages/counters/CountersPage'));
+const ConcurrencyLimitsPage = lazy(() => import('@/pages/concurrency/ConcurrencyLimitsPage'));
+const RateLimitsPage = lazy(() => import('@/pages/ratelimits/RateLimitsPage'));
+const SagasListPage = lazy(() => import('@/pages/sagas/SagasListPage'));
+const SagaDetailPage = lazy(() => import('@/pages/sagas/SagaDetailPage'));
+const BackgroundServicesList = lazy(() => import('@/pages/BackgroundServices/List'));
+const BackgroundServiceDetail = lazy(() => import('@/pages/BackgroundServices/Detail'));
+const WorkerDetailPage = lazy(() => import('@/pages/workers/WorkerDetailPage'));
+const TracePage = lazy(() => import('@/pages/trace/TracePage'));
+const DetailPage = lazy(() => import('@/pages/detail/DetailPage'));
+const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
+const ExtensionPage = lazy(() => import('@/extensions/ExtensionPage'));
 import { setOnUnauthorized } from '@/api/client';
 import { loadExtensions } from '@/extensions/loader';
 import { extensionRuntime } from '@/extensions/runtime';
 import { getAuthStatus } from '@/api';
 import { config } from '@/config';
+import { queryClient } from '@/lib/queryClient';
+import { Toaster } from '@/components/ui/sonner';
+import { RootErrorFallback } from '@/components/RootErrorFallback';
 import type { ExtensionManifest } from '@/extensions/types';
 
-function App() {
+function AppRoutes() {
   const [needsLogin, setNeedsLogin] = useState(false);
   const [extensions, setExtensions] = useState<ExtensionManifest[]>([]);
   const [extensionsLoaded, setExtensionsLoaded] = useState(false);
@@ -73,9 +79,8 @@ function App() {
 
   const handleLogin = useCallback(() => {
     setNeedsLogin(false);
-    // Now authenticated — load extensions. MainLayout's mount-effect re-runs getAddons()
-    // and drives both nav-visibility and connectIfEnabled, so we don't duplicate the
-    // request here.
+    // Now authenticated — load extensions. MainLayout's mount-effect re-runs
+    // getAddons() and drives connectIfEnabled, so we don't duplicate it here.
     initExtensions();
   }, [initExtensions]);
 
@@ -84,10 +89,13 @@ function App() {
   }
 
   if (needsLogin) {
-    return <LoginPage onLogin={handleLogin} />;
+    return (
+      <Suspense fallback={null}>
+        <LoginPage onLogin={handleLogin} />
+      </Suspense>
+    );
   }
 
-  // Wait for extensions to load before rendering routes so dynamic pages are available
   if (!extensionsLoaded) {
     return null;
   }
@@ -96,8 +104,9 @@ function App() {
 
   return (
     <BrowserRouter basename={config.basePath}>
-      <Routes>
-        <Route element={<MainLayout extensions={extensions} />}>
+      <Suspense fallback={null}>
+        <Routes>
+          <Route element={<MainLayout extensions={extensions} />}>
           <Route index element={<DashboardPage />} />
           <Route path="/detail/:id" element={<DetailPage />} />
           <Route path="/jobs/detail/:id" element={<DetailPage />} />
@@ -120,7 +129,6 @@ function App() {
           <Route path="/services/:name" element={<BackgroundServiceDetail />} />
           <Route path="/services" element={<BackgroundServicesList />} />
 
-          {/* Extension pages */}
           {extensionPages.map((page) => (
             <Route
               key={page.path}
@@ -128,9 +136,21 @@ function App() {
               element={<ExtensionPage component={page.component} />}
             />
           ))}
-        </Route>
-      </Routes>
+          </Route>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
+  );
+}
+
+function App() {
+  return (
+    <ErrorBoundary FallbackComponent={RootErrorFallback}>
+      <QueryClientProvider client={queryClient}>
+        <AppRoutes />
+        <Toaster />
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

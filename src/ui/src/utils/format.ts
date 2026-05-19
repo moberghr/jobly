@@ -35,14 +35,14 @@ export function stateName(state: State): string {
 
 export function stateColor(state: State): string {
   switch (state) {
-    case State.Enqueued: return 'bg-blue-100 text-blue-800';
-    case State.Awaiting: return 'bg-yellow-100 text-yellow-800';
-    case State.Processing: return 'bg-purple-100 text-purple-800';
-    case State.Completed: return 'bg-green-100 text-green-800';
-    case State.Failed: return 'bg-red-100 text-red-800';
-    case State.Deleted: return 'bg-gray-100 text-gray-800';
-    case State.Scheduled: return 'bg-amber-100 text-amber-800';
-    default: return 'bg-gray-100 text-gray-800';
+    case State.Enqueued: return 'bg-state-enqueued-bg text-state-enqueued border-transparent';
+    case State.Awaiting: return 'bg-state-awaiting-bg text-state-awaiting border-transparent';
+    case State.Processing: return 'bg-state-processing-bg text-state-processing border-transparent';
+    case State.Completed: return 'bg-state-completed-bg text-state-completed border-transparent';
+    case State.Failed: return 'bg-state-failed-bg text-state-failed border-transparent';
+    case State.Deleted: return 'bg-state-deleted-bg text-state-deleted border-transparent';
+    case State.Scheduled: return 'bg-state-scheduled-bg text-state-scheduled border-transparent';
+    default: return 'bg-state-deleted-bg text-state-deleted border-transparent';
   }
 }
 
