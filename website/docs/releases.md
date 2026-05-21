@@ -4,6 +4,43 @@ sidebar_position: 6
 
 # Releases
 
+## 0.15.3
+
+*2026-05-21*
+
+One performance fix to the bulk job operations behind the dashboard's "Delete" and "Requeue" buttons. No public API changes; no behavior changes on the single-row paths.
+
+### Fixed: bulk delete/requeue scaled linearly with per-row DB round-trips
+
+`IJobCommandService.BulkDeleteJobs` and `BulkRequeueJobs` — and the per-type variants `DeleteFailedJobsByType` / `RequeueFailedJobsByType` that loop over them — were implemented as a `foreach` over the input ID array calling the single-row `DeleteJob` / `RequeueJob` once per item. Each iteration opened its own transaction, took a row lock via `LockJobByIdWaitAsync`, ran a separate `UPDATE`, two `INSERT`s (`JobLog`, `Counter`), and a `COMMIT` — roughly 6 round-trips per row. A 20,000-row dashboard "Delete all" landed ~120k serial round-trips at the DB and took minutes on cloud Postgres / SQL Server.
+
+Both methods are now chunked (500 IDs/chunk, sized to stay under SQL Server's 2,100-parameter limit) and use a single conditional `ExecuteUpdateAsync` per source-state group inside one transaction per chunk. `JobLog` inserts are batched via the change tracker; `Counter` rows are aggregated to one row per state-group instead of one row per affected job. For `BulkRequeueJobs`, parents are locked once per unique parent and `JobCount` is bumped by the total affected children, replacing N×`LockJobByIdWaitAsync` calls when many children share a `Batch` / `Message` parent.
+
+For the 20k-row scenario the round-trip count drops from ~120k to a few hundred — minutes become seconds.
+
+### Concurrency semantics
+
+The conditional UPDATE uses `WHERE CurrentState = sourceState` (the source state from the chunk's snapshot) to make the bulk path a tie-breaker against concurrent single-row Delete/Requeue calls on the same job:
+
+- Whichever writer commits first wins the row's transition.
+- The loser's UPDATE re-evaluates the predicate against the post-commit state, finds the row excluded, and reports it as `Skipped` in the `BulkResultModel`.
+- The loser writes **no** `JobLog`, **no** `Counter` increment, **no** half-update — exactly one of {Delete, Requeue} ever lands per row.
+
+`BulkRequeueJobs` Phase 1 (children) runs before Phase 2 (parent lock), matching the child-then-parent lock order used by single `RequeueJob` to prevent cross-caller deadlock with a single-row requeue racing for the same parent. Both methods sort their target IDs and `BulkRequeueJobs` sorts parents by PK before iteration, so two concurrent `BulkRequeueJobs` callers cannot acquire parent locks in opposing orders — the only remaining deadlock cycle in this code path is eliminated by construction rather than relying on DB-level detection.
+
+### Notification fanout
+
+`BulkRequeueJobs` previously fired one `JobEnqueued` notification per requeued job — for a 20k-row requeue that meant 20k publishes through the notification transport. The method now fires one `JobEnqueued` per **distinct queue** touched, after all chunks commit. Workers are queue-scoped (§2.9), so per-queue wake-up is sufficient. Bulk requeue across one default queue now produces exactly one notification instead of 20,000.
+
+### Behavior preserved
+
+- Per-chunk atomicity: each chunk is one transaction; mid-chunk failures roll back fully.
+- `Processing` jobs still receive `CancellationMode = Graceful` rather than being deleted directly — workers detect via `RunJobMonitor`, same contract as single-row `DeleteJob`.
+- Already-`Deleted` rows count as `Succeeded` (no-op), phantom IDs count as `Skipped`, `Succeeded + Skipped == jobIds.Length`.
+- Duplicate IDs in the input array are deduped at the entry point and credited as no-op `Succeeded`, matching the 1-by-1 behavior where the second call sees `state == Deleted` / `Enqueued` and returns silently.
+
+No action required on upgrade.
+
 ## 0.15.2
 
 *2026-05-18*
