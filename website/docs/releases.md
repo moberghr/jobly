@@ -24,7 +24,7 @@ The conditional UPDATE uses `WHERE CurrentState = sourceState` (the source state
 
 - Whichever writer commits first wins the row's transition.
 - The loser's UPDATE re-evaluates the predicate against the post-commit state, finds the row excluded, and reports it as `Skipped` in the `BulkResultModel`.
-- The loser writes **no** `JobLog`, **no** `Counter` increment, **no** half-update — exactly one of {Delete, Requeue} ever lands per row.
+- The loser writes **no** `JobLog`, **no** `Counter` increment, **no** half-update — exactly one of `Delete` or `Requeue` ever lands per row.
 
 `BulkRequeueJobs` Phase 1 (children) runs before Phase 2 (parent lock), matching the child-then-parent lock order used by single `RequeueJob` to prevent cross-caller deadlock with a single-row requeue racing for the same parent. Both methods sort their target IDs and `BulkRequeueJobs` sorts parents by PK before iteration, so two concurrent `BulkRequeueJobs` callers cannot acquire parent locks in opposing orders — the only remaining deadlock cycle in this code path is eliminated by construction rather than relying on DB-level detection.
 
