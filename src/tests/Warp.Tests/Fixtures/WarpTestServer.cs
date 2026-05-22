@@ -12,6 +12,7 @@ using Warp.Core.Entities;
 using Warp.Core.Enums;
 using Warp.Core.Handlers;
 using Warp.Core.NoRestart;
+using Warp.Core.Notifications;
 using Warp.Core.RateLimit;
 using Warp.Core.Retry;
 using Warp.Core.Services;
@@ -311,6 +312,14 @@ public class WarpTestServer : IAsyncDisposable
         ServerLifecycleTrace.Record(serverId, "IHost.StartAsync starting");
         await host.StartAsync(Xunit.TestContext.Current.CancellationToken);
         ServerLifecycleTrace.Record(serverId, "IHost.StartAsync returned");
+
+        // Gate test return on the push listener finishing its registration (Postgres LISTEN on
+        // the wire / SQL Server Service Broker setup done). Without this the first publish
+        // races the listener and can be silently dropped — see issue #201. NullNotificationTransport
+        // completes ListenerReady immediately, so tests not using push pay nothing.
+        var transport = host.Services.GetRequiredService<IWarpNotificationTransport>();
+        await transport.ListenerReady.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
+
         TestLifecycleTrace.Record($"WarpTestServer.StartAsync returned (server={serverId})");
 
         return new WarpTestServer(host, fixture, jobLogObserver);
@@ -514,12 +523,19 @@ public class WarpTestServer : IAsyncDisposable
         TimeSpan? timeout = null)
     {
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(8);
+
+        // Capture ServerId before building any LINQ predicates. EF's expression-tree funcletizer
+        // evaluates captured members lazily at materialization time, so a getter that reads from
+        // _host.Services would throw ObjectDisposedException if the host disposed between query
+        // build and execution (tests that race DisposeAsync against this method, e.g.
+        // GracefulShutdownOrderingTests). Same rationale in WaitForBackgroundServiceDeleted.
+        var serverId = ServerId;
         var deadline = DateTime.UtcNow + effectiveTimeout;
         while (DateTime.UtcNow < deadline)
         {
             var ctx = CreateContext();
             var current = await ctx.Set<BackgroundServiceInstance>()
-                .Where(x => x.ServerId == ServerId)
+                .Where(x => x.ServerId == serverId)
                 .Where(x => x.ServiceName == serviceName)
                 .Select(x => (BackgroundServiceStatus?)x.Status)
                 .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
@@ -534,13 +550,13 @@ public class WarpTestServer : IAsyncDisposable
 
         var ctx2 = CreateContext();
         var finalStatus = await ctx2.Set<BackgroundServiceInstance>()
-            .Where(x => x.ServerId == ServerId)
+            .Where(x => x.ServerId == serverId)
             .Where(x => x.ServiceName == serviceName)
             .Select(x => (BackgroundServiceStatus?)x.Status)
             .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
 
         throw new TimeoutException(
-            $"BackgroundService '{serviceName}' on server {ServerId} did not reach status {status} within {effectiveTimeout}. " +
+            $"BackgroundService '{serviceName}' on server {serverId} did not reach status {status} within {effectiveTimeout}. " +
             $"Current status: {finalStatus?.ToString() ?? "row not found"}");
     }
 
@@ -552,12 +568,16 @@ public class WarpTestServer : IAsyncDisposable
     public async Task WaitForBackgroundServiceDeleted(string serviceName, TimeSpan? timeout = null)
     {
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(8);
+
+        // Capture ServerId before DisposeAsync can race the predicate's lazy funcletization —
+        // see WaitForBackgroundServiceState for the full rationale.
+        var serverId = ServerId;
         var deadline = DateTime.UtcNow + effectiveTimeout;
         while (DateTime.UtcNow < deadline)
         {
             var ctx = CreateContext();
             var exists = await ctx.Set<BackgroundServiceInstance>()
-                .Where(x => x.ServerId == ServerId)
+                .Where(x => x.ServerId == serverId)
                 .Where(x => x.ServiceName == serviceName)
                 .AnyAsync(Xunit.TestContext.Current.CancellationToken);
 
@@ -570,7 +590,7 @@ public class WarpTestServer : IAsyncDisposable
         }
 
         throw new TimeoutException(
-            $"BackgroundService '{serviceName}' instance row on server {ServerId} was not deleted within {effectiveTimeout}");
+            $"BackgroundService '{serviceName}' instance row on server {serverId} was not deleted within {effectiveTimeout}");
     }
 
     /// <summary>

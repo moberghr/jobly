@@ -180,6 +180,8 @@ public abstract class RecurringJobTestsBase : IAsyncLifetime
             await Task.Yield();
             yield break;
         }
+
+        public Task ListenerReady { get; } = Task.CompletedTask;
     }
 
     [TimedFact]
