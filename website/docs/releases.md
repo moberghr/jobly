@@ -6,7 +6,7 @@ sidebar_position: 6
 
 ## 0.15.3
 
-*2026-05-21*
+*2026-05-22*
 
 One performance fix to the bulk job operations behind the dashboard's "Delete" and "Requeue" buttons. No public API changes; no behavior changes on the single-row paths.
 
