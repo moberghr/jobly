@@ -181,5 +181,7 @@ public abstract class ScheduledJobActivationTaskTestsBase : IAsyncLifetime
             await Task.Delay(Timeout.InfiniteTimeSpan, ct);
             yield break;
         }
+
+        public Task ListenerReady { get; } = Task.CompletedTask;
     }
 }
