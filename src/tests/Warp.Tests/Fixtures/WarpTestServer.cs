@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -309,6 +310,22 @@ public class WarpTestServer : IAsyncDisposable
         TestLifecycleTrace.Record("Host.Build returned");
 
         var serverId = host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<WarpWorkerConfiguration>>().Value.ServerId;
+
+        // SQL Server only: warm the per-test connection pool with a single sequential Open
+        // before IHost.StartAsync fans out the worker + server-task fleet. Without this, the
+        // 5 workers + ~8 server-task loops all hit OpenAsync on a cold pool simultaneously and
+        // can trip a server-side State 7 ("error while evaluating the password") under the
+        // login burst — see issue #205. The lonely warm-up call primes SQL Server's auth path
+        // and seeds the pool with one cached physical connection. Npgsql doesn't have the
+        // same pathology, so we skip it there.
+        if (!isPostgres)
+        {
+            ServerLifecycleTrace.Record(serverId, "SqlServer pool warm-up starting");
+            await using var warmup = new SqlConnection(connectionString);
+            await warmup.OpenAsync(Xunit.TestContext.Current.CancellationToken);
+            ServerLifecycleTrace.Record(serverId, "SqlServer pool warm-up returned");
+        }
+
         ServerLifecycleTrace.Record(serverId, "IHost.StartAsync starting");
         await host.StartAsync(Xunit.TestContext.Current.CancellationToken);
         ServerLifecycleTrace.Record(serverId, "IHost.StartAsync returned");
