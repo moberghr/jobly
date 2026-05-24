@@ -145,6 +145,19 @@ public sealed class SubmitOrderHandler : IRequestHandler<SubmitOrder, OrderDto> 
 
 The generator emits explicit lambda parameters per source and constructs `SubmitOrder` from the bound parts. ASP.NET's `[AsParameters]` doesn't support `[FromBody]` properties directly, so the generator handles this case explicitly.
 
+> **One body parameter only.** ASP.NET Minimal API accepts at most one body-bound parameter per endpoint. On a body verb (POST / PUT / PATCH), any parameter that isn't annotated with `[FromRoute]` / `[FromQuery]` / `[FromHeader]` defaults to the body. If more than one parameter ends up body-bound (e.g. `[FromRoute] int Id` plus two bare scalars), the generator emits a `WHTTP004` error. Fix it by wrapping the body fields in a single record and tagging it `[FromBody]`:
+>
+> ```csharp
+> // ✘ WHTTP004: Name and Price both default to the body
+> public sealed record CreateOrder([FromRoute] int TenantId, string Name, decimal Price) : IRequest<OrderDto>;
+>
+> // ✓ one [FromBody] sub-record
+> public sealed record CreateOrderBody(string Name, decimal Price);
+> public sealed record CreateOrder([FromRoute] int TenantId, [FromBody] CreateOrderBody Body) : IRequest<OrderDto>;
+> ```
+>
+> If no parameter is annotated at all, the verb defaults to **whole-body** binding (shape 1 above) and `TRequest` deserializes from the JSON body — that path has no multi-body limitation.
+
 > **Tip:** for mixed binding, prefer **classes with property setters** over records with primary constructors. Attributes on record positional parameters apply to the parameter, not the synthesized property, which can confuse `[AsParameters]`. Classes with `{ get; set; }` or `{ get; init; }` properties are unambiguous.
 
 ### Records vs classes
