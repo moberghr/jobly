@@ -215,6 +215,151 @@ public sealed class DiagnosticsTests
     }
 
     [TimedFact]
+    public void WHTTP004_FiresOnBodyVerbWithRouteAndMultipleUnattributedParams()
+    {
+        const string source = """
+            using Warp.Core.Handlers;
+            using Warp.Http;
+            using Microsoft.AspNetCore.Mvc;
+            using System.Threading;
+            using System.Threading.Tasks;
+
+            namespace TestSamples;
+
+            public sealed record CreateThing([FromRoute] int TenantId, string Name, decimal Price) : IRequest<string>;
+
+            [WarpHttpPost("/api/tenants/{tenantId}/things")]
+            public sealed class CreateThingHandler : IRequestHandler<CreateThing, string>
+            {
+                public Task<string> HandleAsync(CreateThing request, CancellationToken ct) => Task.FromResult(request.Name);
+            }
+            """;
+
+        var result = GeneratorTestHarness.Run(source);
+
+        result.Diagnostics.ShouldContain(d => d.Id == "WHTTP004" && d.GetMessage().Contains("CreateThingHandler"));
+
+        // The generator must not also throw CS8785 ("Generator failed to generate source").
+        result.Diagnostics.ShouldNotContain(d => d.Id == "CS8785");
+    }
+
+    [TimedFact]
+    public void WHTTP004_FiresOnTwoExplicitFromBodyParams()
+    {
+        const string source = """
+            using Warp.Core.Handlers;
+            using Warp.Http;
+            using Microsoft.AspNetCore.Mvc;
+            using System.Threading;
+            using System.Threading.Tasks;
+
+            namespace TestSamples;
+
+            public sealed record DoubleBody([FromRoute] int Id, [FromBody] BodyA A, [FromBody] BodyB B) : IRequest<string>;
+
+            public sealed record BodyA(string X);
+            public sealed record BodyB(string Y);
+
+            [WarpHttpPost("/api/double-body/{id}")]
+            public sealed class DoubleBodyHandler : IRequestHandler<DoubleBody, string>
+            {
+                public Task<string> HandleAsync(DoubleBody request, CancellationToken ct) => Task.FromResult(request.A.X);
+            }
+            """;
+
+        var diagnostics = GeneratorTestHarness.Run(source).Diagnostics;
+
+        diagnostics.ShouldContain(d => d.Id == "WHTTP004" && d.GetMessage().Contains("DoubleBodyHandler"));
+    }
+
+    [TimedFact]
+    public void WHTTP004_DoesNotFireOnSingleBodyTargetMixed()
+    {
+        // POST with [FromRoute] + one bare scalar parameter — Mixed shape with exactly one
+        // body target. This is supported and must not trip WHTTP004.
+        const string source = """
+            using Warp.Core.Handlers;
+            using Warp.Http;
+            using Microsoft.AspNetCore.Mvc;
+            using System.Threading;
+            using System.Threading.Tasks;
+
+            namespace TestSamples;
+
+            public sealed record PromoteUser([FromRoute] int Id, string NewRole) : IRequest<string>;
+
+            [WarpHttpPost("/api/users/{id}/promote")]
+            public sealed class PromoteUserHandler : IRequestHandler<PromoteUser, string>
+            {
+                public Task<string> HandleAsync(PromoteUser request, CancellationToken ct) => Task.FromResult(request.NewRole);
+            }
+            """;
+
+        var diagnostics = GeneratorTestHarness.Run(source).Diagnostics;
+
+        diagnostics.ShouldNotContain(d => d.Id == "WHTTP004");
+    }
+
+    [TimedFact]
+    public void WHTTP004OnOneHandler_DoesNotWipeOtherHandlers()
+    {
+        // One bad handler (multi-body Mixed) sits alongside a good one. The bad handler is
+        // diagnosed and skipped; the good handler must still register exactly one endpoint.
+        const string source = """
+            using Warp.Core.Handlers;
+            using Warp.Http;
+            using Microsoft.AspNetCore.Mvc;
+            using System.Threading;
+            using System.Threading.Tasks;
+
+            namespace TestSamples;
+
+            public sealed record BadRequest([FromRoute] int Id, string A, string B) : IRequest<string>;
+
+            [WarpHttpPost("/api/bad/{id}")]
+            public sealed class BadHandler : IRequestHandler<BadRequest, string>
+            {
+                public Task<string> HandleAsync(BadRequest request, CancellationToken ct) => Task.FromResult(request.A);
+            }
+
+            public sealed record GoodRequest(string Name) : IRequest<string>;
+
+            [WarpHttpPost("/api/good")]
+            public sealed class GoodHandler : IRequestHandler<GoodRequest, string>
+            {
+                public Task<string> HandleAsync(GoodRequest request, CancellationToken ct) => Task.FromResult(request.Name);
+            }
+            """;
+
+        var result = GeneratorTestHarness.Run(source);
+
+        result.Diagnostics.ShouldContain(d => d.Id == "WHTTP004" && d.GetMessage().Contains("BadHandler"));
+        result.Diagnostics.ShouldNotContain(d => d.Id == "CS8785");
+
+        var generated = string.Concat(result.Results
+            .SelectMany(r => r.GeneratedSources)
+            .Select(s => s.SourceText.ToString()));
+
+        // Exactly one endpoint registered, and it must be GoodHandler.
+        CountOccurrences(generated, "WarpGeneratedHttpRegistry.Add").ShouldBe(1);
+        generated.ShouldContain("typeof(global::TestSamples.GoodHandler)");
+        generated.ShouldNotContain("typeof(global::TestSamples.BadHandler)");
+    }
+
+    private static int CountOccurrences(string source, string needle)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = source.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += needle.Length;
+        }
+
+        return count;
+    }
+
+    [TimedFact]
     public void WHTTP002_DoesNotFireForSingleAttribute()
     {
         const string source = """

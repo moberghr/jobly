@@ -441,6 +441,20 @@ public sealed class BindingInitOnlyHandler : IRequestHandler<BindingInitOnlyQuer
         => Task.FromResult(new BindingInitOnlyResponse(request.Name, request.Count));
 }
 
+// Mixed shape with a single body target — POST with [FromRoute] route param + one bare
+// scalar body param. Regression coverage for #208: this is the working Mixed path and
+// must not trip WHTTP004.
+public sealed record PromoteUser([FromRoute(Name = "id")] Guid Id, string NewRole) : IRequest<PromoteUserResponse>;
+
+public sealed record PromoteUserResponse(Guid Id, string NewRole);
+
+[WarpHttpPost("/api/users/{id}/promote")]
+public sealed class PromoteUserHandler : IRequestHandler<PromoteUser, PromoteUserResponse>
+{
+    public Task<PromoteUserResponse> HandleAsync(PromoteUser request, CancellationToken cancellationToken)
+        => Task.FromResult(new PromoteUserResponse(request.Id, request.NewRole));
+}
+
 // Submit-a-job pattern (#4) — IRequest<Guid> wrapper. We use a fake IPublisher in tests
 // so this stays NoDb; real DB path is exercised end-to-end in the demo app.
 public sealed record QueueWorkRequest(string Tag) : IRequest<Guid>;
