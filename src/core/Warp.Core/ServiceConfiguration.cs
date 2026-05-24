@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Warp.Core.BackgroundServices;
 using Warp.Core.Data.Entities;
 using Warp.Core.Data.Queries;
 using Warp.Core.Entities;
@@ -73,6 +74,11 @@ public static class ServiceConfiguration
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
 
+        // Background-services dashboard read service. Registered in AddWarp (not AddWarpWorker)
+        // so dashboard-only / publisher-only processes that call AddWarp without AddWarpWorker
+        // can still serve the /api/services endpoints. Only depends on TContext.
+        services.TryAddScoped<IBackgroundServiceQueryService, BackgroundServiceQueryService<TContext>>();
+
         // Default no-op transport. opt.UseDatabasePush() (inside the AddWarp/AddWarpWorker lambda) replaces this with a
         // provider-specific implementation (Postgres LISTEN/NOTIFY or SQL Server Service Broker).
         services.TryAddSingleton<IWarpNotificationTransport, NullNotificationTransport>();
@@ -126,6 +132,10 @@ public static class ServiceConfiguration
         AddCounterEntity(modelBuilder, schema);
         AddServerTaskEntity(modelBuilder, schema);
         AddServerLogEntity(modelBuilder, schema);
+        AddBackgroundServiceDefinitionEntity(modelBuilder, schema);
+        AddBackgroundServiceInstanceEntity(modelBuilder, schema);
+        AddBackgroundServiceLeaseEntity(modelBuilder, schema);
+        AddBackgroundServiceLogEntity(modelBuilder, schema);
     }
 
     private static void AddJobEntity(ModelBuilder modelBuilder, string? schema)

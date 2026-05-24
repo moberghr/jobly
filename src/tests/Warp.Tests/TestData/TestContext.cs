@@ -32,10 +32,6 @@ public class TestContext : DbContext
         ServiceConfiguration.AddRateLimitOverrideEntity(modelBuilder, _schema);
         ServiceConfiguration.AddSagaStateEntity(modelBuilder, _schema);
         ServiceConfiguration.AddSagaJobLinkEntity(modelBuilder, _schema);
-        ServiceConfiguration.AddBackgroundServiceDefinitionEntity(modelBuilder, _schema);
-        ServiceConfiguration.AddBackgroundServiceInstanceEntity(modelBuilder, _schema);
-        ServiceConfiguration.AddBackgroundServiceLeaseEntity(modelBuilder, _schema);
-        ServiceConfiguration.AddBackgroundServiceLogEntity(modelBuilder, _schema);
 
         // Mirror what WarpModelCustomizer does in production. The unit-fixture path bypasses
         // ReplaceService<IModelCustomizer> by building DbContextOptions directly, so we apply

@@ -4,6 +4,42 @@ sidebar_position: 6
 
 # Releases
 
+## 0.16.0 (unreleased)
+
+`WarpBackgroundService` is now a base part of Warp instead of an opt-in addon, plus automatic cleanup of orphaned service definitions.
+
+### Breaking: `AddBackgroundService<TContext, T>()` → `AddBackgroundService<T>()`
+
+The two-type-parameter form was needed when the registration baked `TContext` into a generic query service. The query service has moved to `AddWarp<TContext>` (where `TContext` is already known from the receiver), so the user-facing call drops one type parameter:
+
+```csharp
+// 0.15.x
+opt.AddBackgroundService<AppDbContext, KafkaDrainService>();
+
+// 0.16.0
+opt.AddBackgroundService<KafkaDrainService>();
+```
+
+No backwards-compat overload is shipped — the old form is a compile error. A one-line replace per call site is all that's needed.
+
+### Schema: four BG-service tables now ship with every install
+
+`BackgroundServiceDefinition`, `BackgroundServiceInstance`, `BackgroundServiceLease`, `BackgroundServiceLog` are now added unconditionally by `AddWarp<TContext>()` via `WarpModelCustomizer` — previously they were added conditionally by `AddBackgroundService<T>()`. Existing deployments that previously called `AddBackgroundService<T>()` see no schema change. Deployments that **didn't** previously call it will get those four tables on the next `dotnet ef migrations add`. The tables stay empty until a `WarpBackgroundService` is registered — no runtime cost, just a one-time migration.
+
+If you bypass `WarpModelCustomizer` (e.g., a unit-test `DbContext` that calls `modelBuilder.AddOutboxStateEntity(schema)` directly in `OnModelCreating`), the four entities are now included in `AddOutboxStateEntity` and no additional calls are needed — you can delete any explicit `AddBackgroundServiceDefinitionEntity`/`...InstanceEntity`/`...LeaseEntity`/`...LogEntity` calls in your override.
+
+### Feature: orphaned `Definition` rows are cleaned up automatically
+
+Renamed or removed services left a permanent row in `BackgroundServiceDefinition` (the dashboard's "Services" list would keep showing the old name forever). `ExpirationCleanup` now sweeps orphan Definitions on its existing 60-second cadence — a row is deleted when no live `BackgroundServiceInstance` references its name **and** the row's `LastSeenAt` is older than `WarpConfiguration.BackgroundServiceDefinitionOrphanGrace` (default 2 minutes). The grace window covers the rolling-deploy gap between server A's exit and server B's startup; tune it up if your deploys take longer.
+
+### Dashboard: `Services` nav is always shown
+
+The `Services` flag was removed from `GET /api/addons`; the dashboard nav entry is always present. The list page is simply empty when no `WarpBackgroundService` is registered — same shape as the Jobs / Recurring / Servers tabs.
+
+### Worker heartbeat: BG-service CTEs run unconditionally
+
+The provider-package heartbeat SQL (`HeartbeatAsync`) previously branched on whether the addon was registered. Both branches collapsed to the BG-service-aware variant — two extra `UPDATE` statements piggyback on every heartbeat round-trip. For deployments with no registered service the UPDATEs target empty tables and are no-ops; no measurable perf change. The `else` branch (lighter SQL) is removed along with the `HasBackgroundServiceTables` flag.
+
 ## 0.15.3
 
 *2026-05-22*

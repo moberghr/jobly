@@ -24,8 +24,8 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
     private readonly string _lockAllServersSql;
     private readonly string _heartbeatSql;
     private readonly string _activateScheduledJobsSql;
-    private readonly string? _lockLeaseByServiceNameSql;
-    private readonly string? _lockDefinitionByServiceNameSql;
+    private readonly string _lockLeaseByServiceNameSql;
+    private readonly string _lockDefinitionByServiceNameSql;
 
     public PostgresWarpSqlQueries(WarpJobTableNames names)
     {
@@ -82,23 +82,23 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
             SELECT * FROM {serverTable}
             FOR NO KEY UPDATE";
 
-        // CTE+LEFT JOIN folds the heartbeat UPDATE, the server paused_at read, AND the
-        // worker_group pause-state read into ONE round-trip. When the BackgroundServices addon
-        // is registered, two extra CTE members piggyback on the same round-trip:
+        // CTE+LEFT JOIN folds the heartbeat UPDATE, the server paused_at read, the
+        // worker_group pause-state read, the BG-service instance heartbeat bump, and the
+        // BG-service lease renewal into ONE round-trip. Two extra CTE members:
         //   • instance_bump — refreshes last_heartbeat_at on all instance rows for @me
         //   • lease_renewed — extends lease_expires_at on active leases held by @me and
         //                      returns the renewed service names so the Heartbeat task can
         //                      detect lost leases (held last beat but not in this set).
         // The TTL is baked in at construction time (from WarpJobTableNames.LeaseTtlSeconds) so
         // no extra runtime parameter is needed — the interface signature stays unchanged.
-        // When the addon is absent, the extra CTEs are omitted and the result has no extra column.
-        if (_n.HasBackgroundServiceTables)
-        {
-            var instanceTable = QualifiedBackgroundServiceInstanceTable();
-            var leaseTable = QualifiedBackgroundServiceLeaseTable();
-            var ttlSeconds = _n.LeaseTtlSeconds;
+        // The BG tables are always present in the model (§2.13), so the extra CTEs run
+        // unconditionally; deployments with no registered WarpBackgroundService simply have
+        // empty Instance/Lease tables, and the UPDATEs are no-ops.
+        var instanceTable = QualifiedBackgroundServiceInstanceTable();
+        var leaseTable = QualifiedBackgroundServiceLeaseTable();
+        var ttlSeconds = _n.LeaseTtlSeconds;
 
-            _heartbeatSql = $@"
+        _heartbeatSql = $@"
             WITH heartbeat AS (
                 UPDATE {serverTable}
                 SET ""{_n.ServerLastHeartbeatTime}"" = {{1}},
@@ -125,24 +125,6 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
                    (SELECT array_agg(service_name) FROM lease_renewed) AS renewed_leases
             FROM heartbeat h
             LEFT JOIN {QualifiedWorkerGroupTable()} w ON w.""{_n.WorkerGroupServerId}"" = h.id";
-        }
-        else
-        {
-            _heartbeatSql = $@"
-            WITH heartbeat AS (
-                UPDATE {serverTable}
-                SET ""{_n.ServerLastHeartbeatTime}"" = {{1}},
-                    ""{_n.ServerMemoryWorkingSetBytes}"" = COALESCE({{2}}, ""{_n.ServerMemoryWorkingSetBytes}""),
-                    ""{_n.ServerCpuUsagePercent}"" = COALESCE({{3}}, ""{_n.ServerCpuUsagePercent}"")
-                WHERE ""{_n.ServerId}"" = {{0}}
-                RETURNING ""{_n.ServerId}"" AS id, ""{_n.ServerPausedAt}"" AS paused_at
-            )
-            SELECT h.paused_at AS server_paused_at,
-                   w.""{_n.WorkerGroupId}"" AS group_id,
-                   w.""{_n.WorkerGroupPausedAt}"" AS group_paused_at
-            FROM heartbeat h
-            LEFT JOIN {QualifiedWorkerGroupTable()} w ON w.""{_n.WorkerGroupServerId}"" = h.id";
-        }
 
         // Atomic activation: UPDATE ... RETURNING queue flips due rows AND streams back the
         // queue names so the caller can fire one JobEnqueued notification per distinct queue.
@@ -154,23 +136,19 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
               AND ""{_n.ScheduleTime}"" <= {{0}}
             RETURNING ""{_n.Queue}""";
 
-        // BackgroundService row-lock queries — only built when the addon is registered.
-        // FOR UPDATE (no SKIP LOCKED) so concurrent callers block and serialise, eliminating
-        // the TOCTOU window between SELECT and the caller's INSERT/UPDATE (§1.4).
-        if (_n.HasBackgroundServiceTables)
-        {
-            var leaseTable = QualifiedBackgroundServiceLeaseTable();
-            _lockLeaseByServiceNameSql = $@"
+        // BackgroundService row-lock queries. FOR NO KEY UPDATE so concurrent callers block
+        // and serialise, eliminating the TOCTOU window between SELECT and the caller's
+        // INSERT/UPDATE (§1.4).
+        _lockLeaseByServiceNameSql = $@"
                 SELECT * FROM {leaseTable}
                 WHERE ""{_n.BackgroundServiceLeaseServiceName}"" = {{0}}
                 FOR NO KEY UPDATE";
 
-            var defTable = QualifiedBackgroundServiceDefinitionTable();
-            _lockDefinitionByServiceNameSql = $@"
+        var defTable = QualifiedBackgroundServiceDefinitionTable();
+        _lockDefinitionByServiceNameSql = $@"
                 SELECT * FROM {defTable}
                 WHERE ""{_n.BackgroundServiceDefinitionName}"" = {{0}}
                 FOR NO KEY UPDATE";
-        }
     }
 
     public async Task<List<Job>> ClaimEnqueuedJobsAsync(
@@ -274,9 +252,8 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
                     groupPaused[groupId] = groupIsPaused;
                 }
 
-                // Column 3 (renewed_leases array) is present only when the BackgroundServices
-                // addon is registered. When present it is NULL when no leases were renewed this beat.
-                if (_n.HasBackgroundServiceTables && !await reader.IsDBNullAsync(3, ct))
+                // Column 3 (renewed_leases array) is NULL when no leases were renewed this beat.
+                if (!await reader.IsDBNullAsync(3, ct))
                 {
                     // Npgsql returns a PostgreSQL array column as string[] when the element type is text.
                     var raw = reader.GetValue(3);
@@ -447,11 +424,6 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
         string serviceName,
         CancellationToken ct)
     {
-        if (_lockLeaseByServiceNameSql == null)
-        {
-            throw new InvalidOperationException("BackgroundServices addon is not registered in this deployment.");
-        }
-
         return await context.Set<BackgroundServiceLease>()
             .FromSqlRaw(_lockLeaseByServiceNameSql, serviceName)
             .FirstOrDefaultAsync(ct);
@@ -462,11 +434,6 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
         string serviceName,
         CancellationToken ct)
     {
-        if (_lockDefinitionByServiceNameSql == null)
-        {
-            throw new InvalidOperationException("BackgroundServices addon is not registered in this deployment.");
-        }
-
         return await context.Set<BackgroundServiceDefinition>()
             .FromSqlRaw(_lockDefinitionByServiceNameSql, serviceName)
             .FirstOrDefaultAsync(ct);

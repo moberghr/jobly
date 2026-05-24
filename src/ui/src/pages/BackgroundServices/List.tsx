@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { ServiceScope } from '@/types/backgroundServices';
@@ -12,20 +10,13 @@ export default function BackgroundServicesList() {
   const navigate = useNavigate();
   const [items, setItems] = useState<BackgroundServiceListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [unavailable, setUnavailable] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
       const list = await api.getBackgroundServices();
       setItems(list);
       setError(null);
-      setUnavailable(false);
-    } catch (e) {
-      if (axios.isAxiosError(e) && e.response?.status === 404) {
-        setUnavailable(true);
-        setError(null);
-        return;
-      }
+    } catch {
       setError('Unable to load background services');
     }
   }, []);
@@ -36,19 +27,6 @@ export default function BackgroundServicesList() {
 
     return () => clearInterval(interval);
   }, [fetchData]);
-
-  if (unavailable) {
-    return (
-      <div>
-        <h1 className="text-2xl font-bold mb-4">Background Services</h1>
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Background services addon is not registered. Call <code className="font-mono text-xs">opt.AddBackgroundServices()</code> in your Warp configuration to enable.
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   if (error) return <ErrorState message={error} />;
   if (!items) return <LoadingState />;
