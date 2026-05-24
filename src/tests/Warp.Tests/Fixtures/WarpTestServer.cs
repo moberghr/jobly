@@ -640,6 +640,32 @@ public class WarpTestServer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         GC.SuppressFinalize(this);
+
+        // Capture a pre-stop diagnostic snapshot for any future failure of this test. We can't
+        // tell here whether the test has already thrown — xunit's TestState isn't set until
+        // after the test method body fully unwinds, AFTER this DisposeAsync. So we always
+        // capture and stash; the IntegrationTestBase.DisposeAsync that runs later checks
+        // TestState and prints the stash only when the test actually failed. Cost on passing
+        // tests: one diagnostic query per test (~50 ms on integration tests), accepted in
+        // exchange for row-level state at the actual failure moment instead of post-StopAsync
+        // (when server tasks are torn down and in-flight handlers have already drained).
+        // Fresh CancellationToken — xunit's may already be cancelling if shutdown is in flight.
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var snapshot = await _fixture.DumpDiagnosticsAsync(
+                "Pre-disposal server-state diagnostics (captured before IHost.StopAsync):",
+                cts.Token);
+            DiagnosticDumpStorage.Stash(snapshot);
+        }
+#pragma warning disable CA1031 // capture must never throw — failing to dump is not a reason to fail teardown
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            DiagnosticDumpStorage.Stash(
+                $"Pre-disposal diagnostic capture failed: {ex.GetType().Name}: {ex.Message}");
+        }
+
         ServerLifecycleTrace.Record(ServerId, "IHost.StopAsync starting");
         await _host.StopAsync(Xunit.TestContext.Current.CancellationToken);
         ServerLifecycleTrace.Record(ServerId, "IHost.StopAsync returned");

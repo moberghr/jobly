@@ -24,6 +24,14 @@ public abstract class EndToEndIntegrationTestsBase : IntegrationTestBase
     [TimedFact(90_000)]
     public async Task GivenComplexWorkload_WhenProcessedByRealWorkers_ThenAllJobsReachTerminalState()
     {
+        // Pre-disposal dump capture: if any assertion below throws, the WarpTestServer
+        // disposal stashes a live snapshot of Job / JobLog / ServerTask rows into the
+        // AsyncLocal box installed here, and IntegrationTestBase.DisposeAsync prints it
+        // instead of the post-stop view (which loses ServerTask state and the actual mid-flight
+        // job states). Opting in per-test because xunit's IAsyncLifetime.InitializeAsync runs
+        // on a different ExecutionContext — see DiagnosticDumpStorage for the full pattern.
+        DiagnosticDumpStorage.Initialize();
+
         await using var server = await WarpTestServer.StartAsync(Fixture);
         var publisher = server.CreatePublisher();
         var batchPublisher = server.CreateBatchPublisher();

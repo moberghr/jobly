@@ -88,12 +88,14 @@ public interface IWarpSqlQueries<TContext>
 
     /// <summary>
     /// Atomic activation of due scheduled jobs: flips <c>State.Scheduled</c> rows whose
-    /// <c>ScheduleTime</c> has elapsed to <c>State.Enqueued</c> and RETURNS the queue of each
-    /// activated row. Caller deduplicates to fire one <c>JobEnqueued</c> notification per
-    /// distinct queue. Replaces a separate SELECT DISTINCT + UPDATE and saves one DB hop per
-    /// ScheduledJobActivation tick (every 5s by default).
+    /// <c>ScheduleTime</c> has elapsed to <c>State.Enqueued</c> and RETURNS one row per activated
+    /// job carrying <c>(Id, Queue, ScheduleTime)</c>. <c>ScheduleTime</c> is the row's existing
+    /// value — the UPDATE does not change it — so it documents when the job had been scheduled to
+    /// run. Caller deduplicates queues to fire one <c>JobEnqueued</c> notification per distinct
+    /// queue, and writes one <c>Activated</c> <see cref="JobLog"/> per Id so operators have a
+    /// per-row trail of the Scheduled→Enqueued transition.
     /// </summary>
-    Task<List<string>> ActivateScheduledJobsAsync(
+    Task<List<(Guid Id, string Queue, DateTime ScheduleTime)>> ActivateScheduledJobsAsync(
         TContext context,
         DateTime now,
         CancellationToken ct);

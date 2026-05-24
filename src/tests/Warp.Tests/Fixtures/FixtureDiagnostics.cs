@@ -25,14 +25,31 @@ public static class FixtureDiagnostics
 
     /// <summary>
     /// Shared failure-dump tail for integration test bases. On any non-passing test result,
-    /// invokes <paramref name="dumper"/> with a fresh CancellationToken (xunit's is already
-    /// cancelled) and writes the result to stderr so flakes are diagnosable in CI.
+    /// prints the pre-disposal snapshot stashed by <see cref="WarpTestServer"/> if present
+    /// (capturing live server-state before <c>IHost.StopAsync</c>); otherwise falls back to
+    /// the <paramref name="dumper"/> against the now-disposed DB. Either way the output goes
+    /// to stderr so flakes are diagnosable in CI.
+    /// <para>
+    /// The fall-back path stays useful for tests that don't construct a <see cref="WarpTestServer"/>
+    /// (DB-only tests against the fixture) and for tests where the failure happened before
+    /// <c>StartAsync</c> ran (so no pre-stop snapshot exists).
+    /// </para>
     /// </summary>
     public static async ValueTask DumpOnFailureAsync(Func<string, CancellationToken, Task<string>> dumper)
     {
         var testState = Xunit.TestContext.Current.TestState;
         if (testState == null || testState.Result == Xunit.TestResult.Passed)
         {
+            DiagnosticDumpStorage.Drain();
+
+            return;
+        }
+
+        var stashed = DiagnosticDumpStorage.Drain();
+        if (stashed != null)
+        {
+            await Console.Error.WriteLineAsync(stashed);
+
             return;
         }
 
@@ -40,7 +57,7 @@ public static class FixtureDiagnostics
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var dump = await dumper(
-                $"Test failed ({testState.Result}). Server-state diagnostics:",
+                $"Test failed ({testState.Result}). Server-state diagnostics (post-shutdown — no pre-stop snapshot stashed):",
                 cts.Token);
             await Console.Error.WriteLineAsync(dump);
         }
