@@ -66,7 +66,6 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   const [concurrencyAvailable, setConcurrencyAvailable] = useState(false);
   const [rateLimitsAvailable, setRateLimitsAvailable] = useState(false);
   const [sagasAvailable, setSagasAvailable] = useState(false);
-  const [servicesAvailable, setServicesAvailable] = useState(false);
 
   // Initial fetch for first paint — after this, fresh stats arrive directly via
   // the SignalR push payload on every JobFinalized / MessageEnqueued event (see
@@ -110,7 +109,6 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
         setConcurrencyAvailable(addons.concurrency);
         setRateLimitsAvailable(addons.rateLimits);
         setSagasAvailable(addons.sagas);
-        setServicesAvailable(addons.services);
         void useRealtimeStore.getState().connectIfEnabled(addons.push);
       })
       .catch(() => {
@@ -118,7 +116,6 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
         setConcurrencyAvailable(false);
         setRateLimitsAvailable(false);
         setSagasAvailable(false);
-        setServicesAvailable(false);
         void useRealtimeStore.getState().connectIfEnabled(false);
       });
 
@@ -143,7 +140,7 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
               ...(concurrencyAvailable ? [concurrencyNavItem] : []),
               ...(rateLimitsAvailable ? [rateLimitsNavItem] : []),
               ...(sagasAvailable ? [sagasNavItem] : []),
-              ...(servicesAvailable ? [servicesNavItem] : []),
+              servicesNavItem,
               ...extensions.flatMap((ext) =>
                 ext.pages.map((page) => ({
                   to: page.path,

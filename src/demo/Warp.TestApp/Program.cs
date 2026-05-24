@@ -80,8 +80,8 @@ builder.Services.AddWarpWorker<TestContext>(options =>
     // service runs once on every host (per-server scope). The second uses singleton scope —
     // one host across the cluster holds the lease and reports job stats every 10 seconds.
     // Watch the lease panel on the detail page to see which host currently holds it.
-    options.AddBackgroundService<TestContext, TickCounterService>();
-    options.AddBackgroundService<TestContext, JobStatsLoggerService>();
+    options.AddBackgroundService<TickCounterService>();
+    options.AddBackgroundService<JobStatsLoggerService>();
 });
 builder.Services.AddSagaHandler<OrderSagaWorkflow>();
 

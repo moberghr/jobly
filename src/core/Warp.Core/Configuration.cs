@@ -44,4 +44,15 @@ public class WarpConfiguration
     /// <c>WarpBackgroundService.LogRetentionAgeOverride</c> take precedence.
     /// </summary>
     public TimeSpan BackgroundServiceLogRetentionAge { get; set; } = TimeSpan.FromDays(7);
+
+    /// <summary>
+    /// Grace window before an orphaned <c>BackgroundServiceDefinition</c> row is deleted by
+    /// <c>ExpirationCleanup</c>. A Definition is considered orphaned when no live
+    /// <c>BackgroundServiceInstance</c> references its name AND its <c>LastSeenAt</c> is
+    /// older than this value. The grace exists solely to absorb the rolling-deploy gap
+    /// between server A's exit (its Instance is cleaned) and server B's startup
+    /// registration — without it the Definition would be deleted and immediately recreated,
+    /// losing <c>FirstSeenAt</c> history. Increase for environments with longer deploys.
+    /// </summary>
+    public TimeSpan BackgroundServiceDefinitionOrphanGrace { get; set; } = TimeSpan.FromMinutes(2);
 }
