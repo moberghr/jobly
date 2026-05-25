@@ -18,7 +18,7 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
     private readonly WarpJobTableNames _n;
 
     private readonly string _claimEnqueuedJobsSql;
-    private readonly string _lockNextEnqueuedMessageSql;
+    private readonly string _claimEnqueuedMessagesSql;
     private readonly string _lockStaleProcessingJobsSql;
     private readonly string _lockJobByIdWaitSql;
     private readonly string _lockAllServersSql;
@@ -57,13 +57,27 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
             WHERE t.""{_n.Id}"" = c.id
             RETURNING t.*";
 
-        _lockNextEnqueuedMessageSql = $@"
-            SELECT * FROM {table}
-            WHERE ""{_n.Kind}"" = {(int)JobKind.Message}
-              AND ""{_n.CurrentState}"" = {(int)State.Enqueued}
-            ORDER BY ""{_n.Queue}"", ""{_n.ScheduleTime}""
-            LIMIT 1
-            FOR NO KEY UPDATE SKIP LOCKED";
+        // Atomic batch-claim for the message router. Mirrors _claimEnqueuedJobsSql shape: an
+        // inner SELECT-FOR-UPDATE-SKIP-LOCKED picks up to N eligible message rows in queue /
+        // schedule order, the outer UPDATE flips them to Processing in one round-trip, and
+        // RETURNING streams the post-update rows back as tracked entities. Replaces the older
+        // one-at-a-time LockNextEnqueuedMessage pattern — that path required per-message commit
+        // (otherwise the next select would re-fetch the same uncommitted row), so it could not
+        // scale beyond ~commit-RTT messages per second.
+        _claimEnqueuedMessagesSql = $@"
+            UPDATE {table} AS t
+            SET ""{_n.CurrentState}"" = {(int)State.Processing}
+            FROM (
+                SELECT ""{_n.Id}"" AS id
+                FROM {table}
+                WHERE ""{_n.Kind}"" = {(int)JobKind.Message}
+                  AND ""{_n.CurrentState}"" = {(int)State.Enqueued}
+                ORDER BY ""{_n.Queue}"", ""{_n.ScheduleTime}""
+                LIMIT {{0}}
+                FOR NO KEY UPDATE SKIP LOCKED
+            ) AS c
+            WHERE t.""{_n.Id}"" = c.id
+            RETURNING t.*";
 
         _lockStaleProcessingJobsSql = $@"
             SELECT * FROM {table}
@@ -169,11 +183,11 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
             .ToListAsync(ct);
     }
 
-    public async Task<Job?> LockNextEnqueuedMessageAsync(TContext context, CancellationToken ct)
+    public async Task<List<Job>> ClaimEnqueuedMessagesAsync(TContext context, int limit, CancellationToken ct)
     {
         return await context.Set<Job>()
-            .FromSqlRaw(_lockNextEnqueuedMessageSql)
-            .FirstOrDefaultAsync(ct);
+            .FromSqlRaw(_claimEnqueuedMessagesSql, limit)
+            .ToListAsync(ct);
     }
 
     public async Task<List<Job>> LockStaleProcessingJobsAsync(

@@ -13,6 +13,7 @@ using Warp.Core.Handlers;
 using Warp.Core.Handlers.Generated;
 using Warp.Core.Helper;
 using Warp.Tests.Fixtures;
+using Warp.Tests.Helpers;
 using Warp.Tests.TestData.Handlers;
 using Warp.Worker;
 
@@ -55,7 +56,7 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
         var provider = services.BuildServiceProvider();
         await using var scope = provider.CreateAsyncScope();
         var publisherCtx = scope.ServiceProvider.GetRequiredService<TestContext>();
-        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider);
+        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider, TestTasks.NullTransport, TestTasks.NullSignals);
 
         // Act
         var jobId = await publisher.Enqueue(new SemaphoreAttributeRequest());
@@ -85,7 +86,7 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
         var provider = services.BuildServiceProvider();
         await using var scope = provider.CreateAsyncScope();
         var publisherCtx = scope.ServiceProvider.GetRequiredService<TestContext>();
-        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider);
+        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider, TestTasks.NullTransport, TestTasks.NullSignals);
 
         // Act
         var jobId = await publisher.Enqueue(new SemaphoreSkipAttributeRequest());
@@ -115,7 +116,7 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
         var provider = services.BuildServiceProvider();
         await using var scope = provider.CreateAsyncScope();
         var publisherCtx = scope.ServiceProvider.GetRequiredService<TestContext>();
-        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider);
+        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider, TestTasks.NullTransport, TestTasks.NullSignals);
 
         // Act: enqueue with WithSemaphore extension (default Mode = Wait)
         var jobId = await publisher.Enqueue(new UnitRequest(), new JobParameters().WithSemaphore("dynamic-semaphore-key", 7));
@@ -145,7 +146,7 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
         var provider = services.BuildServiceProvider();
         await using var scope = provider.CreateAsyncScope();
         var publisherCtx = scope.ServiceProvider.GetRequiredService<TestContext>();
-        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider);
+        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider, TestTasks.NullTransport, TestTasks.NullSignals);
 
         // Act: enqueue with WithSemaphore + explicit Mode = Skip
         var jobId = await publisher.Enqueue(new UnitRequest(), new JobParameters().WithSemaphore("dynamic-semaphore-skip", 3, ConcurrencyMode.Skip));
@@ -300,7 +301,7 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
         var provider = services.BuildServiceProvider();
         await using var scope = provider.CreateAsyncScope();
         var publisherCtx = scope.ServiceProvider.GetRequiredService<TestContext>();
-        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider);
+        var publisher = new Publisher<TestContext>(publisherCtx, TimeProvider.System, scope.ServiceProvider, TestTasks.NullTransport, TestTasks.NullSignals);
 
         // Act
         var jobId = await publisher.Enqueue(new MutexAndSemaphoreRequest());

@@ -4,6 +4,7 @@ using Warp.Core.Data.Entities;
 using Warp.Core.Data.Queries;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
+using Warp.Core.Events;
 using Warp.Core.Models;
 using Warp.Core.Notifications;
 
@@ -32,14 +33,16 @@ public class JobCommandService<TContext> : IJobCommandService
     private readonly WarpConfiguration _configuration;
     private readonly IWarpNotificationTransport _notificationTransport;
     private readonly IWarpSqlQueries<TContext> _sqlQueries;
+    private readonly ServerTaskSignals<TContext> _signals;
 
-    public JobCommandService(TContext context, TimeProvider timeProvider, IOptions<WarpConfiguration> configuration, IWarpNotificationTransport notificationTransport, IWarpSqlQueries<TContext> sqlQueries)
+    public JobCommandService(TContext context, TimeProvider timeProvider, IOptions<WarpConfiguration> configuration, IWarpNotificationTransport notificationTransport, IWarpSqlQueries<TContext> sqlQueries, ServerTaskSignals<TContext> signals)
     {
         _context = context;
         _timeProvider = timeProvider;
         _configuration = configuration.Value;
         _notificationTransport = notificationTransport;
         _sqlQueries = sqlQueries;
+        _signals = signals;
     }
 
     public async Task DeleteJob(Guid jobId)
@@ -165,11 +168,12 @@ public class JobCommandService<TContext> : IJobCommandService
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
-        // Requeue lands the row in Enqueued with ScheduleTime=now — wake dispatcher immediately.
+        // Requeue lands the row in Enqueued with ScheduleTime=now — wake dispatcher / bare workers immediately.
         var queue = string.IsNullOrEmpty(job.Queue) ? "default" : job.Queue;
-        await NotificationDispatch.FireAsync(
-            _notificationTransport,
-            [new Notification(NotificationKind.JobEnqueued, queue)]);
+        await NotificationDispatch.DispatchAsync(
+            [new Notification(NotificationKind.JobEnqueued, queue)],
+            _signals,
+            _notificationTransport);
     }
 
     public async Task<BulkResultModel> BulkDeleteJobs(Guid[] jobIds)
@@ -491,7 +495,7 @@ public class JobCommandService<TContext> : IJobCommandService
             var notifications = queuesToNotify
                 .Select(q => new Notification(NotificationKind.JobEnqueued, q))
                 .ToArray();
-            await NotificationDispatch.FireAsync(_notificationTransport, notifications);
+            await NotificationDispatch.DispatchAsync(notifications, _signals, _notificationTransport);
         }
 
         return result;

@@ -35,11 +35,16 @@ public interface IWarpSqlQueries<TContext>
         CancellationToken ct);
 
     /// <summary>
-    /// Locks the next <c>Kind=Message</c> row in <c>State=Enqueued</c> with SKIP LOCKED semantics
-    /// and returns it as a tracked entity. Caller runs inside a transaction, mutates the entity
-    /// + adds child jobs, then SaveChanges to commit atomically.
+    /// Atomically claims up to <paramref name="limit"/> rows of <c>Kind=Message</c> in
+    /// <c>State=Enqueued</c>, flipping them to <c>State=Processing</c> in one round-trip and
+    /// returning the post-update rows as tracked entities. Uses <c>FOR NO KEY UPDATE SKIP LOCKED</c>
+    /// (PG) / <c>WITH (ROWLOCK, UPDLOCK, READPAST)</c> (SQL Server) so concurrent routers across
+    /// servers — when not serialised by the routing advisory lock — would still get distinct rows.
+    /// Routing decisions are then made in-memory; child jobs and any state corrections
+    /// (no-handler → Failed) commit together in a single <c>SaveChanges</c> at the end of the
+    /// caller's batch.
     /// </summary>
-    Task<Job?> LockNextEnqueuedMessageAsync(TContext context, CancellationToken ct);
+    Task<List<Job>> ClaimEnqueuedMessagesAsync(TContext context, int limit, CancellationToken ct);
 
     /// <summary>
     /// Locks <c>Kind=Job</c> rows in <c>State=Processing</c> whose <c>LastKeepAlive</c> is older

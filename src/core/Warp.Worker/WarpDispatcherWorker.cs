@@ -256,7 +256,7 @@ public class WarpDispatcherWorker<TContext> : BackgroundService
             var handlerContext = handlerScope.ServiceProvider.GetRequiredService<TContext>();
             var handlerPending = NotificationDispatch.CapturePending(handlerContext);
             await handlerContext.SaveChangesAsync(default);
-            await NotificationDispatch.FireAsync(_notificationTransport, handlerPending, CancellationToken.None);
+            await NotificationDispatch.DispatchAsync(handlerPending, _signals, _notificationTransport, CancellationToken.None);
 
             // Read metadata and outcome from handler scope before disposing
             job.Metadata = JsonSerializer.Serialize(jobContext.Metadata);

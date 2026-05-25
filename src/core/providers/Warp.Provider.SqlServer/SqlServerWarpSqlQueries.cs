@@ -26,7 +26,7 @@ public sealed class SqlServerWarpSqlQueries<TContext> : IWarpSqlQueries<TContext
     private readonly WarpJobTableNames _n;
 
     private readonly string _claimEnqueuedJobsSql;
-    private readonly string _lockNextEnqueuedMessageSql;
+    private readonly string _claimEnqueuedMessagesSql;
     private readonly string _lockStaleProcessingJobsSql;
     private readonly string _lockJobByIdWaitSql;
     private readonly string _lockAllServersSql;
@@ -63,12 +63,23 @@ public sealed class SqlServerWarpSqlQueries<TContext> : IWarpSqlQueries<TContext
                 [{_n.LastKeepAlive}] = {{1}}
             OUTPUT INSERTED.*";
 
-        _lockNextEnqueuedMessageSql = $@"
-            SELECT TOP (1) *
-            FROM {table} WITH (ROWLOCK, UPDLOCK, READPAST)
-            WHERE [{_n.Kind}] = {(int)JobKind.Message}
-              AND [{_n.CurrentState}] = {(int)State.Enqueued}
-            ORDER BY [{_n.Queue}], [{_n.ScheduleTime}]";
+        // Atomic batch-claim for the message router. Mirrors _claimEnqueuedJobsSql shape: a CTE
+        // picks up to N eligible message rows under ROWLOCK+UPDLOCK+READPAST, the UPDATE flips
+        // them to Processing in one round-trip and OUTPUT INSERTED.* streams the post-update
+        // rows back as tracked entities. Replaces the older one-at-a-time LockNextEnqueuedMessage
+        // — that path required per-message commit (otherwise the next select would re-fetch the
+        // same uncommitted row), so it could not scale beyond ~commit-RTT messages per second.
+        _claimEnqueuedMessagesSql = $@"
+            WITH candidates AS (
+                SELECT TOP ({{0}}) *
+                FROM {table} WITH (ROWLOCK, UPDLOCK, READPAST)
+                WHERE [{_n.Kind}] = {(int)JobKind.Message}
+                  AND [{_n.CurrentState}] = {(int)State.Enqueued}
+                ORDER BY [{_n.Queue}], [{_n.ScheduleTime}]
+            )
+            UPDATE candidates
+            SET [{_n.CurrentState}] = {(int)State.Processing}
+            OUTPUT INSERTED.*";
 
         _lockStaleProcessingJobsSql = $@"
             SELECT *
@@ -169,11 +180,11 @@ public sealed class SqlServerWarpSqlQueries<TContext> : IWarpSqlQueries<TContext
             .ToListAsync(ct);
     }
 
-    public async Task<Job?> LockNextEnqueuedMessageAsync(TContext context, CancellationToken ct)
+    public async Task<List<Job>> ClaimEnqueuedMessagesAsync(TContext context, int limit, CancellationToken ct)
     {
         return await context.Set<Job>()
-            .FromSqlRaw(_lockNextEnqueuedMessageSql)
-            .FirstOrDefaultAsync(ct);
+            .FromSqlRaw(_claimEnqueuedMessagesSql, limit)
+            .ToListAsync(ct);
     }
 
     public async Task<List<Job>> LockStaleProcessingJobsAsync(
