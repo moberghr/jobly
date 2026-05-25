@@ -144,7 +144,7 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
         // queue names so the caller can fire one JobEnqueued notification per distinct queue.
         // Replaces the previous SELECT-DISTINCT-then-UPDATE pattern (2 round-trips).
         // RETURNING carries Id + Queue + ScheduleTime so the caller can write a per-row
-        // "Activated" JobLog (with the previous ScheduleTime for operator context) atomically
+        // "Enqueued" JobLog (with the previous ScheduleTime for operator context) atomically
         // with the state change. The ambient transaction from the xact-lock path
         // (LocksWithTransaction = true) makes the UPDATE + downstream JobLog inserts commit
         // together.

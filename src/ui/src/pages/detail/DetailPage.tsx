@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { StateBadge } from '@/components/StateBadge';
 import { FlowCard } from '@/components/FlowCard';
 import { FilteredJobsTable } from '@/components/FilteredJobsTable';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { RelativeTime } from '@/components/RelativeTime';
 import { shortType, formatDateTime, shortId } from '@/utils/format';
 import { LoadingState, ErrorState } from '@/components/PageState';
@@ -13,13 +14,24 @@ import { State } from '@/types';
 import type { UnifiedJobDetailModel, JobLogModel } from '@/types';
 import * as api from '@/api';
 
+type DetailPendingAction = 'cancel' | 'requeue' | 'delete';
+
+// Color rules for the history panel: Failed always red, Completed always green, every
+// other event type renders neutral. This is intentional — do NOT add entries here for
+// new event types like Scheduled / Enqueued / Processing / Requeued / Created. Most
+// events don't carry meaning that benefits from a dedicated color, and a fully-painted
+// timeline becomes harder to scan than one that highlights only "this finished" /
+// "this broke". The exception payload's dedicated red <pre> block (below) continues to
+// show exception detail on Failed rows regardless of this map.
+const neutralRowClasses = {
+  border: 'border-l-border',
+  bg: 'bg-transparent',
+  text: 'text-foreground',
+};
+
 const eventColors: Record<string, { border: string; bg: string; text: string }> = {
-  Created:    { border: 'border-l-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/30', text: 'text-blue-700 dark:text-blue-400' },
-  Processing: { border: 'border-l-purple-500', bg: 'bg-purple-50 dark:bg-purple-950/30', text: 'text-purple-700 dark:text-purple-400' },
-  Completed:  { border: 'border-l-green-500', bg: 'bg-green-50 dark:bg-green-950/30', text: 'text-green-700 dark:text-green-400' },
-  Failed:     { border: 'border-l-red-500', bg: 'bg-red-50 dark:bg-red-950/30', text: 'text-red-700 dark:text-red-400' },
-  Requeued:   { border: 'border-l-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-950/30', text: 'text-yellow-700 dark:text-yellow-400' },
-  Deleted:    { border: 'border-l-gray-500', bg: 'bg-gray-50 dark:bg-gray-950/30', text: 'text-gray-700 dark:text-gray-400' },
+  Completed: { border: 'border-l-green-500', bg: 'bg-green-50 dark:bg-green-950/30', text: 'text-green-700 dark:text-green-400' },
+  Failed:    { border: 'border-l-red-500',   bg: 'bg-red-50 dark:bg-red-950/30',     text: 'text-red-700 dark:text-red-400' },
 };
 
 function formatDuration(ms: number): string {
@@ -56,6 +68,7 @@ export default function DetailPage() {
   const [job, setJob] = useState<UnifiedJobDetailModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [jobCounts, setJobCounts] = useState<Record<string, number>>({});
+  const [pending, setPending] = useState<DetailPendingAction | null>(null);
 
   useEffect(() => {
     if (id) api.getDetail(id).then(setJob).catch(() => setError('Unable to load details'));
@@ -117,11 +130,11 @@ export default function DetailPage() {
         {job.queue && <span className="text-sm text-muted-foreground">Queue: {job.queue}</span>}
         <div className="flex-1" />
         {isJob && job.currentState === State.Processing ? (
-          <Button variant="destructive" size="sm" onClick={() => api.deleteJob(job.id)}>Cancel</Button>
+          <Button variant="destructive" size="sm" onClick={() => setPending('cancel')}>Cancel</Button>
         ) : isJob ? (
           <>
-            <Button variant="outline" size="sm" onClick={() => api.requeueJob(job.id)}>Requeue</Button>
-            <Button variant="destructive" size="sm" onClick={() => api.deleteJob(job.id)}>Delete</Button>
+            <Button variant="outline" size="sm" onClick={() => setPending('requeue')}>Requeue</Button>
+            <Button variant="destructive" size="sm" onClick={() => setPending('delete')}>Delete</Button>
           </>
         ) : null}
       </div>
@@ -233,7 +246,7 @@ export default function DetailPage() {
               <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">History</h2>
               <div className="space-y-3">
                 {systemEvents.map((event, index) => {
-                  const colors = eventColors[event.eventType] ?? eventColors.Created;
+                  const colors = eventColors[event.eventType] ?? neutralRowClasses;
                   const duration = getDuration(systemEvents, index);
                   return (
                     <div key={event.id} className={`border-l-4 ${colors.border} ${colors.bg} rounded-r-md p-4`}>
@@ -303,6 +316,33 @@ export default function DetailPage() {
           />
         </div>
       )}
+
+      <ConfirmDialog
+        open={pending !== null}
+        onOpenChange={(open) => !open && setPending(null)}
+        title={
+          pending === 'cancel' ? 'Cancel running job?'
+            : pending === 'requeue' ? 'Requeue job?'
+              : pending === 'delete' ? 'Delete job?'
+                : ''
+        }
+        description={
+          pending === 'cancel'
+            ? 'The job will be marked for graceful cancellation. If the handler ignores the cancellation token and completes, the job stays in its current state.'
+            : pending === 'requeue'
+              ? 'The job will be re-enqueued and picked up by a worker on the next poll.'
+              : pending === 'delete'
+                ? 'The job will be removed permanently. This cannot be undone.'
+                : null
+        }
+        confirmLabel={pending === 'requeue' ? 'Requeue' : pending === 'cancel' ? 'Cancel job' : 'Delete'}
+        variant={pending === 'delete' || pending === 'cancel' ? 'destructive' : 'default'}
+        onConfirm={() => {
+          if (pending === 'cancel' || pending === 'delete') api.deleteJob(job.id);
+          else if (pending === 'requeue') api.requeueJob(job.id);
+          setPending(null);
+        }}
+      />
     </div>
   );
 }

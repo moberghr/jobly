@@ -138,7 +138,7 @@ public abstract class ScheduledJobActivationTaskTestsBase : IAsyncLifetime
     [TimedFact]
     public async Task ActivateWithNotify_WritesActivatedJobLog_PerActivatedRow_WithPreviousScheduleTime()
     {
-        // Each Scheduled→Enqueued flip writes one JobLog row with EventType="Activated" and
+        // Each Scheduled→Enqueued flip writes one JobLog row with EventType="Enqueued" and
         // the row's previous ScheduleTime in the message. Atomic with the state change via
         // the xact-lock transaction that wraps ExecuteAsync — so observers reading via the
         // ServerTaskLoop's lock release point see state=Enqueued AND the audit row together.
@@ -165,18 +165,18 @@ public abstract class ScheduledJobActivationTaskTestsBase : IAsyncLifetime
 
         var readCtx = _fixture.CreateContext();
         var logs = await readCtx.Set<JobLog>()
-            .Where(l => l.JobId == jobId && l.EventType == "Activated")
+            .Where(l => l.JobId == jobId && l.EventType == "Enqueued")
             .ToListAsync(Xunit.TestContext.Current.CancellationToken);
         logs.ShouldHaveSingleItem();
         logs[0].Level.ShouldBe("Information");
-        logs[0].Message.ShouldStartWith("Activated from Scheduled — was scheduled at ");
+        logs[0].Message.ShouldStartWith("Enqueued from Scheduled — was scheduled at ");
 
         // PG's timestamp(6) truncates the .NET 100-ns tick to microsecond precision, so a
         // string-equality compare on the full round-tripped ISO timestamp can disagree on the
         // last digit. Parse and compare with a microsecond tolerance — same pattern as the
         // CircuitBreaker time-precision tests.
         var emittedSchedule = DateTime.Parse(
-            logs[0].Message["Activated from Scheduled — was scheduled at ".Length..],
+            logs[0].Message["Enqueued from Scheduled — was scheduled at ".Length..],
             System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.RoundtripKind);
         emittedSchedule.ShouldBe(scheduledAt, TimeSpan.FromMilliseconds(1));
@@ -206,10 +206,11 @@ public abstract class ScheduledJobActivationTaskTestsBase : IAsyncLifetime
         var result = await Warp.Tests.Helpers.TestTasks.CreateScheduledJobActivation(actCtx, TimeProvider.System).ActivateWithNotifyAsync(CancellationToken.None);
         result.Activated.ShouldBe(0);
 
+        // Activation never ran on this row → no Enqueued log written by the activation task.
         var readCtx = _fixture.CreateContext();
-        var anyActivatedLog = await readCtx.Set<JobLog>()
-            .AnyAsync(l => l.EventType == "Activated", Xunit.TestContext.Current.CancellationToken);
-        anyActivatedLog.ShouldBeFalse();
+        var anyActivationLog = await readCtx.Set<JobLog>()
+            .AnyAsync(l => l.JobId == noiseId && l.EventType == "Enqueued", Xunit.TestContext.Current.CancellationToken);
+        anyActivationLog.ShouldBeFalse();
     }
 
     [TimedFact]

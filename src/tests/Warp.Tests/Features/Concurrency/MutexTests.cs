@@ -322,7 +322,8 @@ public abstract class MutexTestsBase : IAsyncLifetime
 
         var log = await readCtx.Set<JobLog>()
             .Where(x => x.JobId == job2Id)
-            .Where(x => x.EventType == "Requeued")
+            .Where(x => x.EventType == "Enqueued")
+            .Where(x => x.Message.Contains("payment:wait"))
             .FirstOrDefaultAsync(CancellationToken.None);
         log.ShouldNotBeNull();
         log.Message.ShouldContain("Requeued");

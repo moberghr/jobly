@@ -7,6 +7,7 @@ import { shortType, shortId } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { DataTable } from '@/components/DataTable';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
 import {
   useJobsList,
@@ -20,6 +21,14 @@ import {
   useDeleteFailedJobsByType,
 } from '@/api/hooks/useJobs';
 import type { JobModel } from '@/types';
+
+type PendingAction =
+  | { kind: 'requeue-one'; id: string }
+  | { kind: 'delete-one'; id: string }
+  | { kind: 'requeue-bulk'; ids: string[] }
+  | { kind: 'delete-bulk'; ids: string[] }
+  | { kind: 'requeue-by-type'; type: string }
+  | { kind: 'delete-by-type'; type: string };
 
 export default function JobListPage() {
   const { state } = useParams<{ state: string }>();
@@ -47,6 +56,33 @@ export default function JobListPage() {
   const bulkDelete = useBulkDeleteJobs();
   const requeueByType = useRequeueFailedJobsByType();
   const deleteByType = useDeleteFailedJobsByType();
+
+  const [pending, setPending] = useState<PendingAction | null>(null);
+
+  const runPending = () => {
+    if (!pending) return;
+    switch (pending.kind) {
+      case 'requeue-one':
+        requeue.mutate(pending.id);
+        break;
+      case 'delete-one':
+        remove.mutate(pending.id);
+        break;
+      case 'requeue-bulk':
+        bulkRequeue.mutate(pending.ids, { onSuccess: () => setSelectedIds(new Set()) });
+        break;
+      case 'delete-bulk':
+        bulkDelete.mutate(pending.ids, { onSuccess: () => setSelectedIds(new Set()) });
+        break;
+      case 'requeue-by-type':
+        requeueByType.mutate(pending.type);
+        break;
+      case 'delete-by-type':
+        deleteByType.mutate(pending.type);
+        break;
+    }
+    setPending(null);
+  };
 
   const active = isFailed && selectedType ? typedQuery : listQuery;
   const data = active.data;
@@ -149,14 +185,18 @@ export default function JobListPage() {
         header: 'Actions',
         cell: ({ row }) => (
           <>
-            <Button variant="ghost" size="sm" onClick={() => requeue.mutate(row.original.id)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPending({ kind: 'requeue-one', id: row.original.id })}
+            >
               Requeue
             </Button>
             <Button
               variant="ghost"
               size="sm"
               className="text-destructive"
-              onClick={() => remove.mutate(row.original.id)}
+              onClick={() => setPending({ kind: 'delete-one', id: row.original.id })}
             >
               Delete
             </Button>
@@ -165,7 +205,7 @@ export default function JobListPage() {
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
     ],
-    [data, selectedIds, activeState, requeue, remove],
+    [data, selectedIds, activeState],
   );
 
   if (active.isError) return <ErrorState message="Unable to load jobs" />;
@@ -220,14 +260,18 @@ export default function JobListPage() {
       {isFailed && selectedType && (
         <div className="flex items-center gap-3 mb-3 p-3 bg-muted rounded-md">
           <span className="text-sm font-medium">Filtered: {shortType(selectedType)}</span>
-          <Button variant="outline" size="sm" onClick={() => requeueByType.mutate(selectedType)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPending({ kind: 'requeue-by-type', type: selectedType })}
+          >
             Requeue All
           </Button>
           <Button
             variant="outline"
             size="sm"
             className="text-destructive"
-            onClick={() => deleteByType.mutate(selectedType)}
+            onClick={() => setPending({ kind: 'delete-by-type', type: selectedType })}
           >
             Delete All
           </Button>
@@ -240,11 +284,7 @@ export default function JobListPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() =>
-              bulkRequeue.mutate(Array.from(selectedIds), {
-                onSuccess: () => setSelectedIds(new Set()),
-              })
-            }
+            onClick={() => setPending({ kind: 'requeue-bulk', ids: Array.from(selectedIds) })}
           >
             Requeue
           </Button>
@@ -252,11 +292,7 @@ export default function JobListPage() {
             variant="outline"
             size="sm"
             className="text-destructive"
-            onClick={() =>
-              bulkDelete.mutate(Array.from(selectedIds), {
-                onSuccess: () => setSelectedIds(new Set()),
-              })
-            }
+            onClick={() => setPending({ kind: 'delete-bulk', ids: Array.from(selectedIds) })}
           >
             Delete
           </Button>
@@ -279,6 +315,54 @@ export default function JobListPage() {
           onPageSizeChange: handlePageSizeChange,
         }}
       />
+
+      <ConfirmDialog
+        open={pending !== null}
+        onOpenChange={(open) => !open && setPending(null)}
+        title={pending ? pendingTitle(pending) : ''}
+        description={pending ? pendingDescription(pending) : null}
+        confirmLabel={pending ? pendingConfirmLabel(pending) : 'Confirm'}
+        variant={pending && pending.kind.startsWith('delete') ? 'destructive' : 'default'}
+        onConfirm={runPending}
+      />
     </div>
   );
+}
+
+function pendingTitle(p: PendingAction): string {
+  switch (p.kind) {
+    case 'requeue-one':
+      return 'Requeue job?';
+    case 'delete-one':
+      return 'Delete job?';
+    case 'requeue-bulk':
+      return `Requeue ${p.ids.length} job${p.ids.length === 1 ? '' : 's'}?`;
+    case 'delete-bulk':
+      return `Delete ${p.ids.length} job${p.ids.length === 1 ? '' : 's'}?`;
+    case 'requeue-by-type':
+      return `Requeue all failed ${shortType(p.type)} jobs?`;
+    case 'delete-by-type':
+      return `Delete all failed ${shortType(p.type)} jobs?`;
+  }
+}
+
+function pendingDescription(p: PendingAction): string {
+  switch (p.kind) {
+    case 'requeue-one':
+      return 'The job will be re-enqueued and picked up by a worker on the next poll.';
+    case 'delete-one':
+      return 'The job will be removed permanently. This cannot be undone.';
+    case 'requeue-bulk':
+      return `All ${p.ids.length} selected job${p.ids.length === 1 ? '' : 's'} will be re-enqueued.`;
+    case 'delete-bulk':
+      return `${p.ids.length} selected job${p.ids.length === 1 ? '' : 's'} will be removed permanently. This cannot be undone.`;
+    case 'requeue-by-type':
+      return 'All failed jobs of this type will be re-enqueued. Depending on the type, this may be a large number of jobs.';
+    case 'delete-by-type':
+      return 'All failed jobs of this type will be removed permanently. This cannot be undone.';
+  }
+}
+
+function pendingConfirmLabel(p: PendingAction): string {
+  return p.kind.startsWith('delete') ? 'Delete' : 'Requeue';
 }

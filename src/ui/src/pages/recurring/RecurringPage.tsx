@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { DataTable } from '@/components/DataTable';
@@ -15,6 +16,10 @@ import {
 } from '@/api/hooks/useRecurring';
 import type { RecurringJobModel } from '@/types';
 
+type RecurringPending =
+  | { kind: 'trigger'; id: number; name: string }
+  | { kind: 'remove'; id: number; name: string };
+
 export default function RecurringPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
@@ -24,6 +29,15 @@ export default function RecurringPage() {
   const disable = useDisableRecurringJob();
   const trigger = useTriggerRecurringJob();
   const remove = useDeleteRecurringJob();
+
+  const [pending, setPending] = useState<RecurringPending | null>(null);
+
+  const runPending = () => {
+    if (!pending) return;
+    if (pending.kind === 'trigger') trigger.mutate(pending.id);
+    else remove.mutate(pending.id);
+    setPending(null);
+  };
 
   const columns = useMemo<ColumnDef<RecurringJobModel>[]>(
     () => [
@@ -101,14 +115,18 @@ export default function RecurringPage() {
                 Disable
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={() => trigger.mutate(row.original.id)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPending({ kind: 'trigger', id: row.original.id, name: row.original.name })}
+            >
               Trigger
             </Button>
             <Button
               variant="ghost"
               size="sm"
               className="text-destructive"
-              onClick={() => remove.mutate(row.original.id)}
+              onClick={() => setPending({ kind: 'remove', id: row.original.id, name: row.original.name })}
             >
               Remove
             </Button>
@@ -117,7 +135,7 @@ export default function RecurringPage() {
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
     ],
-    [enable, disable, trigger, remove],
+    [enable, disable],
   );
 
   if (isError) return <ErrorState message="Unable to load recurring jobs" />;
@@ -142,6 +160,22 @@ export default function RecurringPage() {
             setPage(0);
           },
         }}
+      />
+
+      <ConfirmDialog
+        open={pending !== null}
+        onOpenChange={(open) => !open && setPending(null)}
+        title={pending?.kind === 'remove' ? `Remove recurring job "${pending.name}"?` : pending ? `Trigger "${pending.name}" now?` : ''}
+        description={
+          pending?.kind === 'remove'
+            ? 'The recurring job definition and its history will be removed permanently. Any future scheduled runs will not fire. This cannot be undone.'
+            : pending
+              ? 'A job will be enqueued immediately, on top of the normal cron schedule. Any in-progress concurrency or rate-limit guards on the underlying handler still apply.'
+              : null
+        }
+        confirmLabel={pending?.kind === 'remove' ? 'Remove' : 'Trigger'}
+        variant={pending?.kind === 'remove' ? 'destructive' : 'default'}
+        onConfirm={runPending}
       />
     </div>
   );

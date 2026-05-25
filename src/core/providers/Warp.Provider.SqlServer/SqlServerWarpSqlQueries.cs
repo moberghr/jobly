@@ -142,7 +142,7 @@ public sealed class SqlServerWarpSqlQueries<TContext> : IWarpSqlQueries<TContext
 
         // Atomic activation: UPDATE ... OUTPUT INSERTED.(id, queue, schedule_time) flips due rows
         // AND streams back per-row identity + queue + schedule_time. Caller fires one
-        // JobEnqueued notification per distinct queue AND writes one "Activated" JobLog row per
+        // JobEnqueued notification per distinct queue AND writes one "Enqueued" JobLog row per
         // id (atomic with this UPDATE via the ambient xact-lock transaction).
         _activateScheduledJobsSql = $@"
             UPDATE {table}

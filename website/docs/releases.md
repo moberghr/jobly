@@ -4,6 +4,142 @@ sidebar_position: 6
 
 # Releases
 
+## 0.17.0
+
+*2026-05-25*
+
+External adopter feedback drove most of this release. Addon entities are now part of the base schema (no more mirroring opt-ins across hosts), `AddWarp` fails fast on misconfigured DbContext registration, and the source generator's multi-project ergonomics are fixed. The worker's "Requeued" log row is split into discrete `Failed` + `Scheduled`/`Enqueued` rows; job list pages sort by finished time on terminal states; metadata persists enums as strings instead of integers; the dashboard's history panel reduces color noise; and destructive UI actions now go through a confirmation dialog.
+
+### Feature: addon entities always in the schema
+
+`opt.AddConcurrency()` / `AddCircuitBreaker()` / `AddRateLimit()` / `AddSagas()` previously contributed their EF entities (`ConcurrencyLimit`, `CircuitBreakerState`, `RateLimitBucket`, `RateLimitOverride`, `SagaState`, `SagaJobLink`) only when the host called the opt-in. In a multi-host deployment (API + Workers + BackOffice + Migrations all built from the same monorepo), every host had to declare the same addon set or the migrations job would skip tables a downstream host needed at runtime — manifesting as `relation "warp.concurrency_limit" does not exist` on the first attribute-decorated handler invocation.
+
+`WarpModelCustomizer` now registers all six addon entities unconditionally. The opt-in methods still gate runtime behavior (pipeline behaviors, admin services, dashboard endpoints) — the schema is just always there. One migration covers every deployment shape, and operators don't need to remember which addons each host declares.
+
+Trade-off: six tables exist in deployments that don't use the addons. Each is an empty B-tree with no inserts and one indexed `Name` / `GroupKey` column; the overhead is cosmetic. If you actively need to avoid the tables (very strict multi-tenant schema discipline), file an issue.
+
+### Feature: `opt.ExcludeHandlersFromAssembly(...)` for multi-host solutions
+
+The Warp source generator scans handlers transitively across project references and auto-registers everything it finds. In a single-host solution that's convenient; in a multi-host one (API + Workers built from a shared `Domain` project that transitively pulls each other's handlers) it causes scope-validation explosions — the API host can't satisfy worker-only DI dependencies on handlers it doesn't intend to invoke.
+
+```csharp
+builder.Services.AddWarp<AppDbContext>(opt =>
+{
+    opt.UsePostgreSql();
+    opt.ExcludeHandlersFromAssembly(typeof(WorkerOnlyMarker).Assembly);
+});
+```
+
+The exclusion is per-host (configured on the `AddWarp` / `AddWarpWorker` lambda) and runs after `WarpGeneratedHandlerRegistry.ApplyAll` to scrub `IRequestHandler<,>` / `IJobHandler<>` / `IMessageHandler<>` / `IStreamRequestHandler<,>` registrations whose implementation type lives in the excluded assembly. Pipeline behaviors and other DI registrations are unaffected.
+
+### Feature: `AddWarp` fails fast on misconfigured DbContext registration
+
+Adopters using `AddDbContextFactory<T>` (Blazor render-scoped contexts, design-time tooling) without also calling `AddDbContext<T>` previously saw silent failures — empty migrations from `dotnet ef migrations add` and runtime `Unable to resolve service for type 'AppDbContext'` errors after their handlers had already partially executed.
+
+`AddWarp<TContext>` now checks the service collection for a Scoped `TContext` registration and throws at startup with an actionable message:
+
+```text
+AddWarp<AppDbContext>() requires AppDbContext to be registered via
+services.AddDbContext<AppDbContext>(...). If you're using
+AddDbContextFactory<AppDbContext>(...) (e.g. for Blazor / design-time
+tooling), also call AddDbContext<AppDbContext>(...) so Warp's scoped
+services can resolve the context.
+```
+
+### Feature: split `"Requeued"` worker log into `Failed` + `Scheduled`/`Enqueued`
+
+The worker auto-retry path previously wrote one `JobLog` row with `EventType = "Requeued"` that combined the exception detail and the next-attempt timestamp. Operators on the dashboard couldn't visually separate the failure from the requeue, and the row had to render in a hybrid yellow color that didn't communicate "this attempt failed."
+
+The worker now emits two log rows on retry-after-error:
+
+- **`Failed`** with the exception, error message, and per-attempt duration. Renders red.
+- **`Scheduled`** (or **`Enqueued`** for immediate retry) with `Message = "Retry scheduled for <ISO timestamp>"`. Renders neutral.
+
+Single-row emission is preserved for the non-retry paths (terminal Completed/Failed/Deleted, or addon-driven requeues like Mutex Wait / Rate-Limit Wait — those still emit one row with `EventType` matching the literal state). `JobCommandService.RequeueJob` (admin "Requeue" button) and `StaleJobRecovery` (crash recovery) continue to emit `"Requeued"` — those are user-driven actions, not retry-after-failure.
+
+### Feature: finished-time sort on terminal-state job lists
+
+Job list pages for terminal states (Completed, Failed, Deleted, including failed-by-type) now sort by the latest `JobLog` terminal-event timestamp descending, falling back to `CreateTime` when no terminal log exists. The Completed page shows the most recently finished jobs at the top, which is what operators expect from "newest first."
+
+Non-terminal pages (Enqueued, Processing, Scheduled, Awaiting) sort by `CreateTime` directly — there is no terminal log row to find, so the subquery would be wasted work.
+
+A composite index on `job_log (job_id, event_type, timestamp)` is added to support the correlated subquery; the previously-existing single-column `job_log (job_id)` index is removed (the composite is a superset).
+
+### Feature: metadata enums persisted as strings
+
+`JobParameters().WithMutex("k", ConcurrencyMode.Skip)` previously wrote the integer enum value (`1`) into `Job.Metadata`. The dashboard rendered the raw JSON, so operators saw `"ConcurrencyMode": 1` and had to mentally map the integer back to the enum name.
+
+`MetadataSerializer` now adds `JsonStringEnumConverter` to its options. New rows write `"ConcurrencyMode": "Skip"`; `MetadataConvert.To<TEnum>` was extended with a `string → enum` branch using `Enum.TryParse(ignoreCase: true)`. Applies to all enum metadata properties — `ConcurrencyMode`, `RateLimitMode`, `RateLimitStyle`, `TimeoutMode`, `TimeoutScope`, `CancellationMode`.
+
+### Feature: UI confirmation dialogs on destructive actions
+
+Delete, Requeue, Trigger, and Disable buttons across the dashboard now open a confirmation dialog before firing the mutation. Coverage:
+
+- **Job list page**: single Delete + single Requeue + bulk Delete + bulk Requeue + by-type Delete-all + by-type Requeue-all.
+- **Job detail page**: Delete, Requeue, Cancel (running job).
+- **Recurring jobs list**: Trigger, Remove.
+- **Recurring jobs detail**: Trigger, Delete, Disable. Enable stays immediate (harmless to re-enable).
+
+A new `<ConfirmDialog>` component wraps `@base-ui/react`'s `AlertDialog`. The dialog states the action, the resource (job ID, count, name), and uses the destructive variant for irreversible actions (delete, disable).
+
+### Feature: dashboard history panel — color noise reduction
+
+The job detail page's history panel previously colored every event type (Created blue, Processing purple, Completed green, Failed red, Requeued yellow, Deleted grey). With the `Failed` + `Scheduled` split adding more rows per retry, the timeline became visually noisy.
+
+Only two event types are now colored:
+
+- **`Failed`** — red border + background + text.
+- **`Completed`** — green border + background + text.
+
+Everything else (`Processing`, `Created`, `Scheduled`, `Enqueued`, `Requeued`, `Deleted`) renders neutral. The exception detail still gets its dedicated red `<pre>` block on Failed rows. The policy is documented in source so future event types fall through to neutral by default.
+
+### Feature: `Activated` → `Enqueued` rename in `ScheduledJobActivation`
+
+The log row written when `ScheduledJobActivation` transitions a job from `Scheduled` to `Enqueued` was previously `EventType = "Activated"`. Operators reading the dashboard had to mentally translate "Activated" → "is now Enqueued."
+
+The row is now `EventType = "Enqueued"` with message `"Enqueued from Scheduled — was scheduled at <ISO timestamp>"`. Lines up with the literal state and reduces the event-type vocabulary by one.
+
+### Fix: source generator `WarpMediatorServiceExtensions` is now `internal`
+
+`Warp.SourceGenerator` emits a `WarpMediatorServiceExtensions` class in every consuming project. Previously this class was `public`, which caused `CS0436` "duplicate type" warnings across project references in multi-project solutions — under `TreatWarningsAsErrors`, the build failed.
+
+The emitted class is now `internal`. Each assembly's copy is callable from within that assembly (the `[ModuleInitializer]` wiring path is unchanged), but referenced projects don't see it. CS0436 is gone for this type.
+
+### Fix: `JobOutcome` short-circuit documentation
+
+`JobOutcome` has `init`-only properties; pipeline behaviors that want to short-circuit (skip retry, mark deleted) have to construct a new instance rather than mutating an existing one. The previous XML doc didn't make this clear and external adopters hit `CS8852`. The doc now includes a worked example showing the canonical pattern.
+
+### Documentation
+
+Three new pages under `operations/`:
+
+- **EF Core integration** — `AddDbContext` vs `AddDbContextFactory`, design-time tooling, addon entity always-on contract, naming conventions.
+- **Multi-project source generation** — CS0436 fix explained, `ExcludeHandlersFromAssembly` usage, `IJob`-as-HTTP-body rejection, instance-class requirement.
+- **Migrating from Wolverine** — translation table (`InvokeAsync` → `Send`, cascade return values → explicit Publish + SaveChanges, static handlers → instance, etc.), with the auth-policy diagnostic checklist.
+
+`llms-full.txt` updated to match — stale `services.AddWarpRetry` / `AddJobHandlers` references removed, install snippet includes the provider NuGet, addon opt-ins documented on the builder lambda parameter.
+
+### Breaking changes
+
+- **`"Requeued"` worker log → `Failed` + `Scheduled`/`Enqueued` split.** Code that queries `JobLog` for `EventType = "Requeued"` to count retries no longer matches the worker's emissions. Switch to counting `Scheduled` + `Enqueued` rows where `Level = "Information"` and `Message.StartsWith("Retry scheduled for")`. `JobCommandService.RequeueJob` and `StaleJobRecovery` continue to emit `"Requeued"` — those are admin / crash-recovery actions, not retry-on-failure.
+- **`"Activated"` → `"Enqueued"`.** Same shape applies for any code keyed off the literal `"Activated"` event type.
+- **`Job.Metadata` JSON shape: enum values are now strings.** Code that reads metadata directly via SQL (`metadata->>'ConcurrencyMode'::int` in Postgres) breaks. Reading via the EF model + `IConcurrencyMetadata` / `IRateLimitMetadata` accessors continues to work — `MetadataConvert.To<TEnum>` handles both formats.
+- **`WarpMediatorServiceExtensions` is `internal`.** Code that explicitly called `Warp.Core.Handlers.Generated.WarpMediatorServiceExtensions.AddWarpMediator(services)` from a different assembly stops compiling. The cross-assembly registration path goes through `[ModuleInitializer]` + `WarpGeneratedHandlerRegistry.ApplyAll` — no direct call is needed. Intra-assembly calls (in your test fixtures) continue to work.
+- **`AddWarp<T>` throws when TContext isn't registered as Scoped.** Hosts that previously got away with `AddDbContextFactory<T>` (without also calling `AddDbContext<T>`) now fail at startup with a clear error. Add `AddDbContext<T>` to the registration chain.
+- **Removed: `WarpConfiguration.EntityConfigurators` is no longer used by in-tree addons.** The list itself remains as a public extension point for third-party / provider-package addons.
+
+### Migration
+
+Run `dotnet ef migrations add UpgradeWarp_0_17_0` and apply. The migration is mostly additive:
+
+- `CREATE TABLE` for any addon entity your host wasn't previously opting into.
+- `CREATE INDEX warp.ix_job_log_job_id_event_type_timestamp` on `job_log (job_id, event_type, timestamp)`.
+- `DROP INDEX warp.ix_job_log_job_id` (the single-column index is now redundant).
+
+On large `job_log` tables the composite index build can take a while — schedule the migration accordingly.
+
+---
+
 ## 0.16.0
 
 *2026-05-25*

@@ -26,7 +26,7 @@
 
 ## Addon Composition
 
-- **§2.11** Addons are opt-in via builder methods: `opt.AddRetry()`, `opt.AddConcurrency()`, `opt.AddRateLimit()`, `opt.AddCircuitBreaker()`, `opt.AddNoRestart()`, `opt.AddTimeout()`, `opt.UseDatabasePush()`, `opt.AddDashboardPush()`. Addons compose against Core's public API only — **never use `InternalsVisibleTo` to reach into Core internals**.
+- **§2.11** Addons are opt-in via builder methods: `opt.AddRetry()`, `opt.AddConcurrency()`, `opt.AddRateLimit()`, `opt.AddCircuitBreaker()`, `opt.AddNoRestart()`, `opt.AddTimeout()`, `opt.UseDatabasePush()`, `opt.AddDashboardPush()`. Addons compose against Core's public API only — **never use `InternalsVisibleTo` to reach into Core internals**. **Addon entities are always in the schema** — `WarpModelCustomizer` adds `ConcurrencyLimit`, `CircuitBreakerState`, `RateLimitBucket`, `RateLimitOverride`, `SagaState`, `SagaJobLink` unconditionally so the migration story doesn't depend on which hosts opt in. The builder methods gate runtime behavior only (pipeline behaviors + admin services), not the table existence.
 - **§2.12** Pipeline ordering matters (DI insertion order = outer → inner):
   - `AddRetry()` MUST come **before** `AddTimeout()` — retry's `catch (Exception)` needs to see the `TimeoutException` thrown by Timeout's `Fail` mode.
   - `AddConcurrency()` MUST come **before** `AddRateLimit()` — preserves rate-limit tokens when the mutex rejects.

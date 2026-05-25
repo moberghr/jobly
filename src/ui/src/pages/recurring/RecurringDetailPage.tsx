@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { StateBadge } from '@/components/StateBadge';
 import { Pagination } from '@/components/Pagination';
 import { RelativeTime } from '@/components/RelativeTime';
@@ -20,6 +21,7 @@ export default function RecurringDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
+  const [pending, setPending] = useState<'trigger' | 'delete' | 'disable' | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -43,12 +45,17 @@ export default function RecurringDetailPage() {
   if (error) return <ErrorState message={error} />;
   if (!detail) return <LoadingState />;
 
-  const handleToggleEnabled = async () => {
-    if (detail.disabledAt) {
-      await api.enableRecurringJob(detail.id);
-    } else {
-      await api.disableRecurringJob(detail.id);
-    }
+  // Enable is reversible and harmless — apply immediately. Disable on a production
+  // recurring job (billing sweep, reconciliation, etc.) is potentially an outage, so it
+  // goes through the confirm dialog like the other destructive actions.
+  const handleEnable = async () => {
+    await api.enableRecurringJob(detail.id);
+    const updated = await api.getRecurringJobById(detail.id);
+    setDetail(updated);
+  };
+
+  const handleDisable = async () => {
+    await api.disableRecurringJob(detail.id);
     const updated = await api.getRecurringJobById(detail.id);
     setDetail(updated);
   };
@@ -79,12 +86,44 @@ export default function RecurringDetailPage() {
           <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">Enabled</span>
         )}
         <div className="flex-1" />
-        <Button variant="outline" size="sm" onClick={handleToggleEnabled}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={detail.disabledAt ? handleEnable : () => setPending('disable')}
+        >
           {detail.disabledAt ? 'Enable' : 'Disable'}
         </Button>
-        <Button variant="outline" size="sm" onClick={handleTrigger}>Trigger</Button>
-        <Button variant="destructive" size="sm" onClick={handleDelete}>Delete</Button>
+        <Button variant="outline" size="sm" onClick={() => setPending('trigger')}>Trigger</Button>
+        <Button variant="destructive" size="sm" onClick={() => setPending('delete')}>Delete</Button>
       </div>
+
+      <ConfirmDialog
+        open={pending !== null}
+        onOpenChange={(open) => !open && setPending(null)}
+        title={
+          pending === 'delete' ? `Remove recurring job "${detail.name}"?`
+            : pending === 'trigger' ? `Trigger "${detail.name}" now?`
+              : pending === 'disable' ? `Disable recurring job "${detail.name}"?`
+                : ''
+        }
+        description={
+          pending === 'delete'
+            ? 'The recurring job definition and its history will be removed permanently. Any future scheduled runs will not fire. This cannot be undone.'
+            : pending === 'trigger'
+              ? 'A job will be enqueued immediately, on top of the normal cron schedule.'
+              : pending === 'disable'
+                ? 'No new runs will fire until the job is re-enabled. In-flight jobs from earlier runs continue to completion. Disable a job that drives critical work (reconciliation, billing, etc.) only with the same care as deleting it.'
+                : null
+        }
+        confirmLabel={pending === 'delete' ? 'Remove' : pending === 'disable' ? 'Disable' : 'Trigger'}
+        variant={pending === 'delete' || pending === 'disable' ? 'destructive' : 'default'}
+        onConfirm={() => {
+          if (pending === 'trigger') handleTrigger();
+          else if (pending === 'delete') handleDelete();
+          else if (pending === 'disable') handleDisable();
+          setPending(null);
+        }}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left column */}
