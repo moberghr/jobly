@@ -14,7 +14,7 @@ public class SagaServiceConfigurationTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<TimeProvider>(TimeProvider.System);
-        services.AddSingleton<IWarpSemaphoreProvider, Fixtures.FakeSemaphoreProvider>();
+        services.AddSingleton<IWarpLockProvider, Fixtures.FakeLockProvider>();
         services.AddScoped<IJobContext, JobContext>();
         services.AddSingleton<SagaCorrelationCache>();
         services.AddScoped<ISagaStore, Fixtures.FakeSagaStore>();
@@ -45,7 +45,7 @@ public class SagaServiceConfigurationTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<TimeProvider>(TimeProvider.System);
-        services.AddSingleton<IWarpSemaphoreProvider, Fixtures.FakeSemaphoreProvider>();
+        services.AddSingleton<IWarpLockProvider, Fixtures.FakeLockProvider>();
         services.AddScoped<IJobContext, JobContext>();
         services.AddSingleton<SagaCorrelationCache>();
         services.AddScoped<ISagaStore, Fixtures.FakeSagaStore>();
@@ -125,7 +125,7 @@ public class SagaServiceConfigurationTests
     public void AddSagas_ContributesEntityConfiguratorExactlyOnce()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IWarpSemaphoreProvider, Fixtures.FakeSemaphoreProvider>();
+        services.AddSingleton<IWarpLockProvider, Fixtures.FakeLockProvider>();
         var builder = new WarpBuilder<TestContext>(services);
 
         builder.AddSagas();
@@ -141,7 +141,7 @@ public class SagaServiceConfigurationTests
     public void AddSagas_RegistersStoreAsScoped()
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IWarpSemaphoreProvider, Fixtures.FakeSemaphoreProvider>();
+        services.AddSingleton<IWarpLockProvider, Fixtures.FakeLockProvider>();
         var builder = new WarpBuilder<TestContext>(services);
 
         builder.AddSagas();
@@ -151,13 +151,14 @@ public class SagaServiceConfigurationTests
     }
 
     [TimedFact]
-    public void AddSagas_WithoutSemaphoreProvider_Throws()
+    public void AddSagas_WithoutLockProvider_Throws()
     {
         var services = new ServiceCollection();
         var builder = new WarpBuilder<TestContext>(services);
 
         var ex = Should.Throw<InvalidOperationException>(() => builder.AddSagas());
 
+        ex.Message.ShouldContain("IWarpLockProvider");
         ex.Message.ShouldContain("UsePostgreSql");
         ex.Message.ShouldContain("UseSqlServer");
     }

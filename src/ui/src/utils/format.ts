@@ -1,8 +1,11 @@
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistance, format } from 'date-fns';
 import { State } from '@/types';
 
+// Uses `Date.now()` rather than `new Date()` for the "now" baseline so demo
+// mode can pin the clock via a single `Date.now` override and keep "X ago"
+// labels stable across screenshot runs.
 export function formatRelativeTime(dateString: string): string {
-  return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+  return formatDistance(new Date(dateString), new Date(Date.now()), { addSuffix: true });
 }
 
 export function formatDateTime(dateString: string): string {

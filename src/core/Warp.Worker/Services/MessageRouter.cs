@@ -188,6 +188,22 @@ public sealed class MessageRouter<TContext> : IServerTask
                     });
                 }
 
+                // Per-message audit row: when MessageRouter actually picked up this message
+                // and how many handlers got fan-out. Atomic with the claim-flip + child
+                // INSERTs because they all commit in the single end-of-batch SaveChanges
+                // inside the surrounding transaction. Operators reading the dashboard can
+                // correlate "Created" (publisher commit) → "Routed" (this row) → children's
+                // "Created" → handler activity, closing the gap that previously made
+                // MessageRouter pickup latency invisible per-row.
+                _context.Set<JobLog>().Add(new JobLog
+                {
+                    JobId = message.Id,
+                    EventType = "Routed",
+                    Timestamp = now,
+                    Level = "Information",
+                    Message = $"Routed to {handlerTypes.Count} handler(s)",
+                });
+
                 routed++;
             }
 

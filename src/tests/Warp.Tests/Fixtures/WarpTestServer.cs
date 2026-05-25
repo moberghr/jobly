@@ -640,6 +640,40 @@ public class WarpTestServer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         GC.SuppressFinalize(this);
+
+        // Pre-stop diagnostic snapshot, written directly to stderr BEFORE IHost.StopAsync. The
+        // earlier design stashed via AsyncLocal expecting IntegrationTestBase.DisposeAsync to
+        // drain it later, but xunit's lifecycle phases run on different ExecutionContexts
+        // (`IAsyncLifetime.InitializeAsync` / test method body / `IAsyncLifetime.DisposeAsync`
+        // are not on a single async flow), so the box reference never made it across.
+        // <para>
+        // Unconditional by design: the alternative is detecting test failure inline, but
+        // <see cref="Xunit.TestContext.Current.TestState"/> isn't yet set when a normal
+        // (non-timeout) failing test's <c>await using var server</c> runs disposal. Always
+        // dumping accepts the ~50 ms diagnostic query + a few KB of stderr per integration
+        // test in exchange for actionable pre-stop state on every flake. Cost was discussed
+        // and accepted as part of the issue #208 follow-up.
+        // </para>
+        // <para>
+        // Header is marker-prefixed so flake hunters can grep CI logs for it directly without
+        // wading through xunit's per-test output.
+        // </para>
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var snapshot = await _fixture.DumpDiagnosticsAsync(
+                $"[WARP-PRE-STOP-DIAG server={ServerId}] state captured before IHost.StopAsync:",
+                cts.Token);
+            await Console.Error.WriteLineAsync(snapshot);
+        }
+#pragma warning disable CA1031 // capture must never throw — failing to dump is not a reason to fail teardown
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            await Console.Error.WriteLineAsync(
+                $"[WARP-PRE-STOP-DIAG server={ServerId}] capture failed: {ex.GetType().Name}: {ex.Message}");
+        }
+
         ServerLifecycleTrace.Record(ServerId, "IHost.StopAsync starting");
         await _host.StopAsync(Xunit.TestContext.Current.CancellationToken);
         ServerLifecycleTrace.Record(ServerId, "IHost.StopAsync returned");

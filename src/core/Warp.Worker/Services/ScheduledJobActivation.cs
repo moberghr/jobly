@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Warp.Core.Data.Entities;
 using Warp.Core.Data.Queries;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
@@ -56,20 +57,43 @@ public sealed class ScheduledJobActivation<TContext> : IServerTask
     {
         var now = _time.GetUtcNow().UtcDateTime;
 
-        // Single round-trip: atomically flip every due Scheduled row to Enqueued AND stream
-        // back its queue. The list has one entry per activated row; deduplicate in-memory
-        // so we publish one JobEnqueued notification per distinct queue.
-        var activatedQueues = await _sqlQueries.ActivateScheduledJobsAsync(_context, now, ct);
+        // One round-trip: atomically flip every due Scheduled row to Enqueued AND stream back
+        // (Id, Queue, ScheduleTime) per activated row.
+        var activated = await _sqlQueries.ActivateScheduledJobsAsync(_context, now, ct);
 
-        if (activatedQueues.Count == 0)
+        if (activated.Count == 0)
         {
             return (0, []);
         }
 
-        var distinctQueues = new HashSet<string>(activatedQueues, StringComparer.Ordinal).ToList();
+        // Per-row JobLog "Activated" entry — atomic with the UPDATE via the xact-lock
+        // transaction that wraps ExecuteAsync (LocksWithTransaction defaults to true on
+        // IServerTask; ServerTaskLoop.TryAcquireLockAndExecuteAsync calls
+        // RunUnderTransactionLockAsync which commits both this SaveChanges and the UPDATE
+        // above together). If this insert fails the outer commit also fails — operators
+        // never see "state=Enqueued with no Activated log row" in the dashboard.
+        foreach (var entry in activated)
+        {
+            _context.Set<JobLog>().Add(new JobLog
+            {
+                JobId = entry.Id,
+                EventType = "Activated",
+                Timestamp = now,
+                Level = "Information",
+                Message = "Activated from Scheduled — was scheduled at "
+                    + entry.ScheduleTime.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
+            });
+        }
+
+        await _context.SaveChangesAsync(ct);
+
+        var distinctQueues = activated
+            .Select(a => a.Queue)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
         var notifications = distinctQueues.ConvertAll(q => new Notification(NotificationKind.JobEnqueued, q));
         await NotificationDispatch.DispatchAsync(notifications, _signals, _transport, ct);
 
-        return (activatedQueues.Count, distinctQueues);
+        return (activated.Count, distinctQueues);
     }
 }

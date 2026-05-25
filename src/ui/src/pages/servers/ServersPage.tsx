@@ -1,4 +1,3 @@
-import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,35 +5,25 @@ import { Badge } from '@/components/ui/badge';
 import { formatBytes, serverStatusDotColor, isServerStale } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
-import { useRefreshKey } from '@/hooks/useRefreshKey';
+import { useServers, usePauseServer, useResumeServer } from '@/api/hooks/useServers';
 import { Pause, Play } from 'lucide-react';
 import type { ServerModel } from '@/types';
-import * as api from '@/api';
 
 export default function ServersPage() {
-  const [servers, setServers] = useState<ServerModel[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const refreshKey = useRefreshKey();
+  const { data: servers, isLoading, isError } = useServers();
+  const pauseServer = usePauseServer();
+  const resumeServer = useResumeServer();
 
-  const fetchServers = useCallback(() => {
-    api.getServers().then(setServers).catch(() => setError('Unable to load servers'));
-  }, []);
-
-  useEffect(() => {
-    fetchServers();
-  }, [refreshKey, fetchServers]);
-
-  const handleTogglePause = async (server: ServerModel) => {
+  const handleTogglePause = (server: ServerModel) => {
     if (server.pausedAt) {
-      await api.resumeServer(server.id);
+      resumeServer.mutate(server.id);
     } else {
-      await api.pauseServer(server.id);
+      pauseServer.mutate(server.id);
     }
-    fetchServers();
   };
 
-  if (error) return <ErrorState message={error} />;
-  if (!servers) return <LoadingState />;
+  if (isError) return <ErrorState message="Unable to load servers" />;
+  if (isLoading || !servers) return <LoadingState />;
 
   return (
     <div>
@@ -71,6 +60,7 @@ export default function ServersPage() {
                       size="sm"
                       onClick={(e) => { e.preventDefault(); handleTogglePause(server); }}
                       title={server.pausedAt ? 'Resume server' : 'Pause server'}
+                      disabled={pauseServer.isPending || resumeServer.isPending}
                     >
                       {server.pausedAt ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
                     </Button>

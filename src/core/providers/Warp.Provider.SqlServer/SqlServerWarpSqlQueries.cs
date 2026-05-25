@@ -140,13 +140,14 @@ public sealed class SqlServerWarpSqlQueries<TContext> : IWarpSqlQueries<TContext
             LEFT JOIN {groupTable} w ON w.[{_n.WorkerGroupServerId}] = h.server_id;
             SELECT service_name FROM @renewed;";
 
-        // Atomic activation: UPDATE ... OUTPUT INSERTED.queue flips due rows AND streams back
-        // the queue names so the caller can fire one JobEnqueued notification per distinct
-        // queue. Replaces the previous SELECT-DISTINCT-then-UPDATE pattern (2 round-trips).
+        // Atomic activation: UPDATE ... OUTPUT INSERTED.(id, queue, schedule_time) flips due rows
+        // AND streams back per-row identity + queue + schedule_time. Caller fires one
+        // JobEnqueued notification per distinct queue AND writes one "Activated" JobLog row per
+        // id (atomic with this UPDATE via the ambient xact-lock transaction).
         _activateScheduledJobsSql = $@"
             UPDATE {table}
             SET [{_n.CurrentState}] = {(int)State.Enqueued}
-            OUTPUT INSERTED.[{_n.Queue}]
+            OUTPUT INSERTED.[{_n.Id}], INSERTED.[{_n.Queue}], INSERTED.[{_n.ScheduleTime}]
             WHERE [{_n.CurrentState}] = {(int)State.Scheduled}
               AND [{_n.ScheduleTime}] <= {{0}}";
 
@@ -300,13 +301,14 @@ public sealed class SqlServerWarpSqlQueries<TContext> : IWarpSqlQueries<TContext
         cmd.Parameters.Add(p);
     }
 
-    public async Task<List<string>> ActivateScheduledJobsAsync(
+    public async Task<List<(Guid Id, string Queue, DateTime ScheduleTime)>> ActivateScheduledJobsAsync(
         TContext context,
         DateTime now,
         CancellationToken ct)
     {
         // Raw ADO.NET: EF Core's FromSqlRaw<Job> would try to materialize full Job entities,
-        // but OUTPUT INSERTED.queue only streams back one column.
+        // but the SQL only OUTPUTs three columns. Issuing the command directly keeps the path
+        // narrow and matches how the notification transport opens connections.
         var conn = context.Database.GetDbConnection();
         var openedHere = conn.State != System.Data.ConnectionState.Open;
         if (openedHere)
@@ -328,14 +330,14 @@ public sealed class SqlServerWarpSqlQueries<TContext> : IWarpSqlQueries<TContext
             param.Value = now;
             cmd.Parameters.Add(param);
 
-            var queues = new List<string>();
+            var activated = new List<(Guid Id, string Queue, DateTime ScheduleTime)>();
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
-                queues.Add(reader.GetString(0));
+                activated.Add((reader.GetGuid(0), reader.GetString(1), reader.GetDateTime(2)));
             }
 
-            return queues;
+            return activated;
         }
         finally
         {
