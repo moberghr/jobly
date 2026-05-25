@@ -129,12 +129,17 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
         // Atomic activation: UPDATE ... RETURNING queue flips due rows AND streams back the
         // queue names so the caller can fire one JobEnqueued notification per distinct queue.
         // Replaces the previous SELECT-DISTINCT-then-UPDATE pattern (2 round-trips).
+        // RETURNING carries Id + Queue + ScheduleTime so the caller can write a per-row
+        // "Activated" JobLog (with the previous ScheduleTime for operator context) atomically
+        // with the state change. The ambient transaction from the xact-lock path
+        // (LocksWithTransaction = true) makes the UPDATE + downstream JobLog inserts commit
+        // together.
         _activateScheduledJobsSql = $@"
             UPDATE {table}
             SET ""{_n.CurrentState}"" = {(int)State.Enqueued}
             WHERE ""{_n.CurrentState}"" = {(int)State.Scheduled}
               AND ""{_n.ScheduleTime}"" <= {{0}}
-            RETURNING ""{_n.Queue}""";
+            RETURNING ""{_n.Id}"", ""{_n.Queue}"", ""{_n.ScheduleTime}""";
 
         // BackgroundService row-lock queries. FOR NO KEY UPDATE so concurrent callers block
         // and serialise, eliminating the TOCTOU window between SELECT and the caller's
@@ -283,14 +288,14 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
         cmd.Parameters.Add(p);
     }
 
-    public async Task<List<string>> ActivateScheduledJobsAsync(
+    public async Task<List<(Guid Id, string Queue, DateTime ScheduleTime)>> ActivateScheduledJobsAsync(
         TContext context,
         DateTime now,
         CancellationToken ct)
     {
         // Raw ADO.NET: EF Core's FromSqlRaw<Job> would try to materialize full Job entities,
-        // but the SQL only RETURNS the queue column. Issuing the command directly is cleaner
-        // and matches how the notification transport opens connections.
+        // but the SQL only RETURNS three columns. Issuing the command directly keeps the path
+        // narrow and matches how the notification transport opens connections.
         var conn = context.Database.GetDbConnection();
         var openedHere = conn.State != System.Data.ConnectionState.Open;
         if (openedHere)
@@ -313,14 +318,14 @@ public sealed class PostgresWarpSqlQueries<TContext> : IWarpSqlQueries<TContext>
             param.Value = now;
             cmd.Parameters.Add(param);
 
-            var queues = new List<string>();
+            var activated = new List<(Guid Id, string Queue, DateTime ScheduleTime)>();
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
-                queues.Add(reader.GetString(0));
+                activated.Add((reader.GetGuid(0), reader.GetString(1), reader.GetDateTime(2)));
             }
 
-            return queues;
+            return activated;
         }
         finally
         {

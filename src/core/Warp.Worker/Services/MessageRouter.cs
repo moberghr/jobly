@@ -166,6 +166,21 @@ public sealed class MessageRouter<TContext> : IServerTask
 
             message.CurrentState = State.Processing;
 
+            // Per-message audit row: when MessageRouter actually picked up this message and
+            // how many handlers got fan-out. Atomic with the state flip + child INSERTs above
+            // because they all commit in this one SaveChanges. Operators reading the dashboard
+            // can correlate "Created" (publisher commit) → "Routed" (this row) → children's
+            // "Created" → handler activity, closing the gap that previously made MessageRouter
+            // pickup latency invisible per-row.
+            _context.Set<JobLog>().Add(new JobLog
+            {
+                JobId = message.Id,
+                EventType = "Routed",
+                Timestamp = now,
+                Level = "Information",
+                Message = $"Routed to {handlerTypes.Count} handler(s)",
+            });
+
             // Capture pending JobEnqueued notifications before commit so push wakes the
             // dispatcher as soon as the child rows are visible. Without this, push works
             // for direct enqueues but messages-via-routing fall back to polling.
