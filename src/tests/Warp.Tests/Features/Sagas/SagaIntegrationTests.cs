@@ -134,14 +134,6 @@ public abstract class SagaIntegrationTestsBase : IntegrationTestBase
     [TimedFact(20_000)]
     public async Task TwoConcurrentMessagesSameSaga_OneRequeuesWithBusyOutcome()
     {
-        // Pre-disposal stash for the next CI flake. The default post-disposal dump runs after
-        // the next saga test's InitializeAsync has already called Respawn, so a failure here
-        // currently produces an empty (0-row) dump. Capturing pre-StopAsync gives us actual
-        // Job/JobLog/ServerTask state at the failure moment. Opt-in is per-test because xunit
-        // IAsyncLifetime.InitializeAsync runs on a different ExecutionContext — see
-        // DiagnosticDumpStorage for the full pattern.
-        DiagnosticDumpStorage.Initialize();
-
         // Per memory feedback_no_spray_n_tests: pin a worker in the handler with a BarrierSignal
         // and use N=2, not spray-50. Asserting the deterministic outcome: first message holds
         // the mutex (blocked at barrier), second message hits busy → Enqueued + ClearHandlerType=false.

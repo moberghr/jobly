@@ -641,29 +641,37 @@ public class WarpTestServer : IAsyncDisposable
     {
         GC.SuppressFinalize(this);
 
-        // Capture a pre-stop diagnostic snapshot for any future failure of this test. We can't
-        // tell here whether the test has already thrown — xunit's TestState isn't set until
-        // after the test method body fully unwinds, AFTER this DisposeAsync. So we always
-        // capture and stash; the IntegrationTestBase.DisposeAsync that runs later checks
-        // TestState and prints the stash only when the test actually failed. Cost on passing
-        // tests: one diagnostic query per test (~50 ms on integration tests), accepted in
-        // exchange for row-level state at the actual failure moment instead of post-StopAsync
-        // (when server tasks are torn down and in-flight handlers have already drained).
-        // Fresh CancellationToken — xunit's may already be cancelling if shutdown is in flight.
+        // Pre-stop diagnostic snapshot, written directly to stderr BEFORE IHost.StopAsync. The
+        // earlier design stashed via AsyncLocal expecting IntegrationTestBase.DisposeAsync to
+        // drain it later, but xunit's lifecycle phases run on different ExecutionContexts
+        // (`IAsyncLifetime.InitializeAsync` / test method body / `IAsyncLifetime.DisposeAsync`
+        // are not on a single async flow), so the box reference never made it across.
+        // <para>
+        // Unconditional by design: the alternative is detecting test failure inline, but
+        // <see cref="Xunit.TestContext.Current.TestState"/> isn't yet set when a normal
+        // (non-timeout) failing test's <c>await using var server</c> runs disposal. Always
+        // dumping accepts the ~50 ms diagnostic query + a few KB of stderr per integration
+        // test in exchange for actionable pre-stop state on every flake. Cost was discussed
+        // and accepted as part of the issue #208 follow-up.
+        // </para>
+        // <para>
+        // Header is marker-prefixed so flake hunters can grep CI logs for it directly without
+        // wading through xunit's per-test output.
+        // </para>
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var snapshot = await _fixture.DumpDiagnosticsAsync(
-                "Pre-disposal server-state diagnostics (captured before IHost.StopAsync):",
+                $"[WARP-PRE-STOP-DIAG server={ServerId}] state captured before IHost.StopAsync:",
                 cts.Token);
-            DiagnosticDumpStorage.Stash(snapshot);
+            await Console.Error.WriteLineAsync(snapshot);
         }
 #pragma warning disable CA1031 // capture must never throw — failing to dump is not a reason to fail teardown
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            DiagnosticDumpStorage.Stash(
-                $"Pre-disposal diagnostic capture failed: {ex.GetType().Name}: {ex.Message}");
+            await Console.Error.WriteLineAsync(
+                $"[WARP-PRE-STOP-DIAG server={ServerId}] capture failed: {ex.GetType().Name}: {ex.Message}");
         }
 
         ServerLifecycleTrace.Record(ServerId, "IHost.StopAsync starting");

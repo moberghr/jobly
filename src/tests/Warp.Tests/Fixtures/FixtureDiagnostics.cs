@@ -24,15 +24,16 @@ public static class FixtureDiagnostics
         => DumpAsync(fixture.CreateContext(), header, ct);
 
     /// <summary>
-    /// Shared failure-dump tail for integration test bases. On any non-passing test result,
-    /// prints the pre-disposal snapshot stashed by <see cref="WarpTestServer"/> if present
-    /// (capturing live server-state before <c>IHost.StopAsync</c>); otherwise falls back to
-    /// the <paramref name="dumper"/> against the now-disposed DB. Either way the output goes
-    /// to stderr so flakes are diagnosable in CI.
+    /// Failure-dump tail for integration test bases. On any non-passing test result, runs
+    /// <paramref name="dumper"/> against the (possibly post-stop) DB and writes the result to
+    /// stderr. Useful for tests that don't construct a <see cref="WarpTestServer"/> — DB-only
+    /// tests against the fixture, or tests where the failure happened before <c>StartAsync</c>
+    /// ran.
     /// <para>
-    /// The fall-back path stays useful for tests that don't construct a <see cref="WarpTestServer"/>
-    /// (DB-only tests against the fixture) and for tests where the failure happened before
-    /// <c>StartAsync</c> ran (so no pre-stop snapshot exists).
+    /// Tests that use <see cref="WarpTestServer"/> get a richer, live pre-stop dump emitted
+    /// directly by <see cref="WarpTestServer.DisposeAsync"/> (search stderr for the
+    /// <c>[WARP-PRE-STOP-DIAG …]</c> marker). This method's post-shutdown dump is
+    /// complementary, not a substitute.
     /// </para>
     /// </summary>
     public static async ValueTask DumpOnFailureAsync(Func<string, CancellationToken, Task<string>> dumper)
@@ -40,16 +41,6 @@ public static class FixtureDiagnostics
         var testState = Xunit.TestContext.Current.TestState;
         if (testState == null || testState.Result == Xunit.TestResult.Passed)
         {
-            DiagnosticDumpStorage.Drain();
-
-            return;
-        }
-
-        var stashed = DiagnosticDumpStorage.Drain();
-        if (stashed != null)
-        {
-            await Console.Error.WriteLineAsync(stashed);
-
             return;
         }
 
@@ -57,7 +48,7 @@ public static class FixtureDiagnostics
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var dump = await dumper(
-                $"Test failed ({testState.Result}). Server-state diagnostics (post-shutdown — no pre-stop snapshot stashed):",
+                $"Test failed ({testState.Result}). Server-state diagnostics (post-shutdown):",
                 cts.Token);
             await Console.Error.WriteLineAsync(dump);
         }
