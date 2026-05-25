@@ -1,11 +1,9 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingState, ErrorState } from '@/components/PageState';
-import { useRefreshKey } from '@/hooks/useRefreshKey';
-import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
-import type { CounterModel, CounterHistoryPoint } from '@/types';
-import * as api from '@/api';
+import { useCounters, useCountersHistory } from '@/api/hooks/useCounters';
+import type { CounterHistoryPoint } from '@/types';
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, ChartTooltip, Legend);
 
@@ -28,25 +26,12 @@ function colorFor(key: string): string {
 }
 
 export default function CountersPage() {
-  const [counters, setCounters] = useState<CounterModel[] | null>(null);
-  const [history, setHistory] = useState<CounterHistoryPoint[] | null>(null);
   const [historyHours, setHistoryHours] = useState(24);
-  const [error, setError] = useState<string | null>(null);
-  const refreshKey = useRefreshKey();
+  const { data: counters, isLoading, isError } = useCounters();
+  const { data: history } = useCountersHistory(historyHours);
 
-  const fetchAll = useCallback(() => {
-    api.getCounters().then(setCounters).catch(() => setError('Unable to load counters'));
-    api.getCountersHistory(historyHours).then(setHistory).catch(() => {});
-  }, [historyHours]);
-
-  useEffect(() => {
-    fetchAll();
-  }, [refreshKey, fetchAll]);
-
-  useRealtimeRefetch('JobFinalized', fetchAll);
-
-  if (error) return <ErrorState message={error} />;
-  if (!counters) return <LoadingState />;
+  if (isError) return <ErrorState message="Unable to load counters" />;
+  if (isLoading || !counters) return <LoadingState />;
 
   return (
     <div>
@@ -80,7 +65,7 @@ export default function CountersPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <HistoryChart points={history} hours={historyHours} />
+          <HistoryChart points={history ?? null} hours={historyHours} />
         </CardContent>
       </Card>
 

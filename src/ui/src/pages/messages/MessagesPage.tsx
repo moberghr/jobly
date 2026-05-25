@@ -1,93 +1,98 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { ColumnDef } from '@tanstack/react-table';
 import { StateBadge } from '@/components/StateBadge';
-import { Pagination } from '@/components/Pagination';
 import { shortType, shortId } from '@/utils/format';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
+import { DataTable } from '@/components/DataTable';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
-import { useRefreshKey } from '@/hooks/useRefreshKey';
-import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
-import type { JobGroupModel, PagedList } from '@/types';
-import * as api from '@/api';
+import { useMessagesList } from '@/api/hooks/useMessages';
+import type { JobGroupModel } from '@/types';
 
 export default function MessagesPage() {
   const { state } = useParams<{ state?: string }>();
-  const [data, setData] = useState<PagedList<JobGroupModel> | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
-  const refreshKey = useRefreshKey();
 
-  useEffect(() => { setPage(0); }, [state]);
+  useEffect(() => {
+    setPage(0);
+  }, [state]);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const result = await api.getMessages(page, pageSize, state);
-      setData(result);
-      setError(null);
-    } catch {
-      setError('Unable to load messages');
-    }
-  }, [page, pageSize, state]);
+  const { data, isLoading, isError } = useMessagesList(state, page, pageSize);
 
-  useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
+  const columns = useMemo<ColumnDef<JobGroupModel>[]>(
+    () => [
+      {
+        accessorKey: 'id',
+        header: 'ID',
+        cell: ({ row }) => (
+          <Link to={`/detail/${row.original.id}`} className="font-mono text-xs text-primary hover:underline">
+            {shortId(row.original.id)}
+          </Link>
+        ),
+        meta: { headerClassName: 'w-[100px]' },
+      },
+      {
+        accessorKey: 'type',
+        header: 'Type',
+        cell: ({ row }) => (row.original.type ? shortType(row.original.type) : '—'),
+      },
+      {
+        accessorKey: 'queue',
+        header: 'Queue',
+        cell: ({ row }) => row.original.queue ?? '—',
+      },
+      {
+        accessorKey: 'currentState',
+        header: 'State',
+        cell: ({ row }) => <StateBadge state={row.original.currentState} />,
+      },
+      {
+        accessorKey: 'totalJobs',
+        header: 'Jobs',
+      },
+      {
+        accessorKey: 'createTime',
+        header: 'Created',
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            <RelativeTime date={row.original.createTime} />
+          </span>
+        ),
+      },
+    ],
+    [],
+  );
 
-  useRealtimeRefetch(['MessageEnqueued', 'JobFinalized'], fetchData);
-
-  if (error) return <ErrorState message={error} />;
-  if (!data) return <LoadingState />;
+  if (isError) return <ErrorState message="Unable to load messages" />;
+  if (isLoading || !data) return <LoadingState />;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">{state ? `${state.charAt(0).toUpperCase() + state.slice(1)} Messages` : 'Messages'}</h1>
+        <h1 className="text-2xl font-bold">
+          {state ? `${state.charAt(0).toUpperCase() + state.slice(1)} Messages` : 'Messages'}
+        </h1>
         <span className="text-sm text-muted-foreground">{data.totalCount} total</span>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[100px]">ID</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Queue</TableHead>
-              <TableHead>State</TableHead>
-              <TableHead>Jobs</TableHead>
-              <TableHead>Created</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  No messages found
-                </TableCell>
-              </TableRow>
-            ) : (
-              data.items.map((msg) => (
-                <TableRow key={msg.id}>
-                  <TableCell className="font-mono text-xs">
-                    <Link to={`/detail/${msg.id}`} className="text-primary hover:underline">
-                      {shortId(msg.id)}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{msg.type ? shortType(msg.type) : '—'}</TableCell>
-                  <TableCell>{msg.queue ?? '—'}</TableCell>
-                  <TableCell><StateBadge state={msg.currentState} /></TableCell>
-                  <TableCell>{msg.totalJobs}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    <RelativeTime date={msg.createTime} />
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <Pagination page={page} pageCount={data.pageCount} onPageChange={setPage} pageSize={pageSize} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} />
+      <DataTable
+        columns={columns}
+        data={data.items}
+        emptyMessage="No messages found"
+        getRowId={(row) => row.id}
+        pagination={{
+          page,
+          pageSize,
+          pageCount: data.pageCount,
+          onPageChange: setPage,
+          onPageSizeChange: (size) => {
+            setPageSize(size);
+            setPage(0);
+          },
+        }}
+      />
     </div>
   );
 }

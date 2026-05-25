@@ -1,52 +1,33 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { RelativeTime } from '@/components/RelativeTime';
-import { useRefreshKey } from '@/hooks/useRefreshKey';
+import {
+  useRateLimits,
+  useUpsertRateLimit,
+  useDeleteRateLimit,
+} from '@/api/hooks/useRateLimits';
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 import type { RateLimitInfo } from '@/types';
-import * as api from '@/api';
 
 type ConfirmDelete = { name: string } | null;
 
 export default function RateLimitsPage() {
-  const [limits, setLimits] = useState<RateLimitInfo[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [unavailable, setUnavailable] = useState(false);
+  const { data: limits, isLoading, isError, error } = useRateLimits();
+  const upsert = useUpsertRateLimit();
+  const remove = useDeleteRateLimit();
+
   const [editingName, setEditingName] = useState<string | null>(null);
   const [editCount, setEditCount] = useState<string>('');
   const [editWindow, setEditWindow] = useState<string>('');
   const [editError, setEditError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDelete>(null);
-  const refreshKey = useRefreshKey();
 
-  const fetchAll = useCallback(async () => {
-    try {
-      const result = await api.listRateLimits();
-      setLimits(result);
-      setError(null);
-      setUnavailable(false);
-    } catch (e) {
-      if (axios.isAxiosError(e) && e.response?.status === 404) {
-        setUnavailable(true);
-        setLimits([]);
-        setError(null);
-
-        return;
-      }
-      setError('Unable to load rate limits');
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAll();
-    const id = setInterval(fetchAll, 5000);
-    return () => clearInterval(id);
-  }, [refreshKey, fetchAll]);
+  const unavailable = isError && axios.isAxiosError(error) && error.response?.status === 404;
 
   const startEdit = (limit: RateLimitInfo) => {
     setEditingName(limit.name);
@@ -62,7 +43,7 @@ export default function RateLimitsPage() {
     setEditError(null);
   };
 
-  const saveEdit = async (name: string) => {
+  const saveEdit = (name: string) => {
     const parsedCount = Number(editCount);
     const parsedWindow = Number(editWindow);
     if (!Number.isInteger(parsedCount) || parsedCount < 1) {
@@ -75,39 +56,35 @@ export default function RateLimitsPage() {
 
       return;
     }
-    try {
-      await api.upsertRateLimit(name, parsedCount, parsedWindow);
-      cancelEdit();
-      await fetchAll();
-    } catch {
-      setEditError('Failed to save');
-    }
-  };
-
-  const handleDelete = async (name: string) => {
-    try {
-      await api.deleteRateLimit(name);
-      setConfirmDelete(null);
-      await fetchAll();
-    } catch {
-      setError('Failed to delete rate limit');
-    }
-  };
-
-  if (error) return <ErrorState message={error} />;
-  if (!limits) return <LoadingState />;
-
-  if (unavailable) {
-    return (
-      <div>
-        <h1 className="text-2xl font-bold mb-2">Rate Limits</h1>
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Rate limits addon not registered. Add <code className="font-mono">opt.AddRateLimit()</code> to enable.
-          </CardContent>
-        </Card>
-      </div>
+    upsert.mutate(
+      { name, count: parsedCount, windowSeconds: parsedWindow },
+      {
+        onSuccess: () => cancelEdit(),
+        onError: () => setEditError('Failed to save'),
+      },
     );
+  };
+
+  const handleDelete = (name: string) => {
+    remove.mutate(name, { onSuccess: () => setConfirmDelete(null) });
+  };
+
+  if (isError && !unavailable) return <ErrorState message="Unable to load rate limits" />;
+  if (isLoading || !limits) {
+    if (unavailable) {
+      return (
+        <div>
+          <h1 className="text-2xl font-bold mb-2">Rate Limits</h1>
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              Rate limits addon not registered. Add <code className="font-mono">opt.AddRateLimit()</code> to enable.
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    return <LoadingState />;
   }
 
   const sorted = [...limits].sort((a, b) => a.name.localeCompare(b.name));
@@ -251,10 +228,7 @@ export default function RateLimitsPage() {
       {showAdd && (
         <AddRateLimitModal
           onClose={() => setShowAdd(false)}
-          onSaved={() => {
-            setShowAdd(false);
-            fetchAll();
-          }}
+          onSaved={() => setShowAdd(false)}
           existingNames={new Set(limits.map((x) => x.name))}
         />
       )}
@@ -315,13 +289,13 @@ function AddRateLimitModal({
   onSaved: () => void;
   existingNames: Set<string>;
 }) {
+  const upsert = useUpsertRateLimit();
   const [name, setName] = useState('');
   const [count, setCount] = useState('100');
   const [windowSeconds, setWindowSeconds] = useState('60');
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -349,15 +323,13 @@ function AddRateLimitModal({
       return;
     }
 
-    setSaving(true);
-    try {
-      await api.upsertRateLimit(trimmed, parsedCount, parsedWindow);
-      onSaved();
-    } catch {
-      setError('Failed to save');
-    } finally {
-      setSaving(false);
-    }
+    upsert.mutate(
+      { name: trimmed, count: parsedCount, windowSeconds: parsedWindow },
+      {
+        onSuccess: () => onSaved(),
+        onError: () => setError('Failed to save'),
+      },
+    );
   };
 
   return (
@@ -398,11 +370,11 @@ function AddRateLimitModal({
         </div>
         {error && <div className="text-sm text-destructive">{error}</div>}
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={upsert.isPending}>
             Cancel
           </Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
+          <Button type="submit" disabled={upsert.isPending}>
+            {upsert.isPending ? 'Saving...' : 'Save'}
           </Button>
         </div>
       </form>

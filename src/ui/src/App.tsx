@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
+import { queryClient } from '@/lib/queryClient';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import MainLayout from '@/layouts/MainLayout';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import JobListPage from '@/pages/jobs/JobListPage';
@@ -79,58 +83,66 @@ function App() {
     initExtensions();
   }, [initExtensions]);
 
-  if (!authProbeDone) {
-    return null;
-  }
+  const extensionPages = extensionsLoaded ? extensionRuntime.getPages() : [];
 
-  if (needsLogin) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
+  const body = () => {
+    if (!authProbeDone) {
+      return null;
+    }
+    if (needsLogin) {
+      return <LoginPage onLogin={handleLogin} />;
+    }
+    if (!extensionsLoaded) {
+      return null;
+    }
 
-  // Wait for extensions to load before rendering routes so dynamic pages are available
-  if (!extensionsLoaded) {
-    return null;
-  }
+    return (
+      <BrowserRouter basename={config.basePath}>
+        <Routes>
+          <Route element={<MainLayout extensions={extensions} />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="/detail/:id" element={<DetailPage />} />
+            <Route path="/jobs/detail/:id" element={<DetailPage />} />
+            <Route path="/jobs/:state" element={<JobListPage />} />
+            <Route path="/messages/detail/:id" element={<DetailPage />} />
+            <Route path="/messages/:state" element={<MessagesPage />} />
+            <Route path="/batches/detail/:id" element={<DetailPage />} />
+            <Route path="/batches/:state" element={<BatchesPage />} />
+            <Route path="/recurring/:id" element={<RecurringDetailPage />} />
+            <Route path="/recurring" element={<RecurringPage />} />
+            <Route path="/trace/:traceId/:highlightId?" element={<TracePage />} />
+            <Route path="/workers/:id" element={<WorkerDetailPage />} />
+            <Route path="/servers/:id" element={<ServerDetailPage />} />
+            <Route path="/servers" element={<ServersPage />} />
+            <Route path="/counters" element={<CountersPage />} />
+            <Route path="/concurrency" element={<ConcurrencyLimitsPage />} />
+            <Route path="/ratelimits" element={<RateLimitsPage />} />
+            <Route path="/sagas/:id" element={<SagaDetailPage />} />
+            <Route path="/sagas" element={<SagasListPage />} />
+            <Route path="/services/:name" element={<BackgroundServiceDetail />} />
+            <Route path="/services" element={<BackgroundServicesList />} />
 
-  const extensionPages = extensionRuntime.getPages();
+            {/* Extension pages */}
+            {extensionPages.map((page) => (
+              <Route
+                key={page.path}
+                path={page.path}
+                element={<ExtensionPage component={page.component} />}
+              />
+            ))}
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    );
+  };
 
   return (
-    <BrowserRouter basename={config.basePath}>
-      <Routes>
-        <Route element={<MainLayout extensions={extensions} />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="/detail/:id" element={<DetailPage />} />
-          <Route path="/jobs/detail/:id" element={<DetailPage />} />
-          <Route path="/jobs/:state" element={<JobListPage />} />
-          <Route path="/messages/detail/:id" element={<DetailPage />} />
-          <Route path="/messages/:state" element={<MessagesPage />} />
-          <Route path="/batches/detail/:id" element={<DetailPage />} />
-          <Route path="/batches/:state" element={<BatchesPage />} />
-          <Route path="/recurring/:id" element={<RecurringDetailPage />} />
-          <Route path="/recurring" element={<RecurringPage />} />
-          <Route path="/trace/:traceId/:highlightId?" element={<TracePage />} />
-          <Route path="/workers/:id" element={<WorkerDetailPage />} />
-          <Route path="/servers/:id" element={<ServerDetailPage />} />
-          <Route path="/servers" element={<ServersPage />} />
-          <Route path="/counters" element={<CountersPage />} />
-          <Route path="/concurrency" element={<ConcurrencyLimitsPage />} />
-          <Route path="/ratelimits" element={<RateLimitsPage />} />
-          <Route path="/sagas/:id" element={<SagaDetailPage />} />
-          <Route path="/sagas" element={<SagasListPage />} />
-          <Route path="/services/:name" element={<BackgroundServiceDetail />} />
-          <Route path="/services" element={<BackgroundServicesList />} />
-
-          {/* Extension pages */}
-          {extensionPages.map((page) => (
-            <Route
-              key={page.path}
-              path={page.path}
-              element={<ExtensionPage component={page.component} />}
-            />
-          ))}
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        {body()}
+        <Toaster position="bottom-right" richColors closeButton />
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
