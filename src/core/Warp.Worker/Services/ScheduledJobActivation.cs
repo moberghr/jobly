@@ -66,21 +66,21 @@ public sealed class ScheduledJobActivation<TContext> : IServerTask
             return (0, []);
         }
 
-        // Per-row JobLog "Activated" entry — atomic with the UPDATE via the xact-lock
+        // Per-row JobLog "Enqueued" entry — atomic with the UPDATE via the xact-lock
         // transaction that wraps ExecuteAsync (LocksWithTransaction defaults to true on
         // IServerTask; ServerTaskLoop.TryAcquireLockAndExecuteAsync calls
         // RunUnderTransactionLockAsync which commits both this SaveChanges and the UPDATE
         // above together). If this insert fails the outer commit also fails — operators
-        // never see "state=Enqueued with no Activated log row" in the dashboard.
+        // never see "state=Enqueued with no log row" in the dashboard.
         foreach (var entry in activated)
         {
             _context.Set<JobLog>().Add(new JobLog
             {
                 JobId = entry.Id,
-                EventType = "Activated",
+                EventType = "Enqueued",
                 Timestamp = now,
                 Level = "Information",
-                Message = "Activated from Scheduled — was scheduled at "
+                Message = "Enqueued from Scheduled — was scheduled at "
                     + entry.ScheduleTime.ToString("o", System.Globalization.CultureInfo.InvariantCulture),
             });
         }

@@ -222,7 +222,7 @@ public abstract class RateLimitTestsBase : IAsyncLifetime
 
         var log = await readCtx.Set<JobLog>()
             .Where(x => x.JobId == jobId)
-            .Where(x => x.EventType == "Requeued")
+            .Where(x => x.EventType == "Scheduled")
             .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
         log.ShouldNotBeNull();
         log.Message.ShouldContain("Throttled");
@@ -522,7 +522,7 @@ public abstract class RateLimitTestsBase : IAsyncLifetime
 
         var log = await readCtx.Set<JobLog>()
             .Where(x => x.JobId == jobId)
-            .Where(x => x.EventType == "Requeued")
+            .Where(x => x.EventType == "Scheduled")
             .FirstOrDefaultAsync(Xunit.TestContext.Current.CancellationToken);
         log.ShouldNotBeNull();
         log.Message.ShouldContain("lock contention");

@@ -27,6 +27,8 @@ public static class ServiceConfiguration
         Action<WarpBuilder<TContext>>? configure = null)
         where TContext : DbContext
     {
+        EnsureDbContextRegisteredAsScoped<TContext>(services);
+
         var builder = new WarpBuilder<TContext>(services);
         configure?.Invoke(builder);
 
@@ -48,6 +50,7 @@ public static class ServiceConfiguration
         services.TryAddSingleton(TimeProvider.System);
 
         WarpGeneratedHandlerRegistry.ApplyAll(services);
+        RemoveExcludedHandlerRegistrations(services);
 
         services.AddScoped<IPublisher>(x => new Publisher<TContext>(
             x.GetRequiredService<TContext>(),
@@ -96,6 +99,85 @@ public static class ServiceConfiguration
         // IWarpSqlQueries<TContext> is registered by the provider package (Warp.PostgreSql /
         // Warp.SqlServer) via their UsePostgreSql / UseSqlServer builder extensions.
         return services;
+    }
+
+    // Fails fast when TContext isn't registered as Scoped. The common cause is the user
+    // calling AddDbContextFactory<TContext> instead of AddDbContext<TContext>: the factory
+    // overload registers IDbContextFactory<TContext> but not TContext itself, so every
+    // scoped Warp service that takes TContext via constructor injection blows up at first
+    // resolve. Catching this at AddWarp time turns a silent runtime crash into a clear
+    // startup error with the fix in the message.
+    private static void EnsureDbContextRegisteredAsScoped<TContext>(IServiceCollection services)
+        where TContext : DbContext
+    {
+        var descriptor = services.LastOrDefault(d => d.ServiceType == typeof(TContext));
+        if (descriptor is null)
+        {
+            throw new InvalidOperationException(
+                $"AddWarp<{typeof(TContext).Name}>() requires {typeof(TContext).Name} to be registered " +
+                $"via services.AddDbContext<{typeof(TContext).Name}>(...). If you're using " +
+                $"AddDbContextFactory<{typeof(TContext).Name}>(...) (e.g. for Blazor / design-time tooling), " +
+                $"also call AddDbContext<{typeof(TContext).Name}>(...) so Warp's scoped services can resolve " +
+                "the context. For design-time tooling (dotnet ef migrations), the migrations host must " +
+                "use a real Host builder that calls AddDbContext — Warp's model customizer wires in via " +
+                $"DbContextOptions<{typeof(TContext).Name}>, which AddDbContextFactory does not expose to " +
+                "design-time tooling.");
+        }
+
+        if (descriptor.Lifetime != ServiceLifetime.Scoped)
+        {
+            throw new InvalidOperationException(
+                $"AddWarp<{typeof(TContext).Name}>() requires a Scoped {typeof(TContext).Name} registration; " +
+                $"got {descriptor.Lifetime}. AddDbContext<TContext>(...) registers Scoped by default — " +
+                "do not override the lifetime when using Warp.");
+        }
+    }
+
+    // Strips IRequestHandler / IJobHandler / IMessageHandler / IStreamRequestHandler
+    // registrations whose implementation type lives in an excluded assembly. Called once
+    // after WarpGeneratedHandlerRegistry.ApplyAll. No-op when no assemblies are excluded.
+    private static void RemoveExcludedHandlerRegistrations(IServiceCollection services)
+    {
+        var optionsDescriptor = services.LastOrDefault(d => d.ServiceType == typeof(IOptions<WarpConfiguration>));
+        if (optionsDescriptor?.ImplementationInstance is not IOptions<WarpConfiguration> optionsInstance)
+        {
+            return;
+        }
+
+        var excluded = optionsInstance.Value.ExcludedHandlerAssemblies;
+        if (excluded.Count == 0)
+        {
+            return;
+        }
+
+        for (var i = services.Count - 1; i >= 0; i--)
+        {
+            var descriptor = services[i];
+            if (!descriptor.ServiceType.IsGenericType)
+            {
+                continue;
+            }
+
+            var def = descriptor.ServiceType.GetGenericTypeDefinition();
+            if (def != typeof(Handlers.IRequestHandler<,>)
+                && def != typeof(Handlers.IJobHandler<>)
+                && def != typeof(Handlers.IMessageHandler<>)
+                && def != typeof(Handlers.IStreamRequestHandler<,>))
+            {
+                continue;
+            }
+
+            var implType = descriptor.ImplementationType;
+            if (implType is null)
+            {
+                continue;
+            }
+
+            if (excluded.Contains(implType.Assembly))
+            {
+                services.RemoveAt(i);
+            }
+        }
     }
 
     private static void ConfigureDbContextOptions<TContext>(IServiceCollection services)
@@ -318,7 +400,16 @@ public static class ServiceConfiguration
         jobLog.Property(p => p.Name).HasMaxLength(100);
         jobLog.Property(p => p.Value);
 
-        jobLog.HasIndex(p => p.JobId);
+        // Composite index serving two query shapes:
+        //   1. WHERE job_id = X — the by-job log listing on the detail page. Leading-column
+        //      scan on the composite covers this; no separate (job_id) index needed.
+        //   2. WHERE job_id = X AND event_type IN ('Completed','Failed','Deleted') ORDER BY
+        //      timestamp DESC — the correlated subquery in
+        //      JobQueryService.OrderByFinishedTimeDescending. Without the trailing columns
+        //      the planner would table-scan the per-job slice and filter+sort in memory,
+        //      which scales poorly for jobs with many log rows (handler logs, progress
+        //      reports, retries).
+        jobLog.HasIndex(p => new { p.JobId, p.EventType, p.Timestamp });
 
         jobLog.Metadata.SetSchema(schema);
     }

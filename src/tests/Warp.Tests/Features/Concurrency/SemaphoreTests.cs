@@ -205,7 +205,8 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
 
         var log = await readCtx.Set<JobLog>()
             .Where(x => x.JobId == jobId)
-            .Where(x => x.EventType == "Requeued")
+            .Where(x => x.EventType == "Enqueued")
+            .Where(x => x.Message.Contains("limit-5-wait"))
             .FirstOrDefaultAsync(CancellationToken.None);
         log.ShouldNotBeNull();
         log.Message.ShouldContain("Requeued");
@@ -414,7 +415,8 @@ public abstract class SemaphoreTestsBase : IAsyncLifetime
 
         var log = await readCtx.Set<JobLog>()
             .Where(x => x.JobId == jobId)
-            .Where(x => x.EventType == "Requeued")
+            .Where(x => x.EventType == "Enqueued")
+            .Where(x => x.Message.Contains("admin-restricts-key"))
             .FirstOrDefaultAsync(CancellationToken.None);
         log.ShouldNotBeNull();
         log.Message.ShouldContain("Requeued");

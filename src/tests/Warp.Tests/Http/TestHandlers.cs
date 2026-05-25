@@ -241,6 +241,19 @@ public sealed class AnonEchoHandler : IRequestHandler<AnonEcho, string>
     public Task<string> HandleAsync(AnonEcho request, CancellationToken cancellationToken) => Task.FromResult(request.GetType().Name);
 }
 
+// Custom-requirement policy — exercises IAuthorizationHandler<TRequirement> on a [WarpHttp*]
+// endpoint. The requirement validates a custom header against an expected value; the
+// authorization handler is the only thing that can grant access. Used by
+// CustomAuthorizationRequirementTests to confirm the colleague's §1.3 scenario works.
+public sealed record WebhookEcho : IRequest<string>;
+
+[Authorize(Policy = "WebhookPasswordPolicy")]
+[WarpHttpPost("/api/secure/webhook")]
+public sealed class WebhookEchoHandler : IRequestHandler<WebhookEcho, string>
+{
+    public Task<string> HandleAsync(WebhookEcho request, CancellationToken cancellationToken) => Task.FromResult("authorized");
+}
+
 // Stream endpoints with array binding via Minimal API.
 public sealed record NumbersStream([FromQuery] int Count) : IStreamRequest<int>;
 

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Shouldly;
@@ -9,6 +10,8 @@ namespace Warp.Tests.BackgroundServices;
 [Trait("Category", "NoDb")]
 public class WarpBackgroundServiceBuilderTests
 {
+    private const string DummyConnectionString = "Host=x;Database=x;Username=x;Password=x";
+
     private static WarpBuilder<TestContext> CreateBuilder()
     {
         var services = new ServiceCollection();
@@ -24,6 +27,7 @@ public class WarpBackgroundServiceBuilderTests
     public void AddWarp_RegistersBackgroundServiceQueryService_WithoutAddWarpWorker()
     {
         var services = new ServiceCollection();
+        services.AddDbContext<TestContext>(o => o.UseNpgsql(DummyConnectionString));
 
         services.AddWarp<TestContext>();
 
