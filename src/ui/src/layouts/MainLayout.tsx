@@ -20,6 +20,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
+import { useRealtimeInvalidation } from '@/hooks/useRealtimeInvalidation';
 import { useRealtimeStore } from '@/stores/realtime';
 import { startRealtimeFeed, stopRealtimeFeed } from '@/lib/realtimeFeed';
 import { config } from '@/config';
@@ -66,6 +67,11 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
   const [concurrencyAvailable, setConcurrencyAvailable] = useState(false);
   const [rateLimitsAvailable, setRateLimitsAvailable] = useState(false);
   const [sagasAvailable, setSagasAvailable] = useState(false);
+
+  // Bridge realtime hub events into React Query invalidation for any page that
+  // uses the useQuery-based hooks. Pages still on the older `useRealtimeRefetch`
+  // pattern keep working in parallel until they're migrated.
+  useRealtimeInvalidation();
 
   // Initial fetch for first paint — after this, fresh stats arrive directly via
   // the SignalR push payload on every JobFinalized / MessageEnqueued event (see

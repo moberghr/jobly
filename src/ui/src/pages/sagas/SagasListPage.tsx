@@ -1,59 +1,65 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import type { ColumnDef } from '@tanstack/react-table';
 import { Card, CardContent } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pagination } from '@/components/Pagination';
 import { RelativeTime } from '@/components/RelativeTime';
 import { LoadingState, ErrorState } from '@/components/PageState';
+import { DataTable } from '@/components/DataTable';
 import { usePersistedPageSize } from '@/hooks/usePersistedPageSize';
-import { useRefreshKey } from '@/hooks/useRefreshKey';
-import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
-import type { SagaListItem, SagaStats, PagedList } from '@/types';
-import * as api from '@/api';
+import { useSagasList, useSagaTypes, useSagaStats } from '@/api/hooks/useSagas';
+import type { SagaListItem } from '@/types';
 
 export default function SagasListPage() {
-  const [data, setData] = useState<PagedList<SagaListItem> | null>(null);
-  const [types, setTypes] = useState<string[]>([]);
-  const [stats, setStats] = useState<SagaStats | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [keyFilter, setKeyFilter] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
-  const [unavailable, setUnavailable] = useState(false);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = usePersistedPageSize();
-  const refreshKey = useRefreshKey();
 
-  const fetchAll = useCallback(async () => {
-    try {
-      const [list, typeList, statsData] = await Promise.all([
-        api.listSagas(page, pageSize, typeFilter || undefined, keyFilter || undefined),
-        api.getSagaTypes(),
-        api.getSagaStats(),
-      ]);
-      setData(list);
-      setTypes(typeList);
-      setStats(statsData);
-      setError(null);
-      setUnavailable(false);
-    } catch (e) {
-      if (axios.isAxiosError(e) && e.response?.status === 404) {
-        setUnavailable(true);
-        setError(null);
-        return;
-      }
-      setError('Unable to load sagas');
-    }
-  }, [page, pageSize, typeFilter, keyFilter]);
+  const list = useSagasList(page, pageSize, typeFilter || undefined, keyFilter || undefined);
+  const typesQuery = useSagaTypes();
+  const statsQuery = useSagaStats();
 
-  useEffect(() => {
-    fetchAll();
-  }, [refreshKey, fetchAll]);
+  const unavailable =
+    list.isError && axios.isAxiosError(list.error) && list.error.response?.status === 404;
 
-  // Live updates: saga lifecycle is driven by message arrivals (proxy commits inside
-  // SaveChanges, which emits MessageEnqueued for routed children and JobFinalized when
-  // those jobs settle). Either event indicates a saga may have changed.
-  useRealtimeRefetch(['JobFinalized', 'MessageEnqueued'], fetchAll);
+  const columns = useMemo<ColumnDef<SagaListItem>[]>(
+    () => [
+      {
+        accessorKey: 'type',
+        header: 'Type',
+        cell: ({ row }) => <span className="font-medium">{shortName(row.original.type)}</span>,
+      },
+      {
+        accessorKey: 'correlationKey',
+        header: 'Correlation key',
+        cell: ({ row }) => (
+          <Link to={`/sagas/${row.original.id}`} className="font-mono text-xs text-primary hover:underline">
+            {row.original.correlationKey}
+          </Link>
+        ),
+      },
+      {
+        accessorKey: 'updatedAt',
+        header: 'Updated',
+        cell: ({ row }) => (
+          <span className="text-sm">
+            <RelativeTime date={row.original.updatedAt} />
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'createdAt',
+        header: 'Created',
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            <RelativeTime date={row.original.createdAt} />
+          </span>
+        ),
+      },
+    ],
+    [],
+  );
 
   if (unavailable) {
     return (
@@ -68,8 +74,12 @@ export default function SagasListPage() {
     );
   }
 
-  if (error) return <ErrorState message={error} />;
-  if (!data) return <LoadingState />;
+  if (list.isError) return <ErrorState message="Unable to load sagas" />;
+  if (list.isLoading || !list.data) return <LoadingState />;
+
+  const data = list.data;
+  const types = typesQuery.data ?? [];
+  const stats = statsQuery.data;
 
   return (
     <div>
@@ -105,7 +115,11 @@ export default function SagasListPage() {
           onChange={(e) => { setTypeFilter(e.target.value); setPage(0); }}
         >
           <option value="">All types</option>
-          {types.map(t => <option key={t} value={t}>{shortName(t)}</option>)}
+          {types.map((t) => (
+            <option key={t} value={t}>
+              {shortName(t)}
+            </option>
+          ))}
         </select>
         <input
           type="text"
@@ -116,47 +130,21 @@ export default function SagasListPage() {
         />
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Type</TableHead>
-              <TableHead>Correlation key</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead>Created</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                  No sagas found
-                </TableCell>
-              </TableRow>
-            ) : (
-              data.items.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium">{shortName(s.type)}</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    <Link to={`/sagas/${s.id}`} className="text-primary hover:underline">
-                      {s.correlationKey}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-sm"><RelativeTime date={s.updatedAt} /></TableCell>
-                  <TableCell className="text-sm text-muted-foreground"><RelativeTime date={s.createdAt} /></TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <Pagination
-        page={page}
-        pageSize={pageSize}
-        pageCount={Math.ceil(data.totalCount / pageSize)}
-        onPageChange={setPage}
-        onPageSizeChange={(size) => { setPageSize(size); setPage(0); }}
+      <DataTable
+        columns={columns}
+        data={data.items}
+        emptyMessage="No sagas found"
+        getRowId={(row) => row.id}
+        pagination={{
+          page,
+          pageSize,
+          pageCount: Math.ceil(data.totalCount / pageSize),
+          onPageChange: setPage,
+          onPageSizeChange: (size) => {
+            setPageSize(size);
+            setPage(0);
+          },
+        }}
       />
     </div>
   );
@@ -164,5 +152,6 @@ export default function SagasListPage() {
 
 function shortName(assemblyQualifiedName: string): string {
   const typeName = assemblyQualifiedName.split(',')[0];
+
   return typeName.split('.').pop() ?? typeName;
 }

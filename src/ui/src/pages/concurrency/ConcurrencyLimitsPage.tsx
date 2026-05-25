@@ -1,51 +1,32 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadingState, ErrorState } from '@/components/PageState';
 import { RelativeTime } from '@/components/RelativeTime';
-import { useRefreshKey } from '@/hooks/useRefreshKey';
+import {
+  useConcurrencyLimits,
+  useUpsertConcurrencyLimit,
+  useDeleteConcurrencyLimit,
+} from '@/api/hooks/useConcurrencyLimits';
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 import type { ConcurrencyLimitInfo } from '@/types';
-import * as api from '@/api';
 
 type ConfirmDelete = { name: string } | null;
 
 export default function ConcurrencyLimitsPage() {
-  const [limits, setLimits] = useState<ConcurrencyLimitInfo[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [unavailable, setUnavailable] = useState(false);
+  const { data: limits, isLoading, isError, error } = useConcurrencyLimits();
+  const upsert = useUpsertConcurrencyLimit();
+  const remove = useDeleteConcurrencyLimit();
+
   const [editingName, setEditingName] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [editError, setEditError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDelete>(null);
-  const refreshKey = useRefreshKey();
 
-  const fetchAll = useCallback(async () => {
-    try {
-      const result = await api.listConcurrencyLimits();
-      setLimits(result);
-      setError(null);
-      setUnavailable(false);
-    } catch (e) {
-      if (axios.isAxiosError(e) && e.response?.status === 404) {
-        setUnavailable(true);
-        setLimits([]);
-        setError(null);
-
-        return;
-      }
-      setError('Unable to load concurrency limits');
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAll();
-    const id = setInterval(fetchAll, 5000);
-    return () => clearInterval(id);
-  }, [refreshKey, fetchAll]);
+  const unavailable = isError && axios.isAxiosError(error) && error.response?.status === 404;
 
   const startEdit = (limit: ConcurrencyLimitInfo) => {
     setEditingName(limit.name);
@@ -59,46 +40,42 @@ export default function ConcurrencyLimitsPage() {
     setEditError(null);
   };
 
-  const saveEdit = async (name: string) => {
+  const saveEdit = (name: string) => {
     const parsed = Number(editValue);
     if (!Number.isInteger(parsed) || parsed < 1) {
       setEditError('Limit must be a positive integer');
 
       return;
     }
-    try {
-      await api.upsertConcurrencyLimit(name, parsed);
-      cancelEdit();
-      await fetchAll();
-    } catch {
-      setEditError('Failed to save');
-    }
-  };
-
-  const handleDelete = async (name: string) => {
-    try {
-      await api.deleteConcurrencyLimit(name);
-      setConfirmDelete(null);
-      await fetchAll();
-    } catch {
-      setError('Failed to delete limit');
-    }
-  };
-
-  if (error) return <ErrorState message={error} />;
-  if (!limits) return <LoadingState />;
-
-  if (unavailable) {
-    return (
-      <div>
-        <h1 className="text-2xl font-bold mb-2">Concurrency Limits</h1>
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Concurrency limits addon not registered. Add <code className="font-mono">opt.AddConcurrency()</code> to enable.
-          </CardContent>
-        </Card>
-      </div>
+    upsert.mutate(
+      { name, limit: parsed },
+      {
+        onSuccess: () => cancelEdit(),
+        onError: () => setEditError('Failed to save'),
+      },
     );
+  };
+
+  const handleDelete = (name: string) => {
+    remove.mutate(name, { onSuccess: () => setConfirmDelete(null) });
+  };
+
+  if (isError && !unavailable) return <ErrorState message="Unable to load concurrency limits" />;
+  if (isLoading || !limits) {
+    if (unavailable) {
+      return (
+        <div>
+          <h1 className="text-2xl font-bold mb-2">Concurrency Limits</h1>
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              Concurrency limits addon not registered. Add <code className="font-mono">opt.AddConcurrency()</code> to enable.
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    return <LoadingState />;
   }
 
   const sorted = [...limits].sort((a, b) => a.name.localeCompare(b.name));
@@ -214,10 +191,7 @@ export default function ConcurrencyLimitsPage() {
       {showAdd && (
         <AddLimitModal
           onClose={() => setShowAdd(false)}
-          onSaved={() => {
-            setShowAdd(false);
-            fetchAll();
-          }}
+          onSaved={() => setShowAdd(false)}
           existingNames={new Set(limits.map((x) => x.name))}
         />
       )}
@@ -278,12 +252,12 @@ function AddLimitModal({
   onSaved: () => void;
   existingNames: Set<string>;
 }) {
+  const upsert = useUpsertConcurrencyLimit();
   const [name, setName] = useState('');
   const [limit, setLimit] = useState('5');
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -305,15 +279,13 @@ function AddLimitModal({
       return;
     }
 
-    setSaving(true);
-    try {
-      await api.upsertConcurrencyLimit(trimmed, parsed);
-      onSaved();
-    } catch {
-      setError('Failed to save');
-    } finally {
-      setSaving(false);
-    }
+    upsert.mutate(
+      { name: trimmed, limit: parsed },
+      {
+        onSuccess: () => onSaved(),
+        onError: () => setError('Failed to save'),
+      },
+    );
   };
 
   return (
@@ -343,11 +315,11 @@ function AddLimitModal({
         </div>
         {error && <div className="text-sm text-destructive">{error}</div>}
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={upsert.isPending}>
             Cancel
           </Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
+          <Button type="submit" disabled={upsert.isPending}>
+            {upsert.isPending ? 'Saving...' : 'Save'}
           </Button>
         </div>
       </form>
