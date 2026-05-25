@@ -4,9 +4,11 @@ sidebar_position: 6
 
 # Releases
 
-## 0.16.0 (unreleased)
+## 0.16.0
 
-`WarpBackgroundService` is now a base part of Warp instead of an opt-in addon, plus automatic cleanup of orphaned service definitions. Message routing is rewritten around an atomic batch-claim + single-transaction commit, and bare workers now wake on local in-process enqueues without needing `UseDatabasePush()`.
+*2026-05-25*
+
+`WarpBackgroundService` is now a base part of Warp instead of an opt-in addon, plus automatic cleanup of orphaned service definitions. Message routing is rewritten around an atomic batch-claim + single-transaction commit, and bare workers now wake on local in-process enqueues without needing `UseDatabasePush()`. Activation and routing pickup are now per-row audited in `JobLog`, the dashboard surfaces toast notifications and an error boundary, and a long-standing saga serialization hang on SQL Server is fixed.
 
 ### Feature: bare workers wake on local in-process enqueues
 
@@ -29,6 +31,17 @@ The router now does:
 All three steps run inside one explicit transaction opened in `MessageRouter.ExecuteAsync`, so a process crash anywhere mid-batch rolls everything back: messages stay `Enqueued` and the next router tick re-routes them. The new `IWarpSqlQueries<TContext>.ClaimEnqueuedMessagesAsync` replaces `LockNextEnqueuedMessageAsync` — provider implementations are required to update.
 
 `WarpWorkerConfiguration.ServerTaskBatchSize` default is raised from `100 → 1000` to take advantage of the per-batch commit. The trade-off is multi-server fairness: a router server now holds the routing advisory lock ~10× longer per iteration (still bounded — a few hundred milliseconds in practice). Tune down if you run many routing servers against the same DB and observe one server monopolising work.
+
+### Feature: per-row `Activated` and `Routed` `JobLog` entries
+
+`ScheduledJobActivation` previously flipped `Scheduled → Enqueued` in one bulk `UPDATE` with no per-row audit — operators reading the dashboard saw "Requeued at X" then "Processing at Y" with a one-second gap and nothing between them. `MessageRouter` had the same shape: children got a `Created` log entry on routing, but the parent `Message` row got nothing, so per-row routing latency was invisible.
+
+Both paths now write one `JobLog` per affected row, committed atomically with the state flip:
+
+- **`Activated`** — written by `ScheduledJobActivation` for every job that transitions `Scheduled → Enqueued`. Message records the previous `ScheduleTime`.
+- **`Routed`** — written by `MessageRouter` for every successfully-routed message, recording the handler count (`"Routed to N handler(s)"`). Failure paths (unknown message type, no registered handlers) intentionally skip this log; those paths still write their existing `Failed` entry.
+
+`IWarpSqlQueries<TContext>.ActivateScheduledJobsAsync` now returns `(Id, Queue, ScheduleTime)` instead of just `Queue` so the caller can materialize one `Activated` log per row — both shipped providers are updated, custom provider implementations need to project the two additional columns.
 
 ### Breaking: `ServerTaskSignal` enum values renumbered
 
@@ -84,6 +97,26 @@ The `Services` flag was removed from `GET /api/addons`; the dashboard nav entry 
 ### Worker heartbeat: BG-service CTEs run unconditionally
 
 The provider-package heartbeat SQL (`HeartbeatAsync`) previously branched on whether the addon was registered. Both branches collapsed to the BG-service-aware variant — two extra `UPDATE` statements piggyback on every heartbeat round-trip. For deployments with no registered service the UPDATEs target empty tables and are no-ops; no measurable perf change. The `else` branch (lighter SQL) is removed along with the `HasBackgroundServiceTables` flag.
+
+### Fixed: saga serialization could hang for 20s on SQL Server under contention
+
+`SagaHandlerProxy` and `SagaCommandService` used `IWarpSemaphoreProvider` with `maxCount = 1` — semantically a mutex, but routed through Medallion's `SqlDistributedSemaphore` row-based protocol. Under SQL Server's lock-based MVCC, that protocol's `TryAcquireAsync(TimeSpan.Zero)` did not reliably fast-fail when another transaction held the semaphore-state row: subsequent contenders blocked on the configuration row lock for the full operation budget instead of returning `null` immediately.
+
+Both call sites now use `IWarpLockProvider`, which wraps Medallion's `SqlDistributedLock` (`sp_getapplock` on SQL Server, `pg_try_advisory_lock` on Postgres). Native distributed locks with timeout zero reliably fast-fail without taking row locks, so busy-saga contenders now requeue with a jittered `Busy` outcome (§8.17) in single-digit milliseconds rather than wedging for ~20s. Both sites had to switch together because they share the same lock name (`warp:saga:{type}:{key}`); `AddSagas` registration now validates that `IWarpLockProvider` is present instead of `IWarpSemaphoreProvider`. Both provider packages already register both primitives, so no provider-side change is required.
+
+### Dashboard: toast notifications, error boundary, and per-domain hooks
+
+The dashboard's mutation surfaces — job requeue/delete, bulk job operations, recurring-job actions, server pause/resume, concurrency/rate-limit upserts — previously either failed silently or showed ad-hoc inline UI on failure. Every mutation now flows through a centralized hook layer that emits a `sonner` toast on success and on error, so an operator who clicks "Requeue" on the dashboard reliably sees what happened.
+
+A hand-rolled `<ErrorBoundary>` (no extra dependency) now wraps the app — a crashed page no longer takes the whole dashboard with it.
+
+Internally, the ten list pages (Jobs, Messages, Batches, Recurring, Servers, Sagas, Counters, Concurrency Limits, Rate Limits, Background Services) are migrated to `@tanstack/react-query` with a single `QueryClient`, per-domain `useX` hooks, and a single `useRealtimeInvalidation` bridge that routes SignalR hub events into cache invalidation — replacing the per-page `useState + useEffect + axios + useRefreshKey + useRealtimeRefetch` pattern. Tabular pages share a new `<DataTable>` built on `@tanstack/react-table` for consistent pagination, empty/loading/error states, and column metadata. Detail pages are intentionally left on the legacy pattern for a follow-up; `useRefreshKey` and `useRealtimeRefetch` remain in place to support them. No design changes.
+
+Bundle size grows from ~470 kB gzip to ~487 kB gzip (~17 kB for `react-query` + `react-table` + `sonner`). Build remains analyzer-clean.
+
+### Demo mode: clock is now pinned for deterministic screenshots
+
+`npm run dev -- --mode demo` now pins `Date.now()` to `2026-05-25 11:00 UTC` before the demo module loads, and `formatRelativeTime` uses `Date.now()` as the "now" baseline. The result is that "X ago" labels in demo mode are stable across runs, and `npm run screenshots` is now deterministic enough to use as a visual-regression check — untouched pages diff at 0 px, migrated pages at \<0.2% pure subpixel noise. The screenshot baselines under `website/static/img/screenshots/` are regenerated against the pinned clock and the new dashboard pages.
 
 ## 0.15.3
 
