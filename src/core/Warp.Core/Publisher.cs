@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Warp.Core.Data.Entities;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
+using Warp.Core.Events;
 using Warp.Core.Handlers;
 using Warp.Core.Helper;
 using Warp.Core.Logging;
@@ -60,13 +61,15 @@ public class Publisher<TContext> : IPublisher
     private readonly TimeProvider _timeProvider;
     private readonly IServiceProvider _serviceProvider;
     private readonly IWarpNotificationTransport _notificationTransport;
+    private readonly ServerTaskSignals<TContext> _signals;
 
-    public Publisher(TContext context, TimeProvider timeProvider, IServiceProvider serviceProvider, IWarpNotificationTransport? notificationTransport = null)
+    public Publisher(TContext context, TimeProvider timeProvider, IServiceProvider serviceProvider, IWarpNotificationTransport notificationTransport, ServerTaskSignals<TContext> signals)
     {
         _context = context;
         _timeProvider = timeProvider;
         _serviceProvider = serviceProvider;
-        _notificationTransport = notificationTransport ?? new NullNotificationTransport();
+        _notificationTransport = notificationTransport;
+        _signals = signals;
     }
 
     // --- IMessage: create Message-kind Job ---
@@ -278,7 +281,7 @@ public class Publisher<TContext> : IPublisher
     {
         var pending = NotificationDispatch.CapturePending(_context);
         await _context.SaveChangesAsync(cancellationToken);
-        await NotificationDispatch.FireAsync(_notificationTransport, pending, cancellationToken);
+        await NotificationDispatch.DispatchAsync(pending, _signals, _notificationTransport, cancellationToken);
     }
 
     private async Task<PublishContext<T>> RunPublishPipeline<T>(T job, Dictionary<string, object>? seed, CancellationToken ct)

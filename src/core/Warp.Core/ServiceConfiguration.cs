@@ -10,6 +10,7 @@ using Warp.Core.BackgroundServices;
 using Warp.Core.Data.Entities;
 using Warp.Core.Data.Queries;
 using Warp.Core.Entities;
+using Warp.Core.Events;
 using Warp.Core.Handlers;
 using Warp.Core.Interceptors;
 using Warp.Core.Notifications;
@@ -52,16 +53,17 @@ public static class ServiceConfiguration
             x.GetRequiredService<TContext>(),
             x.GetRequiredService<TimeProvider>(),
             x,
-            x.GetRequiredService<IWarpNotificationTransport>()));
+            x.GetRequiredService<IWarpNotificationTransport>(),
+            x.GetRequiredService<ServerTaskSignals<TContext>>()));
 
         services.AddScoped<IMediator>(x => new Mediator(x));
 
         services.AddScoped<IRecurringJobPublisher>(x =>
             new RecurringJobPublisher<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IWarpLockProvider>()));
         services.AddScoped<IJobQueryService>(x => new JobQueryService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
-        services.AddScoped<IJobCommandService>(x => new JobCommandService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IOptions<WarpConfiguration>>(), x.GetRequiredService<IWarpNotificationTransport>(), x.GetRequiredService<IWarpSqlQueries<TContext>>()));
+        services.AddScoped<IJobCommandService>(x => new JobCommandService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IOptions<WarpConfiguration>>(), x.GetRequiredService<IWarpNotificationTransport>(), x.GetRequiredService<IWarpSqlQueries<TContext>>(), x.GetRequiredService<ServerTaskSignals<TContext>>()));
         services.AddScoped<IJobGroupQueryService>(x => new JobGroupQueryService<TContext>(x.GetRequiredService<TContext>()));
-        services.AddScoped<IRecurringJobService>(x => new RecurringJobService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IWarpNotificationTransport>()));
+        services.AddScoped<IRecurringJobService>(x => new RecurringJobService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>(), x.GetRequiredService<IWarpNotificationTransport>(), x.GetRequiredService<ServerTaskSignals<TContext>>()));
         services.AddScoped<IDashboardStatsService>(x => new DashboardStatsService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
         services.AddScoped<IServerCommandService>(x => new ServerCommandService<TContext>(x.GetRequiredService<TContext>(), x.GetRequiredService<TimeProvider>()));
         services.AddScoped<IBatchPublisher>(x => new BatchPublisher<TContext>(
@@ -69,7 +71,8 @@ public static class ServiceConfiguration
             x.GetRequiredService<IOptions<WarpConfiguration>>(),
             x.GetRequiredService<TimeProvider>(),
             x,
-            x.GetRequiredService<IWarpNotificationTransport>()));
+            x.GetRequiredService<IWarpNotificationTransport>(),
+            x.GetRequiredService<ServerTaskSignals<TContext>>()));
 
         services.AddScoped<JobContext>();
         services.AddScoped<IJobContext>(x => x.GetRequiredService<JobContext>());
@@ -82,6 +85,13 @@ public static class ServiceConfiguration
         // Default no-op transport. opt.UseDatabasePush() (inside the AddWarp/AddWarpWorker lambda) replaces this with a
         // provider-specific implementation (Postgres LISTEN/NOTIFY or SQL Server Service Broker).
         services.TryAddSingleton<IWarpNotificationTransport, NullNotificationTransport>();
+
+        // In-process signal bus. Registered here (not in AddWarpWorker) so Core-side publishers
+        // — IPublisher, IBatchPublisher, IJobCommandService, IRecurringJobService, SagaStore —
+        // can inject it from publish-only processes that never call AddWarpWorker. Worker-side
+        // server-task loops and the dashboard broadcaster subscribe to its channels at host
+        // construction; with no subscribers the SignalXxx calls are cheap no-ops.
+        services.TryAddSingleton<ServerTaskSignals<TContext>>();
 
         // IWarpSqlQueries<TContext> is registered by the provider package (Warp.PostgreSql /
         // Warp.SqlServer) via their UsePostgreSql / UseSqlServer builder extensions.

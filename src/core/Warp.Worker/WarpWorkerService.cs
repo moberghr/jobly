@@ -181,7 +181,7 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
             var handlerContext = handlerScope.ServiceProvider.GetRequiredService<TContext>();
             var handlerPending = NotificationDispatch.CapturePending(handlerContext);
             await handlerContext.SaveChangesAsync(default);
-            await NotificationDispatch.FireAsync(_notificationTransport, handlerPending, cancellationToken);
+            await NotificationDispatch.DispatchAsync(handlerPending, _signals, _notificationTransport, cancellationToken);
 
             // Read metadata and outcome from handler scope before disposing
             job.Metadata = JsonSerializer.Serialize(jobContext.Metadata);
@@ -386,6 +386,9 @@ public class WarpWorkerService<TContext> : IWarpWorkerService
             JobExecutionContext.Current = null;
         }
 
+        // SignalJobFinalized fires the in-process signal; the transport publish covers
+        // cross-process subscribers (other servers' Orchestrator instances, dashboard hub).
+        // DispatchAsync would double-fire the local signal — handled here separately.
         _signals.SignalJobFinalized();
         await NotificationDispatch.FireAsync(
             _notificationTransport,

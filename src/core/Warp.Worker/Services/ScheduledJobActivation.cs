@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Warp.Core.Data.Queries;
 using Warp.Core.Entities;
 using Warp.Core.Enums;
+using Warp.Core.Events;
 using Warp.Core.Notifications;
 
 namespace Warp.Worker.Services;
@@ -20,19 +21,22 @@ public sealed class ScheduledJobActivation<TContext> : IServerTask
     private readonly IWarpNotificationTransport _transport;
     private readonly WarpWorkerConfiguration _configuration;
     private readonly IWarpSqlQueries<TContext> _sqlQueries;
+    private readonly ServerTaskSignals<TContext> _signals;
 
     public ScheduledJobActivation(
         TContext context,
         TimeProvider time,
         IWarpNotificationTransport transport,
         IOptions<WarpWorkerConfiguration> configuration,
-        IWarpSqlQueries<TContext> sqlQueries)
+        IWarpSqlQueries<TContext> sqlQueries,
+        ServerTaskSignals<TContext> signals)
     {
         _context = context;
         _time = time;
         _transport = transport;
         _configuration = configuration.Value;
         _sqlQueries = sqlQueries;
+        _signals = signals;
     }
 
     public string Name => "ScheduledJobActivation";
@@ -64,7 +68,7 @@ public sealed class ScheduledJobActivation<TContext> : IServerTask
 
         var distinctQueues = new HashSet<string>(activatedQueues, StringComparer.Ordinal).ToList();
         var notifications = distinctQueues.ConvertAll(q => new Notification(NotificationKind.JobEnqueued, q));
-        await NotificationDispatch.FireAsync(_transport, notifications, ct);
+        await NotificationDispatch.DispatchAsync(notifications, _signals, _transport, ct);
 
         return (activatedQueues.Count, distinctQueues);
     }

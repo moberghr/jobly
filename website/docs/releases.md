@@ -6,7 +6,52 @@ sidebar_position: 6
 
 ## 0.16.0 (unreleased)
 
-`WarpBackgroundService` is now a base part of Warp instead of an opt-in addon, plus automatic cleanup of orphaned service definitions.
+`WarpBackgroundService` is now a base part of Warp instead of an opt-in addon, plus automatic cleanup of orphaned service definitions. Message routing is rewritten around an atomic batch-claim + single-transaction commit, and bare workers now wake on local in-process enqueues without needing `UseDatabasePush()`.
+
+### Feature: bare workers wake on local in-process enqueues
+
+`WarpWorker` (non-dispatcher mode) used to sit on its exponential-backoff sleep — up to `MaxPollingInterval` (30s default, 5 min with push enabled) — between empty polls, missing in-process enqueues from `Publisher.Publish`, `MessageRouter` routing, `ScheduledJobActivation`, and handler outboxes on the same server.
+
+Each `WarpWorker` now subscribes to a new `ServerTaskSignal.JobEnqueued` channel on `ServerTaskSignals<TContext>`. Anywhere a `Kind=Job` row commits in `Enqueued`, the local signal fires; the worker bypasses its backoff and re-polls immediately. The behaviour is independent of `UseDatabasePush()` — push remains the cross-process / cross-server wake mechanism, but same-process wakes no longer round-trip through the DB. When push is enabled, the listener fires the same signal on incoming notifications, so multi-server deployments converge on the same wake-up path.
+
+No configuration changes are required to opt in. Tuning `MaxPollingInterval` to the long end (the default 30s, or 5min with push) is now safe — that ceiling is only ever reached when there is genuinely no work, and signal wake-up shortcuts it the moment new work appears.
+
+### Feature: `MessageRouter` batch-claim + atomic transaction
+
+`MessageRouter` previously locked one message row at a time and called `SaveChangesAsync` once per message inside the for-loop. With `ServerTaskBatchSize = 100` and ~10ms commit latency, the steady-state ceiling was around 100 messages/s per routing server.
+
+The router now does:
+
+1. One atomic `ClaimEnqueuedMessagesAsync(N)` round-trip — `UPDATE ... RETURNING` (PG) / CTE + `UPDATE ... OUTPUT INSERTED.*` (SQL Server) — flips up to `N` rows from `Enqueued → Processing` and streams them back as tracked entities.
+2. Handler discovery + child-job creation in-memory across all claimed messages.
+3. One `SaveChangesAsync` + commit at the end of the iteration.
+
+All three steps run inside one explicit transaction opened in `MessageRouter.ExecuteAsync`, so a process crash anywhere mid-batch rolls everything back: messages stay `Enqueued` and the next router tick re-routes them. The new `IWarpSqlQueries<TContext>.ClaimEnqueuedMessagesAsync` replaces `LockNextEnqueuedMessageAsync` — provider implementations are required to update.
+
+`WarpWorkerConfiguration.ServerTaskBatchSize` default is raised from `100 → 1000` to take advantage of the per-batch commit. The trade-off is multi-server fairness: a router server now holds the routing advisory lock ~10× longer per iteration (still bounded — a few hundred milliseconds in practice). Tune down if you run many routing servers against the same DB and observe one server monopolising work.
+
+### Breaking: `ServerTaskSignal` enum values renumbered
+
+`ServerTaskSignal` previously used implicit values (`JobFinalized = 0, MessageEnqueued = 1`). Project guideline §8.11 ("Enums always start at 1") plus the new `JobEnqueued` member made this the right moment to fix that pre-existing violation:
+
+```csharp
+// 0.15.x (implicit)
+JobFinalized = 0
+MessageEnqueued = 1
+
+// 0.16.0 (explicit)
+JobFinalized = 1
+MessageEnqueued = 2
+JobEnqueued = 3   // new
+```
+
+In-process the values are routing tokens only — not persisted to the DB and not exposed over the wire — so the rename is transparent for the vast majority of consumers. The exception is callers that **serialize** `ServerTaskSignal` values as integers (config files, custom event payloads, JSON dumps): those need to be re-saved under the new mapping. Code that uses the named members (`ServerTaskSignal.JobFinalized`, `.MessageEnqueued`) is unaffected.
+
+### Breaking: public constructor surface for Core publishers
+
+`Publisher<TContext>`, `BatchPublisher<TContext>`, `JobCommandService<TContext>`, `RecurringJobService<TContext>`, and `SagaStore<TContext>` (plus worker-side `MessageRouter<TContext>`, `ScheduledJobActivation<TContext>`, `WarpWorker<TContext>`) gain a required `ServerTaskSignals<TContext>` constructor parameter. Users who let DI resolve these via `IPublisher` / `IBatchPublisher` / `IJobCommandService` / etc. see no change — the registration is updated and the new dependency is available from `AddWarp`. Code that hand-rolls these types via `new` (subclassing, direct test instantiation) needs to pass `serviceProvider.GetRequiredService<ServerTaskSignals<TContext>>()` (or `new ServerTaskSignals<TContext>()` for a no-op in tests).
+
+`Publisher` / `BatchPublisher`'s previously-optional `IWarpNotificationTransport? notificationTransport = null` parameter is also now required (no implicit `NullNotificationTransport` fallback) — pass `serviceProvider.GetRequiredService<IWarpNotificationTransport>()` or an explicit instance.
 
 ### Breaking: `AddBackgroundService<TContext, T>()` → `AddBackgroundService<T>()`
 
