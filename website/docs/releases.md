@@ -4,6 +4,35 @@ sidebar_position: 6
 
 # Releases
 
+## 0.17.1
+
+*2026-05-26*
+
+UI polish on top of 0.17.0. No API changes, no schema changes — just dashboard ergonomics.
+
+### Fix: history-panel error rows render red end-to-end
+
+The job-detail history panel previously colored only `EventType = "Failed"` rows red. Rows like a `Deleted` event with an attached `TimeoutException` (e.g., `TimeoutMode = Delete` capturing the timeout reason) showed a neutral card with just the inner stack-trace `<pre>` block painted red — visually confused.
+
+The color rule now keys off `event.exception`: any history row carrying an exception payload paints the whole card red (border, background, header text). Rows without an exception fall back to the event-type-based color map. `Failed` events without an exception (a pipeline behavior that short-circuits via `Outcome.State = Failed` with no exception attached) still render red as a fallback.
+
+### Fix: dashboard content centered on wide displays
+
+`MainLayout`'s main content area previously had no max-width constraint — on 1920px+ displays the cards floated against the left edge with empty whitespace on the right. The `<Outlet/>` is now wrapped in `max-w-screen-2xl mx-auto` (1536px, matching the convention most modern admin dashboards converge on). Section sidebars (Jobs / Batches / Messages) stay outside the wrapper so they continue to hug the viewport edge.
+
+### Feature: collapse/expand toggle on Payload and Metadata blocks
+
+Job-detail Payload and Metadata blocks have a clamped height (`max-h-40`, ~160px) with overflow-scroll for big JSON documents. Useful for keeping the page navigable, but reading a multi-line metadata dict required scrolling inside a 160-pixel window.
+
+Both blocks now have a small "Expand" toggle next to the heading that removes the clamp and switches the `<pre>` to `whitespace-pre-wrap` so the full content reads inline. "Collapse" puts it back. Default state is unchanged from 0.17.0 (clamped).
+
+### Internal
+
+- Marketing screenshot pipeline bumped from 1280×800 to 1920×1080 viewport with full-page capture on every entry — the recurring page's Actions column, list-page right-side controls, and job/batch detail pages were being horizontally / vertically cropped. New `22-message-detail.png` entry was missing from the suite.
+- Demo `/addons` adapter reports the addon-conditional nav items (Concurrency, Rate Limits, Sagas) as off so the top nav stays compact in marketing screenshots. The dedicated pages still render via direct URL — only the nav links are suppressed.
+
+---
+
 ## 0.17.0
 
 *2026-05-25*
