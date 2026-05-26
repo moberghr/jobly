@@ -250,7 +250,14 @@ export default function MainLayout({ extensions = [] }: { extensions?: Extension
         {isMessagesSection && <MessagesSidebar stats={stats} />}
 
         <main className="flex-1 p-6">
-          <Outlet />
+          {/* Max-width + center so dashboard content is readable on ultra-wide displays
+              without the cards floating off to the left of empty whitespace. 1536px
+              (Tailwind's max-w-screen-2xl) matches what most modern admin dashboards
+              converge on. Section sidebars live outside this wrapper so they hug the
+              viewport edge. */}
+          <div className="max-w-screen-2xl mx-auto">
+            <Outlet />
+          </div>
         </main>
       </div>
 

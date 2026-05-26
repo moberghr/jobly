@@ -16,22 +16,32 @@ import * as api from '@/api';
 
 type DetailPendingAction = 'cancel' | 'requeue' | 'delete';
 
-// Color rules for the history panel: Failed always red, Completed always green, every
-// other event type renders neutral. This is intentional — do NOT add entries here for
-// new event types like Scheduled / Enqueued / Processing / Requeued / Created. Most
-// events don't carry meaning that benefits from a dedicated color, and a fully-painted
-// timeline becomes harder to scan than one that highlights only "this finished" /
-// "this broke". The exception payload's dedicated red <pre> block (below) continues to
-// show exception detail on Failed rows regardless of this map.
+// Color rules for the history panel: any event carrying an exception payload renders
+// red (whole card, not just the inner <pre>), Completed renders green, everything else
+// neutral. Do NOT add per-event-type entries to this map for non-error variants —
+// Scheduled / Enqueued / Processing / Requeued / Created etc. should stay neutral so a
+// timeline highlights only "this finished" / "this broke" rather than painting every
+// row. Driving the red branch off `event.exception` instead of `eventType === "Failed"`
+// catches edge cases like a Deleted row with a captured TimeoutException — anywhere a
+// stack trace is attached, the card should look like an error at a glance.
 const neutralRowClasses = {
   border: 'border-l-border',
   bg: 'bg-transparent',
   text: 'text-foreground',
 };
 
+const errorRowClasses = {
+  border: 'border-l-red-500',
+  bg: 'bg-red-50 dark:bg-red-950/30',
+  text: 'text-red-700 dark:text-red-400',
+};
+
+// Failed is kept in the map as a fallback for the (uncommon) case where a pipeline
+// behavior short-circuits state to Failed via Outcome.State = Failed without an
+// attached exception — the row still represents a failure and should look like one.
 const eventColors: Record<string, { border: string; bg: string; text: string }> = {
   Completed: { border: 'border-l-green-500', bg: 'bg-green-50 dark:bg-green-950/30', text: 'text-green-700 dark:text-green-400' },
-  Failed:    { border: 'border-l-red-500',   bg: 'bg-red-50 dark:bg-red-950/30',     text: 'text-red-700 dark:text-red-400' },
+  Failed:    errorRowClasses,
 };
 
 function formatDuration(ms: number): string {
@@ -55,6 +65,34 @@ function getDuration(logs: JobLogModel[], currentIndex: number): string | null {
 function formatJson(raw: string): string {
   try { return JSON.stringify(JSON.parse(raw), null, 2); }
   catch { return raw; }
+}
+
+// Payload/metadata blocks default to a clamped height (160px) with overflow scroll so a
+// huge JSON document doesn't push the rest of the detail page off-screen. An "Expand"
+// toggle removes the clamp for users who want to read the whole thing inline.
+function ExpandableJsonBlock({ heading, content }: { heading: string; content: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold">{heading}</h3>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          {expanded ? 'Collapse' : 'Expand'}
+        </button>
+      </div>
+      <pre
+        className={`text-xs bg-muted p-3 rounded-md ${
+          expanded ? 'whitespace-pre-wrap break-all' : 'overflow-auto max-h-40'
+        }`}
+      >
+        {content}
+      </pre>
+    </div>
+  );
 }
 
 function kindLabel(kind: number) {
@@ -167,16 +205,10 @@ export default function DetailPage() {
               <Card>
                 <CardContent className="pt-4 space-y-4">
                   {job.message && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2">Payload</h3>
-                      <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">{formatJson(job.message)}</pre>
-                    </div>
+                    <ExpandableJsonBlock heading="Payload" content={formatJson(job.message)} />
                   )}
                   {job.metadata && Object.keys(job.metadata).length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2">Metadata</h3>
-                      <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">{JSON.stringify(job.metadata, null, 2)}</pre>
-                    </div>
+                    <ExpandableJsonBlock heading="Metadata" content={JSON.stringify(job.metadata, null, 2)} />
                   )}
                 </CardContent>
               </Card>
@@ -246,7 +278,9 @@ export default function DetailPage() {
               <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3">History</h2>
               <div className="space-y-3">
                 {systemEvents.map((event, index) => {
-                  const colors = eventColors[event.eventType] ?? neutralRowClasses;
+                  const colors = event.exception
+                    ? errorRowClasses
+                    : (eventColors[event.eventType] ?? neutralRowClasses);
                   const duration = getDuration(systemEvents, index);
                   return (
                     <div key={event.id} className={`border-l-4 ${colors.border} ${colors.bg} rounded-r-md p-4`}>
