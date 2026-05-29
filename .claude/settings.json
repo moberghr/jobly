@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet format:*)"
+    ],
+    "deny": [
+      "Read(**/appsettings.Production.json)",
+      "Bash(dotnet publish:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash $CLAUDE_PLUGIN_ROOT/hooks/format-on-edit.sh" }
+        ]
+      }
+    ]
+  }
+}

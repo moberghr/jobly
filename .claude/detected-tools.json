@@ -1,0 +1,9 @@
+{
+  "stack": "dotnet",
+  "framework": ["aspnetcore", "source-generator"],
+  "data_layer": ["efcore", "raw-sql", "postgresql", "sqlserver"],
+  "test_framework": ["xunit", "testcontainers"],
+  "package_manager": "nuget",
+  "deployment": ["self-hosted", "docker"],
+  "additional": ["mediator-pattern", "signalr", "cronos", "distributedlock", "efcore-namingconventions", "stylecop", "roslynator", "sonaranalyzer", "meziantou", "moq", "shouldly", "respawn", "react", "vite", "tailwind", "tanstack-query"]
+}
